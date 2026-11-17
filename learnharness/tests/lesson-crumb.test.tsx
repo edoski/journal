@@ -17,14 +17,14 @@ describe("the lesson's top bar (2 m8, 3 m7)", () => {
 	it("ends on the topic as a link when the lesson is named after it", () => {
 		assert.equal(topicCrumbShown("Eigenvalues and eigenvectors", "Eigenvalues and eigenvectors"), false);
 		const doc = render(<LessonTopBar title={null} course="Linear Algebra" courseHref="/unit/la" topic={{ title: "Eigenvalues and eigenvectors", href: "/unit/la/eigen" }} />);
-		const topicLink = doc.querySelector('[data-testid="topic-label"]');
+		const topicLink = doc.querySelector('[data-slot="crumb"][data-kind="topic"]');
 		assert.equal(topicLink?.tagName, "A");
 		assert.equal(topicLink?.getAttribute("href"), "/unit/la/eigen");
-		assert.equal(doc.querySelectorAll('[data-slot="lesson-trail"] svg').length, 1, "one chevron between two crumbs, none trailing");
+		assert.equal(doc.querySelectorAll('[data-slot="crumb-chevron"]').length, 1, "one chevron between two crumbs, none trailing");
 	});
 
 	it("cuts no crumb at a fixed width", () => {
 		const doc = render(<LessonTopBar title={<span>Rank practice</span>} course="Linear Algebra" courseHref="/unit/la" topic={{ title: "Rank and the column space", href: "/unit/la/rank" }} />);
-		for (const crumb of doc.querySelectorAll('[data-testid="course-label"], [data-testid="topic-label"]')) assert.doesNotMatch(crumb.getAttribute("class") ?? "", /max-w-/);
+		for (const crumb of doc.querySelectorAll('[data-slot="crumb"][data-kind="course"], [data-slot="crumb"][data-kind="topic"]')) assert.doesNotMatch(crumb.getAttribute("class") ?? "", /max-w-/);
 	});
 });

@@ -1,20 +1,14 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
-import Link from "next/link";
-import { ChevronRightIcon } from "lucide-react";
-import { MathText } from "@/components/ui/math-text";
-
-/** A crumb takes the room its words need and gives way first when the bar
- *  is full (round 8: "Rank and the column s…" with half the bar free). */
-const CRUMB = "min-w-0 shrink-[2] truncate text-body text-muted-foreground";
-const CRUMB_LINK = `lh-no-drag ${CRUMB} rounded-sm outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none`;
+import type { ReactNode } from "react";
+import { Crumbs, type Crumb } from "@/components/nav/crumbs";
 
 /** The lesson's top bar contents (spec: lesson-top-bar.md), rendered inside
- *  the shared TopBar at its slim size: the course and, when it reads
- *  differently from the title, the topic, as links, then the title (the
- *  rename button or its input, owned by the session); on the right where
- *  the lesson is in its plan (lesson-roadmap.md) and Done for today. */
+ *  the shared TopBar at its slim size: the app's one trail (`Crumbs`), the
+ *  course and, when it reads differently from the title, the topic, as
+ *  links, then the title (the rename button or its input, owned by the
+ *  session); on the right where the lesson is in its plan
+ *  (lesson-roadmap.md), which names its arc, and Done for today. */
 export function LessonTopBar({
 	title,
 	course,
@@ -36,43 +30,12 @@ export function LessonTopBar({
 	/** Done for today (done-tonight.tsx): stop now, whatever is open. */
 	tonight?: ReactNode;
 }) {
-	const crumbs: { key: string; node: ReactNode }[] = [];
-	if (course) {
-		crumbs.push({
-			key: "course",
-			node:
-				courseHref !== undefined ? (
-					<Link href={courseHref} data-testid="course-label" className={CRUMB_LINK}>
-						{course}
-					</Link>
-				) : (
-					<span data-testid="course-label" className={CRUMB}>
-						{course}
-					</span>
-				),
-		});
-	}
-	if (topic) {
-		crumbs.push({
-			key: "topic",
-			node: (
-				<Link href={topic.href} data-testid="topic-label" className={CRUMB_LINK}>
-					<MathText>{topic.title}</MathText>
-				</Link>
-			),
-		});
-	}
-	const trail = title ? [...crumbs, { key: "title", node: title }] : crumbs;
+	const crumbs: Crumb[] = [];
+	if (course) crumbs.push({ kind: "course", title: course, href: courseHref });
+	if (topic) crumbs.push({ kind: "topic", title: topic.title, href: topic.href });
 	return (
 		<>
-			<div data-slot="lesson-trail" className="flex min-w-0 grow items-center gap-1.5">
-				{trail.map((c, i) => (
-					<Fragment key={c.key}>
-						{i > 0 && <ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground/60" />}
-						{c.node}
-					</Fragment>
-				))}
-			</div>
+			<Crumbs crumbs={crumbs} end={title} className="grow" />
 			{roadmap}
 			{tonight}
 		</>

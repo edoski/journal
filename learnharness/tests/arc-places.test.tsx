@@ -129,19 +129,20 @@ describe("the topic page", () => {
 		for (const course of [LINALG_ARCS, LINALG]) {
 			const doc = render(<TopicHead facts={topicFacts({ course, topic: rank, chats: [], read: null })} />);
 			assert.ok(doc.querySelector('[data-slot="page-eyebrow"]') === null, "no line above the title");
-			const place = doc.querySelector('[data-slot="topic-place"]')!;
-			assert.equal(place.querySelector('[data-slot="topic-course-link"]')?.getAttribute("href"), courseHref("/s/linalg"));
+			const place = doc.querySelector('[data-slot="crumbs"]')!;
+			assert.equal(place.querySelector('[data-slot="crumb"][data-kind="course"]')?.getAttribute("href"), courseHref("/s/linalg"));
 			assert.doesNotMatch(place.textContent ?? "", /·/);
 		}
 	});
 
-	it("names the arc after the course as a link opening the course page on that arc, and none without arcs", () => {
+	it("names the arc after the course as a link, its one label, opening the course page on that arc, and none without arcs", () => {
 		const facts = topicFacts({ course: LINALG_ARCS, topic: rank, chats: [], read: null });
-		assert.deepEqual(facts.arc, { handle: "systems", title: "Linear systems", share: 0 });
+		assert.deepEqual(facts.arc, { number: 2, handle: "systems", title: "Linear systems", share: 0 });
 		const doc = render(<TopicHead facts={facts} />);
-		const link = doc.querySelector('[data-slot="topic-place"] [data-slot="topic-arc-link"]')!;
+		const link = doc.querySelector('[data-slot="crumbs"] [data-slot="crumb"][data-kind="arc"]')!;
 		assert.ok(link, "the arc follows the course");
-		assert.equal(link.textContent, "Linear systems");
+		assert.equal(link.querySelector('[data-slot="arc-label"]')?.getAttribute("data-arc"), "systems", "the arc's one label, its number then its name");
+		assert.equal(link.textContent, "2Linear systems");
 		assert.equal(link.getAttribute("href"), arcHref("/s/linalg", "systems"));
 		assert.equal(link.getAttribute("href"), `${courseHref("/s/linalg")}?arc=systems`);
 		assert.match(link.getAttribute("class")!, /\btruncate\b/, "a long name ends in …");
@@ -150,7 +151,7 @@ describe("the topic page", () => {
 		assert.equal(topicFacts({ course: LINALG_ARCS, topic: vectors, chats: [], read: null }).arc?.share, 1, "Vectors and Linear independence are both his own");
 		const plain = render(<TopicHead facts={topicFacts({ course: LINALG, topic: rank, chats: [], read: null })} />);
 		assert.equal(topicFacts({ course: LINALG, topic: rank, chats: [], read: null }).arc, null);
-		assert.ok(plain.querySelector('[data-slot="topic-arc-link"]') === null);
+		assert.ok(plain.querySelector('[data-slot="crumb"][data-kind="arc"]') === null);
 	});
 
 	it("says why a topic not started comes when it does in Scheduled, never under Now, whose planned day wraps whole", () => {

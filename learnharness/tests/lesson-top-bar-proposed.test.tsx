@@ -86,8 +86,8 @@ describe("the lesson's top bar", () => {
 		await mount(<LessonTopBar title="Eigenvalues" course="Linear Algebra" courseHref="/unit/la" topic={{ title: "Spectra of 2×2 maps", href: "/unit/la/eigen" }} roadmap={<Roadmap />} tonight={<DoneTonightButton onDone={() => {}} />} />);
 		assert.ok(document.querySelector('[data-testid="phase-chip"]') === null);
 		assert.ok(document.querySelector('[data-testid="session-details"]') === null);
-		assert.equal(element('[data-testid="course-label"]').getAttribute("href"), "/unit/la");
-		assert.equal(element('[data-testid="topic-label"]').getAttribute("href"), "/unit/la/eigen");
+		assert.equal(element('[data-slot="crumb"][data-kind="course"]').getAttribute("href"), "/unit/la");
+		assert.equal(element('[data-slot="crumb"][data-kind="topic"]').getAttribute("href"), "/unit/la/eigen");
 		assert.ok(element('[data-testid="roadmap"]'));
 		const done = element('[data-testid="done-tonight"]');
 		assert.ok(done.querySelector("svg"), "Done for today carries its icon");

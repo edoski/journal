@@ -225,14 +225,14 @@ describe("the topic page's head, the course head's twin", () => {
 		const head = render(<TopicHead facts={facts} />);
 		assert.ok(head.querySelector('[data-slot="page-eyebrow"]') === null, "no line above the title");
 		assert.ok(head.querySelector('[data-slot="arc-pill"]') === null);
-		assert.equal(head.querySelector('[data-slot="topic-course-link"]')?.getAttribute("href"), "/unit/" + Buffer.from("/study/linalg").toString("base64url"));
-		assert.match(head.querySelector('[data-slot="topic-arc-link"]')?.getAttribute("href") ?? "", /\?arc=maps$/);
+		assert.equal(head.querySelector('[data-slot="crumb"][data-kind="course"]')?.getAttribute("href"), "/unit/" + Buffer.from("/study/linalg").toString("base64url"));
+		assert.match(head.querySelector('[data-slot="crumb"][data-kind="arc"]')?.getAttribute("href") ?? "", /\?arc=maps$/);
 		assert.equal(text(head.querySelector('[data-kind="standing"]')).replace(". ", ""), "Partly right");
 	});
 
 	it("runs the place and the standing on one compact line", () => {
 		const head = render(<TopicHead facts={facts} />);
 		assert.match(head.querySelector('[data-slot="page-lines"]')!.className, /\bmin-h-5\b/);
-		assert.ok(head.querySelector('[data-slot="page-standing"] [data-slot="topic-place"]'), "the place on the standing's line");
+		assert.ok(head.querySelector('[data-slot="page-standing"] [data-slot="crumbs"]'), "the place on the standing's line");
 	});
 });

@@ -1,4 +1,4 @@
-import { isReviewSession, markHow, topicOpening, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
+import { isReviewSession, markHow, namedArc, topicOpening, type ArcHandle, type NamedArc, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, lessonBegun, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
@@ -102,10 +102,10 @@ export interface StartsReason {
 
 export interface TopicFacts {
 	course: { workspace: string; title: string };
-	/** The arc the topic lies in, with its ring's share (the topics of it
-	 *  he can do on his own, as Home's ring counts a course); null in a
-	 *  course without arcs. */
-	arc: { handle: ArcHandle; title: string; share: number | null } | null;
+	/** The arc the topic lies in, named with its place in study order
+	 *  (`namedArc`), with its ring's share (the topics of it he can do on his
+	 *  own, as Home's ring counts a course); null in a course without arcs. */
+	arc: (NamedArc & { share: number | null }) | null;
 	topic: CourseMapTopic;
 	/** The engine's study day. */
 	today: string;
@@ -375,11 +375,11 @@ export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => 
  *  live topics he can do on his own (`courseProgress` over them); null in
  *  a course without arcs or for a topic the arc list does not hold. Pure. */
 function arcOf(course: StudyCourse, topic: CourseMapTopic): TopicFacts["arc"] {
-	const arc = topic.arc && course.map.arcs?.find((a) => a.handle === topic.arc);
+	const arc = topic.arc && course.map.arcs ? namedArc(course.map.arcs, topic.arc) : null;
 	if (!arc) return null;
 	const live = course.map.topics.filter((t) => t.arc === arc.handle && t.excluded === undefined);
 	const progress = courseProgress({ ...course, map: { ...course.map, topics: live } });
-	return { handle: arc.handle, title: arc.title, share: progress ? progress.solid / progress.of : null };
+	return { ...arc, share: progress ? progress.solid / progress.of : null };
 }
 
 /** Everything the page draws, from the course, every course (Today

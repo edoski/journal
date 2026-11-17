@@ -82,7 +82,7 @@ describe("the topic head", () => {
 
 	it("opens the course's page from the course line, and has no button: the history's Now holds the action", () => {
 		const document = head(factsOf(RANK));
-		const course = document.querySelector('[data-slot="topic-course-link"]')!;
+		const course = document.querySelector('[data-slot="crumb"][data-kind="course"]')!;
 		assert.equal(course.getAttribute("href"), courseHref(WORKSPACE));
 		assert.equal(course.textContent, "Linear Algebra");
 		assert.ok(document.querySelector("button") === null);
@@ -105,7 +105,7 @@ describe("the topic head", () => {
 		const document = head(factsOf(RANK));
 		const header = document.querySelector('[data-slot="page-head"]')!;
 		assert.ok(header.querySelector('[data-slot="page-eyebrow"]') === null, "no line above the title");
-		assert.equal(header.querySelector('[data-slot="page-standing"] [data-slot="topic-course-link"]')!.textContent, "Linear Algebra");
+		assert.equal(header.querySelector('[data-slot="page-standing"] [data-slot="crumb"][data-kind="course"]')!.textContent, "Linear Algebra");
 		assert.equal(header.querySelector('h1[data-slot="page-title"]')!.textContent, "Rank and the column space");
 		for (const line of header.children) assert.doesNotMatch(line.getAttribute("class") ?? "", /(^|\s)(pl|ml|ps|ms)-/, "no line indented (a divider's own margin is not the line's)");
 		const words = document.querySelector('[data-slot="page-fact"][data-kind="standing"]')!;
