@@ -134,11 +134,12 @@ describe("the road under the map", () => {
 		assert.equal(row.children.length, 4, "pie, where he stands, the topic, its fact");
 	});
 
-	it("is shadcn's carousel, its items centred, the track stopping short of every marker", () => {
-		assert.ok(document.querySelector('[data-slot="carousel"] [data-slot="carousel-content"]'));
+	it("scrolls natively sideways, the track stopping short of every marker", () => {
+		const scroller = document.querySelector<HTMLElement>('[data-slot="road-scroller"]')!;
+		assert.match(scroller.className, /\boverflow-x-auto\b/, "a swipe or the wheel moves it freely");
 		const stop = document.querySelector('[data-slot="road-stop"]')!;
-		assert.match(stop.className, /before:w-\[calc\(50%-6px\)\]/, "the stretch before stops 6px short of the marker");
-		assert.match(stop.className, /after:left-\[calc\(50%\+22px\)\]/, "the stretch after starts 6px past it");
+		assert.match(stop.className, /before:w-\[calc\(50%-14px\)\]/, "the stretch before stops 6px short of the marker's 16px box");
+		assert.match(stop.className, /after:left-\[calc\(50%\+14px\)\]/, "the stretch after starts 6px past it");
 		assert.equal(document.querySelectorAll('[data-slot="road-stop"]').length, 2);
 	});
 });
