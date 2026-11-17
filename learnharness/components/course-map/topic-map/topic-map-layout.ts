@@ -294,10 +294,6 @@ export function cardFit(box: { left: number; top: number; right: number; bottom:
 	if (l < fade.x - slack || r > frame.width - fade.x + slack || t < fade.y - slack || b > frame.height - fade.y + slack) return "faded";
 	return "clear";
 }
-/** The tolerance an opening view is judged with: half of `cardFit`'s pixel,
- *  so a page that scrolls to it, rounding by up to half a pixel more (the
- *  course page, `scrollOfCamera`), still cuts nothing. */
-const OPENING_SLACK = 0.5;
 
 /**
  * Where a map opens (spec: topic-map.md, Behaviour): the whole course
@@ -334,7 +330,7 @@ export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, 
 		const axis = (at: (p: PlacedTopic) => number, size: number, span: number, f: number, extent: number, pad: number, mid: number, top = false) => {
 			const drawn = extent * zoom;
 			if (drawn + pad * 2 <= span) return [Math.round(top ? pad : (span - drawn) / 2)];
-			// Rounded inward, so a page that scrolls the course with its room can reach every candidate.
+			// Rounded inward, so every candidate stays inside the drawing and its room.
 			const [low, high] = [Math.ceil(span - drawn - pad), Math.floor(pad)];
 			const clamp = (v: number) => Math.min(high, Math.max(low, Math.round(v)));
 			const edges = (lo: number, hi: number) => [f - lo, span - f - hi, f - hi, span - f - lo, -lo, -hi, span - hi, span - lo];
@@ -355,7 +351,7 @@ export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, 
 					if (p === target) continue;
 					const l = p.x * zoom + x;
 					const t = p.y * zoom + y;
-					const fit = cardFit({ left: l, top: t, right: l + w * zoom, bottom: t + h * zoom }, frame, fade, OPENING_SLACK);
+					const fit = cardFit({ left: l, top: t, right: l + w * zoom, bottom: t + h * zoom }, frame, fade);
 					if ((fit === "clear" || fit === "faded") && next.has(p.handle)) score.nextWhole += 1;
 					if (fit === "faded") score.cost += VIEW_WORTH.faded;
 					else if (fit === "clear") score.cost -= VIEW_WORTH.whole + (before.has(p.handle) ? VIEW_WORTH.before : next.has(p.handle) ? VIEW_WORTH.next : 0);
