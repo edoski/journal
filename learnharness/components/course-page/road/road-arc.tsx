@@ -32,8 +32,10 @@ export type ArcLineProps = Omit<React.ComponentProps<"section">, "children"> & {
 };
 
 /** Each arc is its own block on the road: a rail down its left edge, as tall as the arc with its open topics,
- *  set apart from the next by a small gap, so the arcs read as separate containers (Edo, 17 Nov 2026). */
-export const BLOCK = "relative pr-3 pl-4";
+ *  set apart from the next by a small gap, so the arcs read as separate containers (Edo, 17 Nov 2026). Its 16px
+ *  right inset ends every fact 16px in from the column's edge, so a topic row, which reaches 12px past its facts,
+ *  ends its fill 4px inside the column and its 2px focus ring whole inside it too. */
+export const BLOCK = "relative pr-4 pl-4";
 /** The arc's rail: quiet, and bright on the arc the map shows. */
 export function Rail({ bright = false }: { bright?: boolean }) {
 	return (
@@ -147,7 +149,8 @@ export function RoadArc({
 						</Button>
 					)}
 				</h2>
-				<CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down motion-reduce:animate-none">
+				{/* Clipped only down, for the slide: a topic row reaches past the list's right edge to its own. */}
+				<CollapsibleContent className="overflow-y-clip data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down motion-reduce:animate-none">
 					{items.length > 0 && <ul className="flex flex-col pt-0.5 pb-1.5 pl-4">{items.map(renderItem)}</ul>}
 				</CollapsibleContent>
 			</section>
