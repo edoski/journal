@@ -37,8 +37,8 @@ export interface PlanTree {
  * How big a lesson's plan map may be: what the topic page's lesson map
  * shows whole, without panning, at Edo's window (1512×982, his ruling of
  * 14 Nov 2026), each step one idea. Measured there with the sidebar open,
- * the map's pane is 696×786; inside its fade it opens a plan whole down to
- * the 75% scale its titles stay readable at (`WHOLE_COURSE_ZOOM`), which
+ * the map's pane is 864×787; inside its fade it opens a plan whole down to
+ * the 80% scale every course map opens whole at (`READABLE_ZOOM`), which
  * holds 8 rows of steps, 4 across. A plan's rows are its longest chain of
  * steps, so `deep` caps that chain; `steps` caps the count, since a map
  * that fills its rows spreads past 4 across: at 12 steps 9 plans in 10 of
