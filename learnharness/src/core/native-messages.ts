@@ -48,6 +48,7 @@ import {
 	NEXT_PROBLEM_TEXT,
 	PRACTICE_REQUEST_TEXT,
 	hintRungText,
+	probeFeedbackText,
 	THINKING_LABEL,
 	type PracticeRequest,
 	type SessionMode,
@@ -253,6 +254,26 @@ export function newHandoffMessage(chatId: string, review = false, task = false):
 		details: { chatId },
 		timestamp: Date.now(),
 	};
+}
+
+/** The probe-handoff wake as the teacher reads it: its text, then what
+ *  the probe's last answer got, read from `record`, where the probe's
+ *  turn has landed (`probeFeedbackText`). Every other steer as it is. */
+export function withProbeFeedback<T extends LhMessage>(steer: T, record: readonly LhMessage[]): T {
+	if (steer.role !== "custom" || steer.customType !== "probe-handoff" || typeof steer.content !== "string") return steer;
+	const line = probeFeedbackText(probeFeedbackOf(record));
+	return line ? { ...steer, content: `${steer.content} ${line}` } : steer;
+}
+
+/** What the tutor told him after his last answer to a question: its
+ *  messages, as he read them. Null when no answer came. Pure. */
+export function probeFeedbackOf(messages: readonly LhMessage[]): string[] | null {
+	const at = messages.findLastIndex((m) => m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName) && !m.isError && isRealAnswer(m.details));
+	if (at < 0) return null;
+	const failed = failedOutputCallIds(messages);
+	return messages.slice(at + 1).flatMap((m) =>
+		m.role !== "assistant" ? [] : m.content.flatMap((b) => (b.type === "toolCall" && b.name === SEND_TO_USER_TOOL && !failed.has(b.id) ? [sendToUserText(b)].filter((t): t is string => !!t?.trim()) : [])),
+	);
 }
 
 // ─── the session's mode: teaching or practice ───────────────────────────────

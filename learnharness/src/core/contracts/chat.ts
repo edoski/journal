@@ -193,9 +193,20 @@ export const HANDOFF_TEXT =
 	"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
-	"When it's genuinely reasoned out, call plan_init and, in that same reply, start teaching with the first step alone: one idea in two to four sentences, then its question, never waiting for plan_init's result; I'll interrupt if I want something else. " +
-	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again. " +
-	"My last probe answer got only its mark, with no words: when it was not right, the first step's first sentence names the part it missed, and the step builds from there.";
+	"When it's genuinely reasoned out, call plan_init and, in that same reply, start teaching with the first step alone: one idea in two to four sentences, then its question, never waiting for plan_init's result; I'll interrupt if I want something else.";
+
+/** What the wake says of the probe's last answer, read from the record
+ *  once the probe's turn has landed (round 15, m13: the first step opened
+ *  "Your answer took the limit of the base alone…" under the feedback
+ *  "The base and the exponent change together…", since the wake said only
+ *  "the probe's feedback above"): the feedback he read after it, quoted as
+ *  already said; or that it got only its mark (round 14); or nothing when
+ *  the probe asked nothing. */
+export function probeFeedbackText(said: readonly string[] | null): string {
+	if (said === null) return "";
+	if (said.length === 0) return "My last probe answer got only its mark, with no words: when it was not right, the first step's first sentence names the part it missed, and the step builds from there.";
+	return `I have already read the probe's feedback on my last answer: ${said.map((t) => `"${t.trim()}"`).join(" ")} That is said: the first step builds on it with something new, and never says its point again, in any words.`;
+}
 
 /** The wake in a session that continues an open task (round 11, 2 N2: the
  *  lesson's wake turned Problem sheet 4, answered right at part (c), into a
@@ -205,8 +216,7 @@ export const HANDOFF_TEXT =
  *  material waits for it. */
 export const TASK_HANDOFF_TEXT =
 	"Next: carry on with my open task at the step the assessment says comes next. It is my task, not a lesson: plan only that step with plan_init, one node named for the part it is, with a node before it only for a gap the assessment names, never a lesson on the topic from its basics. " +
-	"If the step needs something from me first, such as a part's text, ask me for it in one plain line, unless that is already asked above, and end your turn; work the step once I send it. Otherwise pose the step straight away. " +
-	"I have already read the probe's feedback above, so never say it again.";
+	"If the step needs something from me first, such as a part's text, ask me for it in one plain line, unless that is already asked above, and end your turn; work the step once I send it. Otherwise pose the step straight away.";
 
 /** The model-facing words of Continue pressed on an open task this session
  *  holds, when nothing in it waits on him (round 13, 2 M1): Continue
