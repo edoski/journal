@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { useSearchParams } from "next/navigation";
 import type { TakeLine } from "@/components/start/use-lesson-start";
 import { LinkedColumns } from "@/components/linked-columns/linked-columns";
@@ -112,6 +112,13 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 		stops: () => list.current?.stops() ?? [],
 		head: () => headerBox.current?.querySelector<HTMLElement>("[data-slot=course-action]") ?? null,
 	});
+	// Arriving with focus nowhere (`c` on Home, a link), his keys start on Now's row, the page's action (round 15, 4
+	// free: after `c` focus sat on the page's body).
+	useEffect(() => {
+		const active = document.activeElement;
+		if (active && active !== document.body && active.isConnected) return;
+		headerBox.current?.querySelector<HTMLElement>("[data-slot=course-action]")?.focus({ preventScroll: true });
+	}, []);
 
 	const columns: CourseColumns = {
 		view,

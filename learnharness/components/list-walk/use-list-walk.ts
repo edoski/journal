@@ -39,8 +39,8 @@ export interface ListWalk {
 	/** On the list: the keys every stop shares. A stop's own keys (a
 	 *  header's ← →) claim theirs first with preventDefault. */
 	onKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
-	/** On the head the list leaves for: ↓ on its control steps back onto
-	 *  the first stop, Esc leaves it. */
+	/** On the head the list leaves for: ↓ and Home on its control step
+	 *  back onto the first stop, End jumps to the last, Esc leaves it. */
 	onHeadKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
 }
 
@@ -95,9 +95,11 @@ export function useListWalk({ stops, head }: { stops: () => readonly HTMLElement
 		onHeadKeyDown: (e) => {
 			const control = latest.current.head?.();
 			if (!control || e.target !== control || !bare(e)) return;
-			if (e.key === "ArrowDown") {
+			if (e.key === "ArrowDown" || e.key === "Home" || e.key === "End") {
+				// ↓ and Home step onto the first stop, End jumps to the last, as from nothing focused.
 				e.preventDefault();
-				land(latest.current.stops()[0]);
+				const list = latest.current.stops();
+				land(e.key === "End" ? list.at(-1) : list[0]);
 			} else if (e.key === "Escape") {
 				e.preventDefault();
 				control.blur();

@@ -93,7 +93,11 @@ const pages: { name: string; mount: () => Promise<void>; stops: () => HTMLElemen
 	{ name: "Home's Today", mount: mountHome, stops: () => all('[data-slot="today"] [data-line]'), head: () => null },
 	{
 		name: "the course page's road",
-		mount: () => mount(<SplitBody view={view()} standing={null} busy={false} onContinue={() => {}} />),
+		// Arriving puts focus on Now's row; the walk starts from nothing focused here.
+		mount: async () => {
+			await mount(<SplitBody view={view()} standing={null} busy={false} onContinue={() => {}} />);
+			(dom.document.activeElement as HTMLElement | null)?.blur();
+		},
 		stops: () => all('[data-slot="course-split-list"] button, [data-slot="course-split-list"] a[href]'),
 		head: () => dom.document.querySelector<HTMLElement>('[data-slot="course-action"]'),
 	},
@@ -106,6 +110,21 @@ const pages: { name: string; mount: () => Promise<void>; stops: () => HTMLElemen
 ];
 
 const focused = () => dom.document.activeElement;
+
+describe("arriving on the course page (round 15, 4 free)", () => {
+	it("puts his keys on Now's row when nothing held focus, as `c` on Home leaves it", async () => {
+		await mount(<SplitBody view={view()} standing={null} busy={false} onContinue={() => {}} />);
+		const now = dom.document.querySelector<HTMLElement>('[data-slot="course-action"]');
+		assert.ok(now, "Now's row");
+		assert.ok(focused() === now, "focus on Now's row, not the page's body");
+		const rows = all('[data-slot="course-split-list"] button, [data-slot="course-split-list"] a[href]');
+		await press("End");
+		assert.ok(focused() === rows.at(-1), "End from Now's row takes the road's last stop");
+		now!.focus();
+		await press("Home");
+		assert.ok(focused() === rows[0], "Home from Now's row takes the first");
+	});
+});
 
 describe("walking a list with the arrows, one way on every page", () => {
 	for (const { name, mount: open, stops, head } of pages) {
