@@ -314,7 +314,9 @@ function Flow({
 			onFocus: (handle) => {
 				setActive(handle);
 				setTabStop(handle);
-				if (links.current.get(handle)?.matches(":focus-visible")) follow(handle);
+				// While the camera glides between arcs it is already on its way to this arc's opening view; a follow would
+				// cut the glide short, and the arc it left would stay drawn.
+				if (!trail && links.current.get(handle)?.matches(":focus-visible")) follow(handle);
 			},
 			onKeyDown: (handle, event: KeyboardEvent<HTMLAnchorElement>) => {
 				if (!isWalkKey(event.key)) return;
@@ -330,7 +332,7 @@ function Flow({
 			},
 			openArc: onOpenArc,
 		}),
-		[lit, marked, tabStop, layout, map.edges, follow, onOpenArc],
+		[lit, marked, tabStop, layout, map.edges, follow, onOpenArc, trail],
 	);
 
 	const current = map.current ? titleOf(map.current) : null;
