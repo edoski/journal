@@ -129,7 +129,7 @@ describe("the list's groups and rows", () => {
 		const rows = [...document.querySelectorAll('[data-slot="course-topic-row"]')];
 		const openTopics = shown.filter((g) => OPEN_AT_FIRST[g.id]).flatMap((g) => g.topics);
 		assert.equal(rows.length, openTopics.length);
-		assert.ok(rows.every((r) => r.className.includes("h-8") && !r.className.includes("h-9")), "every row is 32px");
+		assert.ok(rows.every((r) => /(^|\s)min-h-8(\s|$)/.test(r.className) && !/(^|\s)(min-)?h-9(\s|$)/.test(r.className)), "every row is 32px at least, growing with a title on two lines");
 		const fact = document.querySelector(`[href="${unitHref(WS, "independence")}"] [data-slot="course-topic-fact"]`)!;
 		assert.equal(fact.textContent, "Sure, but wrong");
 		assert.equal(fact.querySelectorAll(".sr-only").length, 0, "the words show, not only for a screen reader");

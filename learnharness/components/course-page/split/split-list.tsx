@@ -23,7 +23,7 @@ function reducedMotion(): boolean {
 /**
  * The split page's left pane (spec: split-course.md): the course's topics
  * in their groups, each a 32px row ending in its reason's icon and words,
- * flush right so they line up down the list (the title truncates first);
+ * flush right so they line up down the list (the title wraps first);
  * in a course with arcs (`arcs`), its arcs in study order instead, each a
  * folded line (`arcLine`, the road's) that opens on its topics, a ready one
  * with Check it (`onCheck`). Which sections are open is the page's (`open`,
@@ -172,8 +172,9 @@ export function SplitList({
 		<CourseTopicRow
 			key={row.topic.handle}
 			row={row}
-			// The compact row's 32px with the reason's words showing, so the fullest demo course fits at 1440x900.
-			className="h-8"
+			// The compact row's 32px with the reason's words showing, so the fullest demo course fits at 1440x900; a long
+			// title wraps onto a second line rather than being cut (round 15, 1 m8).
+			compact
 			highlighted={marked === row.topic.handle}
 			ref={register({ kind: "row", handle: row.topic.handle })}
 			onMouseEnter={() => onPoint(row.topic.handle, "pointer")}

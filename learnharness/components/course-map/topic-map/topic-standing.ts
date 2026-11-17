@@ -1,6 +1,6 @@
 import type { CourseMapTopic, TopicHandle, TopicLevel } from "@/src/core";
 import { mathPlain } from "@/components/ui/math-text";
-import { SLIPPING_WORDS, slipMark, standingWords, type Fill, type SlipKey } from "@/components/study-words";
+import { RIGHT_ON_YOUR_OWN, RIGHT_WORDS, SLIPPING_WORDS, slipMark, standingWords, type Fill, type SlipKey } from "@/components/study-words";
 import type { Said, TopicFact } from "@/components/unit-inbox/sidebar-says";
 
 /** Where the learner stands on a topic, as the map draws and says it. */
@@ -13,6 +13,10 @@ export interface Standing {
 	/** Where he stands in words true to the record (`standingWords`), or
 	 *  `SLIPPING_WORDS` on a topic that slips. */
 	words: string;
+	/** The same in a card's header strip: the words without what is left
+	 *  to do ("Right on your own"; round 15, 2 n5: "Right on your own,
+	 *  check another …" cut on the map), which the topic's page says. */
+	short: string;
 }
 
 /** The levels at which he can do a topic on his own. */
@@ -42,7 +46,8 @@ export function standingOf(topic: CourseMapTopic): Standing {
 	const full = ON_HIS_OWN.has(topic.level);
 	const fill = full && topic.weak ? 0.75 : FILL[topic.level];
 	const slipping = slipsNow(topic);
-	return { fill, slipping, words: slipping ? SLIPPING_WORDS : standingWords(fill, topic) };
+	const words = slipping ? SLIPPING_WORDS : standingWords(fill, topic);
+	return { fill, slipping, words, short: words === RIGHT_WORDS.unaided ? RIGHT_ON_YOUR_OWN : words };
 }
 
 /** Why a topic slips, beside its Slipping, or the open mistake on a topic

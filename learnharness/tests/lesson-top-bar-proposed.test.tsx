@@ -129,6 +129,10 @@ describe("where the lesson is", () => {
 		assert.match(element('[data-testid="roadmap-topic"]').getAttribute("href")!, /^\/unit\/[^/]+\/eigen$/);
 		assert.match(element('[data-testid="roadmap-course"]').getAttribute("href")!, /^\/unit\/[^/]+$/);
 		assert.equal(element('[data-testid="roadmap-course"] [data-slot="arc-label"]').textContent, "3Spectra");
+		// Round 15, 4 free: beside "Course map" the arc was cut to half the row, its number bare ("6 Diagonalization by ch…").
+		const arc = element('[data-testid="roadmap-course"] [data-slot="arc-label"]');
+		assert.match(arc.parentElement!.getAttribute("class") ?? "", /\bflex-col\b/, "the arc on a line of its own, under Course map");
+		assert.doesNotMatch(arc.getAttribute("class") ?? "", /\bmax-w-/, "the whole line's room, not half");
 	});
 
 	it("the strip's spoken name reads its maths as words, never as TeX", async () => {

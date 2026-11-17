@@ -223,10 +223,13 @@ function RoadmapLinks({ place, course }: { place?: LessonPlace; course: { title:
 					</span>
 				</Link>
 			)}
-			<Link href={courseHref(course.workspace)} data-slot="roadmap-link" data-testid="roadmap-course" className={cn(LINK_ROW, "group/arc")}>
-				<MapIcon aria-hidden className="size-4 shrink-0" />
-				<span className="min-w-0 flex-1 truncate">Course map</span>
-				{place?.arc && <ArcLabel {...place.arc} className="max-w-1/2" />}
+			{/* The arc on a line of its own, whole: beside "Course map" it was cut, its number left bare (round 15, 4 free). */}
+			<Link href={courseHref(course.workspace)} data-slot="roadmap-link" data-testid="roadmap-course" className={cn(LINK_ROW, "group/arc", place?.arc && "h-auto items-start py-1.5")}>
+				<MapIcon aria-hidden className={cn("size-4 shrink-0", place?.arc && "mt-0.5")} />
+				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+					<span className="truncate">Course map</span>
+					{place?.arc && <ArcLabel {...place.arc} />}
+				</span>
 			</Link>
 		</>
 	);

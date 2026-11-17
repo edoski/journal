@@ -83,8 +83,9 @@ export const LESSON_GOES_ON = "Lesson continues";
  *  since. */
 const WRONG_LAST_WORDS = "Not right last time";
 
-/** Right on his own, on the day its check has come. */
-const RIGHT_ON_YOUR_OWN = "Right on your own";
+/** Right on his own, on the day its check has come, and a map card's
+ *  short standing for it any day. */
+export const RIGHT_ON_YOUR_OWN = "Right on your own";
 
 /** A slip's words for each of the engine's signals but a mixed-up method,
  *  which names the method (`slipWords`). */

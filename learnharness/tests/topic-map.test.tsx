@@ -126,8 +126,8 @@ describe("where he stands on a topic", () => {
 	});
 
 	it("takes a quarter off a topic he could do on his own that the engine now calls weak, says what the pie shows, and marks every weak topic", () => {
-		assert.deepEqual(standingOf(byHandle("matmul")), { fill: 0.75, slipping: true, words: "Slipping" }, "a 3/4 pie never says On your own");
-		assert.deepEqual(standingOf(byHandle("rank")), { fill: 0.75, slipping: false, words: "Right with help" }, "still being learned: it never slips (round 11, 3 N1)");
+		assert.deepEqual(standingOf(byHandle("matmul")), { fill: 0.75, slipping: true, words: "Slipping", short: "Slipping" }, "a 3/4 pie never says On your own");
+		assert.deepEqual(standingOf(byHandle("rank")), { fill: 0.75, slipping: false, words: "Right with help", short: "Right with help" }, "still being learned: it never slips (round 11, 3 N1)");
 		assert.equal(standingOf(byHandle("determinant")).slipping, false);
 	});
 
@@ -380,7 +380,7 @@ describe("topic map drawing", () => {
 	});
 
 	it("shows a title and its pie on every node, and under it what the sidebar says when it needs him, or else where he stands", () => {
-		assert.equal(document.querySelectorAll('[data-slot="topic-glyph"]').length, 16);
+		assert.equal(document.querySelectorAll('[data-slot="course-map-node"] [data-slot="topic-glyph"]').length, 16);
 		assert.deepEqual(
 			[...document.querySelectorAll('[data-slot="topic-need"] [data-slot="status-words"]')].map((line) => line.textContent),
 			["Due since 29 Oct", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Sure, but wrong"],

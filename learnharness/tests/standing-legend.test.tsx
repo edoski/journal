@@ -104,7 +104,9 @@ describe("one standing legend on every surface", () => {
 
 	it("says each standing in the same words on every surface, Home's row saying the slip in their place", () => {
 		for (const { t, words, slips } of table) {
-			assert.deepEqual([words.card, words.row, words.head], [slips.standing, slips.standing, slips.standing], t.handle);
+			// A map card's header says the short standing (round 15, 2 n5: "Right on your own, check another …" cut).
+			assert.deepEqual([words.card, words.row, words.head], [standingOf(t).short, slips.standing, slips.standing], t.handle);
+			assert.ok(slips.standing.startsWith(words.card!), `${t.handle}: the card's words begin the standing's`);
 			assert.equal(words.home, slips.home?.words ?? slips.standing, `${t.handle}: one status on Home's row`);
 		}
 	});
@@ -113,7 +115,7 @@ describe("one standing legend on every surface", () => {
 		for (const { t, words } of table) {
 			assert.equal(words.card === "Slipping", standingOf(t).slipping, `${t.handle}: Slipping exactly on the warning ink`);
 			assert.equal(standingOf(t).slipping, t.weak && t.level !== "assisted" && t.signals.mistake === true, `${t.handle}: a topic he had, with a mistake open (round 11, 3 N1)`);
-			assert.deepEqual([words.row, words.head], [words.card, words.card], t.handle);
+			assert.deepEqual([words.row, words.head], [standingOf(t).words, standingOf(t).words], t.handle);
 			assert.notEqual(words.home, "Slipping", `${t.handle}: Home's row says why it slips instead`);
 		}
 		assert.ok(table.some((r) => r.t.weak && r.t.level === "assisted" && r.words.card !== "Slipping"), "a topic still being learned never slips");

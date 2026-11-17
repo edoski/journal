@@ -8,7 +8,6 @@ import { StatusMark } from "@/components/unit-inbox/status-mark";
 import type { CourseTopic } from "@/components/course-page/course-model";
 import { cn } from "@/lib/utils";
 import { MathText } from "@/components/ui/math-text";
-import { MathLine } from "@/components/ui/math-line";
 
 /** A hairline above every row but the first, across the column. */
 const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border/50";
@@ -49,17 +48,17 @@ export function CourseTopicRow({
 				aria-current={row.current ? "location" : undefined}
 				className={cn(
 					"-mx-3 flex w-[calc(100%+1.5rem)] min-w-0 items-center gap-4 rounded-md px-3 outline-none transition-colors duration-150 hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
-					detail ? "items-start py-2" : compact ? "h-8" : "h-9",
+					detail ? "items-start py-2" : compact ? "min-h-8 py-1" : "min-h-9 py-1.5",
 					highlighted && "bg-fill-hover",
 					className,
 				)}
 				{...link}
 			>
 				<TopicGlyph standing={row.standing} className={detail ? "mt-px" : undefined} />
-				{/* The title gives way before the status, whose words show whole (round 11, 1 N8). */}
+				{/* The title wraps before the status, whose words show whole (round 11, 1 N8), and is never cut (round 15, 1 m8). */}
 				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<span data-slot="course-topic-title" className={cn("flex min-w-0 text-body", started ? "text-foreground" : "text-muted-foreground")}>
-						<MathLine className="min-w-0">{row.topic.title}</MathLine>
+					<span data-slot="course-topic-title" className={cn("min-w-0 text-body text-pretty", started ? "text-foreground" : "text-muted-foreground")}>
+						<MathText>{row.topic.title}</MathText>
 						<span className="sr-only">, {row.standing.words}</span>
 					</span>
 					{detail && (

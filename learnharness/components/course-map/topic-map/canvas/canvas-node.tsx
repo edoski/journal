@@ -52,13 +52,21 @@ const STEP_MARK: Record<PlanNodeStatus, string> = {
 };
 
 /** A card's body: the topic's pie and its title on one line, or the step's mark and its title whole on as many lines
- *  as it takes. The lesson map measures a step's card by it (lesson-map.tsx). */
-export function CardContent({ data }: { data: CardData }) {
+ *  as it takes. The lesson map measures a step's card by it (lesson-map.tsx), and a course's map its card's width
+ *  (`useCardBox`), with `whole`: the title on one line, never cut. */
+export function CardContent({ data, whole = false }: { data: CardData; whole?: boolean }) {
 	if (data.kind === "topic") {
+		const ink = data.topic.level !== "new" ? "text-foreground" : "text-muted-foreground";
 		return (
 			<BaseNodeContent className="min-h-0 flex-1">
 				<TopicGlyph standing={data.standing} />
-				<MathLine className={cn("h-4.5 min-w-0 flex-1 text-body", data.topic.level !== "new" ? "text-foreground" : "text-muted-foreground")}>{data.title}</MathLine>
+				{whole ? (
+					<span className={cn("h-4.5 whitespace-nowrap text-body", ink)}>
+						<MathText>{data.title}</MathText>
+					</span>
+				) : (
+					<MathLine className={cn("h-4.5 min-w-0 flex-1 text-body", ink)}>{data.title}</MathLine>
+				)}
 			</BaseNodeContent>
 		);
 	}
@@ -149,7 +157,7 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 						<StatusMark data-slot="topic-need" size="slot" fact={data.line} words={data.line.words} className="flex h-lh min-w-0 items-center gap-1" />
 					) : (
 						<span data-slot="topic-standing" className="truncate text-callout text-muted-foreground">
-							{data.standing.words}
+							{data.standing.short}
 						</span>
 					)}
 				</BaseNodeHeader>
