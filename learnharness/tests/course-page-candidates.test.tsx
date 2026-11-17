@@ -28,6 +28,8 @@ import { RoadCourse } from "../components/course-page/candidates/road/road-cours
 import { arcStarts, examStop } from "../components/course-page/candidates/road/road-model.ts";
 import { ReadyFact } from "../components/course-page/candidates/shared/ready-fact.tsx";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
+import { TopicTwinHead } from "../components/course-page/candidates/shared/topic-twin.tsx";
+import type { TopicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { examReady } from "../components/course-page/standing/standing-model.ts";
 import { ARC_EXAM_WORDS, READY_FACT_WORDS } from "../components/study-words.ts";
 
@@ -229,5 +231,36 @@ describe("the road", () => {
 
 	it("draws the course page's frame around it, as every candidate does", () => {
 		assert.equal(typeof RoadCourse, "function");
+	});
+});
+
+describe("the topic page's head beside the candidates", () => {
+	const facts = {
+		course: { workspace: "/study/linalg", title: "Linear Algebra" },
+		arc: { handle: a("maps"), title: "Linear maps", share: 0.5 },
+		topic: topic("rank"),
+		today: "2026-11-08",
+		standing: { fill: 0.5, words: "Partly right" },
+		marks: [{ kind: "slip", words: "Mistake to fix", slip: "gap" }],
+		studied: null,
+		mistake: null,
+	} as unknown as TopicFacts;
+
+	it("puts the title first, level with the course page's, and links the course and the arc as words, never a pill", () => {
+		for (const lines of ["one", "two"] as const) {
+			const head = render(<TopicTwinHead facts={facts} lines={lines} />);
+			assert.ok(head.querySelector('[data-slot="page-eyebrow"]') === null, "no line above the title");
+			assert.ok(head.querySelector('[data-slot="arc-pill"]') === null);
+			assert.equal(head.querySelector('[data-slot="topic-course-link"]')?.getAttribute("href"), "/unit/" + Buffer.from("/study/linalg").toString("base64url"));
+			assert.match(head.querySelector('[data-slot="topic-arc-link"]')?.getAttribute("href") ?? "", /\?arc=maps$/);
+			assert.equal(text(head.querySelector('[data-kind="standing"]')).replace(". ", ""), "Partly right");
+		}
+	});
+
+	it("runs the place and the standing on one compact line for Agenda and Road, on two for Overview", () => {
+		assert.match(render(<TopicTwinHead facts={facts} lines="one" />).querySelector('[data-slot="page-lines"]')!.className, /\bmin-h-5\b/);
+		const two = render(<TopicTwinHead facts={facts} lines="two" />);
+		assert.ok(two.querySelector('[data-slot="page-lead"] [data-slot="topic-place"]'), "the place on its own line");
+		assert.ok(two.querySelector('[data-slot="page-standing"] [data-slot="topic-place"]') === null);
 	});
 });

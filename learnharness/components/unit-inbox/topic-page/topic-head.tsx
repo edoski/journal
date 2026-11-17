@@ -8,6 +8,7 @@ import { ArcPill } from "@/components/course-map/arc-pill";
 import type { HeadMark, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { SLIP_ICON } from "@/components/slip-icons";
 import { useCoursePageVariant } from "@/components/course-page/course-page-variant";
+import { TopicTwinHead } from "@/components/course-page/candidates/shared/topic-twin";
 
 /** One icon per kind of mark, the ones the map's nodes and Today's rows
  *  use; a slip wears its own (`SLIP_ICON`). */
@@ -30,11 +31,11 @@ const PAUSE = <span className="sr-only">. </span>;
  */
 export function TopicHead({ facts, children }: { facts: TopicFacts; children?: React.ReactNode }) {
 	const { standing, marks, studied, mistake } = facts;
-	// The course page's Agenda and Road heads take one line's room under the title; the topic page's beside them too.
+	// A course page candidate draws the topic page's head as its twin.
 	const variant = useCoursePageVariant();
+	if (variant !== "current") return <TopicTwinHead facts={facts} lines={variant === "overview" ? "two" : "one"}>{children}</TopicTwinHead>;
 	return (
 		<PageHead
-			compact={variant === "agenda" || variant === "road"}
 			eyebrow={
 				<Link
 					href={courseHref(facts.course.workspace)}
