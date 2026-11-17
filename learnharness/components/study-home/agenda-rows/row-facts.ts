@@ -5,13 +5,14 @@ import { continueWords, planDay, stepWords, type NextStep, type TodayRow } from 
 import { leftWords, taskWords } from "@/components/unit-inbox/units";
 import { localDay } from "@/components/day-change";
 import { sessionName } from "@/components/study-home/day-record";
+import type { TakeLine } from "@/components/start/use-lesson-start";
 
 /** What Today's rows draw from: Today's lines and how a line opens. */
 export interface RowsProps {
 	rows: readonly TodayRow[];
 	busy: boolean;
-	/** Take up a course line's step (`courseMove`). */
-	onContinue: (workspace: string, step?: NextStep) => void;
+	/** Take up a course line's step (`takeLine`). */
+	onContinue: TakeLine;
 	/** The line Home's map follows, and
 	 *  where a line reports that he points at it (by pointer or focus) or
 	 *  stops pointing. */

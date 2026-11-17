@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useLessonStart } from "@/components/start/use-lesson-start";
+import { takeLine, useLessonStart, type TakeLine } from "@/components/start/use-lesson-start";
 import { StartScope } from "@/components/start/start-scope";
-import { courseMove } from "@/components/study-home/study-facts";
 import { unreadableLine } from "@/components/study-home/unreadable-course";
 import { Button } from "@/components/ui/button";
 import { PageFrame } from "@/components/page-frame/page-frame";
@@ -20,8 +19,8 @@ export interface CourseReady {
 	/** Where he stands for the exam and the open mistakes; null when the engine cannot say. */
 	standing: CourseStanding | null;
 	busy: boolean;
-	/** Take up the course's next step as Home's line does (`courseMove`). */
-	onContinue: (workspace: string) => void;
+	/** Take up Now's line as Home takes it (`takeLine`): its step, else the course's next. */
+	onContinue: TakeLine;
 }
 
 /**
@@ -44,7 +43,7 @@ export function CourseFrame({ workspace, children }: { workspace: string; childr
 			<div data-slot="course-page" className="min-h-0 flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-ring">
 				<StartScope lesson={lesson}>
 					<CourseBody read={read} standing={standing} onRetry={retry}>
-						{(view, known) => children({ view, standing: known, busy: lesson.busy, onContinue: (ws) => lesson.take(ws, courseMove(view.course, chats)) })}
+						{(view, known) => children({ view, standing: known, busy: lesson.busy, onContinue: takeLine(lesson.take, [view.course], chats) })}
 					</CourseBody>
 				</StartScope>
 			</div>

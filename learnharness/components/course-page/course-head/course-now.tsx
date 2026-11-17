@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { MathLine } from "@/components/ui/math-line";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { standingOf } from "@/components/course-map/topic-map/topic-standing";
@@ -19,9 +17,10 @@ const NOW_ROW = "group/press -mx-3 flex h-14 w-[calc(100%+1.5rem)] items-center 
  * Now (spec: course-head.md), across the page under the head: the step the
  * course's press takes up, as Today's row says it (its title, its reason's
  * icon and words, the press's word flush right beside them), which does
- * what Today's line does. The row is the course's action (`course-action`),
- * which the road's arrow walk reaches from its first stop. A hairline
- * closes it off from the road.
+ * what Today's line does (`LineTarget`, its step taken up through the
+ * page's `takeLine`); without a line, the course's next lesson. The row is
+ * the course's action (`course-action`), which the road's arrow walk
+ * reaches from its first stop. A hairline closes it off from the road.
  */
 export function CourseNow({ view, busy, onContinue }: CourseColumns) {
 	const { course, pickUp: line, next } = view;
@@ -43,24 +42,10 @@ export function CourseNow({ view, busy, onContinue }: CourseColumns) {
 	);
 	return (
 		<div data-slot="course-now" className="mb-3 flex shrink-0 flex-col border-b border-border/50 pb-5">
-			{line ? (
-				<LineTarget row={line.row} busy={busy} onContinue={onContinue} data-slot="course-action" className={NOW_ROW}>
-					<span className="flex shrink-0">{glyph}</span>
-					{lines(line.title, line.why)}
-				</LineTarget>
-			) : next.lesson.open.kind === "session" ? (
-				<Button variant="quiet" asChild data-slot="course-action" className={NOW_ROW}>
-					<Link href={next.lesson.open.href}>
-						<span className="flex shrink-0">{glyph}</span>
-						{lines(next.lesson.title, next.why)}
-					</Link>
-				</Button>
-			) : (
-				<Button variant="quiet" data-slot="course-action" disabled={busy} onClick={() => onContinue(course.map.workspace)} className={NOW_ROW}>
-					<span className="flex shrink-0">{glyph}</span>
-					{lines(next.lesson.title, next.why)}
-				</Button>
-			)}
+			<LineTarget row={line?.row ?? next.row} busy={busy} onContinue={onContinue} data-slot="course-action" className={NOW_ROW}>
+				<span className="flex shrink-0">{glyph}</span>
+				{line ? lines(line.title, line.why) : lines(next.lesson.title, next.why)}
+			</LineTarget>
 		</div>
 	);
 }

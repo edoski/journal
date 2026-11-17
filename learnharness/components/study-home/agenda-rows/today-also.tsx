@@ -5,7 +5,8 @@ import { MathLine } from "@/components/ui/math-line";
 import { mathPlain } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
 import { courseTitle, lessonTitle, lineKey, whyOf } from "@/components/study-home/agenda-rows/row-facts";
-import type { NextStep, TodayRow } from "@/components/study-home/study-facts";
+import type { TodayRow } from "@/components/study-home/study-facts";
+import type { TakeLine } from "@/components/start/use-lesson-start";
 import { linePress } from "@/components/study-home/agenda-rows/line-target";
 
 /** What a folded line's button leaves out, for its tooltip: its course and
@@ -21,7 +22,7 @@ export function alsoHint(row: TodayRow): string {
  *  it, its tooltip naming its course and why; the label sits as far from
  *  the first lesson as the lessons sit from each other. A lesson too long
  *  for the room left is cut at its end, never inside a formula. */
-export function TodayAlso({ rows, busy, onContinue, className }: { rows: readonly TodayRow[]; busy: boolean; onContinue: (workspace: string, step?: NextStep) => void; className?: string }) {
+export function TodayAlso({ rows, busy, onContinue, className }: { rows: readonly TodayRow[]; busy: boolean; onContinue: TakeLine; className?: string }) {
 	const label = "min-w-0 shrink text-body font-normal text-foreground";
 	return (
 		<li data-slot="today-also" className={cn("flex h-13 min-w-0 items-center gap-1 text-body text-muted-foreground", className)}>

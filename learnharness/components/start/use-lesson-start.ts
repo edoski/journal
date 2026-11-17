@@ -7,7 +7,8 @@ import { SessionStarter, type SessionCreation } from "@/components/start-session
 import { usePhotoDraft } from "@/components/photos";
 import { keepPhotos, keepWords, keptWords } from "@/components/lesson/kept-drafts";
 import { continueHref } from "@/components/nav/session-state";
-import type { CourseMove } from "@/components/study-home/study-facts";
+import { courseMove, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
+import type { ChatListItem, StudyCourse } from "@/src/core";
 
 const START_FAILURE = "Couldn’t open the session. Try again.";
 
@@ -99,3 +100,18 @@ export function useLessonStart() {
 }
 
 export type LessonStart = ReturnType<typeof useLessonStart>;
+
+/** A Today line's press, pressed: take up `step` of the course in
+ *  `workspace`, else its next step. */
+export type TakeLine = (workspace: string, step?: NextStep) => void;
+
+/** How a page that draws Today's lines takes one up (Home's rows, the
+ *  course page's Now): the line's step of its course, through `courseMove`,
+ *  so the session that holds it opens, else a lesson starts on it. Both
+ *  pages take a line here, so neither can drop its step. */
+export function takeLine(take: LessonStart["take"], courses: readonly StudyCourse[], chats: readonly ChatListItem[]): TakeLine {
+	return (workspace, step) => {
+		const course = courses.find((c) => c.map.workspace === workspace);
+		if (course) take(workspace, courseMove(course, chats, step));
+	};
+}

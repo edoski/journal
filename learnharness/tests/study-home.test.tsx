@@ -26,7 +26,6 @@ import {
 	type TodayRow,
 } from "../components/study-home/study-facts.ts";
 import { lessonOf } from "../components/study-home/lesson-facts.ts";
-import { LessonButton } from "../components/study-home/lesson-button.tsx";
 import { Today } from "../components/study-home/today.tsx";
 import { courseProgress, foldLines, lessonTitle, studiedAgo, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import { alsoHint } from "../components/study-home/agenda-rows/today-also.tsx";

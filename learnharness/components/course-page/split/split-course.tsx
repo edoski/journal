@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { useSearchParams } from "next/navigation";
+import type { TakeLine } from "@/components/start/use-lesson-start";
 import { LinkedColumns } from "@/components/linked-columns/linked-columns";
 import type { ArcHandle, CourseStanding, TopicHandle } from "@/src/core";
 import { drawingOf } from "@/components/course-map/topic-map/map-drawing";
@@ -23,7 +24,8 @@ export interface CourseColumns {
 	view: CourseView;
 	standing: CourseStanding | null;
 	busy: boolean;
-	onContinue: (workspace: string) => void;
+	/** Take up Now's line, its step included (`takeLine`). */
+	onContinue: TakeLine;
 	/** The groups with topics, for a course without arcs. */
 	groups: readonly CourseGroup[];
 	/** The arc the map shows, of a course with arcs. */
@@ -59,7 +61,7 @@ export interface CourseColumns {
  * window: Now, the road and the composer give way, kept as they were for
  * its return, with the arc it shows.
  */
-export function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; standing: CourseStanding | null; busy: boolean; onContinue: (workspace: string) => void }) {
+export function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; standing: CourseStanding | null; busy: boolean; onContinue: TakeLine }) {
 	const { map } = view.course;
 	const { arcs } = view;
 	const [pointed, setPointed] = useState<Pointed | null>(null);

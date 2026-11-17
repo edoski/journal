@@ -3,11 +3,11 @@
 import { Button } from "@/components/ui/button";
 import { CoursesUnavailable } from "@/components/course-picker";
 import { SetupDialog } from "@/components/setup-dialog";
-import { useLessonStart, type LessonStart } from "@/components/start/use-lesson-start";
+import { takeLine, useLessonStart, type LessonStart, type TakeLine } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import { doneToday, nearExam, type NearExam } from "@/components/study-home/day-record";
 import { needsYouNow } from "@/components/study-home/needs-you";
-import { courseMove, todayCourses, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
+import { todayCourses, type TodayRow } from "@/components/study-home/study-facts";
 import { UnreadableLines } from "@/components/study-home/unreadable-course";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
 import type { ChatListItem, StudyCourse } from "@/src/core";
@@ -28,8 +28,8 @@ export interface HomeReady {
 	/** The nearest exam in the coming week, which the heading names (`nearExam`). */
 	exam: NearExam | null;
 	busy: boolean;
-	/** Take up a course line's step, else the course's next (`courseMove`). */
-	onContinue: (workspace: string, step?: NextStep) => void;
+	/** Take up a course line's step, else the course's next (`takeLine`). */
+	onContinue: TakeLine;
 }
 
 /**
@@ -116,10 +116,7 @@ function HomeBody({
 						done: doneToday(state.chats, new Date(), state.courses),
 						exam: nearExam(state.courses.flatMap(({ map }) => (map.exam ? [{ course: map.title, date: map.exam.date, daysLeft: map.exam.daysLeft }] : []))),
 						busy,
-						onContinue: (workspace, step) => {
-							const course = state.courses.find((c) => c.map.workspace === workspace);
-							if (course) onTake(workspace, courseMove(course, state.chats, step));
-						},
+						onContinue: takeLine(onTake, state.courses, state.chats),
 					})}
 					{!quiet && <UnreadableLines courses={state.failed} />}
 				</>

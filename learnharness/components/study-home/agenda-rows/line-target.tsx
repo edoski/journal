@@ -4,6 +4,7 @@ import type { StudyCourse } from "@/src/core";
 import type { NextStep, TodayRow } from "@/components/study-home/study-facts";
 import { lineKey } from "@/components/study-home/agenda-rows/row-facts";
 import { continueHref } from "@/components/nav/session-state";
+import type { TakeLine } from "@/components/start/use-lesson-start";
 
 /** What a line of Today does, pressed, wherever it is drawn (Home's rows and
  *  its Also line, the course page's Now, the sidebar's card): it opens the
@@ -27,7 +28,7 @@ export function LineTarget({
 }: Omit<React.ComponentProps<typeof Button>, "asChild" | "onClick" | "disabled"> & {
 	row: TodayRow;
 	busy: boolean;
-	onContinue: (workspace: string, step?: NextStep) => void;
+	onContinue: TakeLine;
 }) {
 	const press = linePress(row);
 	if ("href" in press) {
