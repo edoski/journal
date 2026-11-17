@@ -61,7 +61,7 @@ export function ReadyFact({ view, ready }: { view: CourseView; ready: ExamReady 
 				<Icon aria-hidden className={MARK} />
 				{READY_FACT_WORDS[ready.kind]}
 			</PopoverTrigger>
-			<PopoverContent data-slot="course-ready-detail" align="start" collisionPadding={12} className="flex w-96 flex-col gap-3">
+			<PopoverContent data-slot="course-ready-detail" align="start" collisionPadding={12} className="flex flex-col gap-3">
 				<p className={cn("text-callout", ready.kind === "short" ? "text-warning" : "text-foreground")}>
 					{arcs.length > 0 ? NOT_READY_ARCS_WORDS : <ReadyWords ready={ready} workspace={map.workspace} />}
 				</p>
