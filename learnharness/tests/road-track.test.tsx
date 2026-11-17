@@ -1,7 +1,7 @@
 /**
  * Road in rows (course-page/candidates/roadrows/roadrows.md): the road's
- * track left to right, every arc on it and the exam at its place, the strip
- * held inside its window, and the selected arc's topics under its stop.
+ * arcs as cards left to right with the exam at its place, and the selected
+ * arc's topics in the panel under them.
  * Same tsx classic-JSX shim as the other render tests.
  */
 import React from "react";
@@ -17,7 +17,7 @@ import type { ArcHandle, CourseMapTopic, StudyCourse, TopicHandle } from "../src
 import { courseRead, type CourseArcSection, type CourseView } from "../components/course-page/course-model.ts";
 import type { CourseColumns } from "../components/course-page/split/split-course.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
-import { stripOffset, trackItems, type TrackItem } from "../components/course-page/candidates/roadrows/track-model.ts";
+import { trackItems, type TrackItem } from "../components/course-page/candidates/roadrows/track-model.ts";
 import { RoadTrack } from "../components/course-page/candidates/roadrows/road-track.tsx";
 
 const a = (handle: string) => handle as ArcHandle;
@@ -32,12 +32,6 @@ describe("the road's track", () => {
 		assert.deepEqual(kinds(trackItems(road, undefined)), ["a", "b", "c", "d", "e"], "no exam ahead");
 	});
 
-	it("centres the selected arc but never lets the strip leave its window", () => {
-		assert.equal(stripOffset({ start: 0, width: 224 }, 1840, 1232), 0, "the first arc holds the strip at its left end");
-		assert.equal(stripOffset({ start: 1000, width: 352 }, 1840, 1232), 1000 + 176 - 616, "a middle arc is centred");
-		assert.equal(stripOffset({ start: 1696, width: 144 }, 1840, 1232), 1840 - 1232, "the last item holds it at its right end");
-		assert.equal(stripOffset({ start: 600, width: 224 }, 900, 1232), 0, "a strip that fits never moves");
-	});
 });
 
 const h = (handle: string) => handle as TopicHandle;
@@ -100,30 +94,30 @@ const render = (node: React.ReactNode) =>
 describe("the road under the map", () => {
 	const document = render(<RoadTrack {...columns} onFollow={noop} />);
 
-	it("opens the arc the map shows, its topics under its stop, and folds the others to their stop", () => {
+	it("selects the arc the map shows, its topics in the panel under the cards", () => {
 		const open = [...document.querySelectorAll('[data-slot="road-stop"][data-open]')];
 		assert.deepEqual(open.map((s) => s.getAttribute("data-arc")), ["maps"]);
-		assert.deepEqual([...open[0]!.querySelectorAll('[data-slot="course-topic-row"]')].map((r) => r.getAttribute("data-topic")), ["rank", "kernel"]);
+		assert.deepEqual([...document.querySelectorAll('[data-slot="road-topics"] [data-slot="course-topic-row"]')].map((r) => r.getAttribute("data-topic")), ["rank", "kernel"]);
 		assert.equal(document.querySelectorAll('[data-slot="course-topic-row"]').length, 2, "only the open arc's topics");
 	});
 
-	it("shows every arc on the road, with no fold presses", () => {
+	it("shows every arc as a card, with no fold presses", () => {
 		assert.deepEqual([...document.querySelectorAll('[data-slot="road-stop"]')].map((s) => s.getAttribute("data-arc")), ["spaces", "maps", "eigen"]);
 		assert.ok(document.querySelector('[data-slot="road-fold"]') === null);
 	});
 
-	it("ends each stop in its one fact: Check it on a ready arc, the day a new arc starts, and the exam a stop", () => {
+	it("heads each card with its one fact, puts Check it over a ready arc's topics, and makes the exam a card", () => {
 		const atSpaces = courseRead({ status: "ready", courses: [{ ...course, map: { ...course.map, current: h("span") } }], failed: [], open: [], chats: [] }, course.map.workspace);
 		const spacesView = (atSpaces as Extract<typeof atSpaces, { status: "ready" }>).view;
 		const here = render(<RoadTrack {...columns} view={spacesView} shown={spacesView.arcs![0]!} onFollow={noop} />);
-		assert.ok(here.querySelector('[data-arc="spaces"] [data-slot="road-stop-check"]'), "Check it");
+		assert.ok(here.querySelector('[data-slot="road-topics"] [data-slot="road-stop-check"]'), "Check it");
 		assert.equal(document.querySelector('[data-arc="eigen"] [data-slot="road-stop-state"]')?.textContent, "Starts 20 Nov");
 		assert.ok(document.querySelector('[data-slot="road-exam"]'), "the exam's stop");
 		assert.ok(document.querySelector('[data-slot="arc-pill"]') === null, "no pills");
 	});
 
 	it("keeps its height for the course's longest arc, so the map above never moves", () => {
-		assert.match(document.querySelector('[data-slot="road-track"]')!.getAttribute("style") ?? "", /height:\s*208px/);
+		assert.match(document.querySelector('[data-slot="road-track"]')!.getAttribute("style") ?? "", /height:\s*188px/);
 	});
 
 	it("draws each topic as Home's Today row at its compact size: the pie beside where he stands, then the topic and its fact", () => {
@@ -133,11 +127,13 @@ describe("the road under the map", () => {
 		assert.equal(row.children.length, 4, "pie, where he stands, the topic, its fact");
 	});
 
-	it("slides inside a window that never scrolls, the track stopping short of every marker", () => {
-		assert.match(document.querySelector('[data-slot="road-window"]')!.className, /\boverflow-hidden\b/, "the window itself never scrolls");
+	it("draws every arc as a card, as the map draws its cards, all in one row that scrolls only natively", () => {
 		const stop = document.querySelector('[data-slot="road-stop"]')!;
-		assert.match(stop.className, /before:w-\[calc\(50%-14px\)\]/, "the stretch before stops 6px short of the marker's 16px box");
-		assert.match(stop.className, /after:left-\[calc\(50%\+14px\)\]/, "the stretch after starts 6px past it");
+		assert.match(stop.className, /\brounded-lg\b/);
+		assert.match(stop.className, /\bborder\b/);
+		assert.match(stop.className, /\bbg-card\b/);
+		assert.match(document.querySelector('[data-slot="road-window"]')!.className, /\bsnap-x\b/, "a row too long to fit snaps to a card's edge");
 		assert.equal(document.querySelectorAll('[data-slot="road-stop"]').length, 3);
 	});
+
 });

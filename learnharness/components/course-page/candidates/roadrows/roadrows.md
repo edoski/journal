@@ -10,15 +10,13 @@ It follows the road's topic rows the way Home's map follows Today (`road-follow.
 
 ## The road
 
-- Every arc of the course on one track, left to right, the exam a stop where the plan reaches it (`trackItems`, `road-exam`). No folds, no Earlier, Later, More or "Only what's near" presses (Edo, 17 Nov 2026: "Scrap all of that").
-- A fixed window that never scrolls (`road-window`, overflow hidden). The strip inside it slides (a transform, 300ms ease-out, none under reduced motion) so the selected arc sits in the window's centre, held at the strip's ends so it never leaves the window (`stripOffset`). Its sides fade only where the strip runs on beyond them.
-- The selected arc is the one the page shows. It is open and 352px wide, its topics under it as Home's Today rows at their compact size (`hybridRow({ size: "compact" })`). Every other arc is 224px, its ring, its whole name and its one fact: "Needs you", "Ready for its check", "Check passed" or "Starts 20 Nov". Widths are fixed numbers, so the strip's place is worked out, never measured mid-glide.
-- A wheel or swipe moves the strip with it, an arc's width of travel for an arc, momentum included, the arc nearest the centre brightening as it passes; when the gesture rests 140ms the strip glides onto that arc and selects it, so a gentle swipe moves one arc and a flick several. It never runs past the first or last arc. It is listened to directly, so the page never scrolls or swipes back (Edo, 17 Nov 2026: one arc per gesture was "too rigid"). Pressing a stop selects it. Pointing at a stop only brightens its words; pointing at a topic row lights its card on the map, as Home does.
-- The track runs through the items and stops `MARK_GAP` (6px) short of every marker on either side, the exam's included. The row keeps the height of the course's longest arc, so the map never moves.
+- Every arc of the course as a card in one row under the map, left to right in study order, the exam a dashed card where the plan reaches it (`trackItems`, `road-exam`). A card is drawn as the map's cards are (`base-node.tsx`, a hairline border on the card surface): its ring and its one fact on top ("Needs you", "Ready for its check", "Check passed", "Starts 20 Nov", or "You are here"), then its whole name on up to two lines. The cards share the row equally and all fit at 1512×982 (Linear Algebra's seven arcs and the exam, 153px each); a course with more arcs than fit scrolls natively, snapping to a card's edge, with no custom wheel or swipe handling (Edo, 17 Nov 2026: the hand-made swipe "is just broken UI/UX… each arc should have a card there around them in minimalist style").
+- Pressing a card selects its arc: it wears the map's "You are here" ring, the map shows the arc, and its topics fill the panel under the cards as Home's Today rows at their compact size (`hybridRow({ size: "compact" })`), three to a line; Check it heads them on an arc ready for its check. Pointing at a card only brightens its name and border; pointing at a topic row lights its card on the map, as Home does.
+- The panel keeps the height of the course's longest arc, so the map never moves.
 
 ## Keys
 
-← and → select the arc before or after (from a topic row too), gliding it to the centre; Down enters the open arc's topics (opening the arc first); Up leaves them for their stop and, from a stop, for the head's press; Enter or Space opens a topic's page.
+← and → select the arc before or after (from a topic row too); Down enters the open arc's topics (opening the arc first); Up leaves them for their stop and, from a stop, for the head's press; Enter or Space opens a topic's page.
 
 ## The topic page
 

@@ -15,14 +15,3 @@ export function trackItems(sections: readonly CourseArcSection[], examBefore: Ar
 	return items;
 }
 
-/**
- * How far the road's strip slides left so the item spanning `[start,
- * start + width)` sits in the window's centre, held so the strip never
- * leaves the window: never past its first item's left edge, nor its last
- * item's right edge, and still when the whole strip fits. Pure.
- */
-export function stripOffset(item: { start: number; width: number }, strip: number, window: number): number {
-	if (strip <= window) return 0;
-	const centred = item.start + item.width / 2 - window / 2;
-	return Math.min(Math.max(0, centred), strip - window);
-}
