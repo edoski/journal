@@ -323,7 +323,7 @@ function arcCheckLines(arcsReady: unknown, arc: string | undefined): string[] | 
 	if (!check) return null;
 	const pairs = list(check.pairs).flatMap((p) => (Array.isArray(p) && p.length === 2 ? [`${String(p[0])} or ${String(p[1])}`] : []));
 	return [
-		`Arc check: he pressed Check it on ${str(check.title) ?? arc} (${arc}), so this session is its check, offered and never required, and it locks nothing.`,
+		`Arc check: he pressed Test this arc on ${str(check.title) ?? arc} (${arc}), so this session is its check, offered and never required, and it locks nothing.`,
 		...(str(check.question) ? [`  question: ${check.question}`] : []),
 		`  one unaided item per topic, in mixed order: ${handles(check.topics).join(", ")}`,
 		...(pairs.length > 0 ? [`  one choose-the-method item per pair: ${pairs.join("; ")}`] : []),

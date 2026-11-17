@@ -286,18 +286,6 @@ export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today
 	return returnWords(review.date);
 }
 
-/** A review by its one day, for a row too narrow for the sentence
- *  (`reviewWords` stays its hint): "Due 6 Nov" for "Due since 6 Nov"; a
- *  review the plan holds past memory's day by the day it comes back,
- *  "Back 20 Nov" for "Due since 6 Nov, back 20 Nov" (round 11, 2 n9: "Due
- *  6 Nov" read as overdue while the map said back 20 Nov); "Due today" and
- *  any other dated review as `reviewWords`. */
-export function shortReviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
-	if (review.kind === "due" && review.overdue > 0) return `Due ${shortDay(dayBefore(today, review.overdue))}`;
-	if (review.kind === "scheduled" && review.held && review.held.since < today) return `Back ${shortDay(review.date)}`;
-	return reviewWords(review, today);
-}
-
 /** "A", "A and B", "A, B and C". */
 function listWords(names: readonly string[]): string {
 	return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
@@ -798,10 +786,11 @@ export const READY_WORDS = {
  *  course page's head): the whole answer opens under it. "No exam"
  *  for a course without one. When the plan cannot fit all of it, the head
  *  says what it loses in its own words (`ExamReady`'s), never "Not all of
- *  it fits" (round 15, M7). */
+ *  it fits" (round 15, M7); not ready says for what (round 15, m10: "Not
+ *  ready yet" had no object). */
 export const READY_FACT_WORDS = {
 	ready: "Ready for the exam",
-	notYet: "Not ready yet",
+	notYet: "Not ready for the exam yet",
 	none: "No exam",
 } as const;
 

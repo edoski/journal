@@ -6,7 +6,7 @@ import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said, type SidebarPlace, type TopicFact } from "@/components/unit-inbox/sidebar-says";
-import { ARC_EXAM_WORDS, ARC_ROW_EXAM_WORDS, courseShareWords, firstLessonWords, reviewWords, shortDay, shortReviewWords } from "@/components/study-words";
+import { ARC_EXAM_WORDS, ARC_ROW_EXAM_WORDS, courseShareWords, firstLessonWords, shortDay } from "@/components/study-words";
 import { nowFor } from "@/components/unit-inbox/now-inbox";
 import { todayTop } from "@/components/unit-inbox/today/today-top";
 import { buildInbox } from "@/components/unit-inbox/units";
@@ -110,21 +110,20 @@ function courseRows(course: StudyCourse, chats: readonly ChatListItem[], courses
 		const waits = leftOut || (map.exam?.doesNotFit?.includes(topic.handle) ?? false);
 		const afterExam = planned && topic.starts && map.exam && map.exam.daysLeft >= 0 && topic.starts > map.exam.date && waits;
 		const shown = here && !afterExam ? HERE : (planned ?? fact);
-		const words = afterExam ? ARC_ROW_EXAM_WORDS[leftOut ? "leftOut" : "noRoom"] : planned && shown === planned && topic.starts && topic.starts > map.today ? `Planned ${shortDay(topic.starts)}` : shownWords(shown, topic, map.today);
+		const words = afterExam ? ARC_ROW_EXAM_WORDS[leftOut ? "leftOut" : "noRoom"] : planned && shown === planned && topic.starts && topic.starts > map.today ? `Planned ${shortDay(topic.starts)}` : shownWords(shown);
 		return { topic, group, fact: shown, factWords: words, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
 	});
 	return { rows, said };
 }
 
-/** A row's fact in its shortest whole words, the sidebar's sentence kept
- *  for the hint (round 11, 1 N8: rows showed a bare icon where the words
- *  did not fit): a review by its one day (`shortReviewWords`), a method
- *  he mixed up as "Mixed up", any other fact as the sidebar says it. */
-function shownWords(fact: TopicFact | null, topic: CourseMapTopic, today: string): string | null {
+/** A row's fact in the words the sidebar and the map's card say it, so a
+ *  review reads one way on every surface ("Due since 6 Nov", "Due since 13
+ *  Nov, back 23 Dec"; round 15, m10: "Due 6 Nov" in the arc list beside
+ *  "Due since 6 Nov" in the Now row, "Back 23 Dec" against the card's "Due
+ *  since 13 Nov, back 23 Dec"), a method he mixed up as "Mixed up". */
+function shownWords(fact: TopicFact | null): string | null {
 	if (!fact) return null;
-	if (fact.kind === "slip" && fact.slip === "mixed") return MIXED_UP;
-	const review = fact.kind === "review" || fact.kind === "back" ? topic.review : null;
-	return review && fact.words === reviewWords(review, today) ? shortReviewWords(review, today) : fact.words;
+	return fact.kind === "slip" && fact.slip === "mixed" ? MIXED_UP : fact.words;
 }
 
 /** A mixed-up method's slip on a row, the method named in its hint. */

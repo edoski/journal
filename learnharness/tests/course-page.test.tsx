@@ -415,12 +415,12 @@ describe("a topic row's status in words, whole (round 11, 1 N8 and 2 n9)", () =>
 		assert.equal(fact.getAttribute("data-state"), "closed", "the slot is the trigger of its hint, which says the whole sentence");
 	});
 
-	it("says a held review by the day it comes back, a due one by the day it came due, and a planned start by its date", () => {
+	it("says a review in the sidebar's and the map card's words, and a planned start by its date (round 15, m10)", () => {
 		const row = rowOf("matmul", course({ topics: [...TOPICS, held] }));
-		assert.deepEqual(row.fact, { kind: "review", words: "Due since 6 Nov, back 20 Nov" }, "the fact stays the sidebar's, for the hint");
-		assert.equal(row.factWords, "Back 20 Nov");
+		assert.deepEqual(row.fact, { kind: "review", words: "Due since 6 Nov, back 20 Nov" });
+		assert.equal(row.factWords, "Due since 6 Nov, back 20 Nov");
 		const span = rowOf("span", course());
-		assert.deepEqual([span.fact?.words, span.factWords], ["Due since 29 Oct", "Due 29 Oct"]);
+		assert.deepEqual([span.fact?.words, span.factWords], ["Due since 29 Oct", "Due since 29 Oct"]);
 		const fresh = rowOf("eigen", course({ topics: TOPICS.map((t) => (t.handle === "eigen" ? { ...t, starts: "2026-11-18" } : t)) }));
 		assert.equal(fresh.factWords, "Planned 18 Nov");
 	});

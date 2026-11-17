@@ -3,14 +3,17 @@
 import * as React from "react";
 import { ListChecksIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/ui/hint";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ArcLabel } from "@/components/course-map/arc-label";
 import { ARC_STATE_WORDS } from "@/components/study-words";
 import { GROUP_WORDS, type CourseArcSection, type CourseTopic } from "@/components/course-page/course-model";
 import { cn } from "@/lib/utils";
 
-/** The words Check it says. */
-export const CHECK_WORDS = "Check it";
+/** The words the arc's check says: what to do, literally (round 15, m10:
+ *  "Check it" told him neither what nor how), and what it is in its hint. */
+export const CHECK_WORDS = "Test this arc";
+export const CHECK_HINT = "A question on each of its topics, in mixed order, with no hints";
 
 /** What the list hands each arc's line (`SplitList`'s `arcLine`): the arc,
  *  its topics and how to draw one, whether it is open, its check, and the
@@ -132,18 +135,20 @@ export function RoadArc({
 						</button>
 					</CollapsibleTrigger>
 					{checkable && (
-						<Button
-							ref={checkRef}
-							variant="quiet"
-							size="xs"
-							data-slot="course-arc-check"
-							disabled={checking}
-							onClick={onCheck}
-							className="-mr-1.5 h-6 shrink-0 gap-1.5 px-1.5 text-callout font-normal text-muted-foreground hover:text-link [&_svg]:size-3.5"
-						>
-							<ListChecksIcon aria-hidden />
-							{CHECK_WORDS}
-						</Button>
+						<Hint label={CHECK_HINT} side="bottom">
+							<Button
+								ref={checkRef}
+								variant="quiet"
+								size="xs"
+								data-slot="course-arc-check"
+								disabled={checking}
+								onClick={onCheck}
+								className="-mr-1.5 h-6 shrink-0 gap-1.5 px-1.5 text-callout font-normal text-muted-foreground hover:text-link [&_svg]:size-3.5"
+							>
+								<ListChecksIcon aria-hidden />
+								{CHECK_WORDS}
+							</Button>
+						</Hint>
 					)}
 				</h2>
 				{/* Clipped only down, for the slide: a topic row reaches past the list's right edge to its own. */}
