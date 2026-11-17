@@ -293,6 +293,10 @@ function assertOneStatus(s: Survey) {
 		);
 		if (entry && !entry.face.includes(line.status)) problems.push(`"${line.title}": Home says "${line.status}", the calendar "${entry.face}"`);
 	}
+	// Every line Home draws has its card on the sidebar's top, under the same name (round 15, m7: on 10 Nov the
+	// sidebar left out the Linear maps lesson Home listed).
+	const top = s.sidebar.filter((c) => c.shelf === "" && !c.el.matches('[data-testid="session-row"]'));
+	for (const line of s.home) if (!top.some((c) => c.title === line.title)) problems.push(`"${line.title}": on Home's Today, with no card on the sidebar's top (${top.map((c) => `"${c.title}"`).join(", ")})`);
 	assert.ok(problems.length === 0, `${s.label}: one session, two statuses:\n  ${problems.join("\n  ")}`);
 }
 
@@ -623,8 +627,6 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 	/** The Invertible lesson started from its topic page (the live-lesson step), its question still open. */
 	let invertible: { id: string; call: { tool: string; input: unknown } } | null = null;
 
-	const sessionOf = (title: string) => app.chats().find((c) => c.title === title);
-
 	it("Sun 8 Nov, as seeded", async () => {
 		await holds("Sun 8 Nov, as seeded");
 	});
@@ -671,7 +673,8 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 	});
 
 	it("Sun 8 Nov, after Problem sheet 4 is continued and left for next time (lens 2, steps 30 to 32)", async () => {
-		const sheet = sessionOf("Problem sheet 4")!;
+		// The sheet's session, by the task it holds: it is named after the task (round 15, m5).
+		const sheet = app.chats().find((c) => (c.tasks ?? []).includes("sheet-4"))!;
 		app.say(sheet.id, "ok, let us continue the sheet");
 		await app.save(sheet.id, {
 			observations: [
@@ -729,8 +732,11 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 
 	it("Mon 9 Nov, after the Linear Algebra review from Home (lens 1, step 15)", async () => {
 		await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 });
-		const line = app.homeLines().find((l) => l.course === "Linear Algebra" && l.title.startsWith("Review "));
+		// Eigen's review is due today, and the Eigen lesson left yesterday is open on it, so the review is that lesson's
+		// line, where his answers count as it (round 15, m6).
+		const line = app.homeLines().find((l) => l.course === "Linear Algebra" && (l.title.startsWith("Review ") || l.title.startsWith("Eigenvalues and eigenvectors")));
 		assert.ok(line, `Home offers a Linear Algebra review: ${app.homeLines().map((l) => l.title).join(" | ")}`);
+		assert.ok(app.homeLines().filter((l) => /Eigenvalues and eigenvectors/.test(l.title)).length === 1, `one line for Eigen: ${app.homeLines().map((l) => `${l.title} · ${l.status}`).join(" | ")}`);
 		const opened = await app.press(line.el);
 		assert.ok(opened?.startsWith("/chat/"), `the review opens a session (${opened})`);
 		const id = opened!.slice(6);
