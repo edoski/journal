@@ -5,7 +5,7 @@
  * chat/), MIT License, Copyright (c) 2026 T3 Tools Inc. The notice is in
  * components/lesson/T3CODE_LICENSE.txt. */
 
-import { useCallback, useLayoutEffect, useState, type ComponentProps, type ReactNode } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { ArrowRightIcon, ArrowUpIcon, SquareIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -93,7 +93,16 @@ export function LessonComposer({
 	compact = false,
 }: LessonComposerProps) {
 	const [focused, setFocused] = useState(false);
-	const collapsed = compact && !focused && !value.trim() && !(photos?.photos.length ?? 0);
+	const empty = !value.trim() && !(photos?.photos.length ?? 0);
+	const collapsed = compact && !focused && empty;
+	const fieldRef = useRef<HTMLTextAreaElement>(null);
+	// Turning compact as he reads up a lesson, an empty field lets go of focus, so the composer folds; a key
+	// he types lands back in it (type-to-compose). A field holding words keeps focus and stays open.
+	const wasCompact = useRef(compact);
+	useLayoutEffect(() => {
+		if (compact && !wasCompact.current && empty && document.activeElement === fieldRef.current) fieldRef.current?.blur();
+		wasCompact.current = compact;
+	}, [compact, empty]);
 	const next = nextProblem && !answer ? { label: "Next problem", run: () => onNext?.(), testId: "next-problem-button" } : undefined;
 	const act = () => {
 		if (answer) {
@@ -114,6 +123,7 @@ export function LessonComposer({
 	const sendDisabled = stopping ? false : answer ? !answer.ready : !busy && !canSend;
 	const field = (
 		<textarea
+			ref={fieldRef}
 			value={value}
 			onChange={(e) => onChange(e.target.value)}
 			onKeyDown={(e) => {
@@ -189,7 +199,8 @@ export function LessonComposer({
 				data-slot="composer-body"
 				className={cn(compact && "flex min-w-0 items-center transition-[padding] duration-200 ease-out motion-reduce:transition-none", collapsed ? "py-1.5 pr-2 pl-4" : "px-4 pt-4 pb-2")}
 			>
-				{compact ? <div className="min-w-0 flex-1">{field}</div> : field}
+				{/* One place for the field in either state, so it never remounts and drops focus as the composer folds. */}
+				<div className={compact ? "min-w-0 flex-1" : "contents"}>{field}</div>
 				{collapsed && sendControl}
 			</div>
 			{/* The toolbar folds away while the composer is compact, sliding open as it opens (grid rows 0fr to 1fr). */}
