@@ -13,7 +13,11 @@ import type { SessionEntry, TopicAction } from "@/components/unit-inbox/topic-pa
 /** A session whose tutor wrote a plan with steps. */
 export type PlannedEntry = SessionEntry & { plan: SessionPlan };
 
-export const isPlanned = (entry: SessionEntry): entry is PlannedEntry => (entry.plan?.tree.nodes.length ?? 0) > 0;
+/** Whether a session's plan draws as a map: two steps or more. One step
+ *  is a lone card that says what Now says (round 15, 2 n6: Kernel's page
+ *  drew "Part (c) of sheet 4" alone at the top of an empty pane), so the
+ *  history takes the width instead. */
+export const isPlanned = (entry: SessionEntry): entry is PlannedEntry => new Set(entry.plan?.tree.nodes.map((node) => node.id) ?? []).size > 1;
 
 /** The lesson the map shows at first: the session the page's action opens
  *  when it planned, else the topic's newest own session that planned;
