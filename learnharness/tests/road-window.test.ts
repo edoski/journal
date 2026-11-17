@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { roadWindow, shownStop } from "@/components/course-page/candidates/road/road-model";
 import type { CourseArcSection } from "@/components/course-page/course-model";
+import type { ArcHandle } from "@/src/core";
 
 const arc = (handle: string, o: { current?: boolean; needsYou?: boolean; state?: string } = {}) =>
 	({ arc: { handle, state: o.state ?? "new" }, current: o.current ?? false, needsYou: o.needsYou ?? false, topics: [] }) as unknown as CourseArcSection;
@@ -21,7 +22,7 @@ test("with no current arc, the first arc not yet checked stands in", () => {
 
 test("the exam's stop moves to the next shown arc when its own arc is folded away", () => {
 	const shown = roadWindow(road, false);
-	assert.equal(shownStop(road, shown, "d"), "e");
-	assert.equal(shownStop(road, shown, "g"), null);
+	assert.equal(shownStop(road, shown, "d" as ArcHandle), "e");
+	assert.equal(shownStop(road, shown, "g" as ArcHandle), null);
 	assert.equal(shownStop(road, shown, null), null);
 });
