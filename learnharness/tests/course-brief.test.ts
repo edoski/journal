@@ -473,8 +473,8 @@ describe("the brief fetch reads every course's plan", () => {
 		try {
 			const record = { ...linked("/study/probability"), topics: ["variance"], messages: [] };
 			const first = await fetchCourseBrief(record, "Variance");
-			assert.match(first!.text, /\("Variance is ahead of your plan, which starts it on Friday 20 November: today's plan still holds your Binomial distribution review\."\)/);
-			assert.doesNotMatch((await fetchCourseBrief(record, "My exam plan has no room for Variance. How can I still fit it in before the exam?"))!.text, /Ahead of plan/);
+			assert.match(first!.text, /\("Your Binomial distribution review is still due today\."\)/);
+			assert.doesNotMatch((await fetchCourseBrief(record, "My exam plan has no room for Variance. How can I still fit it in before the exam?"))!.text, /Started early/);
 		} finally {
 			delete process.env.FAKE_ENGINE_PLAN;
 			delete process.env.FAKE_ENGINE_MAP;
@@ -497,28 +497,34 @@ describe("the brief fetch reads every course's plan", () => {
 	});
 });
 
-describe("a topic started ahead of plan (round 13, 1 n7; round 14, m1)", () => {
+describe("a topic started ahead of plan (round 13, 1 n7; round 14, m1; round 15, m12)", () => {
 	const linalg = { workspace: "/study/linalg", courses: [{ map: LINEAR_ALGEBRA, days: DAYS["/study/linalg"]! }], unread: [] };
 	const withProbability = { ...linalg, courses: [...linalg.courses, { map: PROBABILITY, days: DAYS["/study/probability"]! }] };
-	it("tells the tutor he starts it early, the day his plan gave and what starting now costs, so the lesson's first words say so", () => {
+	it("says only the review still due today, in one short clause before the first question", () => {
 		const { text } = projectCourseBrief(TODAY, "teach", { plan: withProbability, opened: ["inner-product"], opening: "Inner products" });
-		assert.match(text, /\nAhead of plan: his plan starts Inner products on Tuesday 17 November, and he starts it today\. Your first message to him says so in one plain sentence \("Inner products is ahead of your plan, which starts it on Tuesday 17 November: today's plan still holds your Binomial distribution review and your Random variables and distributions review\."\), with no reason of your own/);
-		const shaky = courseMap("/study/linalg", "Linear Algebra", null, [topic("change-basis", "Change of basis", { review: scheduled("2026-11-12") }), topic("diagonal", "Diagonalization", untaught("2026-11-20", { kind: "after", needs: ["change-basis" as TopicHandle], partners: [] }))]);
-		assert.match(projectCourseBrief(TODAY, "teach", { plan: { ...linalg, courses: [{ map: shaky, days: [] }] }, opened: ["diagonal"], opening: "Start Diagonalization" }).text, /"Diagonalization is ahead of your plan, which starts it on Friday 20 November: Change of basis, which it builds on, is not solid yet\."/);
+		assert.match(text, /\nStarted early: his plan starts Inner products on a later day, and he starts it today while your Binomial distribution review and your Random variables and distributions review are still due today\. Your first message says so in one short clause before its question \("Your Binomial distribution review and your Random variables and distributions review are still due today\."\), and nothing else about his plan/);
+		assert.doesNotMatch(text, /ahead of your plan|not solid yet|Tuesday 17 November/, "never the plan's day, the prerequisites or the opener of round 14");
+	});
+
+	it("a fresh start with nothing due today opens on its first question: no word about the plan, shaky prerequisites or today's other starts (round 15, m12)", () => {
+		const shaky = courseMap("/study/linalg", "Linear Algebra", null, [topic("change-basis", "Change of basis", { review: scheduled("2026-11-12") }), topic("diagonal", "Diagonalization", untaught("2026-11-20", { kind: "after", needs: ["change-basis" as TopicHandle], partners: [] })), topic("inner-product", "Inner products", untaught("2026-11-08", { kind: "next" }))]);
+		const startsToday = { workspace: "/study/linalg", courses: [{ map: shaky, days: [{ date: shaky.today, reviews: [], new: ["inner-product" as TopicHandle] }] }], unread: [] };
+		const { text } = projectCourseBrief(TODAY, "teach", { plan: startsToday as never, opened: ["diagonal"], opening: "Start Diagonalization" });
+		assert.doesNotMatch(text, /Started early|Ahead of plan|ahead of your plan|not solid yet/);
 	});
 
 	it("says nothing for a topic his plan starts today, one already taught, or his review", () => {
 		const onDay = courseMap("/study/linalg", "Linear Algebra", null, [topic("inner-product", "Inner products", untaught("2026-11-08", { kind: "next" }))]);
-		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: { ...withProbability, courses: [{ map: onDay, days: [] }, withProbability.courses[1]!] }, opened: ["inner-product"], opening: "Inner products" }).text, /Ahead of plan/);
-		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: withProbability, opened: ["kernel"], opening: "Kernel and rank-nullity" }).text, /Ahead of plan/);
-		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: withProbability, opened: ["inner-product"], opening: "Inner products", review: true }).text, /Ahead of plan/);
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: { ...withProbability, courses: [{ map: onDay, days: [] }, withProbability.courses[1]!] }, opened: ["inner-product"], opening: "Inner products" }).text, /Started early/);
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: withProbability, opened: ["kernel"], opening: "Kernel and rank-nullity" }).text, /Started early/);
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: withProbability, opened: ["inner-product"], opening: "Inner products", review: true }).text, /Started early/);
 	});
 
-	it("says nothing in a lesson he began, in Ask the tutor, or when starting early costs nothing (round 14, m1)", () => {
+	it("says nothing in a lesson he began, in Ask the tutor, or when no review is due today (round 14, m1)", () => {
 		const begun = courseMap("/study/linalg", "Linear Algebra", null, [topic("inner-product", "Inner products", untaught("2026-11-09", { kind: "begun" }))]);
-		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: { ...withProbability, courses: [{ map: begun, days: [] }, withProbability.courses[1]!] }, opened: ["inner-product"], opening: "Inner products" }).text, /Ahead of plan/, "a lesson under way goes on, never a start");
-		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: withProbability, opened: ["inner-product"], opening: "My exam plan has no room for Inner products. How can I still fit it in before the exam?" }).text, /Ahead of plan/, "Ask the tutor answers his question first");
-		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: linalg, opened: ["inner-product"], opening: "Inner products" }).text, /Ahead of plan/, "nothing else is planned today and what it builds on is solid");
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: { ...withProbability, courses: [{ map: begun, days: [] }, withProbability.courses[1]!] }, opened: ["inner-product"], opening: "Inner products" }).text, /Started early/, "a lesson under way goes on, never a start");
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: withProbability, opened: ["inner-product"], opening: "My exam plan has no room for Inner products. How can I still fit it in before the exam?" }).text, /Started early/, "Ask the tutor answers his question first");
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: linalg, opened: ["inner-product"], opening: "Inner products" }).text, /Started early/, "no review is due today");
 	});
 });
 

@@ -367,31 +367,28 @@ function studiedLine({ date, daysAgo }: LastStudied): string {
 /** "A", "A and B", "A, B and C". */
 const listedWords = (names: readonly string[]) => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
 
-/** What starting `topic` today costs him, in the plan's own facts: what it
- *  builds on is not solid yet (its start waits on it), or today's plan
- *  still holds other work, in any course. Null when it costs nothing. */
-function earlyCost(plans: CoursePlans, map: CourseMap, topic: CourseMapTopic): string | null {
-	const titleIn = (m: CourseMap, h: TopicHandle) => m.topics.find((t) => t.handle === h)?.title ?? h;
-	const waits = topic.startsWhy?.kind === "after" ? [...topic.startsWhy.needs, ...topic.startsWhy.partners] : [];
-	const shaky = waits.length > 0 ? `${listedWords(waits.map((h) => titleIn(map, h)))}, which it builds on, ${waits.length > 1 ? "are" : "is"} not solid yet` : null;
-	const held = plans.courses.flatMap(({ map: m, days }) => {
+/** The reviews today's plan still holds, in any course: what starting
+ *  `topic` early puts off. A new topic planned today is not due, and
+ *  what it builds on is the probe's to show (round 15, m12: the opener
+ *  grew to the plan's day, shaky prerequisites and today's other starts,
+ *  and taught nothing). Empty when nothing is due. */
+function displacedReviews(plans: CoursePlans): string[] {
+	return plans.courses.flatMap(({ map: m, days }) => {
 		const today = days.find((d) => d.date === m.today);
-		if (!today) return [];
-		return [...today.reviews.map((h) => `your ${titleIn(m, h)} review`), ...today.new.filter((h) => h !== topic.handle).map((h) => titleIn(m, h))];
+		return (today?.reviews ?? []).map((h) => `your ${m.topics.find((t) => t.handle === h)?.title ?? h} review`);
 	});
-	const planned = held.length > 0 ? `today's plan still holds ${listedWords(held)}` : null;
-	const costs = [shaky, planned].filter((c): c is string => c !== null);
-	return costs.length > 0 ? costs.join(", and ") : null;
 }
 
 /** A topic he started today, from its page or a row, that his plan starts
- *  on a later day: the lesson's first words say so, with what starting it
- *  early costs him, and only then (round 13, 1 n7: a start 11 days early
- *  opened on a bare probe; round 14, m1: the line opened every lesson, a
- *  lesson he had begun, and the Ask-the-tutor reply). `opening` is the
- *  session's first words: a start opens with the topic's title ("Start" and
- *  it, or it alone); a continue, a question and a free message never do.
- *  Never a reason the plan does not give. */
+ *  on a later day, while a review is still due today: the lesson's first
+ *  words say that review is still due, in one short clause, and nothing
+ *  else of the plan (round 13, 1 n7: a start 11 days early opened on a
+ *  bare probe; round 14, m1: the line opened every lesson, a lesson he had
+ *  begun, and the Ask-the-tutor reply; round 15, m12: it grew to three
+ *  clauses that offered nothing). With nothing due today it says nothing.
+ *  `opening` is the session's first words: a start opens with the topic's
+ *  title ("Start" and it, or it alone); a continue, a question and a free
+ *  message never do. */
 function aheadOfPlanLines(plans: CoursePlans | undefined, opened: readonly string[], opening: string | null): string[] {
 	const map = plans?.courses.find((c) => c.map.workspace === plans.workspace)?.map;
 	if (!plans || !map || !opening) return [];
@@ -400,10 +397,10 @@ function aheadOfPlanLines(plans: CoursePlans | undefined, opened: readonly strin
 		const topic = map.topics.find((t) => t.handle === handle);
 		if (!topic || topic.level !== "new" || !topic.starts || topic.starts <= map.today || lessonBegun(topic)) return [];
 		if (words !== topic.title.toLowerCase()) return [];
-		const cost = earlyCost(plans, map, topic);
-		if (!cost) return [];
-		const day = longDay(topic.starts);
-		return [`Ahead of plan: his plan starts ${topic.title} on ${day}, and he starts it today. Your first message to him says so in one plain sentence ("${topic.title} is ahead of your plan, which starts it on ${day}: ${cost}."), with no reason of your own, then the lesson goes on.`];
+		const due = displacedReviews(plans);
+		if (due.length === 0) return [];
+		const clause = `${listedWords(due)} ${due.length > 1 ? "are" : "is"} still due today`;
+		return [`Started early: his plan starts ${topic.title} on a later day, and he starts it today while ${clause}. Your first message says so in one short clause before its question ("${clause[0]!.toUpperCase()}${clause.slice(1)}."), and nothing else about his plan: never its day, what ${topic.title} builds on, or a reason.`];
 	});
 }
 
