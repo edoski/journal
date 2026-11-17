@@ -99,7 +99,7 @@ const render = (node: React.ReactNode) =>
 	).document;
 
 describe("the road under the map", () => {
-	const document = render(<RoadTrack {...columns} />);
+	const document = render(<RoadTrack {...columns} onFollow={noop} />);
 
 	it("opens the arc the map shows, its topics under its stop, and folds the others to their stop", () => {
 		const open = [...document.querySelectorAll('[data-slot="road-stop"][data-open]')];
@@ -116,7 +116,7 @@ describe("the road under the map", () => {
 	it("ends each stop in its one fact: Check it on a ready arc, the day a new arc starts, and the exam a stop", () => {
 		const atSpaces = courseRead({ status: "ready", courses: [{ ...course, map: { ...course.map, current: h("span") } }], failed: [], open: [], chats: [] }, course.map.workspace);
 		const spacesView = (atSpaces as Extract<typeof atSpaces, { status: "ready" }>).view;
-		const here = render(<RoadTrack {...columns} view={spacesView} shown={spacesView.arcs![0]!} />);
+		const here = render(<RoadTrack {...columns} view={spacesView} shown={spacesView.arcs![0]!} onFollow={noop} />);
 		assert.ok(here.querySelector('[data-arc="spaces"] [data-slot="road-stop-check"]'), "Check it");
 		assert.equal(document.querySelector('[data-arc="eigen"] [data-slot="road-stop-state"]')?.textContent, "Starts 20 Nov");
 		assert.ok(document.querySelector('[data-slot="road-exam"]'), "the exam's stop");
@@ -124,6 +124,21 @@ describe("the road under the map", () => {
 	});
 
 	it("keeps its height for the course's longest arc, so the map above never moves", () => {
-		assert.match(document.querySelector('[data-slot="road-track"]')!.getAttribute("style") ?? "", /height:\s*156px/);
+		assert.match(document.querySelector('[data-slot="road-track"]')!.getAttribute("style") ?? "", /height:\s*208px/);
+	});
+
+	it("draws each topic as Home's Today row at its compact size: the pie beside where he stands, then the topic and its fact", () => {
+		const row = document.querySelector('[data-slot="course-topic-row"][data-topic="rank"]')!;
+		assert.match(row.className, /\bh-12\b/);
+		assert.match(row.className, /grid-cols-\[1rem_minmax\(0,1fr\)_auto\]/);
+		assert.equal(row.children.length, 4, "pie, where he stands, the topic, its fact");
+	});
+
+	it("is shadcn's carousel, its items centred, the track stopping short of every marker", () => {
+		assert.ok(document.querySelector('[data-slot="carousel"] [data-slot="carousel-content"]'));
+		const stop = document.querySelector('[data-slot="road-stop"]')!;
+		assert.match(stop.className, /before:w-\[calc\(50%-6px\)\]/, "the stretch before stops 6px short of the marker");
+		assert.match(stop.className, /after:left-\[calc\(50%\+22px\)\]/, "the stretch after starts 6px past it");
+		assert.equal(document.querySelectorAll('[data-slot="road-stop"]').length, 2);
 	});
 });
