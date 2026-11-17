@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { useSearchParams } from "next/navigation";
 import { LinkedColumns } from "@/components/linked-columns/linked-columns";
 import type { ArcHandle, CourseStanding, TopicHandle } from "@/src/core";
@@ -9,7 +9,7 @@ import { useStartArcCheck } from "@/components/unit-inbox/start-unit";
 import { CourseFrame } from "@/components/course-page/course-frame";
 import { PageFrame } from "@/components/page-frame/page-frame";
 import { CourseHead, arcOnPage } from "@/components/course-page/course-head/course-head";
-import { openingArc, type CourseArcSection, type CourseView } from "@/components/course-page/course-model";
+import { openingArc, type CourseArcSection, type CourseGroup, type CourseView } from "@/components/course-page/course-model";
 import { WhatNextRows } from "@/components/course-page/what-next";
 import { SplitList, type SplitListHandle } from "@/components/course-page/split/split-list";
 import { SplitMap, type SplitMapHandle } from "@/components/course-page/split/split-map";
@@ -32,8 +32,81 @@ export function SplitCourse({ workspace }: { workspace: string }) {
 	return <CourseFrame workspace={workspace}>{({ view, standing, busy, onContinue }) => <SplitBody view={view} standing={standing} busy={busy} onContinue={onContinue} />}</CourseFrame>;
 }
 
-/** The page under its head. */
-function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; standing: CourseStanding | null; busy: boolean; onContinue: (workspace: string) => void }) {
+/** What a course page's head and left column are handed by the page they
+ *  sit in (`SplitBody`): the course, the arc the map shows and which
+ *  sections are open, and the tie to the map, so every page keeps one
+ *  linked-columns layout with the same map. */
+export interface CourseColumns {
+	view: CourseView;
+	standing: CourseStanding | null;
+	busy: boolean;
+	onContinue: (workspace: string) => void;
+	/** The groups with topics, for a course without arcs. */
+	groups: readonly CourseGroup[];
+	/** The arc the map shows, of a course with arcs. */
+	shown: CourseArcSection | null;
+	/** Shows an arc on the map, and opens it in the list. */
+	showArc: (arc: ArcHandle) => void;
+	open: Readonly<Record<string, boolean>>;
+	onOpenChange: (id: string, open: boolean) => void;
+	onCheck: (section: CourseArcSection) => void;
+	/** The arc whose check is starting. */
+	checking: string | null;
+	/** The topic he points at on the map, whose row the list marks. */
+	marked: TopicHandle | null;
+	/** A row he points at or focuses, or none. */
+	onPoint: (handle: TopicHandle | null) => void;
+	/** The list's handle, which the map hands the walk back to. */
+	listRef: RefObject<SplitListHandle | null>;
+	onEnterMap: (handle: TopicHandle) => void;
+	/** Up from the list's first stop: the head's press. */
+	onExitTop: () => void;
+}
+
+/** Current's head: Pace (course-head.md). */
+function currentHead({ view, standing, busy, onContinue }: CourseColumns): ReactNode {
+	return <CourseHead view={view} standing={standing} busy={busy} onContinue={onContinue} />;
+}
+
+/** Current's left column: What next, then the arcs or the groups. */
+function currentList(c: CourseColumns): ReactNode {
+	return (
+		<>
+			<WhatNextRows next={c.view.whatNext} course={c.view.course} busy={c.busy} onContinue={c.onContinue} />
+			<SplitList
+				ref={c.listRef}
+				groups={c.groups}
+				arcs={c.view.arcs}
+				open={c.open}
+				onOpenChange={c.onOpenChange}
+				onCheck={c.onCheck}
+				checking={c.checking}
+				marked={c.marked}
+				onPoint={c.onPoint}
+				onEnterMap={c.onEnterMap}
+				onExitTop={c.onExitTop}
+			/>
+		</>
+	);
+}
+
+/** The page under the course frame: its head, then the list beside the
+ *  map. A candidate page passes its own `head` and `list`. */
+export function SplitBody({
+	view,
+	standing,
+	busy,
+	onContinue,
+	head = currentHead,
+	list: listOf = currentList,
+}: {
+	view: CourseView;
+	standing: CourseStanding | null;
+	busy: boolean;
+	onContinue: (workspace: string) => void;
+	head?: (columns: CourseColumns) => ReactNode;
+	list?: (columns: CourseColumns) => ReactNode;
+}) {
 	const { map } = view.course;
 	const { arcs } = view;
 	const [pointed, setPointed] = useState<Pointed | null>(null);
@@ -101,10 +174,29 @@ function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; sta
 		}
 	};
 
+	const columns: CourseColumns = {
+		view,
+		standing,
+		busy,
+		onContinue,
+		groups,
+		shown,
+		showArc,
+		open,
+		onOpenChange,
+		onCheck,
+		checking: starting,
+		marked: markedOf(pointed),
+		onPoint: pointFrom("list"),
+		listRef: list,
+		onEnterMap: (to) => drawing.current?.focus(to),
+		onExitTop: () => action()?.focus(),
+	};
+
 	return (
 		<PageFrame className="h-full">
 			<div ref={headerBox} className="contents" onKeyDown={onHeaderKeyDown}>
-				<CourseHead view={view} standing={standing} busy={busy} onContinue={onContinue} />
+				{head(columns)}
 			</div>
 			{map.topics.length === 0 ? (
 				<p data-slot="course-notice" className="flex min-h-8 items-center text-body text-muted-foreground">
@@ -113,24 +205,7 @@ function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; sta
 			) : (
 				<LinkedColumns
 					data-slot="course-split"
-					list={
-						<>
-						<WhatNextRows next={view.whatNext} course={view.course} busy={busy} onContinue={onContinue} />
-						<SplitList
-							ref={list}
-							groups={groups}
-							arcs={arcs}
-							open={open}
-							onOpenChange={onOpenChange}
-							onCheck={onCheck}
-							checking={starting}
-							marked={markedOf(pointed)}
-							onPoint={pointFrom("list")}
-							onEnterMap={(to) => drawing.current?.focus(to)}
-							onExitTop={() => action()?.focus()}
-						/>
-						</>
-					}
+					list={listOf(columns)}
 					map={
 						<SplitMap
 							key={map.workspace}

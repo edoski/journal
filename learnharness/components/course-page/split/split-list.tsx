@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ComponentType, type ComponentProps, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import type { TopicHandle } from "@/src/core";
 import { CourseGroup } from "@/components/course-page/course-group";
 import { CourseArc } from "@/components/course-page/course-arc";
@@ -53,6 +53,8 @@ export function SplitList({
 	onPoint,
 	onEnterMap,
 	onExitTop,
+	arcLine: ArcLine = CourseArc,
+	after,
 	ref,
 }: {
 	groups: readonly Group[];
@@ -69,6 +71,10 @@ export function SplitList({
 	onPoint: (handle: TopicHandle | null) => void;
 	onEnterMap: (handle: TopicHandle) => void;
 	onExitTop?: () => void;
+	/** How an arc's line is drawn: `CourseArc`, or a candidate's line with its props. */
+	arcLine?: ComponentType<ComponentProps<typeof CourseArc<CourseTopic>>>;
+	/** What closes the list, after its last section. */
+	after?: ReactNode;
 	ref?: Ref<SplitListHandle>;
 }) {
 	const viewport = useRef<HTMLDivElement>(null);
@@ -235,7 +241,7 @@ export function SplitList({
 				<div className={cn("flex flex-col", arcs ? "gap-0.5" : "gap-4")}>
 					{arcs
 						? arcs.map((section) => (
-								<CourseArc
+								<ArcLine
 									key={section.arc.handle}
 									section={section}
 									items={section.topics}
@@ -266,6 +272,7 @@ export function SplitList({
 									renderItem={row}
 								/>
 							))}
+					{after}
 				</div>
 			</div>
 		</section>
