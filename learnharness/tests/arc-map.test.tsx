@@ -3,7 +3,7 @@
  * "the graph should be the same single standardised component across
  * views"): Home, the enlarged map and the course page list the course's
  * arcs left of the map on one hairline track, the arc shown under its bar,
- * the arc he is in dotted, each row a press that shows its arc, and H goes
+ * the arc he is in dotted, each row a press that shows its arc, and ⌘J goes
  * to You are here. The course page's old selector (a name, a chevron, a dot
  * per arc) is gone.
  */
@@ -124,7 +124,7 @@ describe("the arc list beside every course map", () => {
 		assert.deepEqual(trail(), home, "the course page glides the same way, from the same arc's cards");
 	});
 
-	it("goes to You are here on H from another arc of the course page: its arc, then its card", async () => {
+	it("goes to You are here on ⌘J from another arc of the course page: its arc, then its card", async () => {
 		const opened: string[] = [];
 		let arc = a("eigenvalues");
 		const draw = () => root!.render(<AppRouterContext.Provider value={router as never}>{coursePage(arc, (to) => (opened.push(to), (arc = to), draw()))}</AppRouterContext.Provider>);
@@ -133,7 +133,7 @@ describe("the arc list beside every course map", () => {
 		root = createRoot(host);
 		await act(async () => draw());
 		await act(async () => {
-			document.body.dispatchEvent(Object.assign(new dom.window.Event("keydown", { bubbles: true, cancelable: true }), { key: "h", shiftKey: false, altKey: false, metaKey: false, ctrlKey: false }) as unknown as Event);
+			document.body.dispatchEvent(Object.assign(new dom.window.Event("keydown", { bubbles: true, cancelable: true }), { key: "j", shiftKey: false, altKey: false, metaKey: true, ctrlKey: false }) as unknown as Event);
 		});
 		assert.deepEqual(opened, ["systems"]);
 		await act(async () => new Promise((done) => setTimeout(done, 20)));

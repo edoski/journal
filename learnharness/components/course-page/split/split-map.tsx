@@ -30,7 +30,7 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
  * arc and Whole course always shows; without, only when the course opens
  * on less than all of it. A course with `arcs` lists them left of the map
  * (`ArcMap`): a press there, ⇧↑ or ⇧↓ glides to another arc (`onOpenArc`),
- * and H goes to You are here.
+ * and ⌘J goes to You are here.
  */
 export function SplitMap({
 	map,
@@ -62,7 +62,7 @@ export function SplitMap({
 	reveal: TopicHandle | null;
 	onPoint: (handle: TopicHandle | null) => void;
 	onLeave: (handle: TopicHandle) => void;
-	/** Shows another arc: a press on the arc list, ⇧↑ or ⇧↓, H, or a card's "From <arc>" line. */
+	/** Shows another arc: a press on the arc list, ⇧↑ or ⇧↓, ⌘J, or a card's "From <arc>" line. */
 	onOpenArc?: (arc: ArcHandle) => void;
 	ref?: Ref<SplitMapHandle>;
 }) {

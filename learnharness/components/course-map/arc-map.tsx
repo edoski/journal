@@ -13,9 +13,9 @@ const FIND_HERE_FRAMES = 60;
  * Every course map with its arcs (topic-map.md, Arcs): Home's, the enlarged
  * map's and the course page's. A course with arcs lists them in a column of
  * its own left of the drawing (`ArcIndex`), the drawing framing each arc in
- * the room beside it; ⇧↑ and ⇧↓ pick the arc above and below, and H goes to
+ * the room beside it; ⇧↑ and ⇧↓ pick the arc above and below, and ⌘J goes to
  * "You are here" from any arc: its arc, then its card, focused (`useArcKeys`).
- * A course without arcs is its drawing alone, H still focusing its card.
+ * A course without arcs is its drawing alone, ⌘J still focusing its card.
  * `value` is the arc shown; `whole` says the drawing shows the whole course,
  * so no arc is marked. `onHere` is what else H does on the page (leaving
  * Whole course). `children` is the drawing.

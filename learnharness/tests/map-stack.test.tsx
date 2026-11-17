@@ -2,7 +2,7 @@
  * Stacked arcs, the course map (topic-map.md, Arcs; Edo, 16 Nov 2026,
  * shipped 17 Nov 2026): each arc drawn alone, the arcs stacked in study
  * order and disconnected, one arc framed at a time, and ⇧↑ ⇧↓ that glide
- * one arc up or down, H to You are here. The glide itself is probed in the
+ * one arc up or down, ⌘J to You are here. The glide itself is probed in the
  * running app.
  */
 import React, { act } from "react";
@@ -79,7 +79,7 @@ describe("Stacked arcs' keys", () => {
 		await act(async () => draw());
 		return picked;
 	}
-	const keydown = (key: string, shiftKey: boolean) => Object.assign(new dom.window.Event("keydown", { bubbles: true, cancelable: true }), { key, shiftKey, altKey: false, metaKey: false, ctrlKey: false }) as unknown as Event;
+	const keydown = (key: string, shiftKey: boolean, metaKey = false) => Object.assign(new dom.window.Event("keydown", { bubbles: true, cancelable: true }), { key, shiftKey, altKey: false, metaKey, ctrlKey: false }) as unknown as Event;
 	const key = (k: string, shiftKey = true) =>
 		act(async () => {
 			document.body.dispatchEvent(keydown(k, shiftKey));
@@ -105,10 +105,17 @@ describe("Stacked arcs' keys", () => {
 		assert.deepEqual(last, []);
 	});
 
-	it("H goes to You are here, and shift+H does not", async () => {
+	it("⌘J goes to You are here, even from a field; a bare J or H types and goes nowhere", async () => {
 		const picked = await mount(arcs[1]!.handle);
 		await key("h", false);
-		await key("H", true);
+		await key("j", false);
+		assert.deepEqual(picked, [], "bare letters are left to typing");
+		const field = document.createElement("textarea");
+		document.body.appendChild(field);
+		await act(async () => {
+			field.dispatchEvent(keydown("j", false, true));
+		});
+		field.remove();
 		assert.deepEqual(picked, ["here"]);
 	});
 
