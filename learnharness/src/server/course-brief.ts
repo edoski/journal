@@ -17,6 +17,7 @@
 
 import type { ChatRecord } from "../core/contracts/chat.ts";
 import { recordHasArcs, type CourseResult } from "../core/contracts/course.ts";
+import type { CourseMap } from "../core/contracts/course-map.ts";
 import { lessonTopics } from "../core/course-map-build.ts";
 import { studyDay } from "../core/day-words.ts";
 import { subscribe } from "../core/events.ts";
@@ -145,6 +146,17 @@ function keptCourses(): Promise<Listing> {
 		if (entry) reads.courses = entry;
 		else if (reads.courses?.key === key) reads.courses = undefined;
 	});
+}
+
+/** Every course's map as the daily plan reads them (`keptCourses`), for a
+ *  close that names what a day holds across his courses (round 15, m3:
+ *  the 10 Nov close named Linear Algebra's reviews for 11 Nov and left out
+ *  Probability's review and Geometric start). A save's own read-ahead
+ *  refreshes the read, so the close waits on no extra engine run. Empty
+ *  when the courses cannot be read. */
+export async function keptCourseMaps(): Promise<CourseMap[]> {
+	const listing = await keptCourses().catch(() => null);
+	return listing?.available ? listing.read.map(({ map }) => map) : [];
 }
 
 /** Makes a course's brief reads ahead of his next input; once at a time,

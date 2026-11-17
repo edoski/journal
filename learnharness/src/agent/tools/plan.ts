@@ -70,19 +70,23 @@ async function lessonDays(course: CourseToolContext, candidates: readonly string
 		}
 		else if (topic.starts) days[topic.handle] = { starts: topic.starts, starts_words: plannedDayWords(topic.starts, mapped.map.today) };
 	}
-	const dayItems = dayItemsOf(mapped.map, days);
+	const others = ((await course.courses?.().catch(() => [])) ?? []).filter((map) => map.workspace !== mapped.map.workspace);
+	const dayItems = dayItemsOf(mapped.map, days, others);
 	return { days, ...(dayItems ? { dayItems } : {}) };
 }
 
-/** Everything the plan holds in this course on each day from today to
- *  the last day the close gives a lesson topic (`days`): its reviews,
- *  starts and lessons that go on, by title, each day with the lesson's own
- *  topics, so a close that names what a day holds names all of it (round
- *  14, m4: "On Wednesday 11 November you have your Matrix multiplication
- *  review and you start Linear maps" left out the Determinants review). */
+/** Everything the plan holds on each day from today to the last day the
+ *  close gives a lesson topic (`days`), in this course and in `others`,
+ *  his other courses: their reviews, starts and lessons that go on, by
+ *  title, each day with the lesson's own topics, so a close that names
+ *  what a day holds names all of it (round 14, m4: "On Wednesday 11
+ *  November you have your Matrix multiplication review and you start
+ *  Linear maps" left out the Determinants review; round 15, m3: the 10 Nov
+ *  close named Linear Algebra's four reviews for 11 Nov and left out
+ *  Probability's review and Geometric start). */
 export type DayItems = Record<string, { day_words: string; items: string[]; lesson: string[] }>;
 
-function dayItemsOf(map: CourseMap, days: Record<string, LessonDay>): DayItems | undefined {
+function dayItemsOf(map: CourseMap, days: Record<string, LessonDay>, others: readonly CourseMap[] = []): DayItems | undefined {
 	const last = Object.values(days)
 		.map((d) => ("planned" in d ? d.planned : "starts" in d ? d.starts : d.continues))
 		.sort()
@@ -94,7 +98,7 @@ function dayItemsOf(map: CourseMap, days: Record<string, LessonDay>): DayItems |
 		if (!date || date < map.today || date > last) return;
 		(items[date] ??= { day_words: plannedDayWords(date, map.today), items: [], lesson }).items.push(item);
 	};
-	for (const t of map.topics) {
+	for (const t of [map, ...others].flatMap((m) => m.topics)) {
 		if (t.excluded) continue;
 		if (t.review) add(t.review.date, `${t.title} review`);
 		else if (t.startsWhy?.kind === "begun" && t.starts) add(t.starts === map.today && t.startsWhy.then ? t.startsWhy.then : t.starts, `${t.title} lesson continues`);
@@ -166,8 +170,8 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 			description:
 				"Mark plan steps done on his map, and say when you close the session for today. Call it in the turn that finishes a step, " +
 				"with that step's node id in `done`; in the turn that ends the session, add `close: true` before your closing words. " +
-				"The close's result gives each of the lesson's topics its day on the plan after the close: a day your closing words name is one of these, copied as written. " +
-				"Its `day_items` lists everything the plan holds on each of those days: name a day by itself, or with all it holds, never with part of it.",
+				"The close's result gives each of the lesson's topics its day on the plan after the close: a day your closing words name is one of these, copied as written, and they name the day its topic's next review comes, when it has one. " +
+				"Its `day_items` lists everything the plan holds on each of those days, in every course: name a day by itself, or with all it holds, never with part of it.",
 			parameters: lessonProgressInput,
 			execute: serverExecute(LESSON_PROGRESS_TOOL, lessonProgressInput, async ({ done, close }) => {
 				const record = ctx.chatStore.getChat(ctx.chatId);

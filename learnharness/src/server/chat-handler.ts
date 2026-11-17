@@ -28,7 +28,7 @@ import {
 } from "./jobs.ts";
 import { runPiTurn } from "./pi/ui-stream.ts";
 import { effectiveSettings, stores } from "./stores.ts";
-import { courseBriefMarker, fetchCourseArcs, fetchCourseBrief } from "./course-brief.ts";
+import { courseBriefMarker, fetchCourseArcs, fetchCourseBrief, keptCourseMaps } from "./course-brief.ts";
 import { providerConnected as providerKeyPresent } from "./model-catalog.ts";
 import { providerKeyMissing as providerKeyMissingEnvelope } from "../core/settings.ts";
 import { beginTurn, endTurn, isTurnRunning } from "./turn-liveness.ts";
@@ -461,7 +461,7 @@ export async function handleChatInput(
 		// save's links are kept the moment the engine takes it, so a restart
 		// before the transcript's write loses neither the mark nor the
 		// "already saved" (round 8).
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, review: reviewRecord(record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [] } } : {}),
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, review: reviewRecord(record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [], courses: keptCourseMaps } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
 	// practitioner — no plan/question tools; problem + conclude, and the

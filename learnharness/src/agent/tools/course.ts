@@ -14,6 +14,7 @@ import { serverExecute } from "../tool-execute.ts";
 import { healToolRecord } from "./heal.ts";
 import type { CourseLink, CourseResult, CourseVerb } from "../../core/contracts/course.ts";
 import type { CourseRecords } from "../../core/ports.ts";
+import type { CourseMap } from "../../core/contracts/course-map.ts";
 import { sameQuestionKey, shownHelpNote, withShownHelp } from "../../core/shown-help.ts";
 import { engineConfidence } from "../../core/engine-confidence.ts";
 import { RUNG_HELP } from "../../core/practice-attempts.ts";
@@ -50,6 +51,10 @@ export interface CourseToolContext {
 	/** The steps of this session's lesson plan as they stand when a save
 	 *  runs (the plan may be written in the same turn). Absent: none. */
 	planSteps?: () => readonly { id: string; title: string }[];
+	/** Every course's map as the daily plan reads them, so a close names
+	 *  each day whole across his courses (round 15, m3). Absent: this
+	 *  course's alone. */
+	courses?: () => Promise<readonly CourseMap[]>;
 }
 
 /** A save that creates a course topic out of a step of the session's own
