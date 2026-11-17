@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CircleAlertIcon, ListChecksIcon } from "lucide-react";
+import { ListChecksIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ArcLabel } from "@/components/course-map/arc-label";
@@ -83,8 +83,7 @@ export function RoadArc({
 							{section.current && <span aria-hidden="true" data-slot="road-here" className="size-1.5 shrink-0 rounded-full bg-ring" />}
 							<span className="flex-1" />
 							{section.needsYou ? (
-								<span data-slot="course-arc-state" data-kind="needs-you" className="inline-flex shrink-0 items-center gap-1.5 text-callout text-warning">
-									<CircleAlertIcon aria-hidden className="size-3.5 shrink-0" />
+								<span data-slot="course-arc-state" data-kind="needs-you" className="shrink-0 text-callout text-warning">
 									{GROUP_WORDS["needs-you"]}
 								</span>
 							) : (
@@ -98,13 +97,22 @@ export function RoadArc({
 						</button>
 					</CollapsibleTrigger>
 					{checkable && (
-						<Button ref={checkRef} variant="quiet" size="xs" data-slot="course-arc-check" disabled={checking} onClick={onCheck} onKeyDown={onCheckKeyDown} className="h-6 shrink-0 text-link hover:text-link">
+						<Button
+							ref={checkRef}
+							variant="quiet"
+							size="xs"
+							data-slot="course-arc-check"
+							disabled={checking}
+							onClick={onCheck}
+							onKeyDown={onCheckKeyDown}
+							className="-mr-1.5 h-6 shrink-0 gap-1.5 px-1.5 text-callout font-normal text-muted-foreground hover:text-link [&_svg]:size-3.5"
+						>
 							<ListChecksIcon aria-hidden />
 							{CHECK_WORDS}
 						</Button>
 					)}
 				</h2>
-				<CollapsibleContent className="flex flex-col">{items.length > 0 && <ul className="-ml-4 flex flex-col pt-1 pb-2">{items.map(renderItem)}</ul>}</CollapsibleContent>
+				<CollapsibleContent className="flex flex-col">{items.length > 0 && <ul className="flex flex-col pt-0.5 pb-2 pl-4">{items.map(renderItem)}</ul>}</CollapsibleContent>
 			</section>
 		</Collapsible>
 	);
