@@ -99,6 +99,7 @@ export function SplitBody({
 	onContinue,
 	head = currentHead,
 	list: listOf = currentList,
+	map: mapOf,
 	rows = false,
 }: {
 	view: CourseView;
@@ -107,7 +108,9 @@ export function SplitBody({
 	onContinue: (workspace: string) => void;
 	head?: (columns: CourseColumns) => ReactNode;
 	list?: (columns: CourseColumns) => ReactNode;
-	/** The map across the column with the list under it, in place of the linked columns. */
+	/** The map, in place of the split page's own (`SplitMap`). */
+	map?: (columns: CourseColumns) => ReactNode;
+	/** The map across the column with the list under it, in place of the linked columns; each sizes itself, and the room left stays under them. */
 	rows?: boolean;
 }) {
 	const { map } = view.course;
@@ -196,7 +199,9 @@ export function SplitBody({
 		onExitTop: () => action()?.focus(),
 	};
 
-	const drawn = (
+	const drawn = mapOf ? (
+		mapOf(columns)
+	) : (
 		<SplitMap
 			key={map.workspace}
 			ref={drawing}
@@ -215,9 +220,10 @@ export function SplitBody({
 		/>
 	);
 	const body = rows ? (
-		<div data-slot="course-rows" className="flex min-h-0 flex-1 flex-col gap-5">
-			<div className="relative flex min-h-0 min-w-0 flex-1 flex-col">{drawn}</div>
-			<div className="flex min-w-0 shrink-0 flex-col">{listOf(columns)}</div>
+		<div data-slot="course-rows" className="flex min-h-0 flex-1 flex-col">
+			{drawn}
+			{listOf(columns)}
+			<div className="min-h-0 flex-1" />
 		</div>
 	) : (
 		<LinkedColumns data-slot="course-split" list={listOf(columns)} map={drawn} />
