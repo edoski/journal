@@ -53,6 +53,10 @@ export interface LessonComposerProps {
 	/** Photos of his working: the attach button leads the toolbar,
 	 *  thumbnails wait above the field, paste and drop add more. */
 	photos?: PhotoDraft;
+	/** Starts as one quiet line, the field with attach and send beside it,
+	 *  and opens to the full composer while it is focused or holds words or
+	 *  photos (a course page's composer). */
+	collapsible?: boolean;
 }
 
 /** The surface's one outline: a 1px hairline at white 5% with a 3% inset
@@ -82,7 +86,10 @@ export function LessonComposer({
 	onNext,
 	onEmptyEnter,
 	photos,
+	collapsible = false,
 }: LessonComposerProps) {
+	const [focused, setFocused] = useState(false);
+	const collapsed = collapsible && !focused && !value.trim() && !(photos?.photos.length ?? 0) && !head;
 	const next = nextProblem && !answer ? { label: "Next problem", run: () => onNext?.(), testId: "next-problem-button" } : undefined;
 	const act = () => {
 		if (answer) {
@@ -106,7 +113,12 @@ export function LessonComposer({
 			data-testid="composer"
 			data-slot="composer"
 			data-mode={answer ? "answer" : "message"}
-			className={cn(SURFACE, photos?.dragging && "outline-ring")}
+			data-collapsed={collapsed || undefined}
+			className={cn(SURFACE, collapsed && "flex items-center", photos?.dragging && "outline-ring")}
+			onFocus={() => setFocused(true)}
+			onBlur={(e) => {
+				if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false);
+			}}
 			onSubmit={(e) => {
 				e.preventDefault();
 				act();
@@ -115,7 +127,7 @@ export function LessonComposer({
 		>
 			{head}
 			{photos && <PendingPhotos draft={photos} />}
-			<div data-slot="composer-body" className="px-4 pt-4 pb-2">
+			<div data-slot="composer-body" className={collapsed ? "min-w-0 flex-1 py-2.5 pl-4" : "px-4 pt-4 pb-2"}>
 				<textarea
 					value={value}
 					onChange={(e) => onChange(e.target.value)}
@@ -131,11 +143,14 @@ export function LessonComposer({
 					rows={1}
 					aria-label={answer ? "Your answer" : "Message"}
 					data-slot="composer-field"
-					className="-m-1 block field-sizing-content max-h-52 min-h-[calc(2lh+0.5rem)] w-[calc(100%+0.5rem)] resize-none overflow-y-auto bg-transparent p-1 text-body leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
+					className={cn(
+						"-m-1 block field-sizing-content max-h-52 min-h-[calc(2lh+0.5rem)] w-[calc(100%+0.5rem)] resize-none overflow-y-auto bg-transparent p-1 text-body leading-relaxed text-foreground outline-none placeholder:text-muted-foreground",
+						collapsed && "min-h-[calc(1lh+0.5rem)] truncate",
+					)}
 				/>
 			</div>
-			<div data-slot="composer-toolbar" className="flex min-w-0 items-center px-2 pb-2">
-				<div data-slot="composer-leading" className="flex min-w-0 flex-1 items-center gap-0.5">
+			<div data-slot="composer-toolbar" className={cn("flex min-w-0 items-center px-2 pb-2", collapsed && "shrink-0 pb-0")}>
+				<div data-slot="composer-leading" className={cn("flex min-w-0 items-center gap-0.5", !collapsed && "flex-1")}>
 					{photos && <PhotoAttachButton draft={photos} />}
 					{leading}
 				</div>

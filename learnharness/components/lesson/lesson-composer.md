@@ -34,3 +34,8 @@ Everything today's composer does stays: Enter sends, ⇧Enter is a newline, ⌘E
 | control focus-visible | 2px ring, the send offset 2px |
 
 Sources: T3 Code `apps/web/src/components/chat/ChatComposer.tsx` (body `px-4 pt-4 pb-2`, footer `px-2 pb-2`, controls `gap-0.5`), `ComposerSurface.tsx` (`rounded-2xl`, the `::after` outline), `ComposerPromptEditorTiptap.tsx` (`max-h-52 min-h-[calc(2lh+--spacing(2))] leading-relaxed`), `ComposerPrimaryActions.tsx` (`size-8 rounded-full`); research-ui.md §1.
+
+
+## Collapsible
+
+`collapsible` (the course page's composer): at rest, with an empty field and no photos, the surface is one row, the field (one line) with attach and send at its right; focusing it, or words or photos in it, opens the full composer. The DOM never changes between the two, so focus is kept.

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRightIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { MathLine } from "@/components/ui/math-line";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { standingOf } from "@/components/course-map/topic-map/topic-standing";
@@ -17,10 +17,11 @@ import { cn } from "@/lib/utils";
 
 const NOW_ROW = "group/press -mx-3 flex h-14 w-[calc(100%+1.5rem)] items-center gap-4 rounded-lg px-3 text-left font-normal whitespace-normal";
 
-/** The press's word at the row's end, in the accent, its arrow stepping right on hover. */
+/** The press's word at the row's end: a 32px pill in the send button's fill, centred on the row, its arrow
+ *  stepping right on hover (the row itself is the press). */
 function Press({ words }: { words: string }) {
 	return (
-		<span className="inline-flex shrink-0 items-center gap-1.5 text-headline text-link">
+		<span data-slot="agenda-press" className={cn(buttonVariants({ size: "pill" }), "pointer-events-none shrink-0 self-center font-medium")}>
 			{words}
 			<ArrowRightIcon aria-hidden className="size-4 transition-transform duration-150 group-hover/press:translate-x-0.5 motion-reduce:transition-none" />
 		</span>
@@ -43,20 +44,20 @@ export function AgendaNext({ view, busy, onContinue, showThen = true }: CourseCo
 	const glyph = lead ? <TopicGlyph standing={standingOf(lead)} /> : <ProgressRing course={course} />;
 	const action = line ? lessonOf(line.row).action : next.lesson.action;
 	const word = action === "Open" ? "Resume" : action;
-	// The title takes the first line whole; the reason and the press's word share the second, the reason giving way.
+	// The title on the first line, the reason under it; the press's pill sits centred at the row's end.
 	const lines = (title: string, why: typeof next.why) => (
-		<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-			<MathLine className="min-w-0 text-headline text-foreground">{title}</MathLine>
-			<span className="flex min-w-0 items-center gap-3">
-				<span className="flex min-w-0 flex-1 overflow-hidden [&_[data-slot=today-why]]:max-w-full">
+		<>
+			<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+				<MathLine className="min-w-0 text-headline text-foreground">{title}</MathLine>
+				<span className="flex min-w-0 overflow-hidden [&_[data-slot=today-why]]:max-w-full">
 					<WhyMark why={why} />
 				</span>
-				<Press words={word} />
 			</span>
-		</span>
+			<Press words={word} />
+		</>
 	);
 	return (
-		<div data-slot="agenda-next" className="mb-3 flex shrink-0 flex-col border-b border-border/50 pb-2">
+		<div data-slot="agenda-next" className="mb-3 flex shrink-0 flex-col border-b border-border/50 pb-5">
 			{line ? (
 				<LineTarget row={line.row} busy={busy} onContinue={onContinue} data-slot="agenda-now" className={NOW_ROW}>
 					<span className="flex shrink-0">{glyph}</span>
