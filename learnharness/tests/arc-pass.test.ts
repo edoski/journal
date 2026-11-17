@@ -358,10 +358,21 @@ describe("the cut's shape rules", () => {
 		assert.equal(arcPassProblems({ ...shared, arcs: shared.arcs.map((a) => ({ ...a, shares: "the chapter teaches both ideas" })) }, view(CALC)), null);
 	});
 
-	it("an exam's scope only with an exam date, and leaves out only topics of its arcs", () => {
+	it("an exam's scope only with an exam date, and leaves out only topics of an arc after its own", () => {
 		assert.match(arcPassProblems({ ...good, examArcs: ["limits-continuity"] }, view(CALC))!, /no exam date/);
-		assert.match(arcPassProblems({ ...good, examArcs: ["limits-continuity"], leavesOut: ["chain"] }, view(CALC, { examDate: "2026-12-01" }))!, /"chain", which is in none of examArcs/);
+		const dated = view(CALC, { examDate: "2026-12-01" });
+		assert.equal(arcPassProblems({ ...good, examArcs: ["limits-continuity"], leavesOut: ["chain"] }, dated), null, "an arc after the exam's");
+		assert.match(arcPassProblems({ ...good, examArcs: ["derivatives"], leavesOut: ["limits"] }, dated)!, /"limits", in "limits-continuity", an arc before the exam's/);
 		assert.match(arcPassProblems({ ...good, leavesOut: ["chain"] }, view(CALC))!, /leavesOut needs examArcs/);
+	});
+
+	it("A10: no arc holds topics both inside and outside the exam's scope known as the arcs form (round 15, m11)", () => {
+		// The demo world's Probability cut put Covariance, which its exam leaves out, in the exam's Expectation arc.
+		const dated = view(CALC, { examDate: "2026-12-01" });
+		assert.match(arcPassProblems({ ...good, examArcs: ["limits-continuity", "derivatives"], leavesOut: ["chain"] }, dated)!, /"chain", which the exam leaves out, is in "derivatives", one of examArcs/);
+		assert.match(arcPassProblems({ ...good, examArcs: ["limits-continuity", "derivatives"] }, { ...dated, leftOut: ["riemann"] })!, /"riemann", which the exam leaves out, is in "derivatives"/, "the record's own leaves_out too");
+		const apart = { ...good, arcs: [good.arcs[0]!, { ...good.arcs[1]!, topics: ["derivative", "chain"] }, { ...arc("integrals", "Integrals", ["riemann"]), single: "The exam leaves it out" }] };
+		assert.equal(arcPassProblems({ ...apart, examArcs: ["limits-continuity", "derivatives"], leavesOut: ["riemann"] }, dated), null);
 	});
 
 	it("R4: with registered material, every arc cites the unit it follows", () => {

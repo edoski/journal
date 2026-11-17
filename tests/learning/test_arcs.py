@@ -331,16 +331,17 @@ def test_an_exclusion_an_arc_rule_refuses_is_named_in_the_refusal(
         )
 
 
-def test_leaves_out_holds_topics_of_the_named_arcs_without_emptying_one(
+def test_leaves_out_holds_topics_of_the_named_arcs_or_an_arc_after_them_without_emptying_one(
     workspace: Workspace,
 ) -> None:
     formed(workspace)
-    exam = {"date": "2026-12-20", "arcs": ORDER[:2]}
     refused(
         workspace,
-        {"exam": {**exam, "leaves_out": ["riemann"]}},
-        'exam.leaves_out: "riemann" is not in the exam\'s arcs "limits", "derivatives"',
+        {"exam": {"date": "2026-12-20", "arcs": ORDER[1:], "leaves_out": ["limit"]}},
+        'exam.leaves_out: "limit" is in neither the exam\'s arcs "derivatives", '
+        '"integrals" nor an arc after them',
     )
+    exam = {"date": "2026-12-20", "arcs": ORDER[:2]}
     refused(
         workspace,
         {"exam": {**exam, "leaves_out": ["limit", "continuity"]}},
@@ -352,6 +353,10 @@ def test_leaves_out_holds_topics_of_the_named_arcs_without_emptying_one(
     assert arc_rules.examined(record) == {"limit", "continuity", "derivative"}
     assert records.forget(workspace, ["chain-rule"])["removed"] == ["chain-rule"]
     assert "leaves_out" not in records.load(workspace)["exam"]
+    # A topic it leaves out may sit in an arc after the exam's, so no arc holds
+    # topics both inside and outside its scope (round 15, m11).
+    records.save(workspace, {"exam": {**exam, "leaves_out": ["riemann"]}})
+    assert records.load(workspace)["exam"]["leaves_out"] == ["riemann"]
 
 
 def test_an_exam_over_the_whole_course_may_leave_topics_out(
