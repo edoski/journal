@@ -311,15 +311,23 @@ const OPENING_SLACK = 0.5;
  * the drawing's room, so the frame never ends on an empty band.
  * `fade` is how far the frame fades in from its sides and from its top and
  * bottom; `tag` the room the current topic's tag takes above its node;
- * `fitsDown` where a course shorter than the frame sits, framed or whole.
+ * `fitsDown` where a course shorter than the frame sits when it opens whole:
+ * in its middle, at its top, or at its bottom, clear of the fade (a map with
+ * a list right under it, the course page's Road in rows).
  * Pure.
  */
-export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, frame: Frame, fade: Room, tag = 0, fitsDown: "middle" | "top" = "middle"): Camera {
+/** Where a drawing shorter than its frame sits (`framedCamera`). */
+export type FitsDown = "middle" | "top" | "bottom";
+
+export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, frame: Frame, fade: Room, tag = 0, fitsDown: FitsDown = "middle"): Camera {
 	const room = { x: fade.x, y: fade.y + tag };
 	const whole = wholeZoom(layout, frame, room);
 	const middle: Point = [layout.width / 2, layout.height / 2];
-	const atTop = (camera: Camera): Camera => (fitsDown === "top" && layout.height * camera.zoom + room.y * 2 <= frame.height ? { ...camera, y: room.y } : camera);
-	if (whole >= READABLE_ZOOM) return atTop(cameraAt(layout, middle, whole, frame, room));
+	const atEdge = (camera: Camera): Camera => {
+		if (fitsDown === "middle" || layout.height * camera.zoom + room.y * 2 > frame.height) return camera;
+		return { ...camera, y: fitsDown === "top" ? room.y : frame.height - fade.y - layout.height * camera.zoom };
+	};
+	if (whole >= READABLE_ZOOM) return atEdge(cameraAt(layout, middle, whole, frame, room));
 	const target = (focus && layout.topics.get(focus)) ?? layout.topics.get(layout.layers[0]?.[0] as TopicHandle);
 	if (!target) return cameraAt(layout, middle, 1, frame, room);
 	const before = new Set(layout.routes.flatMap((r) => (r.topic === target.handle ? [r.prerequisite] : [])));
@@ -331,9 +339,9 @@ export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, 
 		/** One axis's candidates: the focus at the middle, and each topic's edges on the fade's inner edge and on the
 		 *  frame's edge, from inside and from outside, so a topic sits clear, wholly in the fade or wholly out of view;
 		 *  inside the drawing and its room (in the frame's pixels at any scale); the middle of a drawing that fits. */
-		const axis = (at: (p: PlacedTopic) => number, size: number, span: number, f: number, extent: number, pad: number, mid: number, top = false) => {
+		const axis = (at: (p: PlacedTopic) => number, size: number, span: number, f: number, extent: number, pad: number, mid: number, edge: FitsDown = "middle") => {
 			const drawn = extent * zoom;
-			if (drawn + pad * 2 <= span) return [Math.round(top ? pad : (span - drawn) / 2)];
+			if (drawn + pad * 2 <= span) return [Math.round(edge === "top" ? pad : edge === "bottom" ? span - f - drawn : (span - drawn) / 2)];
 			// Rounded inward, so a page that scrolls the course with its room can reach every candidate.
 			const [low, high] = [Math.ceil(span - drawn - pad), Math.floor(pad)];
 			const clamp = (v: number) => Math.min(high, Math.max(low, Math.round(v)));
@@ -342,7 +350,7 @@ export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, 
 		};
 		const centre = centreOf(layout, target);
 		const xs = axis((p) => p.x, w, frame.width, fade.x, layout.width, room.x, centre[0]);
-		const ys = axis((p) => p.y, h, frame.height, fade.y, layout.height, room.y, centre[1], fitsDown === "top");
+		const ys = axis((p) => p.y, h, frame.height, fade.y, layout.height, room.y, centre[1], fitsDown);
 		const centred = { x: xs[0]!, y: ys[0]! };
 		for (const x of xs) {
 			for (const y of ys) {
