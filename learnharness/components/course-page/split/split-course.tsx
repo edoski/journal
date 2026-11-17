@@ -134,9 +134,8 @@ export function SplitBody({
 		}
 	}
 	const shown = arcs?.find((a) => a.arc.handle === shownArc) ?? null;
-	// The map's drawing, which sizes the pane's surface.
-	const wholeLayout = useMemo(() => drawingOf(map, undefined).layout, [map]);
-	const layout = useMemo(() => (shown ? drawingOf(map, shown.arc.handle).layout : wholeLayout), [shown, map, wholeLayout]);
+	// The map's drawing, for the topic it opens on.
+	const layout = useMemo(() => drawingOf(map, shown?.arc.handle).layout, [shown, map]);
 	const aim = useMemo(() => aimOf(map.current, view.next.lesson.topics, shown ? [{ id: shown.arc.handle, topics: shown.topics }] : groups, layout), [map.current, view.next.lesson.topics, shown, groups, layout]);
 	const { startArcCheck, starting } = useStartArcCheck();
 	const onCheck = (section: CourseArcSection) =>
@@ -225,8 +224,6 @@ export function SplitBody({
 							arcs={arcs?.map((a) => a.arc) ?? null}
 							index={mapIndex}
 							said={view.said}
-							layout={layout}
-							wholeLayout={wholeLayout}
 							lit={lit}
 							aim={aim}
 							reveal={revealOf(pointed)}

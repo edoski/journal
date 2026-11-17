@@ -38,7 +38,7 @@ const ANYWHERE: CoordinateExtent = [
 ];
 /** The glide between arcs: eased in and out, as a camera moving between two fixed views. */
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
-/** The course page pane's glide (split-map.tsx): fast out, settling in. */
+/** The follow's glide: fast out, settling in. */
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 
 function reducedMotion(): boolean {
@@ -52,9 +52,9 @@ function reducedMotion(): boolean {
  * from `said` (`sidebarSays`), what the sidebar says for it when that
  * needs him, and opens the topic's page. The map opens on the
  * whole course when that fits, else framed on the current topic with the
- * topics it leads to whole (`framedCamera`), or at `zoom` with the whole course in
- * its middle, for a page that frames the map itself; `whole` shows the
- * whole course however small (the enlarged map's zoom out). It pans by
+ * topics it leads to whole (`framedCamera`), a drawing shorter than the
+ * frame in its middle or at its top (`fitsDown`); `whole` shows the
+ * whole course however small (the maps' Whole course). It pans by
  * drag or scroll and zooms by pinch. Hover or focus lights a topic's
  * prerequisite chain; arrows walk the edges. `highlight` lights a set of
  * topics while nothing is hovered or focused, for a page that points at
@@ -74,12 +74,12 @@ export function TopicMap({
 	margin = ROOM,
 	highlight = null,
 	marked = null,
-	zoom,
 	whole = false,
 	framed = null,
 	onOpensWhole,
 	opensOn,
 	onOpenArc,
+	fitsDown,
 }: {
 	map: CourseMap;
 	/** The one arc to draw; unset, the whole course. */
@@ -92,10 +92,6 @@ export function TopicMap({
 	highlight?: ReadonlySet<TopicHandle> | null;
 	/** The topic a page points at from elsewhere, whose card glows; null marks none. */
 	marked?: TopicHandle | null;
-	/** The scale to draw the whole course at, in the frame's middle, for a
-	 *  page that sizes the frame to it and scrolls it; unset, the map
-	 *  frames itself. */
-	zoom?: number;
 	/** Show the whole course in the frame, at whatever scale fits it. */
 	whole?: boolean;
 	/** Topics a page points at, which the camera brings into view; null
@@ -112,13 +108,16 @@ export function TopicMap({
 	opensOn?: TopicHandle | null;
 	/** Shows another arc of the course, which a card's "From <arc>" line asks for; unset, that line is words only. */
 	onOpenArc?: (arc: ArcHandle) => void;
+	/** Where a drawing shorter than the frame sits: in its middle (Home), or at its top (the course page, beside its
+	 *  list). */
+	fitsDown?: "middle" | "top";
 }) {
 	const [shownArc, setShownArc] = useState(arc);
 	// The arc the map just left, drawn beside the shown one while the camera glides over.
 	const [trailArc, setTrailArc] = useState<ArcHandle | null>(null);
 	if (shownArc !== arc) {
 		setShownArc(arc);
-		setTrailArc(zoom === undefined && !whole && shownArc && arc && !reducedMotion() ? shownArc : null);
+		setTrailArc(!whole && shownArc && arc && !reducedMotion() ? shownArc : null);
 	}
 	const { view, layout } = useMemo(() => drawingOf(course, arc), [course, arc]);
 	const trail = useMemo(() => (trailArc && arc ? trailOf(course, trailArc, arc, layout) : null), [course, trailArc, arc, layout]);
@@ -136,7 +135,7 @@ export function TopicMap({
 		[map.edges, map.current, map.title, map.topics.length, here],
 	);
 	return (
-		<CardMap graph={graph} layout={layout} nodes={nodes} edges={edges} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed} trail={trail} onTravelled={endTravel} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} />
+		<CardMap graph={graph} layout={layout} nodes={nodes} edges={edges} margin={margin} highlight={highlight} marked={marked} whole={whole} framed={framed} trail={trail} onTravelled={endTravel} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} fitsDown={fitsDown} />
 	);
 }
 
@@ -159,7 +158,6 @@ type CardMapProps = {
 	margin?: { x: number; y: number };
 	highlight?: ReadonlySet<TopicHandle> | null;
 	marked?: TopicHandle | null;
-	zoom?: number;
 	whole?: boolean;
 	framed?: ReadonlySet<TopicHandle> | null;
 	/** The arc the camera glides away from, drawn beside this one; null at rest. */
@@ -200,7 +198,6 @@ function Flow({
 	margin: frameMargin,
 	highlight,
 	marked,
-	zoom: fixedZoom,
 	whole,
 	framed,
 	trail,
@@ -234,7 +231,7 @@ function Flow({
 	// Zoomed out as far as the whole course, however small: the enlarged map's Whole course.
 	const fitted = frame ? Math.min(1, wholeZoom(layout, frame, margin)) : 1;
 	// While the camera glides between arcs it may look anywhere and at any scale the two views need.
-	const minZoom = trail ? Math.min(fitted, 0.1) : fixedZoom === undefined ? fitted : Math.min(fitted, fixedZoom);
+	const minZoom = trail ? Math.min(fitted, 0.1) : fitted;
 	// As far as the camera may look: the room (in the frame's pixels) at the smallest scale the map shows, and one
 	// topic past it for a pan or a follow (`slackOf`).
 	const reach = useMemo(() => {
@@ -291,12 +288,7 @@ function Flow({
 	useLayoutEffect(() => {
 		if (frameWidth <= 0 || frameHeight <= 0) return;
 		const size = { width: frameWidth, height: frameHeight };
-		const middle: [number, number] = [layout.width / 2, layout.height / 2];
-		const camera = whole
-			? cameraAt(layout, middle, minZoom, size, margin)
-			: fixedZoom === undefined
-				? framedCamera(layout, opensOn, size, frameMargin, TAG_ROOM, fitsDown)
-				: cameraAt(layout, middle, fixedZoom, size, margin);
+		const camera = whole ? cameraAt(layout, [layout.width / 2, layout.height / 2], minZoom, size, margin) : framedCamera(layout, opensOn, size, frameMargin, TAG_ROOM, fitsDown);
 		// Zooming out to the whole course and back glides; any other move is at once. Without a duration React Flow
 		// sets the viewport synchronously; only its promise settles later.
 		const glide = wasWhole.current !== whole && !reducedMotion();
@@ -315,7 +307,7 @@ function Flow({
 			void flow.setViewport(camera, { duration: TRAVEL_MS, ease: easeInOut }).then(() => from && onTravelled(from));
 		} else if (!trail) void flow.setViewport(camera, { duration: glide ? FOLLOW_MS : 0 });
 		setPlaced(true);
-	}, [flow, store, follower, layout, opensOn, frameWidth, frameHeight, margin, frameMargin, fixedZoom, whole, minZoom, trail, onTravelled, fitsDown]);
+	}, [flow, store, follower, layout, opensOn, frameWidth, frameHeight, margin, frameMargin, whole, minZoom, trail, onTravelled, fitsDown]);
 
 	// The topics a page points at on this drawing, which the camera follows; none while it shows the whole course.
 	const pointedAt = useMemo(() => {

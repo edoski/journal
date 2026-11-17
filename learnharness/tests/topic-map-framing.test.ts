@@ -1,8 +1,7 @@
 /**
  * Where each demo course's map opens on Edo's 14" window (1512×982), on the
- * demo seed's graphs (the logbook seed, 14 Nov 2026): on its course page
- * (through the pane's scroll, as he sees it), on Home and in the enlarged
- * map. Edo's ruling (14 Nov 2026): "You are here" and every topic it leads
+ * demo seed's graphs (the logbook seed, 14 Nov 2026): on its course page,
+ * on Home and in the enlarged map, one camera on each. Edo's ruling (14 Nov 2026): "You are here" and every topic it leads
  * to are whole, at 80% or more; a card cut at the frame's edge elsewhere is
  * fine, and a map is never shrunk or moved just to avoid one. The view
  * never shows empty room past the drawing's room on an axis the course
@@ -13,7 +12,6 @@ import { describe, it } from "node:test";
 import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { READABLE_ZOOM, cardFit, framedCamera, type CardFit } from "../components/course-map/topic-map/topic-map-layout.ts";
 import { CANVAS_NODE, layoutCanvas } from "../components/course-map/topic-map/canvas/canvas-layout.ts";
-import { boxesOf, fadeAcross, scrollOfCamera, surfaceOf } from "../components/course-page/split/split-tie.ts";
 
 const h = (handle: string) => handle as TopicHandle;
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -53,33 +51,21 @@ function courseOf(course: (typeof COURSES)[number]) {
 	return { layout, next };
 }
 
-/** The course page: the camera's view as the pane scrolls its surface to it. */
-function onPage(course: (typeof COURSES)[number]): Opening {
+/** The camera React Flow is given: the course page's at the top of its pane, Home's and the enlarged map's in the middle of theirs. */
+function inFrame(course: (typeof COURSES)[number], frame: { width: number; height: number }, fade = HOME_FADE, fitsDown: "middle" | "top" = "middle"): Opening {
 	const { layout } = courseOf(course);
-	const fade = { x: fadeAcross(PAGE.width, PAGE_FADE.x, layout.node), y: PAGE_FADE.y };
-	const camera = framedCamera(layout, h(course.current), PAGE, fade, TAG, "top");
-	const surface = surfaceOf(layout, PAGE, PAGE_FADE, TAG, camera.zoom);
-	const scroll = scrollOfCamera(layout, surface, PAGE, camera);
-	const boxes = new Map<TopicHandle, Box>();
-	for (const [handle, b] of boxesOf(layout, surface)) boxes.set(handle, { left: b.x - scroll.left, top: b.y - scroll.top, right: b.x + b.width - scroll.left, bottom: b.y + b.height - scroll.top });
-	return { zoom: camera.zoom, boxes, frame: PAGE, fade };
-}
-
-/** Home's map and the enlarged map: the camera React Flow is given. */
-function inFrame(course: (typeof COURSES)[number], frame: { width: number; height: number }): Opening {
-	const { layout } = courseOf(course);
-	const camera = framedCamera(layout, h(course.current), frame, HOME_FADE, TAG);
+	const camera = framedCamera(layout, h(course.current), frame, fade, TAG, fitsDown);
 	const boxes = new Map<TopicHandle, Box>();
 	for (const [handle, at] of layout.topics) {
 		const left = at.x * camera.zoom + camera.x;
 		const top = at.y * camera.zoom + camera.y;
 		boxes.set(handle, { left, top, right: left + layout.node.width * camera.zoom, bottom: top + layout.node.height * camera.zoom });
 	}
-	return { zoom: camera.zoom, boxes, frame, fade: HOME_FADE };
+	return { zoom: camera.zoom, boxes, frame, fade };
 }
 
 const SURFACES = [
-	{ name: "on its course page", open: onPage },
+	{ name: "on its course page", open: (course: (typeof COURSES)[number]) => inFrame(course, PAGE, PAGE_FADE, "top") },
 	{ name: "on Home", open: (course: (typeof COURSES)[number]) => inFrame(course, HOME) },
 	{ name: "in the enlarged map", open: (course: (typeof COURSES)[number]) => inFrame(course, ENLARGED) },
 ];

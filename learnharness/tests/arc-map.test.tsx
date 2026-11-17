@@ -16,11 +16,10 @@ import { dom } from "./helpers/radix-dom.ts";
 (globalThis as Record<string, unknown>).self = globalThis;
 import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import type { ArcHandle } from "../src/core/index.ts";
+import { currentArc, type ArcHandle } from "../src/core/index.ts";
 import { ArcMap } from "../components/course-map/arc-map.tsx";
 import { HomeMap } from "../components/study-home/home-map.tsx";
 import { SplitMap } from "../components/course-page/split/split-map.tsx";
-import { drawingOf } from "../components/course-map/topic-map/map-drawing.ts";
 import { LINALG_ARCS, PROB } from "./fixtures/now-demo.ts";
 
 const router = { push: () => {}, replace: () => {}, prefetch: () => {}, back: () => {}, forward: () => {}, refresh: () => {} };
@@ -52,7 +51,7 @@ const press = (el: Element) =>
 
 /** The course page's map pane on one arc. */
 const coursePage = (arc: ArcHandle, onOpenArc: (arc: ArcHandle) => void) => (
-	<SplitMap map={LINALG_ARCS.map} arc={arc} arcs={ARCS} said={new Map()} layout={drawingOf(LINALG_ARCS.map, arc).layout} wholeLayout={drawingOf(LINALG_ARCS.map, undefined).layout} lit={null} aim={null} reveal={null} onPoint={noop} onLeave={noop} onOpenArc={onOpenArc} />
+	<SplitMap map={LINALG_ARCS.map} arc={arc} arcs={ARCS} said={new Map()} lit={null} aim={null} reveal={null} onPoint={noop} onLeave={noop} onOpenArc={onOpenArc} />
 );
 
 describe("the arc list beside every course map", () => {
@@ -97,6 +96,32 @@ describe("the arc list beside every course map", () => {
 		await key("ArrowUp");
 		await key("ArrowDown");
 		assert.deepEqual(opened, ["eigenvalues", "spaces", "eigenvalues"]);
+	});
+
+	it("glides from arc to arc on ⇧↓ on the course page through Home's camera, not by swapping the drawing", async () => {
+		const shiftDown = () =>
+			act(async () => {
+				document.body.dispatchEvent(Object.assign(new dom.window.Event("keydown", { bubbles: true, cancelable: true }), { key: "ArrowDown", shiftKey: true, altKey: false, metaKey: false, ctrlKey: false }) as unknown as Event);
+			});
+		/** The cards of the arc the camera glides away from, drawn beside the new one until it lands (topic-map.md, The glide). */
+		const trail = () => [...document.querySelectorAll('[data-slot="course-map-trail"]')].map((el) => el.closest(".react-flow__node")?.getAttribute("data-id")).sort();
+
+		await mount(<HomeMap courses={[LINALG_ARCS]} chats={[]} workspace={LINALG_ARCS.map.workspace} onSelect={noop} arc={null} enlarged={false} onEnlarge={noop} />);
+		await shiftDown();
+		const home = trail();
+		assert.ok(home.length > 0, "Home glides: the arc it left stays drawn beside the new one");
+		await act(async () => root!.unmount());
+		host!.remove();
+
+		let arc = currentArc(LINALG_ARCS.map)!;
+		const draw = () => root!.render(<AppRouterContext.Provider value={router as never}>{coursePage(arc, (to) => ((arc = to), draw()))}</AppRouterContext.Provider>);
+		host = document.createElement("div");
+		document.body.appendChild(host);
+		root = createRoot(host);
+		await act(async () => draw());
+		await shiftDown();
+		assert.notEqual(arc, currentArc(LINALG_ARCS.map), "⇧↓ showed the next arc");
+		assert.deepEqual(trail(), home, "the course page glides the same way, from the same arc's cards");
 	});
 
 	it("goes to You are here on H from another arc of the course page: its arc, then its card", async () => {

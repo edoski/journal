@@ -1,22 +1,29 @@
 /**
  * The topic map's camera following the topics a page points at (spec:
- * topic-map.md, Behaviour, `framed`): the course page's pane glide
- * (split-course.md, Pointing) on the map's own camera. Where it goes is the
- * course page's `scrollOn`, given the camera's reach as a surface it
- * scrolls; when it goes is the course page's rest and return.
+ * topic-map.md, Behaviour, `framed`): Home's Today row, the course page's
+ * row. Where it goes is `scrollOn`, given the camera's reach as a surface
+ * it scrolls; when it goes is the rest and return (`litFollow`).
  */
 
 import type { TopicHandle } from "@/src/core";
-import { scrollOn, type Box, type Scroll } from "@/components/course-page/split/split-tie";
 import { cardFit, type Camera, type TopicMapLayout } from "./topic-map-layout";
 
 type Frame = { width: number; height: number };
 type Room = { x: number; y: number };
+export interface Box {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+export interface Scroll {
+	left: number;
+	top: number;
+}
 
 /** How long a page rests on what it points at before the camera moves, and
- *  how long it points at nothing before the camera goes home, for Home's
- *  map and the course page alike, so a sweep across rows never sends it there and
- *  back. */
+ *  how long it points at nothing before the camera goes home, so a sweep
+ *  across rows never sends it there and back. */
 export const REVEAL_DWELL_MS = 120;
 export const RETURN_DWELL_MS = 400;
 
@@ -26,9 +33,9 @@ const FRAMED = "" as TopicHandle;
 
 /**
  * Where the camera goes to show `lit` whole, clear of the frame's fade:
- * nowhere (null) when they already are; else as `scrollOn` brings a row's
- * topic into the course page's pane, cutting as few other topics at the
- * frame's edge as it can and moving as little as it can, with `here` ("You
+ * nowhere (null) when they already are; else as `scrollOn` brings a topic
+ * into view, cutting as few other topics at the frame's edge as it can and
+ * moving as little as it can, with `here` ("You
  * are here", its tag `tag` px above it) kept clear too when it fits with
  * them. At the camera's scale, or as far out as the lit topics need to fit,
  * never past `minZoom`. `reach` is how far the camera may look past the
@@ -113,8 +120,7 @@ export interface LitFollow {
 }
 
 /**
- * The course page's rest and return (split-course.md, Pointing): what a
- * page points at moves the camera (`plan`, null to stay) once it rests on
+ * The rest and return (split-course.md, Pointing): what a page points at moves the camera (`plan`, null to stay) once it rests on
  * it `REVEAL_DWELL_MS`; once it points at nothing for `RETURN_DWELL_MS`
  * after a point, the camera goes `home` (null when it is there). A camera
  * he moved himself (`stay`) stays where he left it until the next point.
@@ -145,4 +151,59 @@ export function litFollow({ plan, home, move }: { plan: (lit: readonly TopicHand
 		},
 		stop: () => clearTimeout(wait),
 	};
+}
+
+/** What a topic cut at the view's edge costs against moving one pixel. */
+const CUT = 1000;
+
+/**
+ * Where a view of `surface` scrolls to show `target`: nowhere (null) when
+ * it is already clear of the fade; else wholly inside the part the fade
+ * leaves clear, with as few other topics as it can cut at the view's edges
+ * (a topic cut where it shows reads as overflow, not as a fade), moving as
+ * little as it can. Pure.
+ */
+export function scrollOn(boxes: ReadonlyMap<TopicHandle, Box>, target: TopicHandle, view: Frame & Scroll, surface: Frame, fade: { x: number; y: number }): Scroll | null {
+	const at = boxes.get(target);
+	if (!at) return null;
+	const all = [...boxes.values()];
+	const maxLeft = Math.max(0, surface.width - view.width);
+	const maxTop = Math.max(0, surface.height - view.height);
+	const clear = (lo: number, size: number, s: number, span: number, f: number) => lo >= s + f && lo + size <= s + span - f;
+	if (clear(at.x, at.width, view.left, view.width, fade.x) && clear(at.y, at.height, view.top, view.height, fade.y)) return null;
+
+	/** One axis's candidates: each topic's edge just clear of the fade, the
+	 *  ends, and where it starts; those that keep the target clear (or, in a
+	 *  view too small for that, wholly in view). */
+	const axis = (lo: (b: Box) => number, size: (b: Box) => number, span: number, f: number, max: number, start: number) => {
+		const clamp = (s: number) => Math.round(Math.min(max, Math.max(0, s)));
+		// Each topic's edges on the fade's inner edge and on the view's edge, from inside and from outside.
+		const edges = (b: Box) => [lo(b) - f, lo(b) + size(b) + f - span, lo(b), lo(b) + size(b), lo(b) + size(b) - span, lo(b) - span];
+		const options = [...new Set([start, 0, max, ...all.flatMap(edges)].map(clamp))];
+		const t0 = lo(at);
+		const t1 = t0 + size(at);
+		const keepsClear = options.filter((s) => t0 >= s + f && t1 <= s + span - f);
+		if (keepsClear.length) return keepsClear;
+		const inView = options.filter((s) => t0 >= s && t1 <= s + span);
+		return inView.length ? inView : [clamp(start)];
+	};
+	const lefts = axis((b) => b.x, (b) => b.width, view.width, fade.x, maxLeft, view.left);
+	const tops = axis((b) => b.y, (b) => b.height, view.height, fade.y, maxTop, view.top);
+
+	/** How many topics a view cuts: part of one shows, faded or not, and the view's edge cuts the rest (`cardFit`). */
+	const cuts = (left: number, top: number) =>
+		all.filter((b) => cardFit({ left: b.x - left, top: b.y - top, right: b.x + b.width - left, bottom: b.y + b.height - top }, view, fade) === "cut").length;
+
+	let best: Scroll = { left: lefts[0]!, top: tops[0]! };
+	let bestCost = Infinity;
+	for (const left of lefts) {
+		for (const top of tops) {
+			const cost = cuts(left, top) * CUT + Math.abs(left - view.left) + Math.abs(top - view.top);
+			if (cost < bestCost) {
+				bestCost = cost;
+				best = { left, top };
+			}
+		}
+	}
+	return best;
 }

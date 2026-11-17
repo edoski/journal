@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { READABLE_ZOOM, cardFit, framedCamera, layoutTopicMap, slackOf, wholeZoom, type Camera, type CardFit } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { RETURN_DWELL_MS, REVEAL_DWELL_MS, litCamera, litFollow } from "../components/course-map/topic-map/lit-camera.ts";
+import { RETURN_DWELL_MS, REVEAL_DWELL_MS, litCamera, litFollow, scrollOn, type Box } from "../components/course-map/topic-map/lit-camera.ts";
 
 const h = (handle: string) => handle as TopicHandle;
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -160,5 +160,28 @@ describe("when the map's camera moves", () => {
 		f.stay();
 		mock.timers.tick(REVEAL_DWELL_MS);
 		assert.deepEqual(moves, []);
+	});
+});
+
+describe("where a view scrolls to show one topic", () => {
+	// Three topics side by side, 224 wide, 24 apart, on a surface with room to scroll past them.
+	const row = (xs: number[], y = 100): Map<TopicHandle, Box> => new Map(xs.map((x, i) => [h(`t${i}`), { x, y, width: 224, height: 64 }]));
+	const surface = { width: 1400, height: 400 };
+	const fade = { x: 48, y: 32 };
+
+	it("leaves a topic already clear of the fade where it is", () => {
+		assert.equal(scrollOn(row([300, 548, 796]), h("t1"), { left: 200, top: 0, width: 696, height: 400 }, surface, fade), null);
+	});
+
+	it("brings a topic into view cutting none at the view's edges when it can, moving as little as it can", () => {
+		const boxes = row([300, 548, 796]);
+		const to = scrollOn(boxes, h("t2"), { left: 0, top: 0, width: 600, height: 400 }, surface, fade)!;
+		const view = { left: to.left, right: to.left + 600 };
+		assert.ok(796 >= view.left + 48 && 1020 <= view.right - 48, "the target clear of the fade");
+		for (const b of boxes.values()) {
+			const showsPastFade = b.x + b.width > view.left + 48 && b.x < view.right - 48;
+			const whole = b.x >= view.left && b.x + b.width <= view.right;
+			assert.ok(!showsPastFade || whole, `topic at ${b.x} is not cut`);
+		}
 	});
 });

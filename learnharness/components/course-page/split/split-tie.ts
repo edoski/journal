@@ -1,5 +1,5 @@
 import type { CourseMapEdge, TopicHandle } from "@/src/core";
-import { NODE_GAP, NODE_SIZE, cardFit, chainOf, slackOf, wholeZoom, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
+import { chainOf, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import type { CourseGroup, CourseTopic, GroupId } from "@/components/course-page/course-model";
 
 /** One section of the list: a group, or an arc of a course with arcs,
@@ -14,7 +14,7 @@ export interface ListSection {
 /**
  * What ties the split page's two panes (spec: split-course.md): the topic
  * he points at or focuses, and the pane it is in; which groups the list
- * shows; and where the map pane scrolls to. Pure.
+ * shows; and where the map opens. Pure.
  */
 export interface Pointed {
 	handle: TopicHandle;
@@ -102,143 +102,4 @@ export function walkTo(key: string, at: number | null, count: number): number | 
 		default:
 			return null;
 	}
-}
-
-export interface Size {
-	width: number;
-	height: number;
-}
-export interface Box {
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-}
-export interface Scroll {
-	left: number;
-	top: number;
-}
-
-export interface Surface extends Size {
-	/** The scale the map draws the course at on it. */
-	zoom: number;
-}
-
-/**
- * The map's drawing surface in the map pane, which the map fits whole at
- * `zoom` (the scale `framedCamera` opens the course at), so it never moves
- * its own camera; the pane scrolls the surface instead. `room` (and `tag`
- * more above and below, the room the map keeps for its "You are here" tag)
- * is in the pane's pixels at any scale, as `framedCamera` keeps it, so the
- * pane can scroll to every view the camera opens on. On an axis where the
- * course at that scale with its room fits the pane, the surface is the
- * pane's width, or the course's height from the pane's top, with nothing
- * to scroll; on one it overflows, the course, its room and `slackOf` its
- * node on each side at that scale. Pure.
- */
-export function surfaceOf(layout: TopicMapLayout, pane: Size, room: { x: number; y: number }, tag: number, zoom = 1): Surface {
-	const width = layout.width * zoom + room.x * 2;
-	const height = layout.height * zoom + (room.y + tag) * 2;
-	const slack = slackOf(layout.node);
-	return {
-		width: width > pane.width ? Math.ceil(width + slack.x * 2 * zoom) : pane.width,
-		height: height > pane.height ? Math.ceil(height + slack.y * 2 * zoom) : Math.floor(height),
-		zoom,
-	};
-}
-
-/** The surface for the pane's Whole course: every topic in the pane, clear
- *  of the fade and the tag's room, at whatever scale fits, never above full
- *  size; null when the surface the course opens on already fits the pane,
- *  so there is no more to see. Pure. */
-export function wholeSurfaceOf(layout: TopicMapLayout, pane: Size, opening: Surface, fade: { x: number; y: number }, room: { x: number; y: number }, tag: number): Surface | null {
-	if (opening.width <= pane.width && opening.height <= pane.height) return null;
-	return surfaceOf(layout, pane, room, tag, wholeZoom(layout, pane, { x: fade.x, y: fade.y + tag }));
-}
-
-/** Where the pane scrolls so the surface shows the course as `camera`
- *  frames it in a frame the pane's size: the map draws the course in the
- *  surface's middle (`boxesOf`). Pure. */
-export function scrollOfCamera(layout: TopicMapLayout, surface: Surface, pane: Size, camera: { x: number; y: number }): Scroll {
-	const left = (surface.width - layout.width * surface.zoom) / 2 - camera.x;
-	const top = (surface.height - layout.height * surface.zoom) / 2 - camera.y;
-	const clamp = (v: number, max: number) => Math.round(Math.min(Math.max(0, max), Math.max(0, v)));
-	return { left: clamp(left, surface.width - pane.width), top: clamp(top, surface.height - pane.height) };
-}
-
-/** Every topic's box on that surface: the map draws the course in the
- *  frame's middle at the surface's scale. */
-export function boxesOf(layout: TopicMapLayout, surface: Surface): Map<TopicHandle, Box> {
-	const { zoom } = surface;
-	const left = (surface.width - layout.width * zoom) / 2;
-	const top = (surface.height - layout.height * zoom) / 2;
-	const boxes = new Map<TopicHandle, Box>();
-	for (const [handle, at] of layout.topics) boxes.set(handle, { x: left + at.x * zoom, y: top + at.y * zoom, width: layout.node.width * zoom, height: layout.node.height * zoom });
-	return boxes;
-}
-
-/**
- * How far the map pane's vignette reaches in from its sides: `least`,
- * unless the pane is too narrow to show two topics side by side clear of
- * that. Then it shows one, and the fade widens until the topics beside it
- * fall wholly inside the fade instead of being cut where they show. Pure.
- */
-export function fadeAcross(pane: number, least: number, node: NodeSize = NODE_SIZE): number {
-	if (pane <= 0 || pane >= node.width * 2 + NODE_GAP + least * 2) return least;
-	return Math.max(least, Math.floor((pane - node.width) / 2 - NODE_GAP));
-}
-
-/** What a topic cut at the pane's edge costs against moving one pixel. */
-const CUT = 1000;
-
-/**
- * Where the map pane scrolls to show `target`, a topic he points at or
- * reaches: nowhere (null) when it is already clear of the fade; else
- * wholly inside the part the fade leaves clear, with as few other topics
- * as it can cut at the pane's edges (a topic cut where it shows reads as
- * overflow, not as a fade), moving as little as it can. Pure.
- */
-export function scrollOn(boxes: ReadonlyMap<TopicHandle, Box>, target: TopicHandle, view: Size & Scroll, surface: Size, fade: { x: number; y: number }): Scroll | null {
-	const at = boxes.get(target);
-	if (!at) return null;
-	const all = [...boxes.values()];
-	const maxLeft = Math.max(0, surface.width - view.width);
-	const maxTop = Math.max(0, surface.height - view.height);
-	const clear = (lo: number, size: number, s: number, span: number, f: number) => lo >= s + f && lo + size <= s + span - f;
-	if (clear(at.x, at.width, view.left, view.width, fade.x) && clear(at.y, at.height, view.top, view.height, fade.y)) return null;
-
-	/** One axis's candidates: each topic's edge just clear of the fade, the
-	 *  ends, and where it starts; those that keep the target clear (or, in a
-	 *  pane too small for that, wholly in view). */
-	const axis = (lo: (b: Box) => number, size: (b: Box) => number, span: number, f: number, max: number, start: number) => {
-		const clamp = (s: number) => Math.round(Math.min(max, Math.max(0, s)));
-		// Each topic's edges on the fade's inner edge and on the pane's edge, from inside and from outside.
-		const edges = (b: Box) => [lo(b) - f, lo(b) + size(b) + f - span, lo(b), lo(b) + size(b), lo(b) + size(b) - span, lo(b) - span];
-		const options = [...new Set([start, 0, max, ...all.flatMap(edges)].map(clamp))];
-		const t0 = lo(at);
-		const t1 = t0 + size(at);
-		const keepsClear = options.filter((s) => t0 >= s + f && t1 <= s + span - f);
-		if (keepsClear.length) return keepsClear;
-		const inView = options.filter((s) => t0 >= s && t1 <= s + span);
-		return inView.length ? inView : [clamp(start)];
-	};
-	const lefts = axis((b) => b.x, (b) => b.width, view.width, fade.x, maxLeft, view.left);
-	const tops = axis((b) => b.y, (b) => b.height, view.height, fade.y, maxTop, view.top);
-
-	/** How many topics a view cuts: part of one shows, faded or not, and the pane's edge cuts the rest (`cardFit`). */
-	const cuts = (left: number, top: number) =>
-		all.filter((b) => cardFit({ left: b.x - left, top: b.y - top, right: b.x + b.width - left, bottom: b.y + b.height - top }, view, fade) === "cut").length;
-
-	let best: Scroll = { left: lefts[0]!, top: tops[0]! };
-	let bestCost = Infinity;
-	for (const left of lefts) {
-		for (const top of tops) {
-			const cost = cuts(left, top) * CUT + Math.abs(left - view.left) + Math.abs(top - view.top);
-			if (cost < bestCost) {
-				bestCost = cost;
-				best = { left, top };
-			}
-		}
-	}
-	return best;
 }
