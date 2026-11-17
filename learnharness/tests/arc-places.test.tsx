@@ -161,14 +161,15 @@ describe("the topic page", () => {
 		const diag = { ...LINALG_ARCS.map.topics.find((t) => t.handle === "diag")!, starts: "2026-11-11", startsWhy };
 		const course = { ...LINALG_ARCS, map: { ...LINALG_ARCS.map, topics: LINALG_ARCS.map.topics.map((t) => (t.handle === "diag" ? diag : t)) } };
 		const facts = topicFacts({ course, topic: diag, chats: [], read: null });
-		assert.deepEqual(facts.startsWhy, { kind: "after", words: "After Eigenvalues and eigenvectors, which it needs" });
+		assert.deepEqual(facts.startsWhy, { kind: "after", words: "After Eigenvalues and eigenvectors, which it needs", short: "After Eigenvalues and eigenvectors" });
 		const { now } = pickupSections(facts);
-		assert.deepEqual([now.kind, now.note, now.why], ["start", "Planned Wed 11 Nov", facts.startsWhy]);
+		// Round 15, m2: the plan line says why the plan starts it then.
+		assert.deepEqual([now.kind, now.note, now.why], ["start", "Planned Wed 11 Nov · After Eigenvalues and eigenvectors", facts.startsWhy]);
 		const doc = render(<SectionsPane facts={facts} busy={false} onAct={() => {}} onTask={() => {}} shown={null} onShow={() => {}} />);
 		// Round 12, 3 n9: Now carries no reason line, and its planned day wraps whole.
 		assert.ok(doc.querySelector('[data-slot="pickup-now"] [data-slot="topic-starts-why"]') === null, "no reason line under Now");
 		const note = doc.querySelector('[data-slot="pickup-now-note"]')!;
-		assert.equal(note.textContent, "Planned Wed 11 Nov");
+		assert.equal(note.textContent, "Planned Wed 11 Nov · After Eigenvalues and eigenvectors");
 		assert.ok(!note.className.includes("truncate"), "the planned day is never cut");
 		const withSession = topicFacts({ course, topic: diag, chats: [chat("d", { topics: ["diag"], pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })], read: null });
 		assert.deepEqual(pickupSections(withSession).scheduled?.why, facts.startsWhy, "Scheduled's first lesson says it too, when Now does not start it");
@@ -184,7 +185,7 @@ describe("the topic page", () => {
 		const diag = { ...LINALG.map.topics.find((t) => t.handle === "diag")!, starts: "2026-12-04" };
 		const map = { ...LINALG.map, exam: { date: "2026-11-29", daysLeft: 21, leavesOut: h("diag") }, topics: LINALG.map.topics.map((t) => (t.handle === "diag" ? diag : t)) };
 		const facts = topicFacts({ course: { ...LINALG, map }, topic: diag, chats: [], read: null });
-		assert.deepEqual(facts.startsWhy, { kind: "after", words: "Not on the exam; after it" });
+		assert.deepEqual(facts.startsWhy, { kind: "after", words: "Not on the exam; after it", short: "Not on the exam; after it" });
 		assert.equal(pickupSections(facts).now.why, facts.startsWhy);
 	});
 

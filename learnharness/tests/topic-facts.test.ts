@@ -313,7 +313,7 @@ describe("when a topic comes up", () => {
 	it("says why the plan starts a topic not started then, in a course without arcs too", () => {
 		const early = topic("inner-product", { title: "Inner products", starts: "2026-11-15", startsWhy: { kind: "early", waitingOn: [h("rank")], exam: false } });
 		assert.equal(COURSE.map.arcs ?? null, null, "a course without arcs");
-		assert.deepEqual(factsOf(early).startsWhy, { kind: "early", words: "Early, ahead of its place, while earlier topics wait on Rank and the column space" });
+		assert.deepEqual(factsOf(early).startsWhy, { kind: "early", words: "Early, ahead of its place, while earlier topics wait on Rank and the column space", short: "Early, ahead of its place" });
 		const after = topic("projection", { title: "Projection", starts: "2026-11-16", startsWhy: { kind: "after", needs: [h("rank")], partners: [] } });
 		assert.equal(factsOf(after).startsWhy?.words, "After Rank and the column space, which it needs");
 	});

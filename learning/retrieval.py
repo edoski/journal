@@ -1377,16 +1377,40 @@ def _worked_on(record: dict[str, Any], day: date) -> bool:
 def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:
     """A save's receipt with each review it set on the day the daily plan
     puts it (``planned``), and ``due_count`` as the reviews the plan puts
-    today: the days the learner is told are the days every view shows."""
+    today: the days the learner is told are the days every view shows.
+    ``starts_moved`` lists each first lesson his study today moved off a
+    day he was told, by title, with its new day and why (``moved``, the
+    topics it waits on by title), so the close that follows can say so (round 15, m2: a partly right Binomial review
+    moved Poisson's start from tomorrow to 13 Nov, and nothing said it)."""
     record = records.load(workspace)
     today = clock.today()
-    planned = when(workspace, record, today)
+    planned, moves = _planned_and_moves(workspace, record, today)
     reviews = {
         topic: {**review, "planned": planned.review(topic, review["due"])}
         for topic, review in receipt["reviews"].items()
     }
     due, _ = tonight(progress.due(record, today), planned)
-    return {**receipt, "reviews": reviews, "due_count": len(due)}
+
+    def title(key: str) -> str:
+        return str(record["topics"].get(key, {}).get("title") or key)
+
+    starts_moved = {
+        topic: {
+            "title": title(topic),
+            "starts": planned.starts[topic].isoformat(),
+            "moved": {**move, "waits_on": [title(key) for key in move["waits_on"]]}
+            if "waits_on" in move
+            else move,
+        }
+        for topic, move in moves.items()
+        if move["by"] == "study" and topic in planned.starts
+    }
+    return {
+        **receipt,
+        "reviews": reviews,
+        "due_count": len(due),
+        **({"starts_moved": starts_moved} if starts_moved else {}),
+    }
 
 
 def _searched(

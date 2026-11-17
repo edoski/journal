@@ -4,7 +4,7 @@ import { reviewAsked, type ChatListItem, type TopicRef } from "@/src/core";
 import { earlierSessions, trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { leftWords } from "@/components/unit-inbox/units";
 import { continueHref, pausedWords } from "@/components/nav/session-state";
-import { FIRST_LESSON, TUTOR_WRITING, overdueWords, pressWord, startsAfterWords, type PressWord } from "@/components/study-words";
+import { FIRST_LESSON, TUTOR_WRITING, movedWords, overdueWords, pressWord, startsAfterWords, type PressWord } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -70,18 +70,25 @@ export interface PickupSections {
  *  today", "Planned Wed 11 Nov", then what the exam ahead means for it,
  *  as the head and the calendar say it ("Planned Sat 28 Nov · Not before
  *  the exam, every study day is full at your pace", "Planned Tue 24 Nov ·
- *  Not on the exam; after it"), else which courses' new topics come first
- *  when it waits behind them (`startsAfterWords`); for a topic the course
- *  leaves out, which the plan never starts, the reason it is left out;
- *  null when the plan has no day for it. */
+ *  Not on the exam; after it"); else, for a day he was told that his
+ *  study moved, what moved it ("Planned Fri 13 Nov · Moved from Mon 9 Nov,
+ *  since Binomial distribution is not solid yet"), and once that day is
+ *  past, the topic it starts after ("Planned Fri 13 Nov · After Binomial
+ *  distribution"; round 15, m2: Poisson moved 9 → 13 Nov with no word
+ *  anywhere); else which courses' new topics come first when it waits
+ *  behind them (`startsAfterWords`); for a topic the course leaves out,
+ *  which the plan never starts, the reason it is left out; null when the
+ *  plan has no day for it. */
 export function plannedWords(facts: TopicFacts): string | null {
-	const { starts, startsAfter, excluded } = facts.topic;
+	const { starts, startsAfter, excluded, moved } = facts.topic;
 	// The plan starts no topic the course leaves out; its reason says why (round 5: Covariance read as ordinary work).
 	if (!starts) return excluded ?? null;
 	const day = starts <= facts.today ? "Planned today" : `Planned ${dayOf(starts)}`;
 	// The exam is why it comes when it does, whatever else it waits behind (round 13, 1 N1: Geometric read only
 	// "Planned Sat 28 Nov" while the head said no room before the exam to start it).
 	if (facts.exam) return `${day} · ${facts.exam}`;
+	if (moved) return `${day} · ${movedWords(null, facts.today, moved)}`;
+	if (facts.startsWhy?.kind === "after") return `${day} · ${facts.startsWhy.short}`;
 	const after = startsAfterWords(startsAfter);
 	return after ? `${day}, ${after.charAt(0).toLowerCase()}${after.slice(1)}` : day;
 }

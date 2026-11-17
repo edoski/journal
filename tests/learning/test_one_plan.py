@@ -487,6 +487,41 @@ def test_a_moved_day_says_what_of_his_study_moved_it(
     assert span["moved"] == {"from": told["span"], "by": "answered"}, span
 
 
+def test_a_save_receipt_names_each_start_his_study_moved_today(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A save's receipt lists each first lesson his study today moved off a
+    day he was told, with its new day and the move the map gives, so the
+    close that follows says it (round 15, m2: a partly right Binomial review
+    moved Poisson's start from tomorrow to 13 Nov, and neither the close nor
+    the page said so)."""
+    slipped = World(tmp_path, "slip", monkeypatch, capsys, R14)
+    poisson = next(
+        topic
+        for topic in slipped.run("probability", "map", day="2026-11-09")["topics"]
+        if topic["topic"] == "poisson"
+    )
+    assert poisson["moved"]["by"] == "study", poisson
+    monkeypatch.setenv("LEARNING_TODAY", "2026-11-09")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"focus": None})))
+    assert main(["--workspace", str(slipped.roots["probability"]), "save"]) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    titles = {
+        topic["topic"]: topic["title"]
+        for topic in slipped.run("probability", "map", day="2026-11-09")["topics"]
+    }
+    assert receipt["starts_moved"]["poisson"] == {
+        "title": titles["poisson"],
+        "starts": poisson["starts"],
+        "moved": {
+            **poisson["moved"],
+            "waits_on": [titles[key] for key in poisson["moved"]["waits_on"]],
+        },
+    }, receipt
+
+
 def test_a_lesson_he_works_on_today_stays_today(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

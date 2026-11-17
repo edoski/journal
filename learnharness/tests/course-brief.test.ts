@@ -349,8 +349,20 @@ describe("the daily plan of every course", () => {
 
 	it("gives a topic every review the plan holds, those of topics not taught yet inside the final review included", () => {
 		const { text } = projectCourseBrief(TODAY, "teach", plan([PROBABILITY]));
-		assert.match(text, /\n- Sat 14 Nov: review Law of total probability \(due since Sat 7 Nov, earlier days are full\), Poisson distribution, Expectation and linearity; start Variance \(after Expectation and linearity\)\n/);
+		assert.match(text, /\n- Sat 14 Nov: review Law of total probability \(due since Sat 7 Nov, earlier days are full\), Poisson distribution, Expectation and linearity; start Variance \(after Expectation and linearity, which it needs\)\n/);
 		assert.match(text, /\n- Sun 15 Nov: review Binomial distribution\n- Mon 16 Nov: review Variance, Bayes' rule\n/, "a topic's later review and a new topic's first one have their days");
+	});
+
+	it("says why a start waits on a topic it is kept apart from, the reason he is given when he asks (round 15, m2)", () => {
+		// Lens 1, 9 Nov: Poisson moved 9 → 13 Nov the day before, after a partly right Binomial review, and the tutor said
+		// "I can't see a recorded reason for the move", though the engine gives `why.poisson = {after, partners: [binomial]}`.
+		const map = courseMap("/study/probability", "Probability", null, [
+			topic("binomial", "Binomial distribution", { review: scheduled("2026-11-10") }),
+			topic("poisson", "Poisson distribution", untaught("2026-11-13", { kind: "after", needs: [], partners: ["binomial" as TopicHandle] })),
+		]);
+		const { text } = projectCourseBrief(TODAY, "teach", { plan: { workspace: "/study/probability", courses: [{ map, days: [day("2026-11-13", [], ["poisson"])] }], unread: [] } });
+		assert.match(text, /- Fri 13 Nov: start Poisson distribution \(after Binomial distribution, which it waits on until that is solid\)/);
+		assert.match(text, /A start's “after …” note is why it starts that day, the reason to give when he asks/);
 	});
 
 	it("gives the final review's days and what it has no room for, and what cannot start before the exam", () => {

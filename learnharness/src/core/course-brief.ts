@@ -194,8 +194,11 @@ function startNote(why: StartsWhy | undefined, title: (handle: TopicHandle) => s
 		case "next":
 			return why.arc ? "next in its arc" : "next in the course";
 		case "after": {
-			const waited = [...why.needs, ...why.partners];
-			return waited.length > 0 ? `after ${waited.map(title).join(", ")}` : null;
+			// Why it starts that day, the reason he is given when he asks (round 15, m2: "I can't see a recorded reason"
+			// for Poisson's start, which waits on Binomial distribution).
+			const needs = why.needs.length > 0 ? `after ${why.needs.map(title).join(", ")}, which it needs` : null;
+			const apart = why.partners.length > 0 ? `after ${why.partners.map(title).join(", ")}, which it waits on until ${why.partners.length === 1 ? "that is" : "they are"} solid` : null;
+			return [needs, apart].filter(Boolean).join("; ") || null;
 		}
 		case "early":
 			return [
@@ -289,7 +292,7 @@ function planLines(plans: CoursePlans | undefined, live: readonly string[]): str
 	const courses = ordered.flatMap(({ map, days }) => coursePlanLines(map, days, own(map.workspace), own(map.workspace) ? new Set(live) : new Set()));
 	if (courses.length === 0) return [];
 	return [
-		"Daily plan of every course, as the calendar shows it: each day's reviews and new topics, every review of every topic. A day you tell him is one of these, unless a save this turn gave the topic a newer one. Say a day moved only where its note says “moved from”, with that note's cause; otherwise name the day alone:",
+		"Daily plan of every course, as the calendar shows it: each day's reviews and new topics, every review of every topic. A day you tell him is one of these, unless a save this turn gave the topic a newer one. Say a day moved only where its note says “moved from”, with that note's cause; otherwise name the day alone. A start's “after …” note is why it starts that day, the reason to give when he asks:",
 		...courses,
 		...(plans.unread.length > 0 ? [`Not in this plan, its record could not be read: ${plans.unread.join(", ")}`] : []),
 	];
