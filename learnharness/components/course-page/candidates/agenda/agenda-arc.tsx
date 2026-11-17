@@ -46,7 +46,7 @@ export function AgendaArc({
 							id={headerId}
 							data-slot="course-arc-header"
 							onKeyDown={onHeaderKeyDown}
-							className="h-8 min-w-0 flex-1 gap-1.5 px-3 text-callout font-medium text-muted-foreground hover:text-foreground"
+							className="h-8 min-w-0 flex-1 gap-1.5 px-3 text-callout font-normal text-muted-foreground hover:text-foreground"
 						>
 							<span data-slot="course-arc-title" className="min-w-0 truncate">
 								<MathText>{arc.title}</MathText>
