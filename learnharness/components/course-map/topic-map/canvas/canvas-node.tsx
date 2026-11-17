@@ -105,7 +105,9 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 			data-status={data.kind === "step" ? data.status : undefined}
 			data-current={current || undefined}
 			data-entry={from !== null || undefined}
+			data-lit={state?.lit?.has(handle) || undefined}
 			data-marked={marked || undefined}
+			data-framed={state?.framed?.has(handle) || undefined}
 			data-testid={`map-node-${handle}`}
 			aria-label={label}
 			aria-description={needs ?? undefined}

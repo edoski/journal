@@ -16,6 +16,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import { currentArc } from "../src/core/index.ts";
 import { HomeMap } from "../components/study-home/home-map.tsx";
 import { SplitMap } from "../components/course-page/split/split-map.tsx";
+import { NO_LIGHTS } from "../components/course-map/use-map-tie.ts";
 import { LINALG_ARCS } from "./fixtures/now-demo.ts";
 
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
@@ -31,9 +32,8 @@ const coursePage = (enlarged: boolean) =>
 			arc={currentArc(LINALG_ARCS.map) ?? undefined}
 			arcs={LINALG_ARCS.map.arcs!}
 			said={new Map()}
-			lit={null}
+			lights={NO_LIGHTS}
 			aim={null}
-			reveal={null}
 			onPoint={noop}
 			onLeave={noop}
 			enlarged={enlarged}

@@ -6,6 +6,7 @@ import { leftWords, taskWords } from "@/components/unit-inbox/units";
 import { localDay } from "@/components/day-change";
 import { sessionName } from "@/components/study-home/day-record";
 import type { TakeLine } from "@/components/start/use-lesson-start";
+import type { PointBy } from "@/components/course-map/use-map-tie";
 
 /** What Today's rows draw from: Today's lines and how a line opens. */
 export interface RowsProps {
@@ -17,8 +18,8 @@ export interface RowsProps {
 	 *  where a line reports that he points at it (by pointer or focus) or
 	 *  stops pointing. */
 	pointed?: string | null;
-	onPoint?: (row: TodayRow, by: "pointer" | "focus") => void;
-	onPointEnd?: () => void;
+	onPoint?: (row: TodayRow, by: PointBy) => void;
+	onPointEnd?: (by: PointBy) => void;
 }
 
 /** The handlers and mark that let a line tell Home's map he points at it
@@ -28,9 +29,9 @@ export function pointProps(row: TodayRow, { pointed, onPoint, onPointEnd }: Pick
 	return {
 		"data-pointed": pointed === lineKey(row) || undefined,
 		onPointerEnter: () => onPoint(row, "pointer"),
-		onPointerLeave: onPointEnd,
+		onPointerLeave: () => onPointEnd?.("pointer"),
 		onFocus: () => onPoint(row, "focus"),
-		onBlur: onPointEnd,
+		onBlur: () => onPointEnd?.("focus"),
 	};
 }
 

@@ -38,6 +38,7 @@ export function HomeMap({
 	workspace,
 	onSelect,
 	highlight = null,
+	marked = null,
 	framed = null,
 	arc: followed,
 	enlarged,
@@ -51,6 +52,8 @@ export function HomeMap({
 	onSelect: (workspace: string) => void;
 	/** Topics to light on the chosen course's map; null lights none. */
 	highlight?: ReadonlySet<TopicHandle> | null;
+	/** The topic whose card glows on the chosen course's map, the Today row he points at (`useMapTie`). */
+	marked?: TopicHandle | null;
 	/** Topics the chosen course's map brings into view while he points at
 	 *  their Today row; null while he points at none. */
 	framed?: ReadonlySet<TopicHandle> | null;
@@ -118,6 +121,7 @@ export function HomeMap({
 								arc={shown && view.whole ? undefined : arcOf(course, shown)}
 								said={said.get(course.map.workspace)!}
 								highlight={shown ? highlight : null}
+								marked={shown ? marked : null}
 								framed={shown ? framed : null}
 								whole={shown && view.whole}
 								margin={view.margin}
@@ -218,6 +222,7 @@ function CourseDrawing({
 	arc,
 	said,
 	highlight,
+	marked,
 	framed,
 	whole,
 	margin,
@@ -228,6 +233,7 @@ function CourseDrawing({
 	arc: ArcHandle | undefined;
 	said: ReadonlyMap<TopicHandle, Said>;
 	highlight: ReadonlySet<TopicHandle> | null;
+	marked: TopicHandle | null;
 	framed: ReadonlySet<TopicHandle> | null;
 	whole: boolean;
 	margin: MapView["margin"];
@@ -237,7 +243,7 @@ function CourseDrawing({
 	const { map } = course;
 	if (map.topics.length === 0) return <p className="m-auto text-body text-muted-foreground">Topics appear as you study this course.</p>;
 	// As much room as the fade, so a topic at the edge scrolls clear of it.
-	return <TopicMap map={map} arc={arc} said={said} margin={margin} highlight={highlight} framed={framed} whole={whole} onOpenArc={onOpenArc} onOpensWhole={onOpensWhole} />;
+	return <TopicMap map={map} arc={arc} said={said} margin={margin} highlight={highlight} marked={marked} framed={framed} whole={whole} onOpenArc={onOpenArc} onOpensWhole={onOpensWhole} />;
 }
 
 /** The one arc a set of lit topics lies in, or undefined when they span

@@ -1,5 +1,5 @@
-import type { CourseMapEdge, TopicHandle } from "@/src/core";
-import { chainOf, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
+import type { TopicHandle } from "@/src/core";
+import type { TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import type { CourseGroup, CourseTopic, GroupId } from "@/components/course-page/course-model";
 
 /** One section of the list: a group, or an arc of a course with arcs,
@@ -9,33 +9,6 @@ export interface ListSection {
 	topics: readonly CourseTopic[];
 	/** An arc ready for its check: its line holds Check it. */
 	checkable?: boolean;
-}
-
-/**
- * What ties the split page's two panes (spec: split-course.md): the topic
- * he points at or focuses, and the pane it is in; which groups the list
- * shows; and where the map opens. Pure.
- */
-export interface Pointed {
-	handle: TopicHandle;
-	from: "list" | "map";
-}
-
-/** The topics the map lights for what he points at: a row lights its
- *  topic with its whole prerequisite chain, as a hover on the map does;
- *  a node lights itself (the map draws that), so nothing more. */
-export function litOf(pointed: Pointed | null, edges: readonly CourseMapEdge[]): ReadonlySet<TopicHandle> | null {
-	return pointed?.from === "list" ? chainOf(pointed.handle, edges) : null;
-}
-
-/** The row the list marks for what he points at: a node's topic. */
-export function markedOf(pointed: Pointed | null): TopicHandle | null {
-	return pointed?.from === "map" ? pointed.handle : null;
-}
-
-/** The topic the map brings into view for what he points at: a row's. */
-export function revealOf(pointed: Pointed | null): TopicHandle | null {
-	return pointed?.from === "list" ? pointed.handle : null;
 }
 
 /** The groups the left pane shows: the four in their order, an empty one

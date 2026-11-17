@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HomeFrame, type HomeReady } from "@/components/study-home/home-frame";
 import { HomeMap } from "@/components/study-home/home-map";
@@ -13,22 +13,20 @@ import { courseHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
 import { PAGE_COLUMN } from "@/components/page-frame/page-frame";
 import type { TopicHandle } from "@/src/core";
+import { useMapTie, type PointBy } from "@/components/course-map/use-map-tie";
 
 /** The map's share of the column while Today shows: enough to see where
  *  the current topic sits, so Today's rows lead (Edo, 12 Nov 2026). */
 const MAP_SHARE = "basis-1/2";
-
-/** How long the pointer rests on a Today line before the map follows it, so
- *  crossing lines on the way up to the map does not flip it course by course. */
-const FOLLOW_DWELL_MS = 150;
 
 /**
  * The agenda study home (spec: study-home.md): what to study now, in one
  * window. A course's map on top behind course tabs, then Today, a line per step of today's plan. The
  * map follows Today: it shows the course of the line he points at, with
  * that line's topics lit and, in a course with arcs, the arc they lie in
- * shown on the map (home-map.md); while he points at the line,
- * the map brings those topics into view.
+ * shown on the map (home-map.md); while he points at the line, its first
+ * topic's card glows and the map brings its topics into view, through the
+ * maps' one tie (`useMapTie`, the course page's and the topic page's).
  */
 export function StudyHome() {
 	const [enlarged, setEnlarged] = useState(false);
@@ -60,17 +58,16 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 	const { rows, courses, chats, done, exam, busy, onContinue } = ready;
 	const router = useRouter();
 	const [chosen, setChosen] = useState<Chosen | null>(null);
-	// The line under the pointer or holding focus, if any: only then does the line the map follows wear its fill, so
-	// no row has a card behind it at rest.
-	const [pointingAt, setPointingAt] = useState<string | null>(null);
-	const dwell = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-	useEffect(() => () => clearTimeout(dwell.current), []);
+	// The line he points at, once the pointer rests or the focus lands, moves the map to its course and lights its
+	// topics alone (the maps' tie, `useMapTie`); the map stays on that line once he leaves it.
+	const tie = useMapTie({ onHold: (at) => setChosen({ by: "line", key: at.key }) });
 
 	const followed = chosen?.by !== "tab" ? followedRow(rows, chosen?.by === "line" ? chosen.key : null) : null;
 	const workspace = chosen?.by === "tab" ? chosen.workspace : (followed?.course?.map.workspace ?? courses[0]!.map.workspace);
 	const lesson = useMemo(() => (followed ? lessonOf(followed) : null), [followed]);
-	const highlight = useMemo<ReadonlySet<TopicHandle> | null>(() => (lesson?.topics.length ? new Set(lesson.topics) : null), [lesson]);
-	const pointed = followed && pointingAt === lineKey(followed) ? pointingAt : null;
+	const followedTopics = useMemo<ReadonlySet<TopicHandle> | null>(() => (lesson?.topics.length ? new Set(lesson.topics) : null), [lesson]);
+	// Only the line the map follows wears its fill while he points at it, so no row has a card behind it at rest.
+	const pointed = followed && tie.pointed?.key === lineKey(followed) ? tie.pointed.key : null;
 	useHomeKeys({
 		moveCourse: (step) => {
 			const next = neighbourCourse(
@@ -89,13 +86,7 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 		openShownCoursePage: () => router.push(courseHref(workspace)),
 	});
 
-	const onPoint = (row: TodayRow, by: "pointer" | "focus") => {
-		clearTimeout(dwell.current);
-		setPointingAt(lineKey(row));
-		const pick = () => setChosen({ by: "line", key: lineKey(row) });
-		if (by === "focus") pick();
-		else dwell.current = setTimeout(pick, FOLLOW_DWELL_MS);
-	};
+	const onPoint = (row: TodayRow, by: PointBy) => tie.point("list", { key: lineKey(row), topics: lessonOf(row).topics }, by);
 
 	return (
 		<>
@@ -105,8 +96,9 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 					chats={chats}
 					workspace={workspace}
 					onSelect={(ws) => setChosen({ by: "tab", workspace: ws })}
-					highlight={highlight}
-					framed={pointed && !enlarged ? highlight : null}
+					highlight={tie.lights.lit ?? followedTopics}
+					marked={tie.lights.glow}
+					framed={enlarged ? null : tie.lights.framed}
 					arc={lesson?.place?.handle ?? null}
 					enlarged={enlarged}
 					onEnlarge={onEnlarge}
@@ -121,10 +113,7 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 					onContinue={onContinue}
 					pointed={pointed}
 					onPoint={onPoint}
-					onPointEnd={() => {
-						clearTimeout(dwell.current);
-						setPointingAt(null);
-					}}
+					onPointEnd={(by) => tie.point("list", null, by)}
 				/>
 			)}
 		</>

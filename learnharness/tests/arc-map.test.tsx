@@ -21,6 +21,7 @@ import { currentArc, type ArcHandle } from "../src/core/index.ts";
 import { ArcMap } from "../components/course-map/arc-map.tsx";
 import { HomeMap } from "../components/study-home/home-map.tsx";
 import { SplitMap } from "../components/course-page/split/split-map.tsx";
+import { NO_LIGHTS } from "../components/course-map/use-map-tie.ts";
 import { LINALG_ARCS, PROB } from "./fixtures/now-demo.ts";
 
 const router = { push: () => {}, replace: () => {}, prefetch: () => {}, back: () => {}, forward: () => {}, refresh: () => {} };
@@ -47,13 +48,13 @@ const rows = () => [...document.querySelectorAll('[data-slot="arc-index-row"]')]
 const shown = () => document.querySelector('[data-slot="arc-index-row"][data-shown]')?.getAttribute("data-arc") ?? null;
 /** The course page's map pane on one arc. */
 const coursePage = (arc: ArcHandle, onOpenArc: (arc: ArcHandle) => void) => (
-	<SplitMap map={LINALG_ARCS.map} arc={arc} arcs={ARCS} said={new Map()} lit={null} aim={null} reveal={null} onPoint={noop} onLeave={noop} onOpenArc={onOpenArc} enlarged={false} onEnlarge={noop} />
+	<SplitMap map={LINALG_ARCS.map} arc={arc} arcs={ARCS} said={new Map()} lights={NO_LIGHTS} aim={null} onPoint={noop} onLeave={noop} onOpenArc={onOpenArc} enlarged={false} onEnlarge={noop} />
 );
 
 /** The course page's map pane, enlarging as the page does. */
 function EnlargingCoursePage({ onOpenArc }: { onOpenArc: (arc: ArcHandle) => void }) {
 	const [enlarged, setEnlarged] = useState(false);
-	return <SplitMap map={LINALG_ARCS.map} arc={a("systems")} arcs={ARCS} said={new Map()} lit={null} aim={null} reveal={null} onPoint={noop} onLeave={noop} onOpenArc={onOpenArc} enlarged={enlarged} onEnlarge={setEnlarged} />;
+	return <SplitMap map={LINALG_ARCS.map} arc={a("systems")} arcs={ARCS} said={new Map()} lights={NO_LIGHTS} aim={null} onPoint={noop} onLeave={noop} onOpenArc={onOpenArc} enlarged={enlarged} onEnlarge={setEnlarged} />;
 }
 
 describe("the course page's map enlarged", () => {

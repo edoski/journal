@@ -335,6 +335,7 @@ function Flow({
 		() => ({
 			lit,
 			marked,
+			framed: pointedAt ? new Set(pointedAt) : null,
 			tabStop,
 			onActive: setActive,
 			onFocus: (handle) => {
@@ -358,7 +359,7 @@ function Flow({
 			},
 			openArc: onOpenArc,
 		}),
-		[lit, marked, tabStop, layout, graph.edges, follow, onOpenArc, trail],
+		[lit, marked, pointedAt, tabStop, layout, graph.edges, follow, onOpenArc, trail],
 	);
 
 	return (

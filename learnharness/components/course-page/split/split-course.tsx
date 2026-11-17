@@ -15,7 +15,8 @@ import { RoadList } from "@/components/course-page/road/road-list";
 import { openingArc, type CourseArcSection, type CourseGroup, type CourseView } from "@/components/course-page/course-model";
 import type { SplitListHandle } from "@/components/course-page/split/split-list";
 import { SplitMap, type SplitMapHandle } from "@/components/course-page/split/split-map";
-import { OPEN_AT_FIRST, aimOf, litOf, markedOf, revealOf, shownGroups, type Pointed } from "@/components/course-page/split/split-tie";
+import { OPEN_AT_FIRST, aimOf, shownGroups } from "@/components/course-page/split/split-tie";
+import { useMapTie, type PointBy } from "@/components/course-map/use-map-tie";
 
 /** What the course page's head and road are handed by the page they sit
  *  in (`SplitBody`): the course, the arc the map shows and which sections
@@ -36,8 +37,8 @@ export interface CourseColumns {
 	onOpenChange: (id: string, open: boolean) => void;
 	/** The topic he points at on the map, whose row the list marks. */
 	marked: TopicHandle | null;
-	/** A row he points at or focuses, or none. */
-	onPoint: (handle: TopicHandle | null) => void;
+	/** A row he points at or focuses, or none (`useMapTie`). */
+	onPoint: (handle: TopicHandle | null, by?: PointBy) => void;
 	/** The list's handle, which the map hands the walk back to. */
 	listRef: RefObject<SplitListHandle | null>;
 	onEnterMap: (handle: TopicHandle) => void;
@@ -64,7 +65,6 @@ export interface CourseColumns {
 export function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; standing: CourseStanding | null; busy: boolean; onContinue: TakeLine }) {
 	const { map } = view.course;
 	const { arcs } = view;
-	const [pointed, setPointed] = useState<Pointed | null>(null);
 	const groups = useMemo(() => shownGroups(view.groups), [view.groups]);
 	// `?arc=` (the head's arc pill, a topic head's) shows that arc; else where he is.
 	const asked = useSearchParams().get("arc");
@@ -100,14 +100,11 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 		show(arc);
 		setOpen((was) => (was[arc] ? was : { ...was, [arc]: true }));
 	};
-	const lit = useMemo(() => litOf(pointed, map.edges), [pointed, map.edges]);
+	// A row lights its topic with its whole prerequisite chain, as a hover on the map does.
+	const tie = useMapTie({ chain: map.edges });
 	const headerBox = useRef<HTMLDivElement>(null);
 	const list = useRef<SplitListHandle>(null);
 	const drawing = useRef<SplitMapHandle>(null);
-
-	/** One pane says what he points at; leaving it clears only its own. */
-	const pointFrom = (from: Pointed["from"]) => (handle: TopicHandle | null) =>
-		setPointed((was) => (handle ? { handle, from } : was?.from === from ? null : was));
 
 	/** Now's row joins the arrow walk: Up from the first row reaches it, Down returns to the rows. */
 	const action = () => headerBox.current?.querySelector<HTMLElement>("[data-slot=course-action]") ?? null;
@@ -132,8 +129,8 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 		showArc,
 		open,
 		onOpenChange,
-		marked: markedOf(pointed),
-		onPoint: pointFrom("list"),
+		marked: tie.row,
+		onPoint: (handle, by) => tie.pointTopic("list", handle, by),
 		listRef: list,
 		onEnterMap: (to) => drawing.current?.focus(to),
 		onExitTop: () => action()?.focus(),
@@ -163,10 +160,9 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 							arc={shownArc ?? undefined}
 							arcs={arcs?.map((a) => a.arc) ?? null}
 							said={view.said}
-							lit={lit}
+							lights={tie.lights}
 							aim={aim}
-							reveal={revealOf(pointed)}
-							onPoint={pointFrom("map")}
+							onPoint={(handle, by) => tie.pointTopic("map", handle, by)}
 							onLeave={(to) => list.current?.focus(to)}
 							onOpenArc={showArc}
 							enlarged={enlarged}

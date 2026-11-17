@@ -12,7 +12,7 @@ import { LinkedColumns } from "@/components/linked-columns/linked-columns";
 import { SectionsPane } from "@/components/unit-inbox/topic-page/pickup/sections";
 import { lessonBegun } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
 import { BuildsOnMap } from "@/components/unit-inbox/topic-page/hybrid/builds-on-map";
-import type { TopicHandle } from "@/src/core";
+import { useMapTie } from "@/components/course-map/use-map-tie";
 
 /** What the history pane is given (`../pickup/pickup.md`). */
 export interface HybridPaneProps {
@@ -45,10 +45,11 @@ export interface HybridPaneProps {
 export function HybridTopic({ facts, busy, error = null, onAct, onTask }: TopicPageProps & { error?: string | null }) {
 	const planned = facts.sessions.filter(isPlanned);
 	const [chosen, setChosen] = useState(() => mapLessonAtFirst(facts.sessions, facts.action));
-	const [pointed, setPointed] = useState<TopicHandle | null>(null);
+	// A row of Builds on lights its topic alone: the map is already the chain the topic builds on.
+	const tie = useMapTie();
 	const shown = planned.find((entry) => entry.chat.id === chosen) ?? planned.find((entry) => entry.chat.id === mapLessonAtFirst(facts.sessions, facts.action)) ?? null;
 	const side = (className?: string) => (
-		<SectionsPane facts={facts} busy={busy} onAct={onAct} onTask={onTask} shown={shown?.chat.id ?? null} onShow={setChosen} onPoint={(handle) => setPointed(handle as TopicHandle | null)} className={className} />
+		<SectionsPane facts={facts} busy={busy} onAct={onAct} onTask={onTask} shown={shown?.chat.id ?? null} onShow={setChosen} onPoint={(handle, by) => tie.pointTopic("list", handle, by)} className={className} />
 	);
 	const starting = (facts.action.kind === "start" || lessonBegun(facts)) && facts.buildsMap;
 	return (
@@ -68,7 +69,7 @@ export function HybridTopic({ facts, busy, error = null, onAct, onTask }: TopicP
 					map={<LessonMap key={shown.chat.id} entry={shown} label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")} />}
 				/>
 			) : starting ? (
-				<LinkedColumns data-slot="topic-panes" list={side("flex-1")} map={<BuildsOnMap map={starting} said={facts.said} topic={facts.topic.handle} pointed={pointed} />} />
+				<LinkedColumns data-slot="topic-panes" list={side("flex-1")} map={<BuildsOnMap map={starting} said={facts.said} topic={facts.topic.handle} lights={tie.lights} />} />
 			) : (
 				side("flex-1")
 			)}

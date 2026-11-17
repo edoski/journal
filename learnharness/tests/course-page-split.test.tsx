@@ -16,7 +16,8 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseGroups } from "../components/course-page/course-model.ts";
 import { layoutTopicMap } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { OPEN_AT_FIRST, aimOf, walkStops, litOf, markedOf, revealOf, shownGroups, topicAt, walkTo } from "../components/course-page/split/split-tie.ts";
+import { OPEN_AT_FIRST, aimOf, walkStops, shownGroups, topicAt, walkTo } from "../components/course-page/split/split-tie.ts";
+import { NO_LIGHTS, lightsOf, type MapLights, type Pointed } from "../components/course-map/use-map-tie.ts";
 import { WholeCourseButton } from "../components/course-map/topic-map/whole-course-button.tsx";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
 import { SplitMap } from "../components/course-page/split/split-map.tsx";
@@ -61,27 +62,25 @@ const noop = () => {};
 /** A course without arcs draws no arc line. */
 const noArcLine = () => null;
 const LAYOUT = layoutTopicMap(MAP.topics, MAP.edges);
-const drawMap = (lit: ReadonlySet<TopicHandle> | null = null, reveal: TopicHandle | null = null) =>
-	render(<SplitMap map={MAP} said={new Map()} lit={lit} aim={null} reveal={reveal} onPoint={noop} onLeave={noop} enlarged={false} onEnlarge={noop} />);
+const drawMap = (lights: MapLights = NO_LIGHTS) => render(<SplitMap map={MAP} said={new Map()} lights={lights} aim={null} onPoint={noop} onLeave={noop} enlarged={false} onEnlarge={noop} />);
+/** A row (or a card) he points at, as the page's tie holds it. */
+const at = (handle: string, from: Pointed["from"] = "list"): Pointed => ({ from, key: handle, topics: [h(handle)] });
 
 describe("what ties the two panes", () => {
 	it("lights a pointed row's topic with its whole prerequisite chain, as a hover on the map does", () => {
-		assert.deepEqual([...litOf({ handle: h("independence"), from: "list" }, MAP.edges)!].sort(), ["independence", "span", "vectors"]);
-		assert.deepEqual([...litOf({ handle: h("vectors"), from: "list" }, MAP.edges)!], ["vectors"]);
+		assert.deepEqual([...lightsOf(at("independence"), MAP.edges).lit!].sort(), ["independence", "span", "vectors"]);
+		assert.deepEqual([...lightsOf(at("vectors"), MAP.edges).lit!], ["vectors"]);
 	});
 
 	it("brings a pointed row's topic into view on the map, and moves nothing for a node he points at there", () => {
-		assert.equal(revealOf({ handle: h("span"), from: "list" }), "span");
-		assert.equal(revealOf({ handle: h("span"), from: "map" }), null);
-		assert.equal(revealOf(null), null);
+		assert.deepEqual([...lightsOf(at("span"), MAP.edges).framed!], ["span"]);
+		assert.equal(lightsOf(at("span", "map"), MAP.edges).framed, null);
+		assert.equal(lightsOf(null, MAP.edges).framed, null);
 	});
 
 	it("leaves the map to light a node he points at on it, and marks that node's row instead", () => {
-		assert.equal(litOf({ handle: h("span"), from: "map" }, MAP.edges), null);
-		assert.equal(markedOf({ handle: h("span"), from: "map" }), "span");
-		assert.equal(markedOf({ handle: h("span"), from: "list" }), null);
-		assert.equal(litOf(null, MAP.edges), null);
-		assert.equal(markedOf(null), null);
+		assert.deepEqual(lightsOf(at("span", "map"), MAP.edges), NO_LIGHTS, "a card lights itself; the tie marks its row (`row`)");
+		assert.deepEqual(lightsOf(null, MAP.edges), NO_LIGHTS);
 	});
 
 	it("reads the topic a pointer or focus on the map is about from the node it sits in, and none between nodes", () => {
@@ -174,14 +173,13 @@ describe("the map pane", () => {
 	});
 
 	it("dims every topic but the ones a row lights, You are here and the topics it leads to", () => {
-		const document = drawMap(litOf({ handle: h("span"), from: "list" }, MAP.edges));
+		const document = drawMap({ ...lightsOf(at("span"), MAP.edges), glow: null });
 		const dimmed = [...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => /opacity:\s*0?\.\d/.test(n.parentElement!.parentElement!.getAttribute("style") ?? "")).map((n) => n.getAttribute("data-testid"));
 		assert.deepEqual(dimmed.sort(), ["map-node-eigen"]);
 	});
 
 	it("rings the card of the row he points at with the glow, and no other", () => {
-		const pointed = { handle: h("span"), from: "list" } as const;
-		const document = drawMap(litOf(pointed, MAP.edges), revealOf(pointed));
+		const document = drawMap(lightsOf(at("span"), MAP.edges));
 		const glowing = [...document.querySelectorAll('.lh-card-mark > [data-slot="course-map-node"]')].map((n) => n.getAttribute("data-testid"));
 		assert.deepEqual(glowing, ["map-node-span"]);
 		assert.ok(drawMap().querySelector(".lh-card-mark") === null, "nothing glows at rest");

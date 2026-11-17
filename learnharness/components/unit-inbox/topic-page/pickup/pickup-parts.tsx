@@ -17,7 +17,8 @@ import type { NextItem, NowItem } from "@/components/unit-inbox/topic-page/picku
 import type { BuildsOn, StartsReason } from "@/components/unit-inbox/topic-page/topic-facts";
 import { startsFact } from "@/components/unit-inbox/fact-icon";
 import { FactIcon } from "@/components/unit-inbox/status-mark";
-import type { TopicRef } from "@/src/core";
+import type { TopicHandle, TopicRef } from "@/src/core";
+import type { PointBy } from "@/components/course-map/use-map-tie";
 import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
 
@@ -109,7 +110,7 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
  *  and where he stands on it in the pie's words, opening its page; a
  *  pointer or focus on a row tells the page (`onPoint`), so the map beside
  *  can light it. */
-export function BuildsOnList({ builds, onPoint }: { builds: readonly BuildsOn[]; onPoint?: (handle: string | null) => void }) {
+export function BuildsOnList({ builds, onPoint }: { builds: readonly BuildsOn[]; onPoint?: (handle: TopicHandle | null, by: PointBy) => void }) {
 	return (
 		<ul className="flex flex-col">
 			{builds.map(({ topic, standing, words, href }) => (
@@ -118,10 +119,10 @@ export function BuildsOnList({ builds, onPoint }: { builds: readonly BuildsOn[];
 						href={href}
 						data-slot="pickup-builds-on"
 						data-topic={topic.handle}
-						onMouseEnter={() => onPoint?.(topic.handle)}
-						onMouseLeave={() => onPoint?.(null)}
-						onFocus={() => onPoint?.(topic.handle)}
-						onBlur={() => onPoint?.(null)}
+						onMouseEnter={() => onPoint?.(topic.handle, "pointer")}
+						onMouseLeave={() => onPoint?.(null, "pointer")}
+						onFocus={() => onPoint?.(topic.handle, "focus")}
+						onBlur={() => onPoint?.(null, "focus")}
 						className={cn(WRAPPING_ROW, "outline-none transition-colors duration-150 hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none")}
 					>
 						<TopicGlyph standing={standing} />

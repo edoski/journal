@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import { useCallback, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { currentArc, type ArcHandle, type CourseMap, type CourseMapArc, type TopicHandle } from "@/src/core";
 import { MapFrame } from "@/components/course-map/map-frame";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
 import { topicAt } from "@/components/course-page/split/split-tie";
+import type { MapLights, PointBy } from "@/components/course-map/use-map-tie";
 
 /** What the page asks of the map: focus a topic's node. */
 export interface SplitMapHandle {
@@ -16,9 +17,10 @@ export interface SplitMapHandle {
  * The split page's right pane (spec: split-course.md): Home's map
  * (`TopicMap`, topic-map.md) in Home's frame (`MapFrame`: its fade, Whole
  * course while enlarged, Enlarge), with its own camera, opening on `aim` at
- * the top of the pane. `lit` lights the row's topic and prerequisites, its
- * card glows (`marked`) and, once he rests on it, the camera brings it into
- * view (`framed`), returning once he points at nothing. Pointing at or
+ * the top of the pane. A row he points at lights its topic and
+ * prerequisites, its card glows and, once he rests on it, the camera
+ * brings it into view (`lights`, the page's `useMapTie`), returning once he
+ * points at nothing. Pointing at or
  * focusing a node tells the page its topic (`onPoint`), so the list marks
  * its row; Escape on a focused node hands the walk back to that row
  * (`onLeave`). With `arc`, the map draws that arc. A course with `arcs`
@@ -32,9 +34,8 @@ export function SplitMap({
 	arc,
 	arcs = null,
 	said,
-	lit,
+	lights,
 	aim,
-	reveal,
 	onPoint,
 	onLeave,
 	onOpenArc,
@@ -49,12 +50,11 @@ export function SplitMap({
 	arcs?: readonly CourseMapArc[] | null;
 	/** What the sidebar says for each topic (`sidebarSays`), for the cards. */
 	said: ReadonlyMap<TopicHandle, Said>;
-	lit: ReadonlySet<TopicHandle> | null;
+	/** What the row he points at lights, glows and brings into view (`useMapTie`). */
+	lights: MapLights;
 	/** The topic the map opens on. */
 	aim: TopicHandle | null;
-	/** A topic to bring into view; null moves nothing. */
-	reveal: TopicHandle | null;
-	onPoint: (handle: TopicHandle | null) => void;
+	onPoint: (handle: TopicHandle | null, by: PointBy) => void;
 	onLeave: (handle: TopicHandle) => void;
 	/** Shows another arc: a press on the arc list, ⇧↑ or ⇧↓, ⌘J, or a card's "From <arc>" line. */
 	onOpenArc?: (arc: ArcHandle) => void;
@@ -66,13 +66,12 @@ export function SplitMap({
 	const root = useRef<HTMLElement>(null);
 	const pointed = useRef<TopicHandle | null>(null);
 	const [opensWhole, setOpensWhole] = useState<boolean | null>(null);
-	const framed = useMemo(() => (reveal ? new Set([reveal]) : null), [reveal]);
 	const open = useCallback((to: ArcHandle) => onOpenArc?.(to), [onOpenArc]);
 
-	const point = (handle: TopicHandle | null) => {
+	const point = (handle: TopicHandle | null, by: PointBy) => {
 		if (handle === pointed.current) return;
 		pointed.current = handle;
-		onPoint(handle);
+		onPoint(handle, by);
 	};
 
 	useImperativeHandle(
@@ -89,11 +88,11 @@ export function SplitMap({
 			ref={root}
 			aria-label={`${map.title} map`}
 			data-slot="course-split-map"
-			onPointerOver={(e) => point(topicAt(e.target))}
-			onPointerLeave={() => point(null)}
-			onFocus={(e) => point(topicAt(e.target))}
+			onPointerOver={(e) => point(topicAt(e.target), "pointer")}
+			onPointerLeave={() => point(null, "pointer")}
+			onFocus={(e) => point(topicAt(e.target), "focus")}
 			onBlur={(e) => {
-				if (!e.currentTarget.contains(e.relatedTarget as Node | null)) point(null);
+				if (!e.currentTarget.contains(e.relatedTarget as Node | null)) point(null, "focus");
 			}}
 			onKeyDown={(e) => {
 				const handle = e.key === "Escape" ? topicAt(e.target) : null;
@@ -119,9 +118,9 @@ export function SplitMap({
 					arc={view.whole ? undefined : arc}
 					said={said}
 					margin={view.margin}
-					highlight={lit}
-					marked={reveal}
-					framed={framed}
+					highlight={lights.lit}
+					marked={lights.glow}
+					framed={lights.framed}
 					whole={view.whole}
 					opensOn={aim}
 					fitsDown="top"

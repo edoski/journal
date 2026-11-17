@@ -41,13 +41,13 @@ describe("a line reporting that he points at it", () => {
 
 	it("reports the pointer, focus and leaving, and marks the followed line", () => {
 		const seen: string[] = [];
-		const props = pointProps(PR, { pointed: lineKey(PR), onPoint: (row, by) => seen.push(`${lineKey(row)}:${by}`), onPointEnd: () => seen.push("end") }) as Record<string, unknown>;
+		const props = pointProps(PR, { pointed: lineKey(PR), onPoint: (row, by) => seen.push(`${lineKey(row)}:${by}`), onPointEnd: (by) => seen.push(`end:${by}`) }) as Record<string, unknown>;
 		assert.equal(props["data-pointed"], true);
 		(props.onPointerEnter as () => void)();
 		(props.onFocus as () => void)();
 		(props.onPointerLeave as () => void)();
 		(props.onBlur as () => void)();
-		assert.deepEqual(seen, [`${lineKey(PR)}:pointer`, `${lineKey(PR)}:focus`, "end", "end"]);
+		assert.deepEqual(seen, [`${lineKey(PR)}:pointer`, `${lineKey(PR)}:focus`, "end:pointer", "end:focus"]);
 		assert.equal((pointProps(LA, { pointed: lineKey(PR), onPoint: () => {} }) as Record<string, unknown>)["data-pointed"], undefined);
 	});
 });

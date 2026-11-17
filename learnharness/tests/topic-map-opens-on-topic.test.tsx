@@ -16,6 +16,7 @@ import { buildsMapOf } from "../components/unit-inbox/topic-page/topic-facts.ts"
 import { framedCamera } from "../components/course-map/topic-map/topic-map-layout.ts";
 import { CANVAS_NODE, layoutCanvas } from "../components/course-map/topic-map/canvas/canvas-layout.ts";
 import { BuildsOnMap } from "../components/unit-inbox/topic-page/hybrid/builds-on-map.tsx";
+import { NO_LIGHTS } from "../components/course-map/use-map-tie.ts";
 
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const h = (handle: string) => handle as TopicHandle;
@@ -52,7 +53,7 @@ describe("a topic page's map", () => {
 	});
 
 	it("is opened on its topic by the topic page", () => {
-		const element = BuildsOnMap({ map: MAP, said: new Map(), topic: h("invertibility"), pointed: null }) as React.ReactElement<{ children: React.ReactElement<{ opensOn?: TopicHandle }> }>;
+		const element = BuildsOnMap({ map: MAP, said: new Map(), topic: h("invertibility"), lights: NO_LIGHTS }) as React.ReactElement<{ children: React.ReactElement<{ opensOn?: TopicHandle }> }>;
 		assert.equal(element.props.children.props.opensOn, "invertibility");
 	});
 });

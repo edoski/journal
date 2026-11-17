@@ -8,6 +8,7 @@ import type { ArcLineProps } from "@/components/course-page/road/road-arc";
 import { CourseTopicRow } from "@/components/course-page/course-topic-row";
 import { cn } from "@/lib/utils";
 import { stopKey, walkStops, walkTo, type ListSection, type Stop } from "@/components/course-page/split/split-tie";
+import type { PointBy } from "@/components/course-map/use-map-tie";
 
 /** What the page asks of the list: focus a topic's row, or its first. */
 export interface SplitListHandle {
@@ -68,7 +69,7 @@ export function SplitList({
 	/** The arc whose check is starting. */
 	checking?: string | null;
 	marked: TopicHandle | null;
-	onPoint: (handle: TopicHandle | null) => void;
+	onPoint: (handle: TopicHandle | null, by: PointBy) => void;
 	onEnterMap: (handle: TopicHandle) => void;
 	onExitTop?: () => void;
 	/** How an arc's line is drawn: the road's (`RoadLine`). */
@@ -215,10 +216,10 @@ export function SplitList({
 			className="h-8"
 			highlighted={marked === row.topic.handle}
 			ref={register({ kind: "row", handle: row.topic.handle })}
-			onMouseEnter={() => onPoint(row.topic.handle)}
-			onMouseLeave={() => onPoint(null)}
-			onFocus={() => onPoint(row.topic.handle)}
-			onBlur={() => onPoint(null)}
+			onMouseEnter={() => onPoint(row.topic.handle, "pointer")}
+			onMouseLeave={() => onPoint(null, "pointer")}
+			onFocus={() => onPoint(row.topic.handle, "focus")}
+			onBlur={() => onPoint(null, "focus")}
 			onKeyDown={(e) => onRowKeyDown(row, e)}
 		/>
 	);

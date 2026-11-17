@@ -1,5 +1,7 @@
 "use client";
 
+import type { TopicHandle } from "@/src/core";
+import type { PointBy } from "@/components/course-map/use-map-tie";
 import { HistoryPane } from "@/components/unit-inbox/topic-page/hybrid/history";
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { pickupSections } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
@@ -12,7 +14,7 @@ import { BuildsOnList, EarlierDays, MaterialList, NextList, NowRow, ScheduledEnt
  * section is not drawn. While Now starts a topic, Builds on and In your
  * material say why it comes now.
  */
-export function SectionsPane({ facts, busy, onAct, onTask, shown, onShow, onPoint, className }: HybridPaneProps & { onPoint?: (handle: string | null) => void }) {
+export function SectionsPane({ facts, busy, onAct, onTask, shown, onShow, onPoint, className }: HybridPaneProps & { onPoint?: (handle: TopicHandle | null, by: PointBy) => void }) {
 	const { now, next, scheduled, review, earlier, why } = pickupSections(facts);
 	return (
 		<HistoryPane className={className}>

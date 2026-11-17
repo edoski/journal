@@ -45,8 +45,10 @@ export type CardData = TopicData | StepData;
 export interface TopicMapState {
 	/** The hovered or focused topic with its prerequisites, or null at rest. */
 	lit: ReadonlySet<TopicHandle> | null;
-	/** The topic a page points at from elsewhere (a row on the course page), whose card glows. */
+	/** The topic a page points at from elsewhere (a row beside the map, `useMapTie`), whose card glows. */
 	marked?: TopicHandle | null;
+	/** The topics a page points at that the camera brings into view (`useMapTie`); null while it points at none. */
+	framed?: ReadonlySet<TopicHandle> | null;
 	tabStop: TopicHandle | null;
 	onActive: (handle: TopicHandle | null) => void;
 	onFocus: (handle: TopicHandle) => void;
