@@ -1,6 +1,6 @@
 /**
  * The course page's head arrives whole (components/course-page/
- * course-frame.tsx): the readiness line and Mistakes come with the page,
+ * course-frame.tsx): the readiness fact and Mistakes come with the page,
  * whichever of the course and its standing is read first, so the head never
  * shows without them and never grows under him (round 8: 2 m7, they
  * appeared 2.1 s after the page and pushed it down; 1 D14, Linear Algebra's
@@ -17,12 +17,14 @@ Object.defineProperty(globalThis, "self", { value: globalThis, configurable: tru
 Object.defineProperty(globalThis, "localStorage", { value: { getItem: () => null, setItem() {}, removeItem() {} }, configurable: true, writable: true });
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import { createRoot, type Root } from "react-dom/client";
+import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { CourseMapTopic, CourseStanding, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { ServerEventsProvider } from "../components/server-events.tsx";
 import { CourseFrame } from "../components/course-page/course-frame.tsx";
 import { CourseHead } from "../components/course-page/course-head/course-head.tsx";
+import { READY_FACT_WORDS } from "../components/study-words.ts";
+import { columnsOf } from "./helpers/course-columns.ts";
 import { forgetStudyHome } from "../components/study-home/use-study-home.ts";
 
 const h = (handle: string) => handle as TopicHandle;
@@ -74,7 +76,7 @@ afterEach(async () => {
 	forgetStudyHome();
 });
 
-/** The page as SplitCourse draws its head, with the course and its standing each answered by the test. */
+/** The page as SplitBody draws its head, with the course and its standing each answered by the test. */
 async function mount() {
 	const study = later<Response>();
 	const standingRead = later<Response>();
@@ -93,7 +95,7 @@ async function mount() {
 		root!.render(
 			<AppRouterContext.Provider value={router as never}>
 				<ServerEventsProvider connect={() => ({ close() {}, onOpen() {}, onEvent() {} })}>
-					<CourseFrame workspace={WS}>{({ view, standing: known, busy, onContinue }) => <CourseHead view={view} standing={known} busy={busy} onContinue={onContinue} />}</CourseFrame>
+					<CourseFrame workspace={WS}>{({ view, standing: known, busy, onContinue }) => <CourseHead {...columnsOf(view, known, { busy, onContinue })} />}</CourseFrame>
 				</ServerEventsProvider>
 			</AppRouterContext.Provider>,
 		),
@@ -112,18 +114,18 @@ async function mount() {
 	};
 }
 
-/** What the head shows now: nothing while reading, else its title, readiness words and whether Mistakes is there. */
+/** What the head shows now: nothing while reading, else its title, readiness fact and whether Mistakes is there. */
 function head() {
 	const title = document.querySelector("[data-slot=course-title]");
 	if (!title) return null;
-	const ready = document.querySelector("[data-slot=course-ready]");
+	const ready = document.querySelector("[data-slot=course-ready-fact]");
 	return { title: title.textContent, ready: ready?.getAttribute("data-kind") ? ready.textContent : null, mistakes: document.querySelector("[data-slot=course-mistakes]") !== null };
 }
 
-const WHOLE = { title: "Linear Algebra", ready: "Not yet solid for the exam: Rank and the column space and Eigenvalues and eigenvectors", mistakes: true };
+const WHOLE = { title: "Linear Algebra", ready: READY_FACT_WORDS.notYet, mistakes: true };
 
 describe("the course head arrives whole", () => {
-	it("waits for its standing when the course is read first, then shows the readiness line and Mistakes at once", async () => {
+	it("waits for its standing when the course is read first, then shows the readiness fact and Mistakes at once", async () => {
 		const page = await mount();
 		await page.course();
 		assert.equal(head(), null, "no head without its readiness: the skeleton holds the place");

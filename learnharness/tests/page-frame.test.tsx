@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
-import { PageAction, PageFact, PageFrame, PageHead } from "../components/page-frame/page-frame.tsx";
+import { PageFact, PageFrame, PageHead } from "../components/page-frame/page-frame.tsx";
 
 const render = (node: React.ReactNode) => parseHTML(`<html><body>${renderToStaticMarkup(<>{node}</>)}</body></html>`).document;
 
@@ -21,7 +21,7 @@ describe("the page frame", () => {
 				<PageHead
 					eyebrow="Linear Algebra"
 					title="Eigenvalues"
-					actions={<PageAction href="/chat/a">Resume</PageAction>}
+					actions={<button data-slot="context">Context</button>}
 					lead={<p data-slot="next">Eigenvalues and eigenvectors</p>}
 					standing={
 						<>
@@ -38,25 +38,19 @@ describe("the page frame", () => {
 		const head = document.querySelector('[data-slot="page-frame"] > [data-slot="page-head"]')!;
 		assert.deepEqual(
 			[...head.querySelectorAll("[data-slot]")].map((el) => el.getAttribute("data-slot")).filter((slot) => slot !== "button"),
-			["page-eyebrow", "page-title", "page-actions", "page-lines", "page-lead", "next", "page-standing", "page-fact", "page-fact", "extra"],
+			["page-eyebrow", "page-title", "page-actions", "context", "page-lines", "page-lead", "next", "page-standing", "page-fact", "page-fact", "extra"],
 		);
 		assert.equal(document.querySelector('[data-slot="page-title"]')!.tagName, "H1");
 		assert.match(document.querySelector('[data-slot="page-lead"]')!.className, /\btext-headline\b.*\btext-foreground\b/, "what to do next leads as a Headline in full ink");
 		assert.match(document.querySelector('[data-slot="page-standing"]')!.className, /\*:not-first:before:w-px/, "a hairline between facts");
 		assert.match(head.className, /border-b/, "a hairline closes the head");
-		const press = document.querySelector('[data-slot="page-actions"] a')!;
-		assert.equal(press.getAttribute("href"), "/chat/a");
-		assert.match(press.className, /text-link/);
-		assert.equal(press.textContent, "Resume");
-		assert.ok(press.querySelector("svg"), "the arrow");
 	});
 
-	it("leaves out what a page does not give, and makes the press a button without an href", () => {
-		const document = render(<PageHead title="Probability" actions={<PageAction disabled>Review</PageAction>} />);
+	it("leaves out what a page does not give", () => {
+		const document = render(<PageHead title="Probability" />);
 		assert.ok(document.querySelector('[data-slot="page-standing"]') === null);
 		assert.ok(document.querySelector('[data-slot="page-lead"]') === null);
-		const press = document.querySelector('[data-slot="page-actions"] button')!;
-		assert.ok(press.hasAttribute("disabled"));
+		assert.ok(document.querySelector('[data-slot="page-actions"]') === null);
 	});
 
 	it("stands the head's first row on the band's centre line: the title, or the line above it when a page has one", () => {

@@ -88,35 +88,37 @@ describe("the topic head", () => {
 		assert.ok(document.querySelector("button") === null);
 	});
 
-	it("says where he stands, when he last studied it and what went wrong", () => {
+	it("says where the topic sits, where he stands and what went wrong", () => {
 		const document = head(factsOf(RANK));
 		assert.equal(document.querySelector("h1")!.textContent, "Rank and the column space");
-		assert.equal(document.querySelector('[data-slot="page-standing"]')!.textContent, "Not right last time. Mistake to fix. Due since 5 Nov. Studied 30 Oct");
+		assert.equal(document.querySelector('[data-slot="page-standing"]')!.textContent, "Linear Algebra. Not right last time. Mistake to fix. Due since 5 Nov");
 		const facts = Array.from(document.querySelectorAll('[data-slot="page-fact"]'));
 		assert.deepEqual(
 			facts.map((fact) => [fact.getAttribute("data-kind"), fact.textContent, fact.firstElementChild!.tagName.toLowerCase()]),
-			[["standing", "Not right last time", "svg"], ["slip", ". Mistake to fix", "svg"], ["review", ". Due since 5 Nov", "svg"], ["studied", ". Studied 30 Oct", "svg"]],
+			[["standing", ". Not right last time", "svg"], ["slip", ". Mistake to fix", "svg"], ["review", ". Due since 5 Nov", "svg"]],
 			"each fact a mark, then its words",
 		);
 		assert.equal(document.querySelector('[data-slot="unit-gap"]')!.textContent, "Counts nonzero entries instead of pivots");
 	});
 
-	it("is the shared page head: the course over the title, every line on one left edge, the shared pie leading where he stands", () => {
+	it("is the shared page head: the title first, the course on the line under it, every line on one left edge, the shared pie leading where he stands", () => {
 		const document = head(factsOf(RANK));
 		const header = document.querySelector('[data-slot="page-head"]')!;
-		assert.equal(header.querySelector('[data-slot="page-eyebrow"] [data-slot="topic-course-link"]')!.textContent, "Linear Algebra");
+		assert.ok(header.querySelector('[data-slot="page-eyebrow"]') === null, "no line above the title");
+		assert.equal(header.querySelector('[data-slot="page-standing"] [data-slot="topic-course-link"]')!.textContent, "Linear Algebra");
 		assert.equal(header.querySelector('h1[data-slot="page-title"]')!.textContent, "Rank and the column space");
 		for (const line of header.children) assert.doesNotMatch(line.getAttribute("class") ?? "", /(^|\s)(pl|ml|ps|ms)-/, "no line indented (a divider's own margin is not the line's)");
 		const words = document.querySelector('[data-slot="page-fact"][data-kind="standing"]')!;
 		const pie = words.firstElementChild!;
 		assert.equal(pie.getAttribute("data-slot"), "topic-glyph", "the pie leads the standing");
 		assert.equal(pie.getAttribute("data-fill"), "0.75");
-		assert.equal(words.textContent, "Not right last time", "a topic still being learned never slips (round 11, 3 N1)");
+		assert.equal(words.textContent, ". Not right last time", "a topic still being learned never slips (round 11, 3 N1)");
 	});
 
-	it("draws no head line for a topic not started whose lesson waits on him", () => {
+	it("says only where the topic sits for a topic not started whose lesson waits on him", () => {
 		const document = head(factsOf(EIGEN, [chat({ pendingQuestion: true, topics: ["eigen"] })]));
-		assert.ok(document.querySelector('[data-slot="page-standing"]') === null);
+		assert.ok(document.querySelector('[data-slot="page-fact"]') === null);
 		assert.ok(document.querySelector('[data-slot="topic-glyph"]') === null);
+		assert.equal(document.querySelector('[data-slot="page-standing"]')!.textContent, "Linear Algebra");
 	});
 });

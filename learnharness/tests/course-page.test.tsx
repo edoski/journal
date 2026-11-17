@@ -314,9 +314,9 @@ function viewOf(c: StudyCourse) {
 }
 
 describe("the course header", () => {
-	it("its skeleton keeps the head's three rows", () => {
+	it("its skeleton keeps the compact head's two rows", () => {
 		const skeleton = render(<CourseHeaderSkeleton />);
-		assert.equal(skeleton.querySelector('[role="status"]')!.children.length, 3);
+		assert.equal(skeleton.querySelector('[role="status"]')!.children.length, 2);
 	});
 
 });

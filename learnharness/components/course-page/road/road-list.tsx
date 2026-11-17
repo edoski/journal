@@ -1,58 +1,15 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
-import type { ArcHandle, StudyCourse } from "@/src/core";
-import { PageHead } from "@/components/page-frame/page-frame";
-import { CourseFrame } from "@/components/course-page/course-frame";
-import type { CourseArc } from "@/components/course-page/course-arc";
-import type { CourseTopic } from "@/components/course-page/course-model";
-import { ContextButton, ExamFact, LessonError, StudiedFact } from "@/components/course-page/course-head/head-parts";
-import { useCourseRunup } from "@/components/course-page/course-head/use-course-runup";
-import { MistakesHead, MistakesPress } from "@/components/course-page/standing/mistakes-press";
-import { SplitBody, type CourseColumns } from "@/components/course-page/split/split-course";
-import { SplitList } from "@/components/course-page/split/split-list";
-import { ReadyFact, useHeadStanding } from "@/components/course-page/candidates/shared/ready-fact";
-import { BLOCK, Rail, RoadArc } from "@/components/course-page/candidates/road/road-arc";
-import { arcStarts, examStop } from "@/components/course-page/candidates/road/road-model";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarIcon } from "lucide-react";
-import { AgendaNext } from "@/components/course-page/candidates/agenda/agenda-next";
-import { CourseComposer } from "@/components/course-page/course-composer";
+import type { ArcHandle, StudyCourse } from "@/src/core";
+import { ExamFact } from "@/components/course-page/course-head/head-parts";
+import { useCourseRunup } from "@/components/course-page/course-head/use-course-runup";
+import type { CourseColumns } from "@/components/course-page/split/split-course";
+import { SplitList } from "@/components/course-page/split/split-list";
+import { BLOCK, Rail, RoadArc, type ArcLineProps } from "@/components/course-page/road/road-arc";
+import { arcStarts, examStop } from "@/components/course-page/road/road-model";
 import { cn } from "@/lib/utils";
-
-/** Road's head (spec: road.md): the title with Mistakes and Context, and
- *  one line, whether he is ready (`ReadyFact`) and when he last studied;
- *  then Now across the page, the step to take up with its press (Agenda's
- *  Now). The exam is a stop on the road below. */
-function RoadHead(c: CourseColumns) {
-	const { view, standing } = c;
-	const { course, facts } = view;
-	const { ready, mistakes } = useHeadStanding(view, standing);
-	return (
-		<>
-			<MistakesHead>
-				<PageHead
-					compact
-					title={<span data-slot="course-title">{course.map.title}</span>}
-					actions={
-						<>
-							<MistakesPress rows={mistakes} />
-							<ContextButton course={course} />
-						</>
-					}
-					standing={
-						<>
-							<ReadyFact view={view} ready={ready} />
-							{facts.studied && <StudiedFact words={facts.studied} session={facts.lastSession} />}
-						</>
-					}
-				>
-					<LessonError />
-				</PageHead>
-			</MistakesHead>
-			<AgendaNext {...c} showThen={false} />
-		</>
-	);
-}
 
 /** The exam as a row on the road's track: its day, its run-up on press. */
 function ExamStop({ course, words }: { course: StudyCourse; words: string }) {
@@ -80,7 +37,7 @@ const Road = createContext<{
 } | null>(null);
 
 /** One arc of the road, with the facts the road gives it, and the exam's row before it when the plan reaches the exam there. */
-function RoadLine(props: ComponentProps<typeof CourseArc<CourseTopic>>) {
+function RoadLine(props: ArcLineProps) {
 	const road = useContext(Road)!;
 	const { handle } = props.section.arc;
 	return (
@@ -91,10 +48,13 @@ function RoadLine(props: ComponentProps<typeof CourseArc<CourseTopic>>) {
 	);
 }
 
-/** Road's left column: every arc of the course in study order on one track, as the map's arc list draws
- *  them (the map beside it lists none), the exam a row where the plan reaches it; a course's four groups
- *  when it has no arcs. */
-function RoadList(c: CourseColumns) {
+/**
+ * The course page's left column, the road (spec: road.md): every arc of the
+ * course in study order on one track, as the map's arc list draws them (the
+ * map beside it lists none), the exam a row where the plan reaches it; a
+ * course's four groups when it has no arcs.
+ */
+export function RoadList(c: CourseColumns) {
 	const { course, arcs, facts } = c.view;
 	const stop = useMemo(() => (arcs ? examStop(course.map, arcs) : null), [course.map, arcs]);
 	// One arc open at a time, the one the map shows: opening another shows it and closes the last; closing it
@@ -144,22 +104,5 @@ function RoadList(c: CourseColumns) {
 				after={arcs && road.exam && stop && stop.stopBefore === null ? <ExamStop course={course} words={road.exam} /> : undefined}
 			/>
 		</Road.Provider>
-	);
-}
-
-/**
- * The course page's Road candidate (spec: road.md): the course as a road
- * to its exam, as Things puts a deadline beside its headings and Duolingo
- * draws a path: the arcs in study order on one track, each saying only
- * what the road needs, the exam a stop where the plan reaches it, and the
- * arcs past it muted. The head is the title and one line.
- */
-export function RoadCourse({ workspace }: { workspace: string }) {
-	return (
-		<CourseFrame workspace={workspace}>
-			{(ready) => (
-				<SplitBody {...ready} head={(c) => <RoadHead {...c} />} list={(c) => <RoadList {...c} />} mapIndex={false} listWidth="24rem" foot={(c) => <CourseComposer course={c.view.course} />} />
-			)}
-		</CourseFrame>
 	);
 }

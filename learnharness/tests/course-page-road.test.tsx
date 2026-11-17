@@ -1,10 +1,10 @@
 /**
- * The course page's three candidates (course-page/candidates/candidates.md):
- * each head says where he stands for the exam as one fact and never a pill
- * per arc, Agenda's and Road's heads take one line under the title, and
- * each left column keeps its own organisation: Overview's quiet arc lines,
- * Agenda's Now, Then and the arc the map shows, Road's arcs on a track with
- * the exam a stop on it. Same tsx classic-JSX shim as the other render tests.
+ * The course page as a road to its exam (course-page/road/road.md): the
+ * head says where he stands for the exam as one fact and never a pill per
+ * arc, with one line under the title and Now under it holding the press;
+ * the road lists the arcs in study order on a track with the exam a stop on
+ * it; the topic page's head is the course head's twin. Same tsx classic-JSX
+ * shim as the other render tests.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -19,19 +19,15 @@ import type { ArcHandle, CourseMapTopic, CourseReadiness, CourseStanding, Readin
 import { courseRead, type CourseView } from "../components/course-page/course-model.ts";
 import type { CourseColumns } from "../components/course-page/split/split-course.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
-import { OverviewHead } from "../components/course-page/candidates/overview/overview-head.tsx";
-import { OverviewArc } from "../components/course-page/candidates/overview/overview-arc.tsx";
-import { AgendaHead } from "../components/course-page/candidates/agenda/agenda-head.tsx";
-import { AgendaArc } from "../components/course-page/candidates/agenda/agenda-arc.tsx";
-import { AgendaNext } from "../components/course-page/candidates/agenda/agenda-next.tsx";
-import { RoadCourse } from "../components/course-page/candidates/road/road-course.tsx";
-import { RoadArc } from "../components/course-page/candidates/road/road-arc.tsx";
+import { CourseHead } from "../components/course-page/course-head/course-head.tsx";
+import { CourseNow } from "../components/course-page/course-head/course-now.tsx";
+import { RoadArc, type ArcLineProps } from "../components/course-page/road/road-arc.tsx";
 import { ArcMap } from "../components/course-map/arc-map.tsx";
 import { courseComposerPlaceholder } from "../components/course-page/course-composer.tsx";
-import { arcStarts, examStop } from "../components/course-page/candidates/road/road-model.ts";
-import { ReadyFact } from "../components/course-page/candidates/shared/ready-fact.tsx";
+import { arcStarts, examStop } from "../components/course-page/road/road-model.ts";
+import { ReadyFact } from "../components/course-page/course-head/ready-fact.tsx";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
-import { TopicTwinHead } from "../components/course-page/candidates/shared/topic-twin.tsx";
+import { TopicHead } from "../components/unit-inbox/topic-page/topic-head.tsx";
 import type { TopicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { examReady } from "../components/course-page/standing/standing-model.ts";
 import { ARC_EXAM_WORDS, READY_FACT_WORDS } from "../components/study-words.ts";
@@ -127,39 +123,29 @@ const render = (node: React.ReactNode) =>
 	).document;
 const text = (el: Element | null | undefined) => el?.textContent ?? "";
 
-describe("the candidates' heads", () => {
+describe("the course head", () => {
 	const view = viewOf(course());
-	const heads = { overview: OverviewHead, agenda: AgendaHead } as const;
 
-	it("say where he stands for the exam as one fact, never a pill per arc", () => {
-		for (const [name, Head] of Object.entries(heads)) {
-			for (const standing of [NOT_READY, SOME_READY]) {
-				const head = render(<Head {...columns(view, standing)} />);
-				assert.ok(head.querySelector('[data-slot="arc-pill"]') === null, `${name}: no arc pill in the head`);
-				assert.equal(head.querySelectorAll('[data-slot="course-ready-fact"]').length, 1, `${name}: one readiness fact`);
-				assert.equal(text(head.querySelector('[data-slot="course-ready-fact"]')), READY_FACT_WORDS.notYet);
-			}
+	it("says where he stands for the exam as one fact, never a pill per arc", () => {
+		for (const standing of [NOT_READY, SOME_READY]) {
+			const head = render(<CourseHead {...columns(view, standing)} />);
+			assert.ok(head.querySelector('[data-slot="arc-pill"]') === null, "no arc pill in the head");
+			assert.equal(head.querySelectorAll('[data-slot="course-ready-fact"]').length, 1, "one readiness fact");
+			assert.equal(text(head.querySelector('[data-slot="course-ready-fact"]')), READY_FACT_WORDS.notYet);
 		}
 	});
 
-	it("give Agenda's head one line's room under the title, and Overview's the two its next step and facts fill", () => {
-		const lines = (Head: (c: CourseColumns) => React.ReactNode) => render(<Head {...columns(view, NOT_READY)} />).querySelector('[data-slot="page-lines"]')!.className;
-		assert.match(lines(AgendaHead), /\bmin-h-5\b/);
-		assert.match(lines(OverviewHead), /\bmin-h-12\b/);
+	it("takes one line's room under the title", () => {
+		assert.match(render(<CourseHead {...columns(view, NOT_READY)} />).querySelector('[data-slot="page-lines"]')!.className, /\bmin-h-5\b/);
 	});
 
-	it("lead Overview's head with what the press takes up and why", () => {
-		const head = render(<OverviewHead {...columns(view, NOT_READY)} />);
-		const next = head.querySelector('[data-slot="page-lead"] [data-slot="course-next"]');
-		assert.ok(next, "the next step under the title");
-		assert.ok(head.querySelector('[data-slot="course-action"]'), "the press stays in the head");
-	});
-
-	it("leave Agenda's press to its Now row", () => {
-		assert.ok(render(<AgendaHead {...columns(view, NOT_READY)} />).querySelector('[data-slot="course-action"]') === null);
-		const now = render(<AgendaNext {...columns(view)} />).querySelector('[data-slot="agenda-now"]');
+	it("leaves the press to Now, under the head", () => {
+		const head = render(<CourseHead {...columns(view, NOT_READY)} />);
+		assert.ok(head.querySelector('[data-slot="page-actions"] [data-slot="course-action"]') === null, "no press among the head's actions");
+		const now = head.querySelector('[data-slot="course-now"] [data-slot="course-action"]');
 		assert.ok(now, "Now holds the press");
 		assert.match(text(now), /Continue|Start|Review|Resume/);
+		assert.ok(head.querySelector('[data-slot="course-now"] [data-slot="arc-pill"]') === null, "no pill in Now");
 	});
 });
 
@@ -172,43 +158,6 @@ describe("the readiness fact", () => {
 		const fact = render(<ReadyFact view={view} ready={short} />).querySelector('[data-slot="course-ready-fact"]')!;
 		assert.equal(text(fact), READY_FACT_WORDS.short);
 		assert.match(fact.className, /text-warning/);
-	});
-});
-
-describe("the candidates' left columns", () => {
-	const view = viewOf(course());
-	const list = (arcLine: typeof OverviewArc, arcs = view.arcs) =>
-		render(<SplitList groups={[]} arcs={arcs} open={{ maps: true }} onOpenChange={noop} onCheck={noop} marked={null} onPoint={noop} onEnterMap={noop} arcLine={arcLine} />);
-
-	it("Overview ends a line in words only when he has something to do there: Check it on a ready arc, Needs you where Today asks, nothing on the rest", () => {
-		const document = list(OverviewArc);
-		assert.ok(document.querySelector('[data-arc="spaces"] [data-slot="course-arc-check"]'), "Check it on the ready arc");
-		for (const section of view.arcs!) {
-			const state = document.querySelector(`[data-arc="${section.arc.handle}"] [data-slot="course-arc-state"]`);
-			if (section.needsYou) assert.equal(state?.getAttribute("data-kind"), "needs-you");
-			else assert.ok(state === null, `${section.arc.handle}: no status words`);
-		}
-		assert.ok(view.arcs!.some((s) => !s.needsYou && s.arc.state !== "ready"), "the fixture has a quiet line");
-		assert.deepEqual(
-			[...document.querySelectorAll('[data-slot="course-topic-row"]')].map((r) => r.getAttribute("data-topic")),
-			["rank", "kernel"],
-			"only the open arc's topics",
-		);
-	});
-
-	it("Agenda shows only the arc the map shows, its name a quiet label over its topics", () => {
-		const shown = view.arcs!.filter((s) => s.current);
-		const document = list(AgendaArc, shown);
-		assert.deepEqual(
-			[...document.querySelectorAll('[data-slot="course-arc-title"]')].map(text),
-			["Linear maps"],
-		);
-		assert.ok(document.querySelector('[data-slot="arc-pill"]') === null);
-	});
-
-	it("no candidate's list draws a pill per arc or per topic", () => {
-		for (const line of [OverviewArc, AgendaArc]) assert.ok(list(line).querySelector('[data-slot="arc-pill"]') === null);
-		assert.ok(render(<AgendaNext {...columns(view)} />).querySelector('[data-slot="arc-pill"]') === null);
 	});
 });
 
@@ -232,13 +181,9 @@ describe("the road", () => {
 		assert.equal(arcStarts(view.arcs!.find((s) => s.arc.handle === "maps")!, view.course.map.today), null);
 	});
 
-	it("draws the course page's frame around it, as every candidate does", () => {
-		assert.equal(typeof RoadCourse, "function");
-	});
-
 	it("is the course's one list of arcs, drawn as the map's arc list draws its rows, so the map beside it lists none", () => {
 		const view = viewOf(course());
-		const line = (props: React.ComponentProps<typeof OverviewArc>) => <RoadArc {...props} number={view.arcs!.indexOf(props.section) + 1} starts={null} shown={props.section.arc.handle === "maps"} />;
+		const line = (props: ArcLineProps) => <RoadArc {...props} number={view.arcs!.indexOf(props.section) + 1} starts={null} shown={props.section.arc.handle === "maps"} />;
 		const document = render(<SplitList groups={[]} arcs={view.arcs} open={{ maps: true }} onOpenChange={noop} onCheck={noop} marked={null} onPoint={noop} onEnterMap={noop} arcLine={line} />);
 		assert.deepEqual(
 			[...document.querySelectorAll('[data-slot="course-arc"] [data-slot="arc-number"]')].map((n) => n.textContent),
@@ -256,14 +201,13 @@ describe("the road", () => {
 
 	it("opens on Now alone across the page, and closes on New lesson's composer with this course chosen", () => {
 		const view = viewOf(course());
-		const now = render(<AgendaNext {...columns(view)} showThen={false} />);
-		assert.ok(now.querySelector('[data-slot="agenda-now"]'), "Now, the step to take up with its press");
-		assert.ok(now.querySelector('[data-slot="agenda-then"]') === null, "no Then on Road");
+		const now = render(<CourseNow {...columns(view)} />);
+		assert.equal(now.querySelectorAll('[data-slot="course-now"] [data-slot="course-action"]').length, 1, "Now, the step to take up with its press, alone");
 		assert.equal(courseComposerPlaceholder("Linear Algebra"), "Name a topic, ask a question or paste a problem in Linear Algebra");
 	});
 });
 
-describe("the topic page's head beside the candidates", () => {
+describe("the topic page's head, the course head's twin", () => {
 	const facts = {
 		course: { workspace: "/study/linalg", title: "Linear Algebra" },
 		arc: { handle: a("maps"), title: "Linear maps", share: 0.5 },
@@ -271,25 +215,21 @@ describe("the topic page's head beside the candidates", () => {
 		today: "2026-11-08",
 		standing: { fill: 0.5, words: "Partly right" },
 		marks: [{ kind: "slip", words: "Mistake to fix", slip: "gap" }],
-		studied: null,
 		mistake: null,
 	} as unknown as TopicFacts;
 
 	it("puts the title first, level with the course page's, and links the course and the arc as words, never a pill", () => {
-		for (const lines of ["one", "two"] as const) {
-			const head = render(<TopicTwinHead facts={facts} lines={lines} />);
-			assert.ok(head.querySelector('[data-slot="page-eyebrow"]') === null, "no line above the title");
-			assert.ok(head.querySelector('[data-slot="arc-pill"]') === null);
-			assert.equal(head.querySelector('[data-slot="topic-course-link"]')?.getAttribute("href"), "/unit/" + Buffer.from("/study/linalg").toString("base64url"));
-			assert.match(head.querySelector('[data-slot="topic-arc-link"]')?.getAttribute("href") ?? "", /\?arc=maps$/);
-			assert.equal(text(head.querySelector('[data-kind="standing"]')).replace(". ", ""), "Partly right");
-		}
+		const head = render(<TopicHead facts={facts} />);
+		assert.ok(head.querySelector('[data-slot="page-eyebrow"]') === null, "no line above the title");
+		assert.ok(head.querySelector('[data-slot="arc-pill"]') === null);
+		assert.equal(head.querySelector('[data-slot="topic-course-link"]')?.getAttribute("href"), "/unit/" + Buffer.from("/study/linalg").toString("base64url"));
+		assert.match(head.querySelector('[data-slot="topic-arc-link"]')?.getAttribute("href") ?? "", /\?arc=maps$/);
+		assert.equal(text(head.querySelector('[data-kind="standing"]')).replace(". ", ""), "Partly right");
 	});
 
-	it("runs the place and the standing on one compact line for Agenda and Road, on two for Overview", () => {
-		assert.match(render(<TopicTwinHead facts={facts} lines="one" />).querySelector('[data-slot="page-lines"]')!.className, /\bmin-h-5\b/);
-		const two = render(<TopicTwinHead facts={facts} lines="two" />);
-		assert.ok(two.querySelector('[data-slot="page-lead"] [data-slot="topic-place"]'), "the place on its own line");
-		assert.ok(two.querySelector('[data-slot="page-standing"] [data-slot="topic-place"]') === null);
+	it("runs the place and the standing on one compact line", () => {
+		const head = render(<TopicHead facts={facts} />);
+		assert.match(head.querySelector('[data-slot="page-lines"]')!.className, /\bmin-h-5\b/);
+		assert.ok(head.querySelector('[data-slot="page-standing"] [data-slot="topic-place"]'), "the place on the standing's line");
 	});
 });

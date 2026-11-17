@@ -1,9 +1,10 @@
 /**
  * The course page head (components/course-page/course-head/): its facts,
  * from the engine's plan and record only, and what it drops and keeps: no
- * progress words and no line that repeats the rows, the title and the
- * press kept, Context in place of Add material, "Studied" opening his last
- * session.
+ * progress words and no line that repeats the rows, the title kept and the
+ * press in Now under it, Context in place of Add material, "Studied"
+ * opening his last session, and what the exam's plan leaves out in the
+ * readiness fact's answer.
  */
 
 import React from "react";
@@ -19,6 +20,8 @@ import { EXAM_GAP_WORDS, examGapAsk } from "../components/study-words.ts";
 import { topicPress } from "../components/unit-inbox/start-unit.ts";
 import { CourseHead } from "../components/course-page/course-head/course-head.tsx";
 import { CourseLessonError } from "../components/course-page/course-head/head-parts.tsx";
+import { ExamGapLine } from "../components/course-page/course-head/exam-gaps.tsx";
+import { columnsOf } from "./helpers/course-columns.ts";
 import { ServerEventsProvider } from "../components/server-events.tsx";
 
 const h = (handle: string) => handle as TopicHandle;
@@ -86,17 +89,17 @@ function viewOf(c: StudyCourse, chats: ChatListItem[] = []) {
 }
 
 describe("the course head", () => {
-	it("keeps the title and the press, puts Context in place of Add material, drops progress words and lines repeating the rows, and Studied opens the last session", () => {
-		const document = render(<CourseHead view={viewOf(course({}, { due: [h("bayes")] }), [chat("b", "2026-11-06T09:00:00Z")])} standing={null} busy={false} onContinue={() => {}} />);
+	it("keeps the title and the press in Now, puts Context in place of Add material, drops progress words and lines repeating the rows, and Studied opens the last session", () => {
+		const document = render(<CourseHead {...columnsOf(viewOf(course({}, { due: [h("bayes")] }), [chat("b", "2026-11-06T09:00:00Z")]))} />);
 		const text = document.body.textContent ?? "";
 		assert.equal(document.querySelector("[data-slot=course-title]")?.textContent, "Probability");
-		assert.ok(document.querySelector("[data-slot=course-action]"));
+		assert.ok(document.querySelector("[data-slot=course-now] [data-slot=course-action]"));
 		assert.ok(document.querySelector("[data-slot=course-context]"));
 		assert.ok(document.querySelector("[data-slot=course-add-material]") === null);
 		assert.ok(document.querySelector("[data-slot=course-next]") === null);
 		assert.doesNotMatch(text, /on your own/i);
 		assert.equal(document.querySelector("[data-slot=course-studied]")?.getAttribute("href"), "/chat/b");
-		assert.match(document.querySelector("[data-slot=course-exam]")?.textContent ?? "", /Exam 19 Nov/);
+		assert.ok(document.querySelector("[data-slot=page-head] [data-slot=course-exam]") === null, "the exam is a stop on the road, not in the head");
 	});
 });
 
@@ -105,7 +108,7 @@ describe("a lesson that could not start", () => {
 		const head = (error: string | null) =>
 			render(
 				<CourseLessonError value={error}>
-					<CourseHead view={viewOf(course())} standing={null} busy={false} onContinue={() => {}} />
+					<CourseHead {...columnsOf(viewOf(course()))} />
 				</CourseLessonError>,
 			);
 		assert.ok(head(null).querySelector('[role="alert"]') === null);
@@ -126,9 +129,9 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.equal(examGaps(course({ exam: { date: "2026-11-01", daysLeft: -7, unreviewed: [h("binomial")] } }).map), null, "once the exam has passed");
 	});
 
-	const gapLine = (c: StudyCourse) => render(<CourseHead view={viewOf(c)} standing={null} busy={false} onContinue={() => {}} />).querySelector('[data-slot="page-head"] [data-slot="course-exam-gaps"]');
+	const gapLine = (c: StudyCourse) => render(<ExamGapLine course={c} chats={[]} />).querySelector('[data-slot="course-exam-gaps"]');
 
-	it("says why under the head's first line, names what that line does not, and offers a way in: start or review it today, or ask the tutor", () => {
+	it("says why in the readiness fact's answer, names what that line does not, and offers a way in: start or review it today, or ask the tutor", () => {
 		const one = gapLine(gapped(["variance"], [], { variance: "full" }))!;
 		assert.equal(one.querySelector("[data-slot=exam-gaps-why]")?.textContent, "Your pace fills every study day before the exam.");
 		assert.deepEqual([...one.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.start, EXAM_GAP_WORDS.ask]);
@@ -214,8 +217,8 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.deepEqual([...stuck.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.ask], "named, with only the tutor to ask");
 	});
 
-	it("shows under the readiness line, and nothing when every topic fits", () => {
-		assert.equal(gapLine(gapped(["variance"], [], { variance: "no_study_day" }))?.previousElementSibling?.getAttribute("data-slot"), "course-ready");
+	it("shows when a topic has no room, and nothing when every topic fits", () => {
+		assert.ok(gapLine(gapped(["variance"], [], { variance: "no_study_day" })));
 		assert.ok(gapLine(course()) === null);
 	});
 
@@ -234,7 +237,7 @@ describe("a topic he began, on the exam's ways in (round 12, 1 D5: Start Poisson
 		const press = topicPress(topics[1]!, c.map, [lesson]);
 		assert.equal(press.resume?.id ?? "a new chat", "chat_poisson");
 		assert.equal(press.continues, true);
-		const line = render(<CourseHead view={viewOf(c, [lesson])} standing={null} busy={false} onContinue={() => {}} />).querySelector("[data-slot=course-exam-gaps]")!;
+		const line = render(<ExamGapLine course={c} chats={[lesson]} />).querySelector("[data-slot=course-exam-gaps]")!;
 		assert.deepEqual([...line.querySelectorAll("button")].map((b) => b.textContent), ["Continue Poisson today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask]);
 		assert.equal(topicPress(topics[2]!, c.map, [lesson]).resume, null, "a topic he never began still starts");
 	});

@@ -1,10 +1,11 @@
 /**
  * Every course map with arcs is one component (`ArcMap`; Edo, 17 Nov 2026:
  * "the graph should be the same single standardised component across
- * views"): Home, the enlarged map and the course page list the course's
- * arcs left of the map on one hairline track, the arc shown under its bar,
- * the arc he is in dotted, each row a press that shows its arc, and ⌘J goes
- * to You are here. The course page's old selector (a name, a chevron, a dot
+ * views"): Home and the enlarged map list the course's arcs left of the
+ * map on one hairline track, the arc shown under its bar, the arc he is in
+ * dotted, each row a press that shows its arc, and ⌘J goes to You are here.
+ * The course page's map lists none, since its road is the course's one list
+ * of arcs, and keeps ⇧↑ and ⇧↓. Its old selector (a name, a chevron, a dot
  * per arc) is gone.
  */
 import React, { act } from "react";
@@ -44,11 +45,6 @@ async function mount(node: React.ReactNode) {
 
 const rows = () => [...document.querySelectorAll('[data-slot="arc-index-row"]')];
 const shown = () => document.querySelector('[data-slot="arc-index-row"][data-shown]')?.getAttribute("data-arc") ?? null;
-const press = (el: Element) =>
-	act(async () => {
-		el.dispatchEvent(new dom.window.Event("click", { bubbles: true }) as unknown as Event);
-	});
-
 /** The course page's map pane on one arc. */
 const coursePage = (arc: ArcHandle, onOpenArc: (arc: ArcHandle) => void) => (
 	<SplitMap map={LINALG_ARCS.map} arc={arc} arcs={ARCS} said={new Map()} lit={null} aim={null} reveal={null} onPoint={noop} onLeave={noop} onOpenArc={onOpenArc} />
@@ -75,27 +71,26 @@ describe("the arc list beside every course map", () => {
 		assert.ok(document.querySelector('[data-slot="drawing"]'));
 	});
 
-	it("draws the same list on Home and on the course page, and no old selector", async () => {
+	it("lists the arcs beside Home's map and none beside the course page's, whose road lists them, and no old selector", async () => {
 		await mount(<HomeMap courses={[LINALG_ARCS, PROB]} chats={[]} workspace={LINALG_ARCS.map.workspace} onSelect={noop} arc={null} enlarged={false} onEnlarge={noop} />);
-		const home = document.querySelector('[data-slot="arc-index"]')!.outerHTML;
+		assert.ok(document.querySelector('[data-slot="arc-index"]'), "Home lists them");
 		await act(async () => root!.unmount());
 		host!.remove();
 		await mount(coursePage(a("systems"), noop));
-		assert.equal(document.querySelector('[data-slot="arc-index"]')!.outerHTML, home, "one list, the same markup");
+		assert.ok(document.querySelector('[data-slot="arc-index"]') === null, "the course page's map lists none");
 		assert.ok(document.querySelector('[data-slot="arc-selector"], [data-slot="arc-rail"], [data-slot="course-split-map-head"]') === null);
 	});
 
-	it("shows the arc he presses on the course page's list, and the arc above or below on ⇧↑ and ⇧↓", async () => {
+	it("shows the arc above or below on the course page on ⇧↑ and ⇧↓", async () => {
 		const opened: string[] = [];
 		await mount(coursePage(a("systems"), (arc) => opened.push(arc)));
-		await press(rows().find((r) => r.getAttribute("data-arc") === "eigenvalues")!);
 		const key = (k: string) =>
 			act(async () => {
 				document.body.dispatchEvent(Object.assign(new dom.window.Event("keydown", { bubbles: true, cancelable: true }), { key: k, shiftKey: true, altKey: false, metaKey: false, ctrlKey: false }) as unknown as Event);
 			});
 		await key("ArrowUp");
 		await key("ArrowDown");
-		assert.deepEqual(opened, ["eigenvalues", "spaces", "eigenvalues"]);
+		assert.deepEqual(opened, ["spaces", "eigenvalues"]);
 	});
 
 	it("glides from arc to arc on ⇧↓ on the course page through Home's camera, not by swapping the drawing", async () => {

@@ -1,5 +1,0 @@
-# Overview
-
-The course page as a project's overview (`overview-course.tsx`; `../candidates.md`). Head: the title with Mistakes, Context and the press; under it, the step the press takes up and why (`nextStep`, `course-next`, 14/500 in full ink with its reason's icon and words); then Exam, readiness (`ReadyFact`) and Studied, a hairline between. List: every arc as a 32px line (`overview-arc.tsx`): its ring, its whole name, a chevron; its end says something only when he has something to do there: "Needs you" when Today takes up one of its topics, Check it on an arc ready for its check, what the exam leaves out of it; otherwise nothing, the ring saying where it stands. Where he is opens on arrival. A course without arcs keeps its four groups.
-
-Removed from Current: the arc pills under the title (the readiness fact's popover lists the arcs), the arc he is in as a pill (the map's list marks it), Pick up and Then (the head's next line and the rows' facts), "In progress", "Not started" and "Ready for its check" on the lines.

@@ -6,9 +6,30 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ArcLabel } from "@/components/course-map/arc-label";
 import { ARC_STATE_WORDS } from "@/components/study-words";
-import { GROUP_WORDS, type CourseTopic } from "@/components/course-page/course-model";
-import { CHECK_WORDS, type CourseArc } from "@/components/course-page/course-arc";
+import { GROUP_WORDS, type CourseArcSection, type CourseTopic } from "@/components/course-page/course-model";
 import { cn } from "@/lib/utils";
+
+/** The words Check it says. */
+export const CHECK_WORDS = "Check it";
+
+/** What the list hands each arc's line (`SplitList`'s `arcLine`): the arc,
+ *  its topics and how to draw one, whether it is open, its check, and the
+ *  refs and keys of the list's arrow walk. */
+export type ArcLineProps = Omit<React.ComponentProps<"section">, "children"> & {
+	section: CourseArcSection;
+	items: readonly CourseTopic[];
+	renderItem: (item: CourseTopic) => React.ReactNode;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	/** Starts the arc's check; offered only on a `ready` arc. */
+	onCheck?: () => void;
+	/** Its check is starting. */
+	checking?: boolean;
+	headerRef?: React.Ref<HTMLButtonElement>;
+	checkRef?: React.Ref<HTMLButtonElement>;
+	onHeaderKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>;
+	onCheckKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>;
+};
 
 /** Each arc is its own block on the road: a rail down its left edge, as tall as the arc with its open topics,
  *  set apart from the next by a small gap, so the arcs read as separate containers (Edo, 17 Nov 2026). */
@@ -25,8 +46,8 @@ export function Rail({ bright = false }: { bright?: boolean }) {
 }
 
 /**
- * One arc on Road's list (spec: road.md), drawn as the map's arc list draws
- * its rows (`ArcIndex`), since Road's list is the course's arcs and the map
+ * One arc on the road (spec: road.md), drawn as the map's arc list draws
+ * its rows (`ArcIndex`), since the road is the course's arcs and the map
  * beside it lists none: its place in study order and its whole name
  * (`ArcLabel`), the dot of "You are here" on the arc he is in, and at its
  * end the one fact the road needs ("Needs you" when Today takes up one of
@@ -34,8 +55,8 @@ export function Rail({ bright = false }: { bright?: boolean }) {
  * the day its first topic starts while none is, `starts`); nothing
  * otherwise. Each arc is its own block with a rail down its left, bright on
  * the arc the map shows (`shown`). An arc past the exam (`past`) is muted.
- * Open, its topics hang under its name. Props otherwise as `CourseArc`'s,
- * so the list walks it the same way.
+ * Open, its topics hang under its name. The list walks it by its
+ * `ArcLineProps`.
  */
 export function RoadArc({
 	section,
@@ -55,7 +76,7 @@ export function RoadArc({
 	past = false,
 	className,
 	...rest
-}: React.ComponentProps<typeof CourseArc<CourseTopic>> & { number: number; starts: string | null; shown?: boolean; past?: boolean }) {
+}: ArcLineProps & { number: number; starts: string | null; shown?: boolean; past?: boolean }) {
 	const headerId = React.useId();
 	const { arc } = section;
 	const checkable = Boolean(arc.state === "ready" && onCheck);

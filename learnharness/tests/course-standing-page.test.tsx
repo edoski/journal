@@ -14,7 +14,6 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import type { ArcHandle, ChatListItem, CourseMapTopic, CourseReadiness, CourseStanding, ReadinessPart, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseRead } from "../components/course-page/course-model.ts";
 import { examReady, leastReadyFirst, mistakeRows, partState } from "../components/course-page/standing/standing-model.ts";
-import { ReadyLine } from "../components/course-page/standing/ready-line.tsx";
 import { MistakeList } from "../components/course-page/standing/mistake-list.tsx";
 import { MistakesPress } from "../components/course-page/standing/mistakes-press.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
@@ -156,31 +155,6 @@ describe("exam readiness, from the engine's sorting", () => {
 		assert.deepEqual(examReady(readiness(part({ solid: [h("span"), h("rank")] })), begun, null, []), { kind: "short", words: "No room in the final review for Rank" }, "a final review already under way needs no day");
 	});
 
-});
-
-describe("the head's readiness line", () => {
-	it("with arcs, shows the arcs not ready as bubbles that show them on the page", () => {
-		const view = viewOf(course(true));
-		const doc = render(<ReadyLine course={view.course} ready={examReady(readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs, [])} />);
-		const line = doc.querySelector("[data-slot=course-ready]")!;
-		assert.match(line.textContent ?? "", /Not ready yet in/);
-		const pills = [...line.querySelectorAll("[data-slot=arc-pill]")];
-		assert.deepEqual(pills.map((p) => p.getAttribute("data-arc")), ["maps"]);
-		assert.match(pills[0]!.getAttribute("href") ?? "", /\?arc=maps$/);
-	});
-
-	it("with arcs, says only that he is not ready when no arc is", () => {
-		const view = viewOf(course(true));
-		const doc = render(<ReadyLine course={view.course} ready={examReady(readiness(part({ arc: a("spaces"), notYet: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs, [])} />);
-		assert.equal(doc.querySelector("[data-slot=course-ready]")?.textContent, "Not ready for the exam yet");
-		assert.equal(doc.querySelectorAll("[data-slot=arc-pill]").length, 0);
-	});
-
-	it("without an exam says what the plan does with its reviews, and while the engine is read says nothing", () => {
-		const plain = course(false, false);
-		assert.match(render(<ReadyLine course={plain} ready={null} />).querySelector("[data-slot=course-ready]")?.textContent ?? "", /^No exam: reviews /);
-		assert.equal(render(<ReadyLine course={course(false)} ready={null} />).querySelector("[data-slot=course-ready]")?.textContent, "");
-	});
 });
 
 const STANDING: CourseStanding = {

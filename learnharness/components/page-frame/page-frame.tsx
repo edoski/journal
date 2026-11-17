@@ -1,7 +1,5 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
-import { ArrowRightIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** The column every page sits in: centred, up to 80rem, 24px sides, 24px
@@ -55,12 +53,11 @@ export function PageHead({
 	...rest
 }: {
 	/** The lines under the title take the room they fill, one line's at
-	 *  least, not two (the course page's Agenda and Road candidates, and the
-	 *  topic page beside them). */
+	 *  least, not two (the course page, and the topic page beside it). */
 	compact?: boolean;
 	eyebrow?: ReactNode;
 	title: ReactNode;
-	/** The page's actions, right to left in weight: `PageAction` last. */
+	/** The page's actions, quiet buttons, right to left in weight. */
 	actions?: ReactNode;
 	/** What to do next: the head's primary line, under the title. */
 	lead?: ReactNode;
@@ -112,36 +109,3 @@ export function PageFact({ icon, children, className, ...rest }: { icon: ReactNo
 	);
 }
 
-/**
- * The page's press, the topic page's Now press: its word in the accent at
- * 500 with an arrow that steps right on hover, on a quiet shadcn Button.
- * A link with `href`, else a button.
- */
-export function PageAction({
-	href,
-	children,
-	className,
-	...button
-}: { href?: string; children: ReactNode } & Omit<ComponentProps<typeof Button>, "asChild" | "variant" | "size" | "children">) {
-	const press = cn("group/press text-link hover:text-link", className);
-	const words = (
-		<>
-			{children}
-			<ArrowRightIcon aria-hidden className="transition-transform duration-150 group-hover/press:translate-x-0.5 motion-reduce:transition-none" />
-		</>
-	);
-	if (href) {
-		return (
-			<Button asChild variant="quiet" size="row" className={press} {...button}>
-				<Link href={href} aria-disabled={button.disabled || undefined} onClick={button.disabled ? (e) => e.preventDefault() : undefined}>
-					{words}
-				</Link>
-			</Button>
-		);
-	}
-	return (
-		<Button variant="quiet" size="row" className={press} {...button}>
-			{words}
-		</Button>
-	);
-}

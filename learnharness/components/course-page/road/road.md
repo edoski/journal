@@ -1,8 +1,8 @@
 # Road
 
-The course page as a road to its exam (`road-course.tsx`; `../candidates.md`), in one row of two columns: the road on the left, the map on the right. Head (`compact`): the title with Mistakes and Context, then readiness (`ReadyFact`) and Studied. Under its hairline, across the page, Agenda's Now (`AgendaNext` with `showThen` off): the step to take up, its reason, and the press (Continue, Resume, Review) flush right, so where he is and how to resume sit in one row (Edo, 17 Nov 2026). The head's own press moved there. At the page's foot, centred, New lesson's composer with this course chosen (`../../course-composer.md`).
+The course page as a road to its exam, as Things puts a deadline beside its headings and Duolingo draws a path (Edo picked it over Current, Overview and Agenda on 17 Nov 2026: "all of this looks good now honestly"). One row of two columns: the road on the left (`road-list.tsx`, `RoadList`), the map on the right. Above them the head and Now (`../course-head/course-head.md`); at the page's foot, centred, New lesson's composer with this course chosen (`../course-composer.md`).
 
-The road is the course's one list of arcs. The map beside it lists none (`SplitBody`'s `mapIndex={false}`, `ArcMap`'s `index`), so the arcs are never listed twice side by side (Edo, 17 Nov 2026: the two lists beside each other made the layout feel "not really laid out correctly"; he liked the map's arc list, so the road takes its look).
+The road is the course's one list of arcs. The map beside it lists none (`SplitMap` draws `ArcMap` with `index={false}`), so the arcs are never listed twice side by side (Edo, 17 Nov 2026: the two lists beside each other made the layout feel "not really laid out correctly"; he liked the map's arc list, so the road takes its look).
 
 - Every arc in study order, drawn as the map's arc list draws its rows (`road-arc.tsx`, `ArcIndex`'s anatomy): its number and whole name (`ArcLabel`), the dot of "You are here" on the arc he is in. Each arc is its own block, with a rail down its left as tall as the arc and its open topics and a small gap before the next, so the arcs read as separate containers; the rail is bright on the arc the map shows (Edo, 17 Nov 2026).
 - The column is 24rem (`SplitBody`'s `listWidth`), wider than the linked columns' 20rem, so names and facts show whole. Every fact and every topic row's fact end on one line, 12px in from the column's edge, where a row's hover fill ends.
@@ -12,4 +12,4 @@ The road is the course's one list of arcs. The map beside it lists none (`SplitB
 
 No folds and no Whole road press: every arc shows (Edo, 17 Nov 2026, on the folds: "Scrap all of that").
 
-Removed from Current: the arc pills and Pick up/Then (the press and the rows' facts say what is next), "In progress" and "Not started" on the lines, the exam in the head (it is on the road).
+Not on the road: arc pills, Pick up and Then (Now and the rows' facts say what is next), "In progress" and "Not started" on the lines, the exam in the head (it is on the road).

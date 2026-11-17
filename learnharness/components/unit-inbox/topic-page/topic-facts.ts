@@ -117,8 +117,6 @@ export interface TopicFacts {
 	standing: Standing | null;
 	/** What the head says beside the pie; empty when the line is silent. */
 	marks: readonly HeadMark[];
-	/** "Studied 4 Nov"; null when nothing dates it or the line is silent. */
-	studied: string | null;
 	/** The engine's diagnosed mistake, else the last attempt of a topic it
 	 *  calls weak when that attempt was not right, in the tutor's words. */
 	mistake: string | null;
@@ -292,13 +290,6 @@ export function headMarks(topic: CourseMapTopic, titleOf: (handle: string) => st
 	return [...(slip ? [{ kind: "slip" as const, words: slip.words, slip: slip.key }] : []), ...(review ? [{ kind: "review" as const, words: review }] : [])];
 }
 
-/** The latest day anything says he studied the topic: its newest attempt,
- *  its newest session's last message, the day it was first taught. */
-export function lastStudiedDay(topic: CourseMapTopic, sessions: readonly SessionEntry[], attempts: readonly TopicAttempt[]): string | null {
-	const days = [attempts[0]?.date, sessions[0]?.day, topic.introduced].filter((day): day is string => Boolean(day));
-	return days.length > 0 ? days.reduce((latest, day) => (day > latest ? day : latest)) : null;
-}
-
 /** What went wrong, when the engine can say: the mistake it diagnosed,
  *  else, for a topic it calls weak, the newest attempt that counts (never
  *  a prediction) in the tutor's words when it was not right. Nothing once
@@ -423,7 +414,6 @@ export function topicFacts({
 	// A lesson he began says "Lesson in progress" (`standingWords`), never "Not started" (round 14, m36: the begun
 	// Poisson page left an empty band under its title); only a topic not started that a session merely touched is silent.
 	const silent = topic.level === "new" && sessions.length > 0 && !lessonBegun(topic);
-	const studied = lastStudiedDay(topic, entries, attempts);
 	const said = sidebarSays(courses, chats, map.workspace);
 	return {
 		course: { workspace: map.workspace, title: map.title },
@@ -432,7 +422,6 @@ export function topicFacts({
 		today: map.today,
 		standing: silent ? null : standingOf(topic),
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
-		studied: !silent && studied ? studiedDaysWords(daysBetween(studied, map.today), map.today) : null,
 		mistake: mistakeOf(topic, attempts),
 		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam, map.today) : null) ?? waitsWords(topic, map.today),
 		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : topic.moved ? movedWords(null, map.today, topic.moved) : startsAfterWords(topic.startsAfter) } : null,

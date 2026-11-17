@@ -79,7 +79,7 @@ function drawn(t: CourseMapTopic) {
 			home: home.querySelector('[data-slot="today-standing"]')!.textContent,
 			card: card.querySelector('[data-slot="topic-standing"]')!.textContent,
 			row: row.querySelector(".sr-only")!.textContent!.replace(/^, /, ""),
-			head: headStanding?.textContent ?? null,
+			head: headStanding?.textContent?.replace(/^\. /, "") ?? null,
 		},
 		slips: {
 			home: slip && { key: home.querySelector('[data-slot="today-standing"]')!.getAttribute("data-slip"), words: home.querySelector('[data-slot="today-standing"]')!.textContent },

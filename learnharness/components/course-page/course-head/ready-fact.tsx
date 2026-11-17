@@ -19,8 +19,8 @@ import { cn } from "@/lib/utils";
 
 const ICON: Record<ExamReady["kind"], typeof CircleCheckIcon> = { ready: CircleCheckIcon, notYet: CircleDotDashedIcon, short: TriangleAlertIcon };
 
-/** What a candidate's head reads from the engine's standing, as Current's
- *  head does: whether he is ready for the exam, and the open mistakes. */
+/** What the head reads from the engine's standing: whether he is ready
+ *  for the exam, and the open mistakes. */
 export function useHeadStanding(view: CourseView, standing: CourseStanding | null) {
 	const { course, arcs, chats } = view;
 	const ready = useMemo(() => (standing?.readiness ? examReady(standing.readiness, course.map, arcs, standing.mistakes) : null), [standing, course.map, arcs]);
@@ -30,7 +30,7 @@ export function useHeadStanding(view: CourseView, standing: CourseStanding | nul
 
 /**
  * Whether he is ready for the exam, as one fact of a head (spec:
- * candidates/candidates.md): an icon and a few words ("Not ready yet",
+ * course-head.md): an icon and a few words ("Not ready yet",
  * "Ready for the exam", "Not all of it fits" in the warning ink), never a
  * pill per arc. Pressed, it opens the whole answer under it: the readiness
  * words the run-up says (`ReadyWords`), the arcs not ready as a list, each

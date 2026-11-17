@@ -9,9 +9,7 @@ import { standingOf } from "@/components/course-map/topic-map/topic-standing";
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
 import { ProgressRing } from "@/components/study-home/agenda-rows/progress-ring";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
-import { Hint } from "@/components/ui/hint";
 import { lessonOf } from "@/components/study-home/lesson-facts";
-import { THEN_WORDS } from "@/components/course-page/what-next";
 import type { CourseColumns } from "@/components/course-page/split/split-course";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +19,7 @@ const NOW_ROW = "group/press -mx-3 flex h-14 w-[calc(100%+1.5rem)] items-center 
  *  stepping right on hover (the row itself is the press). */
 function Press({ words }: { words: string }) {
 	return (
-		<span data-slot="agenda-press" className={cn(buttonVariants({ size: "pill" }), "pointer-events-none shrink-0 self-center font-medium")}>
+		<span data-slot="course-now-press" className={cn(buttonVariants({ size: "pill" }), "pointer-events-none shrink-0 self-center font-medium")}>
 			{words}
 			<ArrowRightIcon aria-hidden className="size-4 transition-transform duration-150 group-hover/press:translate-x-0.5 motion-reduce:transition-none" />
 		</span>
@@ -29,17 +27,15 @@ function Press({ words }: { words: string }) {
 }
 
 /**
- * Agenda's Now and Then (spec: agenda.md): Now, the step the course's press
- * takes up, as Today's row says it (its title, its reason's icon and
- * words, the press's word flush right beside them), which does what
- * Today's line does; Then, one quiet line naming the next new topic the
- * plan starts, why then in its hint, which opens its page. A hairline closes them off from the arc.
- * Road shows Now alone, across the page under its head (`showThen` off).
+ * Now (spec: course-head.md), across the page under the head: the step the
+ * course's press takes up, as Today's row says it (its title, its reason's
+ * icon and words, the press's word flush right beside them), which does
+ * what Today's line does. The row is the course's action (`course-action`),
+ * which the road's arrow walk reaches from its first stop. A hairline
+ * closes it off from the road.
  */
-export function AgendaNext({ view, busy, onContinue, showThen = true }: CourseColumns & { showThen?: boolean }) {
-	const { course, whatNext, next } = view;
-	const line = whatNext?.pickUp?.line ?? null;
-	const then = showThen ? (whatNext?.then ?? null) : null;
+export function CourseNow({ view, busy, onContinue }: CourseColumns) {
+	const { course, pickUp: line, next } = view;
 	const lead = line ? (line.lead ?? line.topics[0] ?? null) : null;
 	const glyph = lead ? <TopicGlyph standing={standingOf(lead)} /> : <ProgressRing course={course} />;
 	const action = line ? lessonOf(line.row).action : next.lesson.action;
@@ -57,39 +53,24 @@ export function AgendaNext({ view, busy, onContinue, showThen = true }: CourseCo
 		</>
 	);
 	return (
-		<div data-slot="agenda-next" className="mb-3 flex shrink-0 flex-col border-b border-border/50 pb-5">
+		<div data-slot="course-now" className="mb-3 flex shrink-0 flex-col border-b border-border/50 pb-5">
 			{line ? (
-				<LineTarget row={line.row} busy={busy} onContinue={onContinue} data-slot="agenda-now" className={NOW_ROW}>
+				<LineTarget row={line.row} busy={busy} onContinue={onContinue} data-slot="course-action" className={NOW_ROW}>
 					<span className="flex shrink-0">{glyph}</span>
 					{lines(line.title, line.why)}
 				</LineTarget>
 			) : next.lesson.open.kind === "session" ? (
-				<Button variant="quiet" asChild data-slot="agenda-now" className={NOW_ROW}>
+				<Button variant="quiet" asChild data-slot="course-action" className={NOW_ROW}>
 					<Link href={next.lesson.open.href}>
 						<span className="flex shrink-0">{glyph}</span>
 						{lines(next.lesson.title, next.why)}
 					</Link>
 				</Button>
 			) : (
-				<Button variant="quiet" data-slot="agenda-now" disabled={busy} onClick={() => onContinue(course.map.workspace)} className={NOW_ROW}>
+				<Button variant="quiet" data-slot="course-action" disabled={busy} onClick={() => onContinue(course.map.workspace)} className={NOW_ROW}>
 					<span className="flex shrink-0">{glyph}</span>
 					{lines(next.lesson.title, next.why)}
 				</Button>
-			)}
-			{then && (
-				<Hint label={then.why} side="right">
-					<Button variant="quiet" asChild data-slot="agenda-then" className={cn(NOW_ROW, "h-9 text-body")}>
-						<Link href={then.href}>
-							<span className="flex shrink-0">
-								<TopicGlyph standing={standingOf(then.topic)} />
-							</span>
-							<span className="flex min-w-0 flex-1 items-center gap-2">
-								<span className="shrink-0 text-muted-foreground">{THEN_WORDS}</span>
-								<MathLine className="min-w-0 text-foreground">{then.topic.title}</MathLine>
-							</span>
-						</Link>
-					</Button>
-				</Hint>
 			)}
 		</div>
 	);

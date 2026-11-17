@@ -53,8 +53,8 @@ export function HybridTopic({ facts, busy, error = null, onAct, onTask }: TopicP
 	const starting = (facts.action.kind === "start" || lessonBegun(facts)) && facts.buildsMap;
 	return (
 		<PageFrame data-testid="unit-page" data-topic-candidate="hybrid">
-			{/* Now and Scheduled say the review and Earlier dates the last study, so the head says neither. */}
-			<TopicHead facts={{ ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review"), studied: null }}>
+			{/* Now and Scheduled say the review, so the head does not. */}
+			<TopicHead facts={{ ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review") }}>
 				{error && (
 					<p role="alert" data-slot="topic-lesson-error" className="flex min-h-5 items-center text-body text-danger">
 						{error}

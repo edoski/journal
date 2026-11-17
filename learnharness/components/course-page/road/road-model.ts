@@ -3,7 +3,7 @@ import type { CourseArcSection } from "@/components/course-page/course-model";
 import { ARC_EXAM_WORDS, arcStartsWords } from "@/components/study-words";
 
 /**
- * Where the exam sits on Road's list (spec: road.md): after the last arc
+ * Where the exam sits on the road (spec: road.md): after the last arc
  * the exam examines and the plan fits (`stopBefore`, the first arc after
  * it, or null when it closes the list), and the arcs past it (`past`):
  * those the exam does not examine, and those whose topics are all still

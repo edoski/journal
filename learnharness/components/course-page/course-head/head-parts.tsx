@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useContext, useState, type ReactNode, createContext } from "react";
 import { BookOpenIcon, CalendarIcon, ClockIcon, FolderOpenIcon, HistoryIcon } from "lucide-react";
 import type { CalendarCourse, StudyCourse } from "@/src/core";
-import type { CourseView } from "@/components/course-page/course-model";
-import { PageAction } from "@/components/page-frame/page-frame";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Hint } from "@/components/ui/hint";
@@ -133,17 +131,6 @@ export function StudiedFact({ words, session, extra }: { words: string; session:
 				{face}
 			</Link>
 		</Hint>
-	);
-}
-
-/** The page's press, as the current head has it: Resume, Review,
- *  Continue or Start, doing what Home's line for the course does. */
-export function CourseAction({ view, busy, onContinue }: { view: CourseView; busy: boolean; onContinue: (workspace: string) => void }) {
-	const { open } = view.next.lesson;
-	return (
-		<PageAction data-slot="course-action" disabled={busy} {...(open.kind === "session" ? { href: open.href } : { onClick: () => onContinue(open.workspace) })}>
-			{view.next.action}
-		</PageAction>
 	);
 }
 

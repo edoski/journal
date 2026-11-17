@@ -1,9 +1,8 @@
 /**
- * Mistakes on Linear Algebra's course page, whose readiness line names
- * enough topics to run under the head's actions and wrap to a second row
- * (round 9, 2 m2: the popover hung from the press and covered that line).
- * The head is laid out as his 1512×982 window draws it, and the popover
- * must open below every one of the head's lines.
+ * Mistakes on Linear Algebra's course page (round 9, 2 m2: the popover
+ * hung from the press and covered the head's lines). The head is laid out
+ * as his 1512×982 window draws it, and the popover must open below every
+ * one of the head's lines.
  */
 
 import React, { act } from "react";
@@ -15,12 +14,13 @@ Object.defineProperty(globalThis, "self", { value: globalThis, configurable: tru
 Object.defineProperty(globalThis, "localStorage", { value: { getItem: () => null, setItem() {}, removeItem() {} }, configurable: true, writable: true });
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import { createRoot, type Root } from "react-dom/client";
+import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { CourseMapTopic, CourseStanding, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { ServerEventsProvider } from "../components/server-events.tsx";
 import { CourseFrame } from "../components/course-page/course-frame.tsx";
 import { CourseHead } from "../components/course-page/course-head/course-head.tsx";
+import { columnsOf } from "./helpers/course-columns.ts";
 
 const h = (handle: string) => handle as TopicHandle;
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -69,10 +69,9 @@ const standing: CourseStanding = {
  *  the whole head, the facts row, and the head's bottom edge. */
 type Box = { top: number; left: number; width: number; height: number };
 const LAYOUT: Record<string, Box> = {
-	"page-head": { top: 80, left: 280, width: 1208, height: 146 },
-	"course-mistakes": { top: 96, left: 1221, width: 92, height: 32 },
-	"course-ready": { top: 136, left: 280, width: 1208, height: 40 },
-	"page-standing": { top: 184, left: 280, width: 1208, height: 20 },
+	"page-head": { top: 24, left: 280, width: 1208, height: 82 },
+	"course-mistakes": { top: 24, left: 1221, width: 92, height: 32 },
+	"page-standing": { top: 61, left: 280, width: 1208, height: 20 },
 };
 const POPOVER = { width: 320, height: 240 };
 const rect = ({ top, left, width, height }: Box) => ({ top, left, width, height, x: left, y: top, right: left + width, bottom: top + height, toJSON() {} }) as DOMRect;
@@ -118,7 +117,7 @@ async function mountHead() {
 		root!.render(
 			<AppRouterContext.Provider value={router as never}>
 				<ServerEventsProvider connect={() => ({ close() {}, onOpen() {}, onEvent() {} })}>
-					<CourseFrame workspace={WS}>{({ view, standing: known, busy, onContinue }) => <CourseHead view={view} standing={known} busy={busy} onContinue={onContinue} />}</CourseFrame>
+					<CourseFrame workspace={WS}>{({ view, standing: known, busy, onContinue }) => <CourseHead {...columnsOf(view, known, { busy, onContinue })} />}</CourseFrame>
 				</ServerEventsProvider>
 			</AppRouterContext.Provider>,
 		),
@@ -136,7 +135,7 @@ function popoverTop(): number {
 }
 
 describe("Mistakes opens under the head", () => {
-	it("covers neither row of a readiness line that wraps under the actions, nor the facts under it", async () => {
+	it("covers none of the head's lines", async () => {
 		await mountHead();
 		const press = document.querySelector("[data-slot=course-mistakes]");
 		assert.ok(press, "Mistakes shows: three mistakes are open");
@@ -146,9 +145,7 @@ describe("Mistakes opens under the head", () => {
 		for (let i = 0; i < 5; i++) await act(async () => new Promise((r) => setTimeout(r, 0)));
 		assert.equal(document.querySelectorAll("[data-slot=mistake-row]").length, 3);
 		const top = popoverTop();
-		const ready = LAYOUT["course-ready"]!;
 		const facts = LAYOUT["page-standing"]!;
-		assert.ok(top >= ready.top + ready.height, `the popover's top (${top}px) is below the readiness line's second row (${ready.top + ready.height}px)`);
 		assert.ok(top >= facts.top + facts.height, `the popover's top (${top}px) is below the facts row (${facts.top + facts.height}px)`);
 	});
 

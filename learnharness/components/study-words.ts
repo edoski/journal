@@ -784,7 +784,7 @@ export const READY_WORDS = {
 } as const;
 
 /** Where he stands for the exam as one fact of a head, a few words (the
- *  course page's candidates): the whole answer opens under it. "No exam"
+ *  course page's head): the whole answer opens under it. "No exam"
  *  for a course without one. */
 export const READY_FACT_WORDS = {
 	ready: "Ready for the exam",

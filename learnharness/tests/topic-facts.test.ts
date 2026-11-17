@@ -19,7 +19,6 @@ import {
 	attemptMark,
 	dayWords,
 	heldTasks,
-	lastStudiedDay,
 	mistakeOf,
 	pickupsOf,
 	sessionEntries,
@@ -275,23 +274,7 @@ describe("the page's words for time", () => {
 	});
 });
 
-describe("when he last studied the topic", () => {
-	const entries = (...days: string[]) => sessionEntries(days.map((day) => chat({ updatedAt: `${day}T10:00:00.000Z` })), [], TODAY, "rank");
-
-	it("is the latest of its newest attempt, its newest session and the day it was first taught", () => {
-		const taught = { ...TOPICS.cramer, introduced: "2026-11-01" };
-		assert.equal(lastStudiedDay(taught, entries("2026-11-03"), [attempt({ date: "2026-11-05" })]), "2026-11-05");
-		assert.equal(lastStudiedDay(taught, entries("2026-11-06"), [attempt({ date: "2026-11-05" })]), "2026-11-06");
-		assert.equal(lastStudiedDay({ ...taught, introduced: "2026-11-07" }, entries("2026-11-06"), [attempt({ date: "2026-11-05" })]), "2026-11-07");
-		assert.equal(lastStudiedDay(TOPICS.eigen, [], []), null);
-	});
-
-	it("reads a session dated after the engine's day as today", () => {
-		const chats = [chat({ topics: ["cramer"], updatedAt: "2026-11-10T08:00:00.000Z" })];
-		assert.equal(topicFacts({ course: COURSE, topic: TOPICS.cramer, chats, read: null }).studied, "Studied today");
-		assert.equal(topicFacts({ course: COURSE, topic: TOPICS.cramer, chats: [], read: null }).studied, "Studied 5 Nov");
-	});
-
+describe("a session's day", () => {
 	it("dates a session by its local day, never after the engine's", () => {
 		const late = new Date(2026, 10, 6, 23, 30).toISOString();
 		assert.equal(localDay(late), "2026-11-06");
@@ -493,15 +476,15 @@ describe("how an attempt went", () => {
 describe("the facts a candidate draws", () => {
 	it("are silent where the engine is, and fold the topic read in", () => {
 		const facts = topicFacts({ course: COURSE, topic: TOPICS.eigen, chats: [], read: null });
-		assert.deepEqual([facts.standing?.words, facts.marks, facts.studied, facts.mistake, facts.standing?.fill], ["Not started", [], null, null, 0]);
+		assert.deepEqual([facts.standing?.words, facts.marks, facts.mistake, facts.standing?.fill], ["Not started", [], null, 0]);
 		const waiting = topicFacts({ course: COURSE, topic: TOPICS.eigen, chats: [chat({ topics: ["eigen"], pendingQuestion: true })], read: null });
-		assert.deepEqual([waiting.standing, waiting.marks, waiting.studied], [null, [], null]);
+		assert.deepEqual([waiting.standing, waiting.marks], [null, []]);
 		const rank = topicFacts({
 			course: COURSE,
 			topic: TOPICS.rank,
 			chats: [],
 			read: { record: { attempts: [attempt({ date: "2026-11-03" })], tasks: [{ key: "sheet-4", updated: "2026-11-06" }] }, plans: [] },
 		});
-		assert.deepEqual([rank.studied, rank.attempts.length, rank.pickups.map((p) => p.when)], ["Studied 3 Nov", 1, ["6 Nov"]]);
+		assert.deepEqual([rank.attempts.length, rank.pickups.map((p) => p.when)], [1, ["6 Nov"]]);
 	});
 });

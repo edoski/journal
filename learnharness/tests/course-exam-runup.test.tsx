@@ -1,7 +1,8 @@
 /**
  * The course head's exam run-up (components/course-page/course-head/
  * head-parts.tsx, `ExamFact`), mounted open: it says whether he is ready in
- * the readiness line's own words, read from the same facts (round 6: the
+ * the readiness fact's own words (`ReadyWords`, its answer under the head),
+ * read from the same facts (round 6: the
  * head named the topics not yet solid while its run-up said "Every topic
  * fits before the exam").
  */
@@ -19,7 +20,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import type { CalendarCourse, CourseMapTopic, CourseReadiness, ReadinessPart, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { ExamFact } from "../components/course-page/course-head/head-parts.tsx";
 import { examReady } from "../components/course-page/standing/standing-model.ts";
-import { ReadyLine } from "../components/course-page/standing/ready-line.tsx";
+import { ReadyWords } from "../components/course-page/standing/ready-line.tsx";
 
 const h = (handle: string) => handle as TopicHandle;
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -64,7 +65,11 @@ async function opened(ready: ReturnType<typeof examReady> | null, { plan = runup
 		root!.render(
 			<AppRouterContext.Provider value={router as never}>
 				<ExamFact course={shown} runup={plan} words="Exam in 25 days" ready={ready} />
-				{ready && <ReadyLine course={shown} ready={ready} />}
+				{ready && (
+					<p data-slot="head-ready">
+						<ReadyWords ready={ready} workspace={shown.map.workspace} />
+					</p>
+				)}
 			</AppRouterContext.Provider>,
 		),
 	);
@@ -92,7 +97,7 @@ describe("the exam's run-up", () => {
 		const panel = await opened(ready, { shown: many });
 		const said = panel.querySelector("[data-slot=course-exam-ready]")!.textContent;
 		assert.equal(said, "Not yet solid for the exam: Kernel, Cramer, Basis and the rest");
-		assert.equal(document.querySelector("[data-slot=course-ready]")!.textContent, said, "the head's line says the run-up's words");
+		assert.equal(document.querySelector("[data-slot=head-ready]")!.textContent, said, "the readiness fact's answer says the run-up's words");
 		await act(async () => {
 			panel.querySelector("[data-slot=ready-rest]")!.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
 		});

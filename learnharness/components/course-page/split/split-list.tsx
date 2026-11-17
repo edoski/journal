@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ComponentType, type ComponentProps, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import type { TopicHandle } from "@/src/core";
 import { CourseGroup } from "@/components/course-page/course-group";
-import { CourseArc } from "@/components/course-page/course-arc";
 import type { CourseArcSection, CourseGroup as Group, CourseTopic } from "@/components/course-page/course-model";
+import type { ArcLineProps } from "@/components/course-page/road/road-arc";
 import { CourseTopicRow } from "@/components/course-page/course-topic-row";
 import { cn } from "@/lib/utils";
 import { stopKey, walkStops, walkTo, type ListSection, type Stop } from "@/components/course-page/split/split-tie";
@@ -24,8 +24,8 @@ function reducedMotion(): boolean {
  * in their groups, each a 32px row ending in its reason's icon and words,
  * flush right so they line up down the list (the title truncates first);
  * in a course with arcs (`arcs`), its arcs in study order instead, each a
- * folded line (`CourseArc`) that opens on its topics, a ready one with
- * Check it (`onCheck`). Which sections are open is the page's (`open`,
+ * folded line (`arcLine`, the road's) that opens on its topics, a ready one
+ * with Check it (`onCheck`). Which sections are open is the page's (`open`,
  * `onOpenChange`), held for the visit only. Pointing at or focusing a row tells the page (`onPoint`); `marked`
  * is the topic he points at on the map, whose row holds the hover fill and
  * is brought into view. The pane scrolls with no bar showing; while more
@@ -53,7 +53,7 @@ export function SplitList({
 	onPoint,
 	onEnterMap,
 	onExitTop,
-	arcLine: ArcLine = CourseArc,
+	arcLine: ArcLine,
 	after,
 	ref,
 }: {
@@ -71,8 +71,8 @@ export function SplitList({
 	onPoint: (handle: TopicHandle | null) => void;
 	onEnterMap: (handle: TopicHandle) => void;
 	onExitTop?: () => void;
-	/** How an arc's line is drawn: `CourseArc`, or a candidate's line with its props. */
-	arcLine?: ComponentType<ComponentProps<typeof CourseArc<CourseTopic>>>;
+	/** How an arc's line is drawn: the road's (`RoadLine`). */
+	arcLine: ComponentType<ArcLineProps>;
 	/** What closes the list, after its last section. */
 	after?: ReactNode;
 	ref?: Ref<SplitListHandle>;

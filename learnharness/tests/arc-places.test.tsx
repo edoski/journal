@@ -125,33 +125,32 @@ describe("the sidebar's cards", () => {
 describe("the topic page", () => {
 	const rank = LINALG_ARCS.map.topics.find((t) => t.handle === "rank")!;
 
-	it("keeps the course link alone above the title, never Course · Arc (Edo, 14 Nov 2026)", () => {
+	it("names the course, then its arc, as linked words under the title, never Course · Arc (Edo, 14 Nov 2026)", () => {
 		for (const course of [LINALG_ARCS, LINALG]) {
 			const doc = render(<TopicHead facts={topicFacts({ course, topic: rank, chats: [], read: null })} />);
-			const eyebrow = doc.querySelector('[data-slot="page-eyebrow"]')!;
-			assert.equal(eyebrow.textContent, "Linear Algebra");
-			assert.deepEqual([...eyebrow.querySelectorAll("a")].map((a) => a.getAttribute("href")), [courseHref("/s/linalg")]);
+			assert.ok(doc.querySelector('[data-slot="page-eyebrow"]') === null, "no line above the title");
+			const place = doc.querySelector('[data-slot="topic-place"]')!;
+			assert.equal(place.querySelector('[data-slot="topic-course-link"]')?.getAttribute("href"), courseHref("/s/linalg"));
+			assert.doesNotMatch(place.textContent ?? "", /·/);
 		}
 	});
 
-	it("ends its facts row with the arc as a bubble with its ring, opening the course page on that arc, and has none without arcs", () => {
+	it("names the arc after the course as a link opening the course page on that arc, and none without arcs", () => {
 		const facts = topicFacts({ course: LINALG_ARCS, topic: rank, chats: [], read: null });
 		assert.deepEqual(facts.arc, { handle: "systems", title: "Linear systems", share: 0 });
 		const doc = render(<TopicHead facts={facts} />);
-		const row = doc.querySelector('[data-slot="page-standing"]')!;
-		const pill = row.lastElementChild!.querySelector('[data-slot="arc-pill"]')!;
-		assert.ok(pill, "the pill is the row's last fact");
-		assert.equal(pill.textContent, "Linear systems");
-		assert.equal(pill.getAttribute("href"), arcHref("/s/linalg", "systems"));
-		assert.equal(pill.getAttribute("href"), `${courseHref("/s/linalg")}?arc=systems`);
-		assert.ok(pill.querySelector("svg"), "its ring");
-		assert.ok(pill.getAttribute("class")!.includes("whitespace-nowrap") && pill.getAttribute("class")!.includes("truncate") === false, "one line");
-		assert.ok(pill.querySelector(".truncate"), "a long name ends in …");
+		const link = doc.querySelector('[data-slot="topic-place"] [data-slot="topic-arc-link"]')!;
+		assert.ok(link, "the arc follows the course");
+		assert.equal(link.textContent, "Linear systems");
+		assert.equal(link.getAttribute("href"), arcHref("/s/linalg", "systems"));
+		assert.equal(link.getAttribute("href"), `${courseHref("/s/linalg")}?arc=systems`);
+		assert.match(link.getAttribute("class")!, /\btruncate\b/, "a long name ends in …");
+		assert.ok(doc.querySelector('[data-slot="arc-pill"]') === null, "words, never a pill");
 		const vectors = LINALG_ARCS.map.topics.find((t) => t.handle === "vectors")!;
 		assert.equal(topicFacts({ course: LINALG_ARCS, topic: vectors, chats: [], read: null }).arc?.share, 1, "Vectors and Linear independence are both his own");
 		const plain = render(<TopicHead facts={topicFacts({ course: LINALG, topic: rank, chats: [], read: null })} />);
 		assert.equal(topicFacts({ course: LINALG, topic: rank, chats: [], read: null }).arc, null);
-		assert.ok(plain.querySelector('[data-slot="arc-pill"]') === null);
+		assert.ok(plain.querySelector('[data-slot="topic-arc-link"]') === null);
 	});
 
 	it("says why a topic not started comes when it does in Scheduled, never under Now, whose planned day wraps whole", () => {

@@ -28,15 +28,14 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
  * (`onPoint`), so the list marks its row; Escape on a focused node hands
  * the walk back to that row (`onLeave`). With `arc`, the map draws that
  * arc and Whole course always shows; without, only when the course opens
- * on less than all of it. A course with `arcs` lists them left of the map
- * (`ArcMap`): a press there, ⇧↑ or ⇧↓ glides to another arc (`onOpenArc`),
- * and ⌘J goes to You are here.
+ * on less than all of it. A course with `arcs` (`ArcMap`, with no list of
+ * its own beside it, since the road lists them): ⇧↑ or ⇧↓ glides to another
+ * arc (`onOpenArc`), and ⌘J goes to You are here.
  */
 export function SplitMap({
 	map,
 	arc,
 	arcs = null,
-	index = true,
 	said,
 	lit,
 	aim,
@@ -49,10 +48,8 @@ export function SplitMap({
 	map: CourseMap;
 	/** The arc the map draws; unset, the whole course. */
 	arc?: ArcHandle;
-	/** The course's arcs, listed beside the map; null for a course without them. */
+	/** The course's arcs; null for a course without them. */
 	arcs?: readonly CourseMapArc[] | null;
-	/** Whether the map lists its arcs beside it (`ArcMap`'s `index`). */
-	index?: boolean;
 	/** What the sidebar says for each topic (`sidebarSays`), for the cards. */
 	said: ReadonlyMap<TopicHandle, Said>;
 	lit: ReadonlySet<TopicHandle> | null;
@@ -105,7 +102,7 @@ export function SplitMap({
 	);
 
 	return (
-		<ArcMap arcs={arcs} value={arc ?? null} here={currentArc(map)} whole={zoomedOut} index={index} onSelect={pick} onHere={leaveWhole}>
+		<ArcMap arcs={arcs} value={arc ?? null} here={currentArc(map)} whole={zoomedOut} index={false} onSelect={pick} onHere={leaveWhole}>
 			<section
 				ref={root}
 				aria-label={`${map.title} map`}

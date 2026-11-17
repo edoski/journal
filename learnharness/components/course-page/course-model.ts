@@ -6,7 +6,7 @@ import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said, type SidebarPlace, type TopicFact } from "@/components/unit-inbox/sidebar-says";
-import { AFTER_EXAM, ARC_EXAM_WORDS, courseShareWords, firstLessonWords, reviewWords, shortDay, shortReviewWords, startsWhyShort } from "@/components/study-words";
+import { AFTER_EXAM, ARC_EXAM_WORDS, courseShareWords, firstLessonWords, reviewWords, shortDay, shortReviewWords } from "@/components/study-words";
 import { nowFor } from "@/components/unit-inbox/now-inbox";
 import { todayTop } from "@/components/unit-inbox/today/today-top";
 import { buildInbox } from "@/components/unit-inbox/units";
@@ -191,50 +191,17 @@ export function arcShare(course: StudyCourse, arc: ArcHandle): number | null {
 	return progress ? progress.solid / progress.of : null;
 }
 
-/** Where he picks up in a course with arcs, and what new topic comes next
- *  (spec: course-page.md, "What next"). */
-export interface WhatNext {
-	/** What Home's Today puts first for this course (`todayTop`), with the
-	 *  arc of the topic it leads with; null when Today has nothing here. */
-	pickUp: { line: NowLine; arc: CourseMapArc | null } | null;
-	/** The next new topic the plan starts (the earliest `starts`), other
-	 *  than the one he picks up, with why it starts then as Today's rows
-	 *  say it (`startsWhyShort`: "After Expectation", "Back to Matrices")
-	 *  and its arc; null when the plan starts none. */
-	then: { topic: CourseMapTopic; why: string; arc: CourseMapArc | null; href: string; whyNamesArc: boolean } | null;
-}
-
 /**
- * The course page's "what next", across arcs: the course's first line on
- * Home's Today, read through `todayTop` over every course, so a slip in
- * another arc that Today puts first is what he picks up; then the next new
- * topic the plan starts, in the plan's words. Null for a course the page
- * shows without arcs, or when there is nothing to say. Pure.
+ * Where he picks up in a course with arcs (spec: course-page.md, "Now"):
+ * the course's first line on Home's Today, read through `todayTop` over
+ * every course, so a slip in another arc that Today puts first is what he
+ * picks up. Null for a course the page shows without arcs, or when Today
+ * has nothing here. Pure.
  */
-export function whatNext(course: StudyCourse, chats: readonly ChatListItem[] = [], courses: readonly StudyCourse[] = [course]): WhatNext | null {
+export function pickUpLine(course: StudyCourse, chats: readonly ChatListItem[] = [], courses: readonly StudyCourse[] = [course]): NowLine | null {
 	const { map } = course;
-	const arcs = shownArcs(map);
-	if (!arcs) return null;
-	const arcOf = (topic: CourseMapTopic | null | undefined) => (topic?.arc ? (arcs.find((a) => a.handle === topic.arc) ?? null) : null);
-	const top = todayTop(nowFor(courses, chats, null, map.today), buildInbox(courses, chats, null), chats).find((item) => item.line.row.course?.map.workspace === map.workspace);
-	const pickUp = top ? { line: top.line, arc: arcOf(top.line.lead ?? top.line.topics[0]) } : null;
-	const NEVER = "9999-12-31";
-	const next = map.topics
-		.filter((t) => t.starts && t.excluded === undefined && !top?.line.topics.some((o) => o.handle === t.handle))
-		.sort((a, b) => (a.starts ?? NEVER).localeCompare(b.starts ?? NEVER))[0];
-	const why = next ? (next.startsWhy ?? { kind: "next" as const, arc: next.arc }) : null;
-	const then =
-		next && why
-			? {
-					topic: next,
-					why: startsWhyShort(why, map),
-					arc: arcOf(next),
-					href: unitHref(map.workspace, next.handle),
-					// "Next in Eigenvalues", "Back to Matrices", "Early, from Orthogonality" name the arc already.
-					whyNamesArc: why.arc !== undefined && (why.kind !== "after" || (why.needs.length === 0 && why.partners.length === 0)),
-				}
-			: null;
-	return pickUp || then ? { pickUp, then } : null;
+	if (!shownArcs(map)) return null;
+	return todayTop(nowFor(courses, chats, null, map.today), buildInbox(courses, chats, null), chats).find((item) => item.line.row.course?.map.workspace === map.workspace)?.line ?? null;
 }
 
 /** The arc a page shows first: where he is, else the first. */
@@ -301,8 +268,8 @@ export interface CourseView {
 	groups: readonly CourseGroup[];
 	/** The course's arcs, when the page leads with them (`courseArcs`). */
 	arcs: readonly CourseArcSection[] | null;
-	/** Where he picks up and what comes next, above the arcs (`whatNext`). */
-	whatNext: WhatNext | null;
+	/** Where he picks up, Now's line under the head (`pickUpLine`). */
+	pickUp: NowLine | null;
 	said: ReadonlyMap<TopicHandle, Said>;
 	facts: CourseFacts;
 	next: CourseNext;
@@ -342,7 +309,7 @@ export function courseRead(state: StudyHomeState, workspace: string): CourseRead
 					course,
 					groups: courseGroups(course, state.chats, state.courses),
 					arcs: courseArcs(course, state.chats, state.courses),
-					whatNext: whatNext(course, state.chats, state.courses),
+					pickUp: pickUpLine(course, state.chats, state.courses),
 					said: sidebarSays(state.courses, state.chats, workspace),
 					facts: courseFacts(course, state.chats),
 					next: courseNext(course, state.open),
