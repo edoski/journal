@@ -17,7 +17,7 @@ import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, Sessi
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
-import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
 import { leftQuestionRepose, sessionEndOf } from "../core/session-end.ts";
 import { openedAsReview } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
@@ -105,7 +105,9 @@ function listChats(): ChatSummary[] {
 					// Its own topics: the ones it was started on or named after, else
 					// for practice its first problem's.
 					const kind = sessionModeOf(messages, summary.kind);
-					const own = summary.topics?.length ? summary.topics : kind === "practice" ? firstProblemTopicsOf(messages) : [];
+					// A session that took up a task belongs to the task's topics (round 15, m4).
+					const tasked = sessionTaskTopicsOf(messages);
+					const own = tasked.length > 0 ? tasked : summary.topics?.length ? summary.topics : kind === "practice" ? firstProblemTopicsOf(messages) : [];
 					return {
 						// turns stay out of the list payload (list =
 						// summaries; usage aggregates ride the full record, the picker

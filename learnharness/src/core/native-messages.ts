@@ -1124,6 +1124,32 @@ export function sessionTaskTitleOf(messages: readonly LhMessage[]): string | nul
 	return title;
 }
 
+/** The topics its saves gave the first task they opened (the one
+ *  `sessionTaskTitleOf` names), so a session that took up a task belongs
+ *  to the task's topics (round 15, m4: the Ask-the-tutor session that took
+ *  up the Expectation lesson stayed the Geometric page's Now). Empty when
+ *  its saves gave that task none. Pure. */
+export function sessionTaskTopicsOf(messages: readonly LhMessage[]): string[] {
+	const clean = cleanToolCallIds(messages);
+	let first: string | null = null;
+	let topics: string[] = [];
+	for (const m of messages) {
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const tasks = saveChanges(block.arguments as Record<string, unknown>)?.tasks;
+			if (typeof tasks !== "object" || tasks === null) continue;
+			for (const [key, patch] of Object.entries(tasks)) {
+				const named = (patch as { title?: unknown } | null)?.title;
+				if (first === null && typeof named === "string" && named.trim()) first = key;
+				const given = (patch as { topics?: unknown } | null)?.topics;
+				if (key === first && Array.isArray(given)) topics = given.filter((t): t is string => typeof t === "string" && t.length > 0);
+			}
+		}
+	}
+	return topics;
+}
+
 /** The conclusion's reveal (owner round, 2026-10-05): the hero of a
  *  conclude card is the modelSolution committed at POSE time — the newest
  *  cleanly-posed problem BEFORE this conclude call. The reveal is never
