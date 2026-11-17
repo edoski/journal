@@ -140,7 +140,7 @@ describe("Now", () => {
 	it("says a reply cut short as the sidebar and Home say it, never Your turn (round 9, 2 m7)", () => {
 		const cut = chat("chat_cut", "Diagonalization preview", "2026-11-06T21:40:05.000Z", { ended: "cut", topics: ["eigen"] });
 		assert.equal(pickupSections(factsOf(EIGEN, [cut])).now.note, "Reply cut off");
-		assert.equal(pickupSections(factsOf(EIGEN, [{ ...cut, stopped: true }])).now.note, "You stopped the tutor");
+		assert.equal(pickupSections(factsOf(EIGEN, [{ ...cut, stopped: true }])).now.note, "Stopped by you");
 	});
 
 	it("names the session when the lesson planned nothing", () => {
