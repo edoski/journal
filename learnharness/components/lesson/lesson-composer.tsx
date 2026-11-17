@@ -9,8 +9,31 @@ import { useCallback, useLayoutEffect, useRef, useState, type ComponentProps, ty
 import { ArrowRightIcon, ArrowUpIcon, SquareIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { enterAction } from "@/components/composer";
 import { PendingPhotos, PhotoAttachButton, type PhotoDraft } from "@/components/photos";
+
+/** What one Enter press does, in precedence order: send the message,
+ *  otherwise run the empty field's go-ahead: the practice pause's next
+ *  problem (owner round 16), or Try again after a reply that never came.
+ *  Enter never stops a turn (round 3, 14 Nov 2026): a second Enter a
+ *  second after a send landed on the empty field and killed the reply.
+ *  Stopping is the square's or Esc's, through the confirm. Pure so the
+ *  static-render harness can pin the decision. */
+export function enterAction(state: {
+	busy: boolean;
+	canSend: boolean;
+	/** The between-problems pause is live: practice session, nothing
+	 *  active, no turn in flight (the caller's fold). */
+	nextProblem?: boolean;
+	/** The empty field's own go-ahead (Try again), when the host has one. */
+	emptyAction?: boolean;
+}): "send" | "next" | "empty-action" | "none" {
+	// While a turn runs, typed text makes Enter a steer (the queued send).
+	if (state.canSend) return "send";
+	if (state.busy) return "none";
+	if (state.nextProblem) return "next";
+	if (state.emptyAction) return "empty-action";
+	return "none";
+}
 
 /** Send submits an answer instead of a message (spec: lesson-composer.md):
  *  the button and Enter run `onSubmit` while `ready`, whatever the field
@@ -65,8 +88,9 @@ export interface LessonComposerProps {
 
 /** The surface's one outline: a 1px hairline at white 5% with a 3% inset
  *  highlight, drawn on ::after so it never takes layout (T3 Code). A field
- *  focused inside lifts it to the ring at 50%. */
-const SURFACE =
+ *  focused inside lifts it to the ring at 50%. The lesson's course-link
+ *  banner draws it too, so the lesson's foot is one family. */
+export const COMPOSER_SURFACE =
 	"relative isolate w-full rounded-[16px] bg-card transition-[outline-color] after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:border after:border-white/5 after:inset-shadow-2xs after:inset-shadow-white/3 outline-1 -outline-offset-1 outline-transparent has-[textarea:focus]:outline-ring/50 motion-reduce:transition-none";
 
 /** The lesson's composer (spec: lesson-composer.md): one 16px-radius card,
@@ -182,7 +206,7 @@ export function LessonComposer({
 			data-slot="composer"
 			data-mode={answer ? "answer" : "message"}
 			data-collapsed={collapsed || undefined}
-			className={cn(SURFACE, photos?.dragging && "outline-ring")}
+			className={cn(COMPOSER_SURFACE, photos?.dragging && "outline-ring")}
 			onFocus={() => setFocused(true)}
 			onBlur={(e) => {
 				if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false);

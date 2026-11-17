@@ -52,7 +52,7 @@ second pillar of input).
 | Rename session | F2 | `lh:kbd-rename-session` (chat.tsx) |
 | Cheat sheet | ? | keyboard-shortcuts.tsx |
 | Find in this lesson | ⌘F | `lh:kbd-find` (session-find.tsx) |
-| Try again | Enter *on the empty message box, or outside any field* | composer.tsx `enterAction` (`empty-action`) after a reply that never came or a failed turn |
+| Try again | Enter *on the empty message box, or outside any field* | lesson/lesson-composer.tsx `enterAction` (`empty-action`) after a reply that never came or a failed turn |
 | Stop the tutor | Esc, or a click on the square | the "Abort this turn?" confirm (abort-turn-dialog.tsx); Enter never stops a turn (round 3, 14 Nov 2026) |
 | Go to the newest reply | ⌘↓ | `lh:kbd-jump-latest` (lesson/scroll-cue.tsx; acts only while the cue above the dock shows) |
 

@@ -6,7 +6,7 @@ import React from "react";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ComposerIcon, LessonComposer } from "../components/lesson/lesson-composer.tsx";
+import { ComposerIcon, enterAction, LessonComposer } from "../components/lesson/lesson-composer.tsx";
 
 const noop = () => {};
 const composer = (props: Partial<React.ComponentProps<typeof LessonComposer>> = {}) =>
@@ -74,4 +74,36 @@ describe("the lesson composer", () => {
 		assert.ok(typed.indexOf('data-slot="composer-toolbar"') < typed.indexOf('data-slot="composer-send"'), "send back in the toolbar");
 	});
 
+});
+
+// The Enter decision (composer steering, 2026-10-03): while a turn runs,
+// typed text makes Enter a steer; Enter with an empty composer does nothing
+// (round 3: stopping is the square's or Esc's, through the confirm). Pure so
+// the static-render harness can pin it.
+describe("enterAction", () => {
+	it("busy stream with text: Enter steers (the queued send)", () => {
+		assert.equal(enterAction({ busy: true, canSend: true }), "send");
+	});
+
+	it("busy stream, empty composer: Enter does nothing, so a second Enter after a send never kills the reply (round 3)", () => {
+		assert.equal(enterAction({ busy: true, canSend: false }), "none");
+		assert.equal(enterAction({ busy: true, canSend: false, nextProblem: true, emptyAction: true }), "none");
+	});
+
+	it("a reply that never came: Enter on the empty field runs Try again", () => {
+		assert.equal(enterAction({ busy: false, canSend: false, emptyAction: true }), "empty-action");
+		assert.equal(enterAction({ busy: false, canSend: true, emptyAction: true }), "send");
+	});
+
+	it("idle: send when there is something to send, nothing when there is not", () => {
+		assert.equal(enterAction({ busy: false, canSend: true }), "send");
+		assert.equal(enterAction({ busy: false, canSend: false }), "none");
+	});
+
+	it("the practice pause (owner round 16): Enter on an empty composer runs Next problem, and typing outranks it", () => {
+		assert.equal(enterAction({ busy: false, canSend: false, nextProblem: true }), "next");
+		assert.equal(enterAction({ busy: false, canSend: true, nextProblem: true }), "send");
+		assert.equal(enterAction({ busy: true, canSend: false, nextProblem: true }), "none");
+		assert.equal(enterAction({ busy: true, canSend: true, nextProblem: true }), "send");
+	});
 });

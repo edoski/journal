@@ -35,6 +35,11 @@ describe("opening message storage", () => {
 		assert.equal(readOpeningPrompt("c1"), undefined);
 	});
 
+	it("hands over an opening of photos alone as no words, never as its own stored record (audit 17 Nov 2026, finding 1)", () => {
+		assert.equal(stashOpeningPrompt("c1", ""), true);
+		assert.deepEqual(readOpeningPromptEntry("c1"), { text: "", attempted: false });
+	});
+
 	it("treats a legacy raw-text stash conservatively as a possibly attempted send", () => {
 		data.set("lh.openingPrompt.old", "teach me logic");
 		assert.deepEqual(readOpeningPromptEntry("old"), { text: "teach me logic", attempted: true });

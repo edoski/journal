@@ -1,6 +1,6 @@
 # Photos of his working
 
-`photos.tsx`: a photo of his handwritten working goes with any answer: the New lesson box (with words; the photo goes with the lesson's first message), the lesson composer, a check's text answer (Explain, Recall, a question with no choices) and the practice problem's thinking. A photo alone is an answer in a lesson. A photo waiting in any box survives a reload (`lesson/kept-drafts.md`).
+`photos.tsx`: a photo of his handwritten working goes with any answer: the boxes that start a lesson (New lesson, a course page's composer: the photo goes with the lesson's first message, and stays in the box until the lesson has opened), the lesson composer, a check's text answer (Explain, Recall, a question with no choices) and the practice problem's thinking. A photo alone is a message everywhere, a lesson's opening included. A photo waiting in any box survives a reload (`lesson/kept-drafts.md`).
 
 ## Getting a photo in
 

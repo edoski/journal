@@ -1,6 +1,6 @@
 # Lesson composer
 
-`<LessonComposer />` (`lesson-composer.tsx`): the lesson's box at the bottom, lifted from T3 Code's composer (`ChatComposer.tsx`, `ComposerSurface.tsx`; MIT, notice in `T3CODE_LICENSE.txt`). `LessonSessionComposer` wraps it with its own keystroke state. Its testids (`composer`, `composer-send`, `photo-attach`, `next-problem-button`), so focus-home, the photo shortcut and the tests find it.
+`<LessonComposer />` (`lesson-composer.tsx`): the lesson's box at the bottom, lifted from T3 Code's composer (`ChatComposer.tsx`, `ComposerSurface.tsx`; MIT, notice in `T3CODE_LICENSE.txt`). The one composer: the lesson draws it (`LessonSessionComposer` wraps it with its own keystroke state), and so do New lesson (`../start/start-screen.md`, the course chip in `leading`) and a course page's foot (`../course-page/course-composer.md`, compact). Its surface (`COMPOSER_SURFACE`) is also the lesson's course-link banner's (`../course-link-banner.tsx`), so the lesson's foot is one family. Its testids (`composer`, `composer-send`, `photo-attach`, `next-problem-button`), so focus-home, the photo shortcut and the tests find it.
 
 ## Anatomy
 
@@ -18,12 +18,12 @@
 | Prop | What it does |
 |---|---|
 | `placeholder` | the field's words; a host names what an open question wants |
-| `leading` | icons after attach (Hint, Show me, Explain instead), as `ComposerIcon`s |
+| `leading` | controls after attach: the lesson's icons (Hint, Show me, Explain instead) as `ComposerIcon`s; New lesson's course chip |
 | `toolbar` | controls before the send (how sure he is, the Answer or Ask toggle) |
 | `answer: { onSubmit, ready, label? }` | Send and Enter submit an answer while `ready`, whatever the field holds; the send reads "Submit answer" (or `label`), the field "Your answer"; `data-mode="answer"` |
 | `head` | a row inside the surface above the field |
 
-Everything today's composer does stays: Enter sends, ⇧Enter is a newline, ⌘Enter sends; the photo button, paste, drop and ⌘⇧P with thumbnails above the field; drafts kept across reload (the lesson's `value` and `revision`); Stop while a turn runs; Next problem and Try again on the empty field.
+Everything today's composer does stays: Enter sends, ⇧Enter is a newline, ⌘Enter sends; the photo button, paste, drop and ⌘⇧P with thumbnails above the field; drafts kept across reload (the lesson's `value` and `revision`); Stop while a turn runs; Next problem and Try again on the empty field (the Enter rules are `enterAction`'s).
 
 ## States
 

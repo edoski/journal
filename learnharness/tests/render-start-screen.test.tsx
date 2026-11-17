@@ -1,7 +1,8 @@
 /**
  * The start surface (polish pass phase 2): the screen asks without naming a
- * mode and holds only the composer; the shared composer's one surface. Same
- * tsx classic-JSX shim as the other render tests.
+ * mode and holds only the composer, the lesson's own (audit 17 Nov 2026,
+ * finding 1: New lesson drew a second composer). Same tsx classic-JSX shim
+ * as the other render tests.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -12,7 +13,8 @@ import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { StartScreen } from "../components/start/start-screen.tsx";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import { Composer } from "../components/composer.tsx";
+import { LessonComposer } from "../components/lesson/lesson-composer.tsx";
+import { usePhotoDraft } from "../components/photos.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
 function documentFor(node: React.ReactNode) {
 	return parseHTML(`<html><body>${renderToStaticMarkup(node)}</body></html>`).document;
@@ -51,17 +53,28 @@ describe("the start screen", () => {
 	});
 });
 
-describe("Composer", () => {
-	const props = { busy: false, value: "", onChange: () => {}, onSend: () => {}, onStop: () => {}, canSend: false };
+/** Every part of a composer, as its slot and its classes, so two boxes
+ *  that differ in any drawn part differ here. */
+function anatomy(composer: Element | null | undefined): string[] {
+	assert.ok(composer, "a composer is drawn");
+	return [composer, ...composer.querySelectorAll("[data-slot]")].map((el) => `${el.getAttribute("data-slot")} ${el.getAttribute("class")}`);
+}
 
-	it("draws one surface with the toolbar's controls and a round send", () => {
-		const doc = documentFor(<Composer {...props} toolbar={<button type="button">Course</button>} />);
-		const surface = doc.querySelector('[data-slot="composer"]');
-		assert.ok(surface);
-		assert.equal(surface.getAttribute("data-testid"), "composer");
-		assert.equal(surface.querySelector('[data-slot="composer-toolbar"] button')?.textContent, "Course");
-		const send = surface.querySelector('[data-slot="composer-send"]');
-		assert.equal(send?.getAttribute("aria-label"), "Send");
-		assert.ok(send?.hasAttribute("disabled"));
+describe("New lesson's composer", () => {
+	it("is the lesson's composer, part for part", () => {
+		const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
+		const start = documentFor(
+			<ServerEventsProvider>
+				<AppRouterContext.Provider value={router as never}>
+					<StartScreen />
+				</AppRouterContext.Provider>
+			</ServerEventsProvider>,
+		).querySelector('[data-slot="composer"]');
+		function Lesson() {
+			const photos = usePhotoDraft();
+			return <LessonComposer busy={false} value="" onChange={() => {}} onSend={() => {}} onStop={() => {}} canSend={false} photos={photos} />;
+		}
+		const lesson = documentFor(<Lesson />).querySelector('[data-slot="composer"]');
+		assert.deepEqual(anatomy(start), anatomy(lesson));
 	});
 });

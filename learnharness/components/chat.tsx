@@ -764,16 +764,23 @@ export function Chat({
 		draftRef.current = prompt; // The existing 503 flow must restore it too.
 		applyText("");
 		// Photos from the New lesson box go with the first message.
-		void takeKeptPhotos(`${chatId}:opening`).then((photos) => send({ type: "text", text: prompt, ...(photos.length ? { photos } : {}) }, () => {
-			clearOpeningPrompt(chatId);
-			openingDraftRef.current = null;
-			if (draftRef.current === prompt) draftRef.current = null;
-		}).then(accepted => {
-			if (!accepted && photos.length) restoreComposerPhotos(photos.map((photo, i) => ({ id: `opening_${i}`, photo })));
-			if (!accepted && openingMountedRef.current && openingDraftRef.current === prompt && !textRef.current) {
-				applyText(prompt);
+		void takeKeptPhotos(`${chatId}:opening`).then((photos) => {
+			// An opening of photos alone whose photos are gone has nothing to send.
+			if (!prompt && !photos.length) {
+				clearOpeningPrompt(chatId);
+				return;
 			}
-		}));
+			return send({ type: "text", text: prompt, ...(photos.length ? { photos } : {}) }, () => {
+				clearOpeningPrompt(chatId);
+				openingDraftRef.current = null;
+				if (draftRef.current === prompt) draftRef.current = null;
+			}).then(accepted => {
+				if (!accepted && photos.length) restoreComposerPhotos(photos.map((photo, i) => ({ id: `opening_${i}`, photo })));
+				if (!accepted && openingMountedRef.current && openingDraftRef.current === prompt && !textRef.current) {
+					applyText(prompt);
+				}
+			});
+		});
 	}, [chatId, send, applyText, restoreComposerPhotos]);
 
 	const sentInitial = useRef(false);
@@ -1987,7 +1994,7 @@ export type EscAbortTarget = "mermaid" | "plan" | "setup" | "ask" | "question" |
  * `length === 0` check saw the marker and refused to fire).
  */
 export function initialPromptOwed(messages: readonly { role: string }[], prompt: string | undefined): boolean {
-	if (!prompt) return false;
+	if (prompt === undefined) return false;
 	return !messages.some((m) => m.role === "user" || m.role === "assistant");
 }
 

@@ -11,13 +11,14 @@
 | A question or problem closes | Its box is forgotten. A sent message empties the message box. |
 | Another window answers the question he was typing in | His words go to the message box with a line saying so, and stay there while the next question is open: the line then says Esc shows them, and Esc back to the answer never moves them into it (`stranded-draft.ts`, kept as `<chat>:rescued` with the question they came from). Once a question after theirs closes, words he left untouched leave the box, and a newer rescue replaces untouched older words rather than merging with them (round 8: they came back during a later hint and merged into the next rescue). |
 | Another window asks for a hint on it, or asks the tutor something | His words go to this window's carry, and a line says they come back when the hint is done, or when the tutor asks the question again. |
-| New lesson with photos | The photos go with the lesson's first message. |
+| A lesson started from a box (New lesson, a course page's composer) | The photos go with the lesson's first message. The box empties only once the lesson has opened: a failed start or a sign-in keeps its words and photos (`start/use-lesson-start.ts`). |
 
 ## Scopes
 
 | Scope | Box |
 |---|---|
 | `new` | the New lesson box |
+| `course:<workspace>` | a course page's composer |
 | `<chat>:composer` | a lesson's message box |
 | `<chat>:q:<question key>` | an open check or question (its whole form: choice, thinking, answer, confidence) |
 | `<chat>:p:<problem call id>` | an open practice problem's thinking and confidence |
