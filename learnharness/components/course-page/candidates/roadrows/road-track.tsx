@@ -40,10 +40,8 @@ const HEAD = 16 + 8 + 40 + 20 + 12;
 /** A topic row (the hybrid row's compact size) and Check it's line. */
 const ROW = 48;
 const CHECK = 32;
-/** How far a wheel or swipe travels before it steps one arc, and how long it must rest before the next step:
- *  one gesture, momentum included, moves one arc. */
-const STEP_TRAVEL = 30;
-const GESTURE_REST_MS = 180;
+/** How long a wheel or swipe must rest before the strip settles onto the arc nearest where it stopped. */
+const GESTURE_REST_MS = 140;
 /** The strip's glide to the selected arc. */
 const GLIDE = "transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none";
 
@@ -89,33 +87,38 @@ export function RoadTrack({ onFollow, ...c }: CourseColumns & { onFollow: (to: R
 	const shownKey = shown?.arc.handle ?? "";
 	const at = (key: string) => keys.indexOf(key);
 
-	// The strip slides so the selected arc sits in the window's centre, held at the strip's ends.
-	const [offset, setOffset] = useState(0);
-	const [fade, setFade] = useState({ left: false, right: false });
+	// The strip slides so the selected arc sits in the window's centre, held at the strip's ends. While a
+	// wheel or swipe moves it, it follows the gesture instead (`live`, a position counted in arcs).
+	const [win, setWin] = useState(0);
 	const [ready, setReady] = useState(false);
+	const [live, setLive] = useState<number | null>(null);
 	const widths = items.map((i) => (i.kind === "exam" ? WIDTH.exam : i.section.arc.handle === shownKey ? WIDTH.open : WIDTH.stop));
-	const place = useCallback(() => {
-		const win = windowEl.current;
-		if (!win) return;
-		const strip = widths.reduce((sum, w) => sum + w, 0);
-		const index = keys.indexOf(shownKey);
-		const start = widths.slice(0, Math.max(0, index)).reduce((sum, w) => sum + w, 0);
-		const to = index >= 0 ? stripOffset({ start, width: widths[index]! }, strip, win.clientWidth) : 0;
-		const max = strip - win.clientWidth;
-		setOffset(to);
-		setFade({ left: to > 0.5, right: max > 0.5 && to < max - 0.5 });
-	}, [shownKey, widths.join(), keys.join()]);
+	const strip = widths.reduce((sum, w) => sum + w, 0);
+	const arcItem = arcs.map((s) => keys.indexOf(s.arc.handle));
+	const selected = Math.max(0, arcs.findIndex((s) => s.arc.handle === shownKey));
+	const offsetOf = (item: number) => {
+		const start = widths.slice(0, Math.max(0, item)).reduce((sum, w) => sum + w, 0);
+		return item >= 0 ? stripOffset({ start, width: widths[item]! }, strip, win) : 0;
+	};
+	const offset = (() => {
+		if (live === null) return offsetOf(keys.indexOf(shownKey));
+		const lo = Math.floor(live);
+		const hi = Math.min(arcs.length - 1, lo + 1);
+		const from = offsetOf(arcItem[lo]!);
+		return from + (offsetOf(arcItem[hi]!) - from) * (live - lo);
+	})();
+	const max = strip - win;
+	const fade = { left: offset > 0.5, right: max > 0.5 && offset < max - 0.5 };
+	const aim = live === null ? null : (arcs[Math.round(live)]?.arc.handle ?? null);
 	useLayoutEffect(() => {
-		place();
+		const el = windowEl.current;
+		if (!el) return;
+		setWin(el.clientWidth);
 		setReady(true);
-	}, [place, items.length]);
-	useEffect(() => {
-		const win = windowEl.current;
-		if (!win) return;
-		const resized = new ResizeObserver(() => place());
-		resized.observe(win);
+		const resized = new ResizeObserver(() => setWin(el.clientWidth));
+		resized.observe(el);
 		return () => resized.disconnect();
-	}, [place]);
+	}, []);
 
 	/** Selects the arc `by` stops along from the selected one, the exam skipped. */
 	const stepBy = useCallback(
@@ -128,35 +131,35 @@ export function RoadTrack({ onFollow, ...c }: CourseColumns & { onFollow: (to: R
 		[arcs, shownKey, showArc],
 	);
 
-	// A wheel or swipe steps one arc per gesture: its travel builds to `STEP_TRAVEL`, then waits for the
-	// gesture (its momentum included) to rest. Listened to directly, so the page never scrolls or swipes back.
-	const gesture = useRef({ travel: 0, spent: false, rest: undefined as ReturnType<typeof setTimeout> | undefined });
-	const step = useRef(stepBy);
-	step.current = stepBy;
+	// A wheel or swipe moves the strip with it, an arc's width of travel for an arc, momentum included; when the
+	// gesture rests the strip glides onto the arc nearest where it stopped, and that arc is selected. Listened to
+	// directly, so the page never scrolls or swipes back.
+	const gesture = useRef({ at: null as number | null, rest: undefined as ReturnType<typeof setTimeout> | undefined });
+	const latest = useRef({ selected, count: arcs.length, order: arcs.map((s) => s.arc.handle), shownKey, showArc });
+	latest.current = { selected, count: arcs.length, order: arcs.map((s) => s.arc.handle), shownKey, showArc };
 	useEffect(() => {
-		const win = windowEl.current;
-		if (!win) return;
+		const el = windowEl.current;
+		if (!el) return;
 		const wheel = (e: globalThis.WheelEvent) => {
 			const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
 			if (delta === 0) return;
 			e.preventDefault();
 			const g = gesture.current;
+			const now = latest.current;
+			g.at = Math.max(0, Math.min(now.count - 1, (g.at ?? now.selected) + delta / WIDTH.stop));
+			setLive(g.at);
 			clearTimeout(g.rest);
 			g.rest = setTimeout(() => {
-				g.travel = 0;
-				g.spent = false;
+				const to = latest.current.order[Math.round(g.at ?? latest.current.selected)];
+				g.at = null;
+				setLive(null);
+				if (to && to !== latest.current.shownKey) latest.current.showArc(to);
 			}, GESTURE_REST_MS);
-			if (g.spent) return;
-			g.travel += delta;
-			if (Math.abs(g.travel) >= STEP_TRAVEL) {
-				g.spent = true;
-				step.current(g.travel > 0 ? 1 : -1);
-			}
 		};
 		const g = gesture.current;
-		win.addEventListener("wheel", wheel, { passive: false });
+		el.addEventListener("wheel", wheel, { passive: false });
 		return () => {
-			win.removeEventListener("wheel", wheel);
+			el.removeEventListener("wheel", wheel);
 			clearTimeout(g.rest);
 		};
 	}, []);
@@ -284,7 +287,7 @@ export function RoadTrack({ onFollow, ...c }: CourseColumns & { onFollow: (to: R
 						data-slot="road-stop-title"
 						className={cn(
 							"min-w-0 text-body text-balance transition-colors duration-150 motion-reduce:transition-none",
-							open ? "text-foreground" : past ? "text-muted-foreground/70 group-hover/press:text-muted-foreground" : "text-muted-foreground group-hover/press:text-foreground",
+							open || aim === arc.handle ? "text-foreground" : past ? "text-muted-foreground/70 group-hover/press:text-muted-foreground" : "text-muted-foreground group-hover/press:text-foreground",
 						)}
 					>
 						<MathText>{arc.title}</MathText>
@@ -343,7 +346,7 @@ export function RoadTrack({ onFollow, ...c }: CourseColumns & { onFollow: (to: R
 	return (
 		<nav aria-label="Road" data-slot="road-track" className="flex min-w-0 shrink-0 flex-col pt-4" style={{ height: 16 + HEAD + tallest * ROW }}>
 			<div ref={windowEl} data-slot="road-window" className="min-w-0 overflow-hidden" style={edgeFade(fade.left, fade.right)}>
-				<div ref={stripEl} data-slot="road-strip" className={cn("flex w-max", ready && GLIDE)} style={{ transform: `translateX(${-offset}px)` }}>
+				<div ref={stripEl} data-slot="road-strip" className={cn("flex w-max", ready && live === null && GLIDE)} style={{ transform: `translateX(${-offset}px)` }}>
 					{items.map(item)}
 				</div>
 			</div>
