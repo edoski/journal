@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { ArcPill } from "@/components/course-map/arc-strip";
+import { ArcPill } from "@/components/course-map/arc-pill";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { PageHead } from "@/components/page-frame/page-frame";
 import type { CourseStanding } from "@/src/core";

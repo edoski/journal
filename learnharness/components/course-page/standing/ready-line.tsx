@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { CircleCheckIcon, CircleDotDashedIcon, TriangleAlertIcon } from "lucide-react";
 import type { StudyCourse } from "@/src/core";
-import { ArcPill } from "@/components/course-map/arc-strip";
+import { ArcPill } from "@/components/course-map/arc-pill";
 import { Popover, PopoverContent, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { MathText } from "@/components/ui/math-text";
 import { noExamWords, READY_WORDS } from "@/components/study-words";

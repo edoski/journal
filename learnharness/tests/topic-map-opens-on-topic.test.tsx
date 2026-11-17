@@ -13,7 +13,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/index.ts";
 import { buildsMapOf } from "../components/unit-inbox/topic-page/topic-facts.ts";
-import { framedCamera, layoutTopicMap, TOPIC_NODE_SIZE } from "../components/course-map/topic-map/topic-map-layout.ts";
+import { framedCamera } from "../components/course-map/topic-map/topic-map-layout.ts";
+import { CANVAS_NODE, layoutCanvas } from "../components/course-map/topic-map/canvas/canvas-layout.ts";
 import { BuildsOnMap } from "../components/unit-inbox/topic-page/hybrid/builds-on-map.tsx";
 
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -35,7 +36,7 @@ const FRAME = { width: 900, height: 700 };
 const FADE = { x: 24, y: 40 };
 
 function inView(map: CourseMap, focus: TopicHandle | null, handle: TopicHandle): boolean {
-	const layout = layoutTopicMap(map.topics, map.edges, TOPIC_NODE_SIZE);
+	const layout = layoutCanvas(map.topics, map.edges);
 	const camera = framedCamera(layout, focus, FRAME, FADE, 24);
 	const at = layout.topics.get(handle)!;
 	const top = at.y * camera.zoom + camera.y;

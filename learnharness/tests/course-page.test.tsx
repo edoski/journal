@@ -358,7 +358,7 @@ describe("the course topic row and group", () => {
 describe("the topic map's highlight", () => {
 	const map = course().map;
 	const dimmed = (document: Document) =>
-		[...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => /opacity:\s*0?\.\d/.test(n.parentElement!.getAttribute("style") ?? "")).map((n) => n.getAttribute("data-testid"));
+		[...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => /opacity:\s*0?\.\d/.test(n.parentElement!.parentElement!.getAttribute("style") ?? "")).map((n) => n.getAttribute("data-testid"));
 
 	it("dims nothing by default, as Home draws it", () => {
 		assert.deepEqual(dimmed(render(<TopicMap map={map} said={new Map()} />) as unknown as Document), []);

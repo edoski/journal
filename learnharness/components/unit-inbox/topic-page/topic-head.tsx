@@ -4,7 +4,7 @@ import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { MathText } from "@/components/ui/math-text";
 import { PageFact, PageHead } from "@/components/page-frame/page-frame";
 import { arcHref, courseHref } from "@/components/unit-inbox/unit-href";
-import { ArcPill } from "@/components/course-map/arc-strip";
+import { ArcPill } from "@/components/course-map/arc-pill";
 import type { HeadMark, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { SLIP_ICON } from "@/components/slip-icons";
 

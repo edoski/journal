@@ -1,27 +1,38 @@
 "use client";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { ReactFlow, ReactFlowProvider, useReactFlow, useStore, useStoreApi, type CoordinateExtent, type Edge, type Node } from "@xyflow/react";
+import { Position, ReactFlow, ReactFlowProvider, useReactFlow, useStore, useStoreApi, type CoordinateExtent, type Edge, type Node } from "@xyflow/react";
 import type { ArcHandle, CourseMap, TopicHandle } from "@/src/core";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
-import { READABLE_ZOOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, showsWhole, slackOf, wholeExtent, wholeZoom, type Camera, type TopicMapLayout } from "./topic-map-layout";
-import { TopicMapContext, type TopicMapState } from "./topic-node";
+import { READABLE_ZOOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, neighbourOf, showsWhole, slackOf, wholeExtent, wholeZoom, type Camera, type TopicMapLayout } from "./topic-map-layout";
+import { TopicMapContext, type TopicData, type TopicMapState } from "./topic-node";
 import { cardLine, standingOf, topicLabel } from "./topic-standing";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
 import { litCamera, litFollow } from "./lit-camera";
-import { drawingOf, handleAt, trailOf, type FrameProps, type MapSkin, type TopicData, type Trail } from "./map-skin";
+import { drawingOf, handleAt, mapEdges, trailOf, type Trail } from "./map-drawing";
 import type { ArcView } from "./arc-view";
-import { ArcOpenContext, type ArcOpen } from "./arcs/arc-open";
-import { useMapSkin } from "./map-skins";
+import { CanvasNode } from "./canvas/canvas-node";
+import { CanvasLinesEdge } from "./canvas/canvas-lines";
+import { CanvasFrame } from "./canvas/canvas-frame";
+import { CanvasChrome } from "./canvas/canvas-chrome";
+import { TrailNode } from "./trail-node";
 
 /** Room around the drawing: the least a topic at its edge can be brought
  *  in from the frame's edge, enough to clear a frame that fades. */
 const ROOM = { x: 48, y: 32 };
 /** How long the camera takes to follow the keyboard to a topic out of view, or a page to the topics it points at. */
 const FOLLOW_MS = 200;
-/** How long the camera takes to glide from one arc to the next (`MapSkin.travel`). */
+/** How long the camera takes to glide from one arc to the next (topic-map.md, Arcs). */
 const TRAVEL_MS = 420;
+/** Room the "You are here" tag takes above its card. */
+const TAG_ROOM = 20;
+/** How far a pinch zooms in: a card reads closer, past its own size, even where the whole arc fits at 100%. */
+const MAX_ZOOM = 1.5;
+/** A shown arc's cards, a card of the arc being left (out of the map's focus, keys and links), and the one edge that
+ *  draws every line. */
+const NODE_TYPES = { canvasTopic: CanvasNode, trailTopic: TrailNode };
+const EDGE_TYPES = { canvasLines: CanvasLinesEdge };
 /** Every place the camera may look while it glides between arcs. */
 const ANYWHERE: CoordinateExtent = [
 	[-Infinity, -Infinity],
@@ -58,16 +69,7 @@ function reducedMotion(): boolean {
  * whole once the page rests on them, and leaves for its opening view once
  * it points at nothing (`litFollow`); off by default.
  */
-export function TopicMap(props: TopicMapProps) {
-	// The map's one switch (map-style.ts): each style draws the same course, its own way.
-	const { style, skin } = useMapSkin();
-	return <SkinnedMap key={style} skin={skin} {...props} />;
-}
-
-type TopicMapProps = Parameters<typeof SkinnedMap>[0] extends infer P ? Omit<P, "skin"> : never;
-
-function SkinnedMap({
-	skin,
+export function TopicMap({
 	map: course,
 	arc,
 	said,
@@ -81,7 +83,6 @@ function SkinnedMap({
 	opensOn,
 	onOpenArc,
 }: {
-	skin: MapSkin;
 	map: CourseMap;
 	/** The one arc to draw; unset, the whole course. */
 	arc?: ArcHandle;
@@ -114,59 +115,32 @@ function SkinnedMap({
 	/** Shows another arc of the course, which a card's "From <arc>" line asks for; unset, that line is words only. */
 	onOpenArc?: (arc: ArcHandle) => void;
 }) {
-	// An arc he opens on the map (a `grouped` style's folded arc), until the page shows another.
-	const [opened, setOpened] = useState<ArcHandle | null>(null);
 	const [shownArc, setShownArc] = useState(arc);
-	// The arc the map just left, drawn beside the shown one while the camera glides over (`travel`).
+	// The arc the map just left, drawn beside the shown one while the camera glides over.
 	const [trailArc, setTrailArc] = useState<ArcHandle | null>(null);
 	if (shownArc !== arc) {
 		setShownArc(arc);
-		setOpened(null);
-		setTrailArc(skin.travel && zoom === undefined && !whole && shownArc && arc && !reducedMotion() ? shownArc : null);
+		setTrailArc(zoom === undefined && !whole && shownArc && arc && !reducedMotion() ? shownArc : null);
 	}
-	const drawing = useMemo(() => drawingOf(skin, course, arc, opened), [skin, course, arc, opened]);
-	const { view, layout, framedArc } = drawing;
-	const trail = useMemo(() => (trailArc && arc ? trailOf(skin, course, trailArc, arc, layout) : null), [skin, course, trailArc, arc, layout]);
+	const { view, layout } = useMemo(() => drawingOf(course, arc), [course, arc]);
+	const trail = useMemo(() => (trailArc && arc ? trailOf(course, trailArc, arc, layout) : null), [course, trailArc, arc, layout]);
 	const endTravel = useCallback((from: ArcHandle) => setTrailArc((was) => (was === from ? null : was)), []);
 	const map = view.map;
-	const arcFramed = useMemo(() => (framedArc ? new Set(map.topics.filter((t) => t.arc === framedArc).map((t) => t.handle)) : null), [framedArc, map.topics]);
-	const arcOpen = useMemo<ArcOpen>(() => ({ opened, open: setOpened, ownCamera: zoom === undefined, workspace: course.workspace }), [opened, zoom, course.workspace]);
 	const titleOf = useCallback((handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle, [map.topics]);
 	const nodes = useMemo<Node[]>(
-		() => [
-			...topicNodes(skin, map, view, layout, said, titleOf),
-			...(trail ? topicNodes(skin, trail.view.map, trail.view, trail.layout, said, titleOf, trail) : []),
-			...(skin.decorations?.(map, layout) ?? []),
-		],
-		[skin, map, said, layout, titleOf, view, trail],
+		() => [...topicNodes(map, view, layout, said, titleOf), ...(trail ? topicNodes(trail.view.map, trail.view, trail.layout, said, titleOf, trail) : [])],
+		[map, said, layout, titleOf, view, trail],
 	);
-	const edges = useMemo<Edge[]>(
-		() =>
-			skin.edges?.(map, layout, trail) ??
-			layout.routes.map((route) => ({
-				id: `${route.prerequisite}>${route.topic}`,
-				source: route.prerequisite,
-				target: route.topic,
-				type: skin.edgeType,
-				data: { points: route.points },
-				focusable: false,
-				selectable: false,
-				domAttributes: { "aria-hidden": true },
-			})),
-		[skin, map, layout, trail],
-	);
+	const edges = useMemo<Edge[]>(() => mapEdges(layout, trail), [layout, trail]);
 	return (
 		// The provider takes the drawing too, so a server render has it before any effect runs.
 		<ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
-			<ArcOpenContext.Provider value={arcOpen}>
-				<Flow skin={skin} map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed ?? arcFramed} trail={trail} onTravelled={endTravel} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} />
-			</ArcOpenContext.Provider>
+			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed} trail={trail} onTravelled={endTravel} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} />
 		</ReactFlowProvider>
 	);
 }
 
 function Flow({
-	skin,
 	map,
 	layout,
 	nodes,
@@ -184,10 +158,9 @@ function Flow({
 	opensOn,
 	onOpenArc,
 }: {
-	skin: MapSkin;
 	map: CourseMap;
 	layout: TopicMapLayout;
-	/** The arc the camera glides away from, drawn beside this one (`travel`); null at rest. */
+	/** The arc the camera glides away from, drawn beside this one; null at rest. */
 	trail: Trail | null;
 	onTravelled: (from: ArcHandle) => void;
 	nodes: Node[];
@@ -204,8 +177,7 @@ function Flow({
 	onOpenArc: ((arc: ArcHandle) => void) | undefined;
 }) {
 	const captionId = useId();
-	const TAG_ROOM = skin.tagRoom;
-	const margin = useMemo(() => ({ x: frameMargin.x, y: frameMargin.y + TAG_ROOM }), [frameMargin.x, frameMargin.y, TAG_ROOM]);
+	const margin = useMemo(() => ({ x: frameMargin.x, y: frameMargin.y + TAG_ROOM }), [frameMargin.x, frameMargin.y]);
 	const flow = useReactFlow();
 	const store = useStoreApi();
 	const frameWidth = useStore((s) => s.width);
@@ -225,7 +197,7 @@ function Flow({
 	}, [active, map.edges, map.current, highlight]);
 
 	const frame = frameWidth > 0 && frameHeight > 0 ? { width: frameWidth, height: frameHeight } : null;
-	// Zoomed out as far as the whole course, however small: the enlarged map's overview.
+	// Zoomed out as far as the whole course, however small: the enlarged map's Whole course.
 	const fitted = frame ? Math.min(1, wholeZoom(layout, frame, margin)) : 1;
 	// While the camera glides between arcs it may look anywhere and at any scale the two views need.
 	const minZoom = trail ? Math.min(fitted, 0.1) : fixedZoom === undefined ? fitted : Math.min(fitted, fixedZoom);
@@ -237,18 +209,18 @@ function Flow({
 		return { x: margin.x / smallest + slack.x, y: margin.y / smallest + slack.y };
 	}, [layout.node, margin.x, margin.y, minZoom]);
 	const extent = useMemo<CoordinateExtent>(() => {
-		// A style held still while the map fits looks no further than the view that shows it whole, so zooming
-		// back out to that view lands on it, centred.
+		// Held still while it fits, the map looks no further than the view that shows it whole, so zooming back out to
+		// that view lands on it, centred.
 		if (trail) return ANYWHERE;
-		if (skin.fixedWhenFits && frameWidth > 0 && frameHeight > 0) return wholeExtent(layout, { width: frameWidth, height: frameHeight }, fitted);
+		if (frameWidth > 0 && frameHeight > 0) return wholeExtent(layout, { width: frameWidth, height: frameHeight }, fitted);
 		return [
 			[-reach.x, -reach.y],
 			[layout.width + reach.x, layout.height + reach.y],
 		];
-	}, [trail, skin.fixedWhenFits, frameWidth, frameHeight, fitted, layout, reach]);
-	// All of it on screen: nothing to pan to, so only a pinch moves the map (`fixedWhenFits`).
+	}, [trail, frameWidth, frameHeight, fitted, layout, reach]);
+	// All of it on screen: nothing to pan to, so only a pinch moves the map (topic-map.md, Held still while it fits).
 	const zoomNow = useStore((s) => s.transform[2]);
-	const still = skin.fixedWhenFits === true && frame !== null && showsWhole(zoomNow, fitted);
+	const still = frame !== null && showsWhole(zoomNow, fitted);
 	const opensWhole = frame ? wholeZoom(layout, frame, margin) >= READABLE_ZOOM : null;
 	const told = useRef(onOpensWhole);
 	told.current = onOpensWhole;
@@ -309,7 +281,7 @@ function Flow({
 			void flow.setViewport(camera, { duration: TRAVEL_MS, ease: easeInOut }).then(() => from && onTravelled(from));
 		} else if (!trail) void flow.setViewport(camera, { duration: glide ? FOLLOW_MS : 0 });
 		setPlaced(true);
-	}, [flow, store, follower, layout, opensOn, frameWidth, frameHeight, margin, frameMargin, fixedZoom, whole, minZoom, TAG_ROOM, trail, onTravelled]);
+	}, [flow, store, follower, layout, opensOn, frameWidth, frameHeight, margin, frameMargin, fixedZoom, whole, minZoom, trail, onTravelled]);
 
 	// The topics a page points at on this drawing, which the camera follows; none while it shows the whole course.
 	const pointedAt = useMemo(() => {
@@ -346,7 +318,7 @@ function Flow({
 			},
 			onKeyDown: (handle, event: KeyboardEvent<HTMLAnchorElement>) => {
 				if (!isWalkKey(event.key)) return;
-				const next = skin.neighbour(layout, map.edges, handle, event.key);
+				const next = neighbourOf(layout, map.edges, handle, event.key);
 				if (!next) return;
 				event.preventDefault();
 				setTabStop(next);
@@ -358,7 +330,7 @@ function Flow({
 			},
 			openArc: onOpenArc,
 		}),
-		[lit, marked, tabStop, layout, map.edges, follow, skin, onOpenArc],
+		[lit, marked, tabStop, layout, map.edges, follow, onOpenArc],
 	);
 
 	const current = map.current ? titleOf(map.current) : null;
@@ -368,20 +340,20 @@ function Flow({
 				{`${map.title}: ${map.topics.length} topics, prerequisites above the topics that need them.`}
 				{current ? ` You are at ${current}.` : ""}
 			</figcaption>
-			<SkinFrame skin={skin} map={map} layout={layout} nodes={nodes} margin={frameMargin} ownCamera={fixedZoom === undefined}>
+			<CanvasFrame map={map} layout={layout}>
 				<TopicMapContext.Provider value={state}>
 					<ReactFlow
 						nodes={nodes}
 						edges={edges}
-						nodeTypes={skin.nodeTypes}
-						edgeTypes={skin.edgeTypes}
+						nodeTypes={NODE_TYPES}
+						edgeTypes={EDGE_TYPES}
 						// No `colorMode="dark"`: its `dark` class on the wrapper would restate the old theme's tokens inside the map.
 						// Hidden only until the frame is measured and the opening view set, in the same frame.
 						className={cn(!placed && "invisible")}
 						minZoom={minZoom}
-						maxZoom={skin.maxZoom ?? 1}
+						maxZoom={MAX_ZOOM}
 						translateExtent={extent}
-						panOnScroll={skin.panOnScroll && !still}
+						panOnScroll={!still}
 						panOnDrag={!still}
 						// Held still, a scroll is the page's and a pinch still zooms.
 						zoomOnScroll={!still}
@@ -402,23 +374,17 @@ function Flow({
 						// MIT asks for no badge; the maintainers ask organisations that hide it to subscribe (spec: topic-map.md).
 						proOptions={{ hideAttribution: true }}
 					>
-						{skin.Chrome && <skin.Chrome map={map} layout={layout} margin={frameMargin} ownCamera={fixedZoom === undefined} />}
+						<CanvasChrome />
 					</ReactFlow>
 				</TopicMapContext.Provider>
-			</SkinFrame>
+			</CanvasFrame>
 		</figure>
 	);
-}
-
-/** The style's own frame around the drawing, or the drawing as it is. */
-function SkinFrame({ skin, children, ...props }: Omit<FrameProps, "children"> & { skin: MapSkin; children: React.ReactNode }) {
-	return skin.Frame ? <skin.Frame {...props}>{children}</skin.Frame> : children;
 }
 
 /** A drawing's topic nodes: each topic the layout places, with what its card says and where a click goes. A `trail`
  *  (the arc the map is leaving) draws its cards beside the shown arc, out of the map's focus and keys. */
 function topicNodes(
-	skin: MapSkin,
 	map: CourseMap,
 	view: ArcView,
 	layout: TopicMapLayout,
@@ -435,14 +401,14 @@ function topicNodes(
 		return [
 			{
 				id: trail ? `trail:${topic.handle}` : topic.handle,
-				type: trail ? "trailTopic" : skin.topicType,
+				type: trail ? "trailTopic" : "canvasTopic",
 				position: { x: placed.x + (trail?.dx ?? 0), y: placed.y + (trail?.dy ?? 0) },
 				width: node.width,
 				height: node.height,
 				// A server render has no measured handles; these let it draw the needs.
 				handles: [
-					{ type: "target" as const, position: skin.handles.target, ...handleAt(skin.handles.target, node) },
-					{ type: "source" as const, position: skin.handles.source, ...handleAt(skin.handles.source, node) },
+					{ type: "target" as const, position: Position.Top, ...handleAt(Position.Top, node) },
+					{ type: "source" as const, position: Position.Bottom, ...handleAt(Position.Bottom, node) },
 				],
 				draggable: false,
 				selectable: false,

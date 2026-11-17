@@ -21,7 +21,6 @@ import {
 	NODE_HEIGHT,
 	NODE_WIDTH,
 	READABLE_ZOOM,
-	TOPIC_NODE_SIZE,
 	cardFit,
 	chainOf,
 	framedCamera,
@@ -299,7 +298,10 @@ describe("where the map opens", () => {
 });
 
 describe("where a course map opens framed", () => {
-	const layout = layoutTopicMap(MAP.topics, MAP.edges, TOPIC_NODE_SIZE);
+	/** A fixed card for the camera's arithmetic, apart from the map's own (canvas-layout.ts; topic-map-framing.test.ts
+	 *  frames the map's own drawing), so each case's premise holds whatever the map's card becomes. */
+	const CARD = { width: 248, height: 56 };
+	const layout = layoutTopicMap(MAP.topics, MAP.edges, CARD);
 	const FADE = { x: 64, y: 40 };
 	const TAG = 20;
 	/** Every topic's box on screen under a camera, sorted into wholly clear of the fade and cut by the frame's edge
@@ -309,7 +311,7 @@ describe("where a course map opens framed", () => {
 		for (const [handle, at] of layout.topics) {
 			const left = at.x * camera.zoom + camera.x;
 			const top = at.y * camera.zoom + camera.y;
-			const fit = cardFit({ left, top, right: left + TOPIC_NODE_SIZE.width * camera.zoom, bottom: top + TOPIC_NODE_SIZE.height * camera.zoom }, frame, FADE);
+			const fit = cardFit({ left, top, right: left + CARD.width * camera.zoom, bottom: top + CARD.height * camera.zoom }, frame, FADE);
 			if (fit === "cut") out.cut.push(handle);
 			else if (fit === "clear") out.clear.push(handle);
 			if (fit === "clear" || fit === "faded") out.whole.push(handle);
@@ -355,7 +357,7 @@ describe("where a course map opens framed", () => {
 		const fits = new Map([...layout.topics].map(([handle, at]) => {
 			const left = at.x * onPage.zoom + onPage.x;
 			const top = at.y * onPage.zoom + onPage.y;
-			return [handle as string, cardFit({ left, top, right: left + TOPIC_NODE_SIZE.width * onPage.zoom, bottom: top + TOPIC_NODE_SIZE.height * onPage.zoom }, page, pageFade)];
+			return [handle as string, cardFit({ left, top, right: left + CARD.width * onPage.zoom, bottom: top + CARD.height * onPage.zoom }, page, pageFade)];
 		}));
 		assert.equal(fits.get("eigen"), "clear");
 		for (const next of nextOf("eigen")) assert.ok(["clear", "faded"].includes(fits.get(next)!), `${next} on its page`);
@@ -378,14 +380,14 @@ describe("where a course map opens framed", () => {
 	it("opens Probability's course page on where he is, its tag and the topics it leads to clear (the round-3 evaluation)", () => {
 		const needs = { "total-probability": ["conditional"], bayes: ["conditional", "total-probability"], independence: ["conditional"], binomial: ["random-variables", "independence"], poisson: ["random-variables"], geometric: ["random-variables", "independence"], expectation: ["random-variables"], variance: ["expectation"], covariance: ["variance", "independence"] };
 		const handles = ["conditional", "total-probability", "bayes", "independence", "random-variables", "binomial", "poisson", "geometric", "expectation", "variance", "covariance"];
-		const probability = layoutTopicMap(handles.map((handle) => topic(handle)), edgesOf(needs), TOPIC_NODE_SIZE);
+		const probability = layoutTopicMap(handles.map((handle) => topic(handle)), edgesOf(needs), CARD);
 		const page = { width: 696, height: 782 };
 		const fade = { x: 48, y: 32 };
 		const camera = framedCamera(probability, h("random-variables"), page, fade, TAG, "top");
 		const fits = new Map([...probability.topics].map(([handle, at]) => {
 			const left = at.x * camera.zoom + camera.x;
 			const top = at.y * camera.zoom + camera.y;
-			return [handle, cardFit({ left, top, right: left + TOPIC_NODE_SIZE.width * camera.zoom, bottom: top + TOPIC_NODE_SIZE.height * camera.zoom }, page, fade)];
+			return [handle, cardFit({ left, top, right: left + CARD.width * camera.zoom, bottom: top + CARD.height * camera.zoom }, page, fade)];
 		}));
 		assert.equal(fits.get(h("random-variables")), "clear");
 		assert.ok(probability.topics.get(h("random-variables"))!.y * camera.zoom + camera.y - TAG >= fade.y - 1, "its tag is clear");
@@ -451,7 +453,8 @@ describe("topic map drawing", () => {
 	it("keeps You are here and the topics it leads to at full strength while a page lights others, and dims the rest only as far as their words still read (round 5: Diagonalization at 2.8:1)", () => {
 		const lit = render(<TopicMap map={MAP} said={said} highlight={new Set([h("basis")])} />);
 		const strength = (handle: string) => {
-			const card = lit.querySelector(`[data-testid="map-node-${handle}"]`)!.parentElement!;
+			// The card's link sits in its surface, inside the card that fades.
+			const card = lit.querySelector(`[data-testid="map-node-${handle}"]`)!.parentElement!.parentElement!;
 			const styled = /opacity:\s*([\d.]+)/.exec(card.getAttribute("style") ?? "")?.[1];
 			const classed = /(?:^|\s)opacity-(\d+)(?:\s|$)/.exec(card.getAttribute("class") ?? "")?.[1];
 			return styled ? Number(styled) : classed ? Number(classed) / 100 : 1;
@@ -462,10 +465,10 @@ describe("topic map drawing", () => {
 		assert.ok(contrastAt(dimmed) >= 4.5, `its muted line at ${contrastAt(dimmed).toFixed(2)}:1`);
 	});
 
-	it("draws one line per need, hidden from a screen reader", () => {
-		const needs = [...document.querySelectorAll('[data-slot="course-map-need"]')];
-		assert.equal(needs.length, 23);
-		assert.ok(needs.every((path) => path.getAttribute("d")!.startsWith("M")));
-		assert.ok(needs.every((path) => path.closest("[aria-hidden]")), "the needs are read from each node's description");
+	it("draws its needs as lines hidden from a screen reader, one path at rest", () => {
+		const lines = [...document.querySelectorAll('[data-slot="course-map-line"]')];
+		assert.equal(lines.length, 1, "every line at rest is one path (map-lines.test.tsx)");
+		assert.ok(lines.every((path) => path.getAttribute("d")!.startsWith("M")));
+		assert.ok(lines.every((path) => path.closest("[aria-hidden]")), "the needs are read from each node's description");
 	});
 });

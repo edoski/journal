@@ -21,9 +21,8 @@ const toggleVariants = cva(
         // writes its own data-state over the item's.
         segmented:
           "rounded-full font-normal text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=on]:bg-fill-selected data-[state=on]:text-foreground aria-checked:bg-fill-selected aria-checked:text-foreground aria-pressed:bg-fill-selected aria-pressed:text-foreground motion-reduce:transition-none",
-        // A bubble of its own, apart from its neighbours (the arc strip):
-        // a hairline and muted ink at rest, the chosen one on the selected
-        // fill. Same weight in every state.
+        // A bubble of its own (an arc pill, ArcPill): a hairline and muted
+        // ink at rest. Same weight in every state.
         pill:
           "rounded-full border border-border font-normal text-muted-foreground transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=on]:border-transparent data-[state=on]:bg-fill-selected data-[state=on]:text-foreground motion-reduce:transition-none",
       },

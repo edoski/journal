@@ -1,5 +1,5 @@
 /**
- * The topic map's card (topic-map.md, Node): its line, the sidebar's fact
+ * The course map's card (canvas/canvas.md, Node): its line, the sidebar's fact
  * when it needs him, else where he stands, and Home's own pie. Same tsx
  * classic-JSX shim as the other render tests.
  */
@@ -11,7 +11,7 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import type { CourseMapTopic, TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { NodeBody } from "../components/course-map/topic-map/topic-node.tsx";
+import { MapCard } from "./helpers/map-card.tsx";
 import { Pie } from "../components/ui/pie.tsx";
 import { cardLine, standingOf, type CardFact } from "../components/course-map/topic-map/topic-standing.ts";
 import type { TopicFact } from "../components/unit-inbox/sidebar-says.ts";
@@ -50,7 +50,7 @@ describe("a card's line", () => {
 
 describe("the card", () => {
 	const render = (t: CourseMapTopic, line: CardFact | null = null) =>
-		parseHTML(`<html><body>${renderToStaticMarkup(<NodeBody topic={t} standing={standingOf(t)} line={line} />)}</body></html>`).document;
+		parseHTML(`<html><body>${renderToStaticMarkup(<MapCard topic={t} standing={standingOf(t)} line={line} />)}</body></html>`).document;
 	const weak = (level: CourseMapTopic["level"], signals: Partial<TopicSignals>) => topic({ level, weak: true, signals: { ...QUIET, ...signals } });
 	/** Every state a card draws, and its line under the title: the sidebar's fact, else the standing in words. */
 	const STATES: { name: string; topic: CourseMapTopic; fact?: CardFact; line: string }[] = [
@@ -84,12 +84,5 @@ describe("the card", () => {
 		assert.ok(pie(topic()).querySelector("path, circle[r='5']") === null, "empty before he starts");
 		assert.match(pie(weak("retained", { lapsed: true, mistake: true })).getAttribute("class")!, /text-warning/);
 		assert.doesNotMatch(pie(weak("attempted", { confidentErrors: 1, mistake: true })).getAttribute("class")!, /text-warning/, "a topic still being learned never slips (round 11, 3 N1)");
-	});
-
-	it("centres the pie beside the two lines, as Home's row does", () => {
-		const body = render(topic({ level: "attempted" })).body.firstElementChild!;
-		assert.match(body.getAttribute("class")!, /items-center/);
-		assert.equal(body.children[0]!.getAttribute("data-slot"), "topic-glyph");
-		assert.equal(body.children[1]!.children.length, 2, "the title over one line");
 	});
 });

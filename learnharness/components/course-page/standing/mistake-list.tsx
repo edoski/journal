@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { HandHelpingIcon } from "lucide-react";
-import { ArcPill } from "@/components/course-map/arc-strip";
+import { ArcPill } from "@/components/course-map/arc-pill";
 import { SLIP_ICON } from "@/components/slip-icons";
 import { MISTAKE_WORDS } from "@/components/study-words";
 import { Button } from "@/components/ui/button";

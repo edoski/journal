@@ -13,7 +13,7 @@ Today's lines as lessons in plain words, which the study home, the course page a
 | detail | "Waiting for your reply"; "Then <task or topic>" after reviews, left out when it only repeats a review; the open task's step | the session's state, the map's tasks |
 | action | Open (a session), Review, Continue, Start | the lesson's kind |
 
-A waiting session sits at the course topics its transcript worked on (`ChatListItem.topics`), so it has a place too. Reviews are named, never counted. The place replaced "topic 5–7 of 24" when arcs landed (design v2, 5.4). Edo turned down the arc as row text (14 Nov 2026): it shows on Home's map, in the arc strip's bubble style, while he points at the row.
+A waiting session sits at the course topics its transcript worked on (`ChatListItem.topics`), so it has a place too. Reviews are named, never counted. The place replaced "topic 5–7 of 24" when arcs landed (design v2, 5.4). Edo turned down the arc as row text (14 Nov 2026): it shows on Home's map, in its arc list, while he points at the row.
 
 ## The page frame
 

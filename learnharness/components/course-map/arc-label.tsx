@@ -3,9 +3,8 @@ import { MathText } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
 
 /**
- * An arc named quietly on the map, where a chapter starts (Bands): its place in study order, then its whole
- * name, both in the muted ink, never a pill (Edo, 16 Nov 2026: the pills
- * were "too in the way"). `here` brightens the name of the arc he is in.
+ * An arc named quietly in the map's arc list (`ArcIndex`): its place in study order, then its whole name, both in
+ * the muted ink, never a pill (Edo, 16 Nov 2026: the pills were "too in the way"). `here` brightens the name.
  */
 export function ArcLabel({ number, handle, title, here = false, className }: { number: number; handle: ArcHandle; title: string; here?: boolean; className?: string }) {
 	return (

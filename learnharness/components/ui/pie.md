@@ -15,6 +15,6 @@ An amount at rest, never a spinner: the whole is always a full, solid outline in
 
 Never animated.
 
-Callers: `ProgressRing` (`../study-home/agenda-rows/progress-ring.tsx`: a course, the share of topics he can do on his own, with "Some topics on your own" on hover, `data-slot` `today-progress`), the arc strip and pills and the course page's arcs (a `Ring` each), and `TopicGlyph` (`../course-map/topic-map/topic-glyph.tsx`: a topic's standing, `data-slot` `topic-glyph`). Decorative unless the caller names it (`role="img"` and an `aria-label`). Tested in `tests/pie.test.tsx`.
+Callers: `ProgressRing` (`../study-home/agenda-rows/progress-ring.tsx`: a course, the share of topics he can do on his own, with "Some topics on your own" on hover, `data-slot` `today-progress`), the arc pills and the course page's arcs (a `Ring` each), and `TopicGlyph` (`../course-map/topic-map/topic-glyph.tsx`: a topic's standing, `data-slot` `topic-glyph`). Decorative unless the caller names it (`role="img"` and an `aria-label`). Tested in `tests/pie.test.tsx`.
 
 Source: Things' project pie; Harvey balls; Apple's Activity rings for a whole's progress.

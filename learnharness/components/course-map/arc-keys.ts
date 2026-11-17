@@ -4,25 +4,21 @@ import { useEffect, useRef } from "react";
 import { isTypingSurface, type ArcHandle, type CourseMapArc } from "@/src/core";
 import { overlayOpen } from "@/components/spatial-arrows";
 
-/** The keys that glide to the arc above and below. Not in the key registry while the style sits behind the map
- *  switch, so the cheat sheet never offers a key that Current ignores; it joins Home's keys there when it ships. */
-export const ARC_UP = "shift+arrowup";
-export const ARC_DOWN = "shift+arrowdown";
 /** The key that goes to "You are here": its arc, then its card, focused. */
-export const GO_HERE = "h";
+const GO_HERE = "h";
 
 /**
- * ⇧↑ and ⇧↓ pick the arc above and below for Stacked arcs (stack.md), and
- * H goes to "You are here" from any arc of the course (`onHere`), from
- * anywhere on the page, unless a field has the key or something is open
- * over it; the arrows stop at the first and last arc.
+ * Home's map keys (topic-map.md, Arcs; the cheat sheet's Home rows,
+ * `home-arc-up`, `home-arc-down` and `home-here`): ⇧↑ and ⇧↓ pick the arc
+ * above and below, and H goes to "You are here" from any arc of the course
+ * (`onHere`), from anywhere on the page, unless a field has the key or
+ * something is open over it; the arrows stop at the first and last arc.
  */
-export function useArcKeys(arcs: readonly CourseMapArc[] | null, value: ArcHandle | null, onSelect: (arc: ArcHandle) => void, onHere: () => void, enabled: boolean) {
+export function useArcKeys(arcs: readonly CourseMapArc[] | null, value: ArcHandle | null, onSelect: (arc: ArcHandle) => void, onHere: () => void) {
 	const at = arcs ? Math.max(0, arcs.findIndex((a) => a.handle === value)) : -1;
 	const go = useRef({ above: arcs?.[at - 1] ?? null, below: arcs?.[at + 1] ?? null, onSelect, onHere });
 	go.current = { above: arcs?.[at - 1] ?? null, below: arcs?.[at + 1] ?? null, onSelect, onHere };
 	useEffect(() => {
-		if (!enabled) return;
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
 			if (isTypingSurface(e) || overlayOpen()) return;
@@ -41,5 +37,5 @@ export function useArcKeys(arcs: readonly CourseMapArc[] | null, value: ArcHandl
 		};
 		window.addEventListener("keydown", onKeyDown, { capture: true });
 		return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
-	}, [enabled]);
+	}, []);
 }

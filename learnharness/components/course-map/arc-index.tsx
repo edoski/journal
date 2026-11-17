@@ -4,22 +4,21 @@ import type { ArcHandle, CourseMapArc } from "@/src/core";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { mathPlain } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
-import { ArcLabel } from "./topic-map/arcs/arc-label";
+import { ArcLabel } from "./arc-label";
 
 /** One row's height: every row holds it, so the bar slides by whole rows and nothing shifts. */
 const ROW = 28;
 
 /**
- * Every arc of the course, top to bottom in study order, beside Stacked
- * arcs' map (stack.md): each named as Bands names a chapter (`ArcLabel`,
- * its number and whole name, quiet), the arc shown bright, each a press that
+ * Every arc of the course, top to bottom in study order, beside Home's map
+ * (topic-map.md, Arcs): each named quietly (`ArcLabel`, its number and
+ * whole name), the arc shown bright, each a press that
  * glides the map there. The rows hang off a hairline track, the course tabs'
  * underline turned on its side, so the arcs read as parts of the course
  * above; a bar on the track slides to the arc shown, as the tabs' underline
  * slides to the course, and a dot in the ink of "You are here"'s ring marks
  * the arc he is in. The rows never move, whichever arc shows (Edo, 16 Nov
- * 2026: "copy the arc display just for the arcs of the bands variant"; "how
- * can I tell which arc I'm at?… extremely compact and minimalist"; "not
+ * 2026: "how can I tell which arc I'm at?… extremely compact and minimalist"; "not
  * clear enough boundary and hierarchy… arcs are something that's contained
  * within a course").
  */

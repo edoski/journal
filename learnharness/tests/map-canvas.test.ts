@@ -1,5 +1,5 @@
 /**
- * Canvas tree (canvas.md): the course top to bottom, each need out of its
+ * The map's canvas (canvas.md): the course top to bottom, each need out of its
  * prerequisite's bottom centre on that prerequisite's bracket and into its
  * topic's top centre; implied needs left to their chain;
  * the focus that lights what a topic needs and leads to; and arrows that
@@ -8,10 +8,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
-import type { Point } from "../components/course-map/topic-map/topic-map-layout.ts";
+import { neighbourOf, type Point } from "../components/course-map/topic-map/topic-map-layout.ts";
 import { CANVAS_NODE, layoutCanvas, orthogonalPath, transitiveReduction } from "../components/course-map/topic-map/canvas/canvas-layout.ts";
 import { focusOf } from "../components/course-map/topic-map/canvas/canvas-focus.ts";
-import { TREE_SKIN } from "../components/course-map/topic-map/canvas/canvas-skin.ts";
 
 const h = (handle: string) => handle as TopicHandle;
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -134,7 +133,7 @@ describe("the canvas's focus", () => {
 });
 
 describe("the canvas's arrows", () => {
-	const walk = (from: string, key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight") => TREE_SKIN.neighbour(layout, NEEDS, h(from), key);
+	const walk = (from: string, key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight") => neighbourOf(layout, NEEDS, h(from), key);
 
 	it("follows the needs with Up and Down, and the layer with Left and Right", () => {
 		assert.equal(walk("span", "ArrowUp"), "vectors");

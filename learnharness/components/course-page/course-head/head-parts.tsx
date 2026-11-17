@@ -12,7 +12,7 @@ import { Hint } from "@/components/ui/hint";
 import { MathText } from "@/components/ui/math-text";
 import { dayAndNearWords, finalReviewWords, longDayWords, roadLines, roadOf, spanWords } from "@/components/calendar/calendar-facts";
 import { ContextSheet } from "@/components/course-context/context-sheet";
-import { ArcPill } from "@/components/course-map/arc-strip";
+import { ArcPill } from "@/components/course-map/arc-pill";
 import { arcOnPage } from "@/components/course-page/course-head/course-head";
 import type { ExamReady } from "@/components/course-page/standing/standing-model";
 import { ReadyWords } from "@/components/course-page/standing/ready-line";

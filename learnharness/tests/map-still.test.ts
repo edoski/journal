@@ -3,40 +3,21 @@
  * should be fixed without the user being able to drag it left and right or
  * up and down when the graph itself cleanly fits on screen… The only
  * navigation that I should be able to do is just zooming in… and zooming
- * out"). The candidate styles pan neither by drag nor by scroll while the
- * whole drawing is on screen; a pinch zooms in past it and only then pans,
+ * out"). The map pans neither by drag nor by scroll while the whole
+ * drawing is on screen; a pinch zooms in past it and only then pans,
  * within the view that shows it whole, so zooming back out lands on that
- * view, centred. Current keeps its pan. The drag and the pinch themselves
- * are probed in the running app (round 14, map polish 2).
+ * view, centred. The drag and the pinch themselves are probed in the
+ * running app (round 14, map polish 2).
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { cameraAt, showsWhole, wholeExtent, wholeZoom, type TopicMapLayout } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { CURRENT_SKIN } from "../components/course-map/topic-map/map-skin.ts";
-import { TREE_SKIN } from "../components/course-map/topic-map/canvas/canvas-skin.ts";
-import { REGIONS_SKIN } from "../components/course-map/topic-map/regions/regions-skin.ts";
-import { BANDS_SKIN } from "../components/course-map/topic-map/bands/bands-skin.ts";
-import { OVERVIEW_SKIN } from "../components/course-map/topic-map/overview/overview-skin.ts";
-import { STACK_SKIN } from "../components/course-map/topic-map/stack/stack-skin.ts";
 
 const layout = { width: 760, height: 420 } as TopicMapLayout;
 const frame = { width: 1192, height: 866 };
 const room = { x: 64, y: 60 };
 
 describe("a map held still while it fits", () => {
-	it("holds every candidate style still, and leaves Current's pan as it was", () => {
-		for (const [name, skin] of Object.entries({ tree: TREE_SKIN, regions: REGIONS_SKIN, bands: BANDS_SKIN, overview: OVERVIEW_SKIN, stack: STACK_SKIN })) {
-			assert.equal(skin.fixedWhenFits, true, name);
-			assert.ok((skin.maxZoom ?? 1) > 1, `${name}: a pinch zooms in even where the whole course fits at 100%`);
-		}
-		// Stacked arcs holds still through Canvas tree's own rule, not a copy of it.
-		assert.equal(STACK_SKIN.fixedWhenFits, TREE_SKIN.fixedWhenFits);
-		assert.equal(STACK_SKIN.maxZoom, TREE_SKIN.maxZoom);
-		assert.equal(STACK_SKIN.panOnScroll, TREE_SKIN.panOnScroll);
-		assert.equal(CURRENT_SKIN.fixedWhenFits, undefined);
-		assert.equal(CURRENT_SKIN.maxZoom, undefined);
-	});
-
 	it("is still at the zoom that shows the whole drawing, and pans once zoomed in past it", () => {
 		const fitted = Math.min(1, wholeZoom(layout, frame, room));
 		assert.ok(showsWhole(fitted, fitted));

@@ -4,13 +4,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useRouter } from "next/navigation";
 import { Maximize2Icon, Minimize2Icon } from "lucide-react";
 import { currentArc, type ArcHandle, type ChatListItem, type StudyCourse, type TopicHandle } from "@/src/core";
-import { ArcStrip } from "@/components/course-map/arc-strip";
-import { ArcSelector } from "@/components/course-map/arc-selector";
 import { useArcKeys } from "@/components/course-map/arc-keys";
 import { ArcIndex } from "@/components/course-map/arc-index";
-import { arcShare, shownArcs } from "@/components/course-page/course-model";
+import { shownArcs } from "@/components/course-page/course-model";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
-import { useMapSkin } from "@/components/course-map/topic-map/map-skins";
 import { WholeCourseButton } from "@/components/course-map/topic-map/whole-course-button";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
@@ -39,8 +36,8 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
  * back. Enlarged, a course too big to open whole has the maps' Whole course
  * control (`WholeCourseButton`, and "-") that zooms out to every topic, and back to where he is. Enlarged or not, it is only the map: no List view and no More menu
  * (Edo, 12 Nov 2026). A course with arcs draws one arc (`TopicMap`'s
- * `arc`), with the arc strip under the course tabs: the arc he picked on
- * the strip, else the arc Home's follow names (`arc`, the Today row he
+ * `arc`), with its arc list (`ArcIndex`) left of the map: the arc he picked
+ * on the list, by ⇧↑ or ⇧↓ or on a card's "From" line, else the arc Home's follow names (`arc`, the Today row he
  * points at, as the course tab slides to its course; without it, the one
  * arc `highlight`'s topics lie in), else where he is (`currentArc`). Once
  * the follow names another arc, a pick is dropped: a press always shows
@@ -84,11 +81,7 @@ export function HomeMap({
 	const [opensWhole, setOpensWhole] = useState<ReadonlyMap<string, boolean>>(new Map());
 	const chosenCourse = courses.find((c) => c.map.workspace === chosen)!;
 	const arcs = shownArcs(chosenCourse.map);
-	// Every map style but Current names the arcs with the quiet selector (arc-selector.md); Stacked arcs with its rail.
-	const style = useMapSkin().style;
-	const quietSelector = style !== "current" && style !== "stack";
-	const indexed = arcs !== null && style === "stack";
-	// The arc he picked on the strip, per course, for the visit.
+	// The arc he picked on the map, per course, for the visit.
 	const [picked, setPicked] = useState<ReadonlyMap<string, ArcHandle>>(new Map());
 	const follow = (followed === undefined ? litArc(chosenCourse, highlight) : followed) ?? null;
 	// A row he points at drops the pick, so leaving it returns to where he is.
@@ -124,7 +117,7 @@ export function HomeMap({
 		};
 		requestAnimationFrame(find);
 	}, [chosen, chosenCourse.map]);
-	useArcKeys(arcs, shownArc ?? null, (arc) => setPicked((was) => new Map(was).set(chosen, arc)), goHere, style === "stack");
+	useArcKeys(arcs, shownArc ?? null, (arc) => setPicked((was) => new Map(was).set(chosen, arc)), goHere);
 	useEffect(() => {
 		if (!enlarged) return;
 		// Anything open over the map claims Esc first (Radix marks it handled).
@@ -156,31 +149,7 @@ export function HomeMap({
 					</Hint>
 				</div>
 			</div>
-			{arcs && quietSelector && (
-				<ArcSelector
-					className="shrink-0"
-					arcs={arcs.map((a) => ({ handle: a.handle, title: a.title, share: arcShare(chosenCourse, a.handle) }))}
-					value={shownArc ?? null}
-					here={currentArc(chosenCourse.map)}
-					onSelect={(arc) => {
-						setPicked((was) => new Map(was).set(chosen, arc));
-						setWhole(false);
-					}}
-				/>
-			)}
-			{arcs && style === "current" && (
-				<ArcStrip
-					quiet
-					className="shrink-0"
-					arcs={arcs.map((a) => ({ handle: a.handle, title: a.title, share: arcShare(chosenCourse, a.handle) }))}
-					value={shownArc ?? null}
-					onSelect={(arc) => {
-						setPicked((was) => new Map(was).set(chosen, arc));
-						setWhole(false);
-					}}
-				/>
-			)}
-			{indexed && (
+			{arcs && (
 				<ArcIndex
 					className="absolute top-16 left-0 z-10 w-64"
 					arcs={arcs}
@@ -192,8 +161,8 @@ export function HomeMap({
 					}}
 				/>
 			)}
-			{/* Stacked arcs keeps its arc list in a column of its own, so the map frames each arc beside it. */}
-			<div data-slot="home-map-frame" className={cn("relative flex min-h-0 flex-1 flex-col", indexed && "ml-72")} style={VIGNETTE}>
+			{/* The arc list keeps a column of its own, so the map frames each arc beside it. */}
+			<div data-slot="home-map-frame" className={cn("relative flex min-h-0 flex-1 flex-col", arcs && "ml-72")} style={VIGNETTE}>
 				{courses.map((course) => {
 					const shown = course.map.workspace === chosen;
 					return (

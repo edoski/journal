@@ -3,7 +3,7 @@
  * there are like multiple edges running in same path it makes that tract
  * look thicker which is inconsistent"). Each need was its own translucent
  * stroke, so a bracket two needs share was painted twice and read thicker.
- * The canvas styles now draw every line of one ink as one path, at one
+ * The map now draws every line of one ink as one path, at one
  * width, in an opaque ink: a run several lines share is stroked once.
  */
 import React from "react";
@@ -16,17 +16,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { layoutCanvas } from "../components/course-map/topic-map/canvas/canvas-layout.ts";
-import { TREE_SKIN } from "../components/course-map/topic-map/canvas/canvas-skin.ts";
-import { BANDS_SKIN } from "../components/course-map/topic-map/bands/bands-skin.ts";
-import { REGIONS_SKIN } from "../components/course-map/topic-map/regions/regions-skin.ts";
-import { STACK_SKIN } from "../components/course-map/topic-map/stack/stack-skin.ts";
+import { mapEdges } from "../components/course-map/topic-map/map-drawing.ts";
 import { LinePaths, inkPaths, snapTo, trackPieces, type CanvasLine } from "../components/course-map/topic-map/canvas/canvas-lines.tsx";
 import { focusOf } from "../components/course-map/topic-map/canvas/canvas-focus.ts";
-import type { MapSkin } from "../components/course-map/topic-map/map-skin.ts";
 
 const h = (handle: string) => handle as TopicHandle;
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
-const topic = (handle: string, arc?: string): CourseMapTopic => ({ handle: h(handle), title: handle, level: "new", introduced: null, review: null, weak: false, signals: QUIET, tasks: [], ...(arc ? { arc: arc as never } : {}) });
+const topic = (handle: string): CourseMapTopic => ({ handle: h(handle), title: handle, level: "new", introduced: null, review: null, weak: false, signals: QUIET, tasks: [] });
 const needsOf = (needs: Record<string, string[]>): CourseMapEdge[] => Object.entries(needs).flatMap(([t, ps]) => ps.map((p) => ({ kind: "needs" as const, prerequisite: h(p), topic: h(t) })));
 
 // Two prerequisites that both feed two topics: their brackets share the lane into each card.
@@ -50,22 +46,20 @@ function steps(d: string): string[] {
 /** The lines drawn as the edge draws them, unsnapped (a server render). */
 const drawnLines = (lines: CanvasLine[]) => <LinePaths pieces={trackPieces(lines, null, null)} snap={null} />;
 
-const draw = (skin: MapSkin, topics: readonly CourseMapTopic[], needs: readonly CourseMapEdge[]) => {
-	const layout = skin.layout(topics, needs, new Set());
-	return { layout, edges: skin.edges!({} as never, layout) };
+const draw = (topics: readonly CourseMapTopic[], needs: readonly CourseMapEdge[]) => {
+	const layout = layoutCanvas(topics, needs);
+	return { layout, edges: mapEdges(layout) };
 };
 
 describe("the map's lines", () => {
-	for (const [name, skin] of [["tree", TREE_SKIN], ["regions", REGIONS_SKIN], ["bands", BANDS_SKIN], ["stack", STACK_SKIN]] as const) {
-		it(`${name}: draws every line as one edge, not one stroke per need`, () => {
-			const { edges } = draw(skin, TOPICS, NEEDS);
-			assert.equal(edges.length, 1);
-			assert.equal(edges[0]!.type, "canvasLines");
-		});
-	}
+	it("draws every line as one edge, not one stroke per need", () => {
+		const { edges } = draw(TOPICS, NEEDS);
+		assert.equal(edges.length, 1);
+		assert.equal(edges[0]!.type, "canvasLines");
+	});
 
 	it("strokes a run several needs share once: at rest every line is one path", () => {
-		const { layout } = draw(TREE_SKIN, TOPICS, NEEDS);
+		const { layout } = draw(TOPICS, NEEDS);
 		const lines: CanvasLine[] = layout.routes.map((r) => ({ key: `${r.prerequisite}>${r.topic}`, points: r.points, prerequisite: r.prerequisite, topic: r.topic }));
 		const all = lines.flatMap((l) => steps(`M${l.points.map((p) => p.join(",")).join(" L")}`));
 		assert.ok(new Set(all).size < all.length, "the fixture has needs that share a run");
@@ -82,7 +76,7 @@ describe("the map's lines", () => {
 	});
 
 	it("keeps one width when a topic is in focus, lit and receded lines each one path", () => {
-		const { layout } = draw(TREE_SKIN, TOPICS, NEEDS);
+		const { layout } = draw(TOPICS, NEEDS);
 		const lines: CanvasLine[] = layout.routes.map((r) => ({ key: `${r.prerequisite}>${r.topic}`, points: r.points, prerequisite: r.prerequisite, topic: r.topic }));
 		const focus = focusOf(h("c"), NEEDS, layout.routes);
 		const paths = inkPaths(lines, focus, null);
@@ -133,16 +127,5 @@ describe("the map's lines", () => {
 		}
 		assert.match(css, /--background: #[0-9a-f]{6};/, "the page itself is opaque");
 	});
-
-	it("draws the lines between arcs in the same paths as the needs", () => {
-		const topics = [topic("a", "one"), topic("b", "one"), topic("c", "two"), topic("d", "two")];
-		const arcs = { arcs: [{ handle: "one", title: "One", state: "learning", entry: [] }, { handle: "two", title: "Two", state: "learning", entry: [] }] as never, open: new Set(["one", "two"]) as never, current: "one" as never };
-		const layout = REGIONS_SKIN.layout(topics, needsOf({ b: ["a"], c: ["b"], d: ["c"] }), new Set(), arcs);
-		const edges = REGIONS_SKIN.edges!({} as never, layout);
-		assert.equal(edges.length, 1);
-		const lines = (edges[0]!.data as { lines: CanvasLine[] }).lines;
-		assert.ok(lines.some((l) => l.needs), "the line from one arc to the next is among them");
-	});
 });
 
-void layoutCanvas;

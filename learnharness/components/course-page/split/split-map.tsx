@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import type { ArcHandle, CourseMap, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
-import { MapScrollContext, mapScroll } from "@/components/course-map/topic-map/frame-left";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
 import { framedCamera, wholeZoom, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import { mapFade } from "@/components/study-home/map-frame";
@@ -51,7 +50,7 @@ function reducedMotion(): boolean {
  * focused node hands the walk back to that row (`onLeave`). With `arc`,
  * the map draws that arc (`layout` is its drawing) and Whole course always
  * shows: it swaps in every topic of the course (`wholeLayout`). `header`
- * (the arc strip) is a row above the pane, holding Whole course at its end.
+ * (the arc selector) is a row above the pane, holding Whole course at its end.
  */
 export function SplitMap({
 	map,
@@ -71,11 +70,11 @@ export function SplitMap({
 	map: CourseMap;
 	/** The arc the map draws; unset, the whole course. */
 	arc?: ArcHandle;
-	/** A row above the map (the arc strip), with Whole course at its end. */
+	/** A row above the map (the arc selector), with Whole course at its end. */
 	header?: React.ReactNode;
 	/** What the sidebar says for each topic (`sidebarSays`), for the cards. */
 	said: ReadonlyMap<TopicHandle, Said>;
-	/** The map's layout (`layoutTopicMap`; with `arc`, that arc's drawing), which sizes the surface. */
+	/** The map's layout (`drawingOf`; with `arc`, that arc's drawing), which sizes the surface. */
 	layout: TopicMapLayout;
 	/** The whole course's layout, for Whole course in a course with arcs. */
 	wholeLayout?: TopicMapLayout;
@@ -93,7 +92,6 @@ export function SplitMap({
 	const root = useRef<HTMLElement>(null);
 	const scroller = useRef<HTMLDivElement>(null);
 	// How far the pane is scrolled across, for the names a map style holds at its visible left edge.
-	const [scroll] = useState(mapScroll);
 	const pointed = useRef<TopicHandle | null>(null);
 	const revealed = useRef<TopicHandle | null>(reveal);
 	revealed.current = reveal;
@@ -253,7 +251,7 @@ export function SplitMap({
 		{header && (
 			<div data-slot="course-split-map-head" className="mb-2 flex min-h-9 shrink-0 items-start gap-4 py-1">
 				<div className="flex min-w-0 flex-1">{header}</div>
-				{/* On the strip's first row, however many rows it wraps to. */}
+				{/* On the selector's row. */}
 				<div className="flex h-7 shrink-0 items-center">{wholeButton}</div>
 			</div>
 		)}
@@ -285,13 +283,10 @@ export function SplitMap({
 			}}
 		>
 			<div className="absolute inset-0" style={mapFade(fade.x, fade.y)}>
-				<div ref={scroller} data-slot="course-split-map-scroller" className="size-full overflow-auto overscroll-contain" onScroll={(e) => scroll.set(e.currentTarget.scrollLeft)}>
+				<div ref={scroller} data-slot="course-split-map-scroller" className="size-full overflow-auto overscroll-contain">
 					{/* The surface's size, from the course's layout: the map fits it whole. */}
 					<div className="flex flex-col" style={{ width: surface.width, height: surface.height }}>
-						{/* The map's names that stay on screen read how far the pane is scrolled (frame-left.ts). */}
-						<MapScrollContext.Provider value={scroll}>
-							<TopicMap map={map} arc={zoomedOut ? undefined : arc} said={said} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} onOpenArc={onOpenArc} />
-						</MapScrollContext.Provider>
+						<TopicMap map={map} arc={zoomedOut ? undefined : arc} said={said} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} onOpenArc={onOpenArc} />
 					</div>
 				</div>
 			</div>

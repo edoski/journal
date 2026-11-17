@@ -6,7 +6,7 @@
  * on its prerequisite's bracket, and into the topic's top centre. Pure.
  */
 
-import { coordSimplex, decrossOpt, decrossTwoLayer, graphStratify, layeringSimplex, sugiyama, type Decross, type Layering, type SugiNode } from "d3-dag";
+import { coordSimplex, decrossOpt, decrossTwoLayer, graphStratify, layeringSimplex, sugiyama } from "d3-dag";
 import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "@/src/core";
 import { layoutTopicMap, type PlacedTopic, type Point, type Route, type TopicMapLayout } from "../topic-map-layout";
 
@@ -185,54 +185,27 @@ function corners(points: readonly Point[]): Point[] {
 	return kept;
 }
 
-/** Each layer left to right by rank: a box by its own, a line passing through by its ends' middle. */
-function byRank(order: (id: string) => number): Decross<{ id: string }, unknown> {
-	const rank = (n: SugiNode<{ id: string }, unknown>) =>
-		n.data.role === "node" ? order(n.data.node.data.id) : (order(n.data.link.source.data.id) + order(n.data.link.target.data.id)) / 2;
-	return (layers) => {
-		for (const layer of layers) layer.sort((a, b) => rank(a) - rank(b));
-	};
-}
-
-/** A box to place: a topic's card, or a group of them. */
-export interface DrawnNode {
+/** A box to place: a topic's card. */
+interface DrawnNode {
 	id: string;
 	width: number;
 	height: number;
 }
 
 /** A box placed, its top left corner and the layer it sits in. */
-export interface PlacedBox extends DrawnNode {
+interface PlacedBox extends DrawnNode {
 	x: number;
 	y: number;
 	layer: number;
 }
 
-/** What a layered drawing may be asked for besides its boxes and links. */
-export interface LayeredOptions {
-	/** Held in the first layer (an arc's entry topics). */
-	top?: ReadonlySet<string>;
-	/** Each box's layer, when the caller sets them (every link must go down at least one); unset, d3-dag's simplex
-	 *  layering chooses. */
-	layerOf?: (id: string) => number;
-	/** Room kept clear just above a layer, under the lines that reach it (a band's header). */
-	headerAbove?: (layer: number) => number;
-	/** Space between boxes side by side; the card gap unset. */
-	nodeGap?: number;
-	/** Each box's rank left to right in its layer (an arc's place in study order), in place of the order that
-	 *  crosses the fewest lines; a line passing through a layer sits between its ends' ranks. */
-	order?: (id: string) => number;
-}
-
 /** Boxes in layers with their links, each link `source>target` as its corners. */
-export interface LayeredDrawing {
+interface LayeredDrawing {
 	width: number;
 	height: number;
 	boxes: Map<string, PlacedBox>;
 	lines: Map<string, Point[]>;
 	layers: string[][];
-	/** Each layer's top, and the top of the room kept above it. */
-	layerTops: number[];
 }
 
 /**
@@ -244,34 +217,21 @@ export interface LayeredDrawing {
  * runs on its source's bracket, each gap as deep as its brackets need.
  * Boxes in a layer share its top. A link's points are its corners. Pure.
  */
-export function layeredDrawing(nodes: readonly DrawnNode[], links: readonly { source: string; target: string }[], options: LayeredOptions = {}): LayeredDrawing {
+function layeredDrawing(nodes: readonly DrawnNode[], links: readonly { source: string; target: string }[], top: ReadonlySet<string>): LayeredDrawing {
 	const size = new Map(nodes.map((n) => [n.id, n]));
 	const parents = new Map<string, string[]>(nodes.map((n) => [n.id, []]));
 	for (const link of links) parents.get(link.target)?.push(link.source);
 	const dag = graphStratify()(nodes.map((n) => ({ id: n.id, parentIds: parents.get(n.id) ?? [] })));
-	const top = options.top ?? new Set<string>();
-	const fixed = options.layerOf;
-	const given: Layering<{ id: string }, unknown> = (graph) => {
-		let deepest = 0;
-		for (const node of graph.nodes()) {
-			node.y = fixed!(node.data.id);
-			deepest = Math.max(deepest, node.y);
-		}
-		return deepest;
-	};
-	const layering: Layering<{ id: string }, unknown> = fixed
-		? given
-		: top.size > 0
-			? layeringSimplex().rank(({ data }: { data: { id: string } }) => rankUnder(top, parents, data.id))
-			: layeringSimplex();
+	// An arc's entry topics held in the first layer.
+	const layering = top.size > 0 ? layeringSimplex().rank(({ data }: { data: { id: string } }) => rankUnder(top, parents, data.id)) : layeringSimplex();
 	sugiyama()
 		.nodeSize((node: { data?: { id: string } }) => {
 			const box = node.data ? size.get(node.data.id) : undefined;
 			return box ? [box.width, box.height] : [0, 0];
 		})
-		.gap([options.nodeGap ?? NODE_GAP, GAP])
+		.gap([NODE_GAP, GAP])
 		.layering(layering)
-		.decross(options.order ? byRank(options.order) : nodes.length <= OPTIMAL_DECROSS_LIMIT ? decrossOpt() : decrossTwoLayer())
+		.decross(nodes.length <= OPTIMAL_DECROSS_LIMIT ? decrossOpt() : decrossTwoLayer())
 		.coord(coordSimplex())(dag);
 
 	const layerYs = [...new Set([...dag.nodes()].map((n) => n.y))].sort((a, b) => a - b);
@@ -279,7 +239,7 @@ export function layeredDrawing(nodes: readonly DrawnNode[], links: readonly { so
 	straighten(
 		[...dag.nodes()].map((n) => ({ id: n.data.id, layer: layerYs.indexOf(n.y), x: n.x, width: size.get(n.data.id)!.width })),
 		[...dag.links()].map((link, i) => ({ source: link.source.data.id, target: link.target.data.id, columns: columnsOf[i]!, layer: layerYs.indexOf(link.source.y) })),
-		options.nodeGap ?? NODE_GAP,
+		NODE_GAP,
 	).forEach((x, id) => {
 		for (const n of dag.nodes()) if (n.data.id === id) n.x = x;
 	});
@@ -310,15 +270,14 @@ export function layeredDrawing(nodes: readonly DrawnNode[], links: readonly { so
 	const lane = new Map<Crossing, number>();
 	const laneCount: number[] = layers.map(() => 0);
 	const depth = layers.map(() => GAP);
-	const header = (layer: number) => options.headerAbove?.(layer) ?? 0;
 	for (let gap = 0; gap < layers.length - 1; gap++) {
 		const lanes = lanesOf(crossings.filter((c) => c.gap === gap));
 		for (const [c, n] of lanes) lane.set(c, n);
 		laneCount[gap] = Math.max(-1, ...lanes.values()) + 1;
 		depth[gap] = Math.max(GAP, (laneCount[gap]! + 1) * LANE);
 	}
-	const layerTop: number[] = [header(0)];
-	for (let i = 1; i < layers.length; i++) layerTop.push(layerTop[i - 1]! + heightOf[i - 1]! + depth[i - 1]! + header(i));
+	const layerTop: number[] = [0];
+	for (let i = 1; i < layers.length; i++) layerTop.push(layerTop[i - 1]! + heightOf[i - 1]! + depth[i - 1]!);
 
 	// The drawing starts at its leftmost box or line.
 	const halfOf = (id: string) => size.get(id)!.width / 2;
@@ -335,7 +294,7 @@ export function layeredDrawing(nodes: readonly DrawnNode[], links: readonly { so
 		for (const c of crossings.filter((c) => c.route === i)) {
 			const n = lane.get(c);
 			if (n === undefined) continue;
-			// The gap's lanes sit in its middle, LANE apart, above any room kept for the next layer.
+			// The gap's lanes sit in its middle, LANE apart.
 			const y = layerTop[c.gap]! + heightOf[c.gap]! + depth[c.gap]! / 2 + (n - (laneCount[c.gap]! - 1) / 2) * LANE;
 			points.push([c.from, y], [c.to, y]);
 		}
@@ -343,7 +302,7 @@ export function layeredDrawing(nodes: readonly DrawnNode[], links: readonly { so
 		lines.set(`${link.source}>${link.target}`, corners(points));
 	});
 	const last = layers.length - 1;
-	return { width: right - left, height: layerTop[last]! + heightOf[last]!, boxes, lines, layers, layerTops: layerTop };
+	return { width: right - left, height: layerTop[last]! + heightOf[last]!, boxes, lines, layers };
 }
 
 /**
@@ -358,13 +317,13 @@ export function layoutCanvas(topics: readonly CourseMapTopic[], edges: readonly 
 	const drawing = layeredDrawing(
 		topics.map((t) => ({ id: t.handle, ...CANVAS_NODE })),
 		transitiveReduction(needs).map((n) => ({ source: n.prerequisite, target: n.topic })),
-		{ top },
+		top,
 	);
 	return asTopicLayout(drawing, needs);
 }
 
 /** A drawing of topic cards as the map's layout: every need with its line, none for one its chain implies. */
-export function asTopicLayout(drawing: LayeredDrawing, needs: readonly Need[]): TopicMapLayout {
+function asTopicLayout(drawing: LayeredDrawing, needs: readonly Need[]): TopicMapLayout {
 	const placed = new Map<TopicHandle, PlacedTopic>();
 	for (const [id, box] of drawing.boxes) placed.set(id as TopicHandle, { handle: id as TopicHandle, x: box.x, y: box.y, layer: box.layer });
 	const routes: Route[] = needs.map((n) => ({ prerequisite: n.prerequisite, topic: n.topic, points: drawing.lines.get(`${n.prerequisite}>${n.topic}`) ?? [] }));

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { StudyCourse } from "@/src/core";
-import { ArcPill, type StripArc } from "@/components/course-map/arc-strip";
+import { ArcPill, type PillArc } from "@/components/course-map/arc-pill";
 import { Button } from "@/components/ui/button";
 import { MathLine } from "@/components/ui/math-line";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
@@ -26,7 +26,7 @@ const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 
 /** A row's two lines: what the row is and why now (the reason's icon and
  *  words, flush right), then the topic or lesson and its arc's pill (flush
  *  right). The reason and the title give way before the pill. */
-function Lines({ label, why, title, arc }: { label: string; why: Why | null; title: string; arc: StripArc | null }) {
+function Lines({ label, why, title, arc }: { label: string; why: Why | null; title: string; arc: PillArc | null }) {
 	return (
 		<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 			<span className="flex min-w-0 items-center gap-3">
@@ -56,7 +56,7 @@ function Lines({ label, why, title, arc }: { label: string; why: Why | null; tit
 export function WhatNextRows({ next, course, busy, onContinue }: { next: Next | null; course: StudyCourse; busy: boolean; onContinue: (workspace: string) => void }) {
 	if (!next) return null;
 	const { pickUp, then } = next;
-	const pill = (arc: CourseMapArc | null): StripArc | null => (arc ? { handle: arc.handle, title: arc.title, share: arcShare(course, arc.handle) } : null);
+	const pill = (arc: CourseMapArc | null): PillArc | null => (arc ? { handle: arc.handle, title: arc.title, share: arcShare(course, arc.handle) } : null);
 	const thenArc = pill(then && !then.whyNamesArc ? then.arc : null);
 	const lead = pickUp ? (pickUp.line.lead ?? pickUp.line.topics[0] ?? null) : null;
 	return (

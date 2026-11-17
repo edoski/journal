@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
-import { READABLE_ZOOM, TOPIC_NODE_SIZE, cardFit, framedCamera, layoutTopicMap, slackOf, wholeZoom, type Camera, type CardFit } from "../components/course-map/topic-map/topic-map-layout.ts";
+import { READABLE_ZOOM, cardFit, framedCamera, layoutTopicMap, slackOf, wholeZoom, type Camera, type CardFit } from "../components/course-map/topic-map/topic-map-layout.ts";
 import { RETURN_DWELL_MS, REVEAL_DWELL_MS, litCamera, litFollow } from "../components/course-map/topic-map/lit-camera.ts";
 
 const h = (handle: string) => handle as TopicHandle;
@@ -17,7 +17,10 @@ const topic = (handle: string): CourseMapTopic => ({ handle: h(handle), title: h
 /** Linear Algebra on the demo seed, as topic-map-framing.test.ts has it. */
 const NEEDS: Record<string, readonly string[]> = { vectors: [], span: ["vectors"], independence: ["span"], basis: ["independence"], matmul: ["vectors"], elimination: [], rank: ["basis", "elimination"], kernel: ["rank"], determinant: ["matmul"], cramer: ["determinant"], invertibility: ["rank", "determinant"], "change-basis": ["basis", "matmul", "invertibility"], eigen: ["determinant", "rank", "invertibility", "kernel"], diagonalization: ["eigen", "basis", "change-basis"], "inner-product": ["vectors"], projection: ["inner-product", "basis"] };
 const EDGES: CourseMapEdge[] = Object.entries(NEEDS).flatMap(([t, prereqs]) => prereqs.map((p) => ({ kind: "needs" as const, prerequisite: h(p), topic: h(t) })));
-const LAYOUT = layoutTopicMap(Object.keys(NEEDS).map(topic), EDGES, TOPIC_NODE_SIZE);
+/** A fixed card for the camera's arithmetic, apart from the map's own (canvas-layout.ts), so each case's premise
+ *  (a topic that opens cut, one out of view) holds whatever the map's card becomes. */
+const CARD = { width: 248, height: 56 };
+const LAYOUT = layoutTopicMap(Object.keys(NEEDS).map(topic), EDGES, CARD);
 const HERE = h("eigen");
 
 /** Home's map frame at 1512×982, measured in the running app, its fade and the tag's room. */

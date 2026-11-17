@@ -11,7 +11,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
-import { READABLE_ZOOM, TOPIC_NODE_SIZE, cardFit, framedCamera, layoutTopicMap, type CardFit } from "../components/course-map/topic-map/topic-map-layout.ts";
+import { READABLE_ZOOM, cardFit, framedCamera, type CardFit } from "../components/course-map/topic-map/topic-map-layout.ts";
+import { CANVAS_NODE, layoutCanvas } from "../components/course-map/topic-map/canvas/canvas-layout.ts";
 import { boxesOf, fadeAcross, scrollOfCamera, surfaceOf } from "../components/course-page/split/split-tie.ts";
 
 const h = (handle: string) => handle as TopicHandle;
@@ -47,7 +48,7 @@ interface Opening {
 function courseOf(course: (typeof COURSES)[number]) {
 	const needs = course.needs as Record<string, readonly string[]>;
 	const edges: CourseMapEdge[] = Object.entries(needs).flatMap(([t, prereqs]) => prereqs.map((p) => ({ kind: "needs" as const, prerequisite: h(p), topic: h(t) })));
-	const layout = layoutTopicMap(Object.keys(needs).map(topic), edges, TOPIC_NODE_SIZE);
+	const layout = layoutCanvas(Object.keys(needs).map(topic), edges);
 	const next = edges.flatMap((e) => (e.kind === "needs" && e.prerequisite === course.current ? [e.topic] : []));
 	return { layout, next };
 }

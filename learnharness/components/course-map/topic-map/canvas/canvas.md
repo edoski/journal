@@ -1,6 +1,6 @@
 # Canvas
 
-Canvas tree, the `tree` option of the Course map switch (`../map-style.ts`): the course as a finished diagram canvas, after Linear's restraint and Figma's canvas, built on React Flow UI's shadcn registry. Edo picked it on 16 Nov 2026 ("the cleanest… the paths of the edges are a lot more structured"); plain Canvas and Brilliant are gone. Research: `research-components.md` and `research-leaders.md` in the 15 Nov pass's scratchpad.
+How the course map draws a course or one arc of it (`../topic-map.md`; Stacked arcs draws each arc this way): the course as a finished diagram canvas, after Linear's restraint and Figma's canvas, built on React Flow UI's shadcn registry. Edo picked it on 16 Nov 2026 ("the cleanest… the paths of the edges are a lot more structured"); plain Canvas and Brilliant are gone. Research: `research-components.md` and `research-leaders.md` in the 15 Nov pass's scratchpad.
 
 Thesis: keep the graph, but make it read like a professional diagram tool: two-tier cards and quiet right-angled lines, drawing only the needs no longer chain implies. It reads top to bottom, as the map does (Edo, 15 Nov 2026: "I just don't like its left-to-right directionality, I'd rather see it visually oriented in the same way as Current").
 
@@ -26,13 +26,13 @@ Why it changed (15 Nov 2026, Edo: "a scattered mess … no standardisation at th
 
 Measured on the demo courses (`lever/metrics.mts`): one entry and one exit per card everywhere; no two lines closer than 24 over any shared run (12 at a90cab68); crossings 2 on Linear Algebra, 5 on Calculus, 1 on Probability (2, 6, 1 at a90cab68).
 
-## Tree
+## Implied needs
 
 The canvas draws only the needs no longer chain implies (`transitiveReduction`): an implied need keeps its route with no points, so the camera still frames by it, and in focus its prerequisite lights with the chain that implies it. Linear Algebra draws 20 of its 26 needs, Calculus 30 of 34, Probability 10 of 11. Crossings 0, 3 and 1; the lines that skip layers drop from 8 to 2 on Linear Algebra and from 8 to 4 on Calculus (measured with every need drawn, 15 Nov 2026).
 
 ## Focus
 
-Pointing at or focusing a topic, or a page marking one (a Today row he rests on), brings it into focus (`CanvasFrame`, `focusOf`): its card and the cards of what it needs and what it leads to stay bright, the lines between them rise, and every other card drops to 45%. On the tree, a topic a lit line passes through between them recedes only to the map's 80%. Nothing moves: the camera stays where it is.
+Pointing at or focusing a topic, or a page marking one (a Today row he rests on), brings it into focus (`CanvasFrame`, `focusOf`): its card and the cards of what it needs and what it leads to stay bright, the lines between them rise, and every other card drops to 45%. Where implied needs are left out, a topic a lit line passes through between them recedes only to the map's 80%. Nothing moves: the camera stays where it is.
 
 No card names them (Edo, 16 Nov 2026: the fixed focus card beside the enlarged map "feels like poor UI/UX"): the lit cards are the answer, and the card's own words and `aria-description` name its needs.
 
@@ -53,6 +53,6 @@ A dot grid (24px, white 10%) under the cards everywhere, and nothing else: no mi
 
 ## Behaviour
 
-- A click or Enter opens the topic's page. An entry card's "From <arc>" line is a press of its own beside the card's link (`FromLink`): it shows that arc on the map, where the page can show one (Home, the course page), and reads in the foreground ink under the pointer (Edo, 16 Nov 2026: "make perhaps the From... header in cards clickable"). Pointer only; the arc selector is the keyboard's way to another arc. The arrows walk it as they walk the map (`neighbourOf`): Up to the nearest prerequisite, Down to the nearest topic that needs it, Left and Right along the layer.
+- A click or Enter opens the topic's page. An entry card's "From <arc>" line is a press of its own beside the card's link (`FromLink`): it shows that arc on the map, where the page can show one (Home, the course page), and reads in the foreground ink under the pointer (Edo, 16 Nov 2026: "make perhaps the From... header in cards clickable"). Pointer only; the keyboard reaches another arc by ⇧↑ and ⇧↓ on Home and by the arc selector on the course page. The arrows walk it as they walk the map (`neighbourOf`): Up to the nearest prerequisite, Down to the nearest topic that needs it, Left and Right along the layer.
 - Camera, framing, follow, highlight and mark are the map's own (`../topic-map.md`). Scroll pans, pinch zooms, held still while it fits.
 - Reduced motion: every hover change is at once.

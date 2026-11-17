@@ -20,7 +20,7 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { CourseMap, CourseMapTopic, StudyCourse, TopicHandle, TopicSignals } from "../src/core/index.ts";
 import { slipBeside, standingOf } from "../components/course-map/topic-map/topic-standing.ts";
-import { NodeBody } from "../components/course-map/topic-map/topic-node.tsx";
+import { MapCard } from "./helpers/map-card.tsx";
 import { CourseTopicRow } from "../components/course-page/course-topic-row.tsx";
 import { TopicHead } from "../components/unit-inbox/topic-page/topic-head.tsx";
 import { topicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
@@ -68,7 +68,7 @@ function drawn(t: CourseMapTopic) {
 	const standing = standingOf(t);
 	const slip = slipBeside(t, titleOf);
 	const home = render(<StandingFact facts={{ standing, slip }} />);
-	const card = render(<NodeBody topic={t} standing={standing} line={null} />);
+	const card = render(<MapCard topic={t} standing={standing} line={null} />);
 	const row = render(<ul><CourseTopicRow row={{ topic: t, group: "learning" as never, standing, current: false, fact: null, factWords: null, href: "/" }} /></ul>);
 	const head = render(<TopicHead facts={topicFacts({ course: COURSE, topic: t, chats: [], read: null })} />);
 	const headStanding = head.querySelector('[data-slot="page-fact"][data-kind="standing"]');

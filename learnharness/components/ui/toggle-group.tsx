@@ -31,8 +31,6 @@ function ToggleGroup({
         "group/toggle-group flex w-fit items-center rounded-md data-[variant=outline]:shadow-xs",
         // The segmented track (spec: toggle-group.md): a pill holding pills.
         variant === "segmented" && "gap-0.5 rounded-full border p-0.5",
-        // Pills stand apart, with no track (spec: toggle-group.md).
-        variant === "pill" && "gap-1.5",
         className
       )}
       {...props}
@@ -65,7 +63,7 @@ function ToggleGroupItem({
           variant: resolved,
           size: context.size || size,
         }),
-        resolved !== "segmented" && resolved !== "pill" &&
+        resolved !== "segmented" &&
           "min-w-0 flex-1 shrink-0 rounded-none shadow-none first:rounded-l-md last:rounded-r-md focus:z-10 focus-visible:z-10 data-[variant=outline]:border-l-0 data-[variant=outline]:first:border-l",
         className
       )}

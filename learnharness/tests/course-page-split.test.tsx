@@ -173,14 +173,14 @@ describe("the map pane", () => {
 
 	it("dims every topic but the ones a row lights, You are here and the topics it leads to", () => {
 		const document = drawMap(litOf({ handle: h("span"), from: "list" }, MAP.edges));
-		const dimmed = [...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => /opacity:\s*0?\.\d/.test(n.parentElement!.getAttribute("style") ?? "")).map((n) => n.getAttribute("data-testid"));
+		const dimmed = [...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => /opacity:\s*0?\.\d/.test(n.parentElement!.parentElement!.getAttribute("style") ?? "")).map((n) => n.getAttribute("data-testid"));
 		assert.deepEqual(dimmed.sort(), ["map-node-eigen"]);
 	});
 
 	it("rings the card of the row he points at with the glow, and no other", () => {
 		const pointed = { handle: h("span"), from: "list" } as const;
 		const document = drawMap(litOf(pointed, MAP.edges), revealOf(pointed));
-		const glowing = [...document.querySelectorAll('[data-slot="course-map-node"].lh-card-mark')].map((n) => n.getAttribute("data-testid"));
+		const glowing = [...document.querySelectorAll('.lh-card-mark > [data-slot="course-map-node"]')].map((n) => n.getAttribute("data-testid"));
 		assert.deepEqual(glowing, ["map-node-span"]);
 		assert.ok(drawMap().querySelector(".lh-card-mark") === null, "nothing glows at rest");
 	});

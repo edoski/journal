@@ -1,5 +1,5 @@
 /**
- * The arc selector on Home's map takes a press (Edo, 16 Nov 2026: "arcs
+ * The arc list beside Home's map takes a press (Edo, 16 Nov 2026: "arcs
  * selectors (which btw are not working clickable here)"). Home always
  * follows a Today row, the top one at rest, so when that row's course is
  * the one on the map its arc outranked the arc he pressed and the press
@@ -43,18 +43,18 @@ async function mount(arc: ArcHandle | null) {
 	return (followed: ArcHandle | null) => act(async () => draw(followed));
 }
 
-const shown = () => document.querySelector('[data-slot="arc-strip"] [data-arc][data-state="on"]')?.getAttribute("data-arc");
+const shown = () => document.querySelector('[data-slot="arc-index-row"][data-shown]')?.getAttribute("data-arc");
 const drawn = () => [...document.querySelectorAll('[data-slot="home-map-course"][data-shown] [data-slot="course-map-node"]')].map((n) => n.getAttribute("data-testid")).sort();
 
 async function press(handle: string) {
-	const item = document.querySelector(`[data-slot="arc-strip"] [data-arc="${handle}"]`);
-	assert.ok(item, `the selector names ${handle}`);
+	const item = document.querySelector(`[data-slot="arc-index-row"][data-arc="${handle}"]`);
+	assert.ok(item, `the list names ${handle}`);
 	await act(async () => {
 		item.dispatchEvent(new dom.window.Event("click", { bubbles: true }) as unknown as Event);
 	});
 }
 
-describe("the arc selector on Home's map", () => {
+describe("the arc list beside Home's map", () => {
 	it("shows the arc he presses while Home follows a row in the same course", async () => {
 		await mount("systems" as ArcHandle);
 		assert.equal(shown(), "systems");

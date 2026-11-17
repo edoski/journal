@@ -9,16 +9,12 @@ import { CORNER } from "./canvas-layout";
 import { useCanvas } from "./canvas-context";
 import { lineKey, type Focus } from "./canvas-focus";
 
-/** One line the canvas draws: a need between two topics, or (`needs`) the
- *  line from one arc to another standing for the needs between them. */
+/** One line the canvas draws: a need between two topics. */
 export interface CanvasLine {
 	key: string;
 	points: readonly Point[];
-	/** A need's two topics; unset for a line between arcs. */
-	prerequisite?: TopicHandle;
-	topic?: TopicHandle;
-	/** For a line between arcs, the needs it stands for, `prerequisite>topic`. */
-	needs?: readonly string[];
+	prerequisite: TopicHandle;
+	topic: TopicHandle;
 }
 
 /** How a line reads: at rest, lit with the topic in focus or the lit
@@ -34,10 +30,9 @@ export type CanvasLinesFlowEdge = Edge<{ lines: readonly CanvasLine[] }, "canvas
 /** Each line's ink, from the topic in focus or else the lit chain. Pure. */
 export function inkOf(line: CanvasLine, focus: Focus | null, chain: ReadonlySet<TopicHandle> | null): LineInk {
 	if (focus) {
-		const on = line.needs ? line.needs.some((key) => key.split(">").includes(focus.topic)) : focus.lines.has(lineKey(line.prerequisite!, line.topic!));
-		return on ? "lit" : "receded";
+		return focus.lines.has(lineKey(line.prerequisite, line.topic)) ? "lit" : "receded";
 	}
-	if (chain) return line.prerequisite && line.topic && chain.has(line.prerequisite) && chain.has(line.topic) ? "lit" : "receded";
+	if (chain) return chain.has(line.prerequisite) && chain.has(line.topic) ? "lit" : "receded";
 	return "rest";
 }
 

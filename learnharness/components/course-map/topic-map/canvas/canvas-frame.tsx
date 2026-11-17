@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { TopicHandle } from "@/src/core";
-import type { FrameProps } from "../map-skin";
+import { useMemo, useState, type ReactNode } from "react";
+import type { CourseMap, TopicHandle } from "@/src/core";
+import type { TopicMapLayout } from "../topic-map-layout";
 import { CanvasContext, type CanvasState } from "./canvas-context";
 import { focusOf } from "./canvas-focus";
 
@@ -11,7 +11,7 @@ import { focusOf } from "./canvas-focus";
  * one he points at or focuses, else the one a page marks (a Today row),
  * which the cards and lines light (`CanvasContext`).
  */
-export function CanvasFrame({ map, layout, children }: FrameProps) {
+export function CanvasFrame({ map, layout, children }: { map: CourseMap; layout: TopicMapLayout; children: ReactNode }) {
 	const [pointed, point] = useState<TopicHandle | null>(null);
 	const [marked, mark] = useState<TopicHandle | null>(null);
 	const subject = pointed ?? marked;

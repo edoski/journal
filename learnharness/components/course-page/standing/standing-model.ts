@@ -1,5 +1,5 @@
 import { TOPIC_LEVELS, type ChatListItem, type CourseMap, type CourseMapTopic, type CourseReadiness, type CourseStanding, type OpenMistake, type ReadinessPart, type StudyCourse, type TopicHandle } from "@/src/core";
-import type { StripArc } from "@/components/course-map/arc-strip";
+import type { PillArc } from "@/components/course-map/arc-pill";
 import { misfitWords } from "@/components/calendar/calendar-facts";
 import { topicPress } from "@/components/unit-inbox/start-unit";
 import type { SessionCreation } from "@/components/start-session";
@@ -35,7 +35,7 @@ export function partState(part: ReadinessPart): PartState {
  *  - `ready`: every part solid. */
 export type ExamReady =
 	| { kind: "short"; words: string }
-	| { kind: "notYet"; words: string; arcs: readonly StripArc[]; rest: { heading: string; topics: readonly CourseMapTopic[] } | null }
+	| { kind: "notYet"; words: string; arcs: readonly PillArc[]; rest: { heading: string; topics: readonly CourseMapTopic[] } | null }
 	| { kind: "ready"; words: string };
 
 /** How many least-ready topics the line names before "and the rest": a
@@ -97,7 +97,7 @@ export interface MistakeRow {
 	helped: boolean;
 	/** What it was on, with his answer: the row's hint. */
 	hint: string | null;
-	arc: StripArc | null;
+	arc: PillArc | null;
 	/** The session its press opens: the one the topic's page would. */
 	resume: ChatListItem | null;
 	/** What its press starts when it opens none: the open task continued

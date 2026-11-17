@@ -1,13 +1,13 @@
 "use client";
 
 import type { NodeProps } from "@xyflow/react";
-import { TopicMapContext } from "../topic-node";
-import { CanvasContext } from "../canvas/canvas-context";
-import { CanvasNode, type CanvasFlowNode } from "../canvas/canvas-node";
+import { TopicMapContext } from "./topic-node";
+import { CanvasContext } from "./canvas/canvas-context";
+import { CanvasNode, type CanvasFlowNode } from "./canvas/canvas-node";
 
 /**
- * A card of the arc the map is leaving, drawn as Canvas tree draws it while
- * the camera glides away (stack.md): out of the map's focus, keys and links,
+ * A card of the arc the map is leaving, drawn as the map draws a card while
+ * the camera glides away (topic-map.md, Arcs): out of the map's focus, keys and links,
  * so it never takes the shown arc's place in them.
  */
 export function TrailNode(props: NodeProps<CanvasFlowNode>) {

@@ -4,9 +4,7 @@ import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { LinkedColumns } from "@/components/linked-columns/linked-columns";
 import { currentArc, type ArcHandle, type CourseStanding, type TopicHandle } from "@/src/core";
-import { useMapSkin } from "@/components/course-map/topic-map/map-skins";
-import { drawingOf } from "@/components/course-map/topic-map/map-skin";
-import { ArcStrip } from "@/components/course-map/arc-strip";
+import { drawingOf } from "@/components/course-map/topic-map/map-drawing";
 import { ArcSelector } from "@/components/course-map/arc-selector";
 import { useStartArcCheck } from "@/components/unit-inbox/start-unit";
 import { CourseFrame } from "@/components/course-page/course-frame";
@@ -26,8 +24,9 @@ import { OPEN_AT_FIRST, aimOf, litOf, markedOf, revealOf, shownGroups, type Poin
  * view; pointing at a node marks its row. A click on either opens the
  * topic's page. The page fits the window; each pane scrolls inside itself.
  * A course with arcs lists its arcs instead, where he is open on arrival,
- * and the map draws one arc under the arc strip: opening an arc, or a tab
- * of the strip, shows it on the map, and a tab opens its arc in the list.
+ * and the map draws one arc under the arc selector (arc-selector.md):
+ * opening an arc, or picking one on the selector, shows it on the map, and
+ * a pick opens its arc in the list.
  * Above its arcs, where he picks up and what comes next (`WhatNextRows`).
  */
 export function SplitCourse({ workspace }: { workspace: string }) {
@@ -54,10 +53,9 @@ function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; sta
 		}
 	}
 	const shown = arcs?.find((a) => a.arc.handle === shownArc) ?? null;
-	// The map style's own drawing (map-style.ts), which sizes the pane's surface.
-	const { style, skin } = useMapSkin();
-	const wholeLayout = useMemo(() => drawingOf(skin, map, undefined).layout, [skin, map]);
-	const layout = useMemo(() => (shown ? drawingOf(skin, map, shown.arc.handle).layout : wholeLayout), [skin, shown, map, wholeLayout]);
+	// The map's drawing, which sizes the pane's surface.
+	const wholeLayout = useMemo(() => drawingOf(map, undefined).layout, [map]);
+	const layout = useMemo(() => (shown ? drawingOf(map, shown.arc.handle).layout : wholeLayout), [shown, map, wholeLayout]);
 	const aim = useMemo(() => aimOf(map.current, view.next.lesson.topics, shown ? [{ id: shown.arc.handle, topics: shown.topics }] : groups, layout), [map.current, view.next.lesson.topics, shown, groups, layout]);
 	const { startArcCheck, starting } = useStartArcCheck();
 	const onCheck = (section: CourseArcSection) =>
@@ -77,7 +75,7 @@ function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; sta
 		setOpen((was) => ({ ...was, [id]: to }));
 		if (arcs && to) show(id as ArcHandle);
 	};
-	/** A tab of the strip shows its arc and opens it in the list. */
+	/** A pick on the selector shows its arc and opens it in the list. */
 	const showArc = (arc: ArcHandle) => {
 		show(arc);
 		setOpen((was) => (was[arc] ? was : { ...was, [arc]: true }));
@@ -140,15 +138,7 @@ function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; sta
 							ref={drawing}
 							map={map}
 							arc={shownArc ?? undefined}
-							header={
-								arcs &&
-								// Every map style but Current names the arcs with the quiet selector (arc-selector.md).
-								(style === "current" ? (
-									<ArcStrip arcs={arcs.map((a) => ({ handle: a.arc.handle, title: a.arc.title, share: a.share }))} value={shownArc} onSelect={showArc} />
-								) : (
-									<ArcSelector arcs={arcs.map((a) => ({ handle: a.arc.handle, title: a.arc.title, share: a.share }))} value={shownArc} here={currentArc(map)} onSelect={showArc} />
-								))
-							}
+							header={arcs && <ArcSelector arcs={arcs.map((a) => ({ handle: a.arc.handle, title: a.arc.title, share: a.share }))} value={shownArc} here={currentArc(map)} onSelect={showArc} />}
 							said={view.said}
 							layout={layout}
 							wholeLayout={wholeLayout}

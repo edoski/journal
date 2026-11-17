@@ -8,14 +8,14 @@ import { Hint } from "@/components/ui/hint";
 import { MathText, mathPlain } from "@/components/ui/math-text";
 import { Ring } from "@/components/ui/pie";
 import { cn } from "@/lib/utils";
-import type { StripArc } from "./arc-strip";
+import type { PillArc } from "./arc-pill";
 
 /** The words beside the arc he is in, in the selector's menu. */
 export const HERE_WORDS = "You are here";
 
 /**
- * Which arc a course map shows (spec: arc-selector.md), quiet and on one
- * line above the map, for every map style but Current: the shown arc's
+ * Which arc the course page's map shows (spec: arc-selector.md), quiet and
+ * on one line above the map: the shown arc's
  * whole name opens a menu of every arc in study order (its ring, its whole
  * name, "You are here" beside the arc he is in), and a rail of one dot per
  * arc says where the shown arc sits in the course, the arc he is in ringed.
@@ -30,7 +30,7 @@ export function ArcSelector({
 	onSelect,
 	className,
 }: {
-	arcs: readonly StripArc[];
+	arcs: readonly PillArc[];
 	/** The arc the map shows. */
 	value: ArcHandle | null;
 	/** The arc of "You are here"; null when he is in none. */
@@ -71,7 +71,7 @@ export function ArcSelector({
 
 /** One dot per arc in study order: the shown arc filled, the arc he is in
  *  ringed, each a press target that shows its arc. ← → step along it. */
-function ArcRail({ arcs, value, here, onSelect }: { arcs: readonly StripArc[]; value: ArcHandle; here: ArcHandle | null; onSelect: (arc: ArcHandle) => void }) {
+function ArcRail({ arcs, value, here, onSelect }: { arcs: readonly PillArc[]; value: ArcHandle; here: ArcHandle | null; onSelect: (arc: ArcHandle) => void }) {
 	return (
 		<div
 			data-slot="arc-rail"

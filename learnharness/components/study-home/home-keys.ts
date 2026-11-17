@@ -29,7 +29,7 @@ export function neighbourCourse(workspaces: readonly string[], workspace: string
 }
 
 /** Whether focus sits where the arrows are another surface's: the map's
- *  cards, its tabs and its arc strip own theirs, and the sidebar's rows
+ *  cards, its tabs and its arc list own theirs, and the sidebar's rows
  *  are the page's arrows' to walk. Home takes them only from its own
  *  page outside the map, or with nothing focused. */
 function arrowsBelongElsewhere(): boolean {
