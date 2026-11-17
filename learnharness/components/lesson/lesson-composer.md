@@ -1,6 +1,6 @@
 # Lesson composer
 
-`<LessonComposer />` (`lesson-composer.tsx`): the lesson's box at the bottom, lifted from T3 Code's composer (`ChatComposer.tsx`, `ComposerSurface.tsx`; MIT, notice in `T3CODE_LICENSE.txt`). The one composer: the lesson draws it (`LessonSessionComposer` wraps it with its own keystroke state), and so do New lesson (`../start/start-screen.md`, the course chip in `leading`) and a course page's foot (`../course-page/course-composer.md`, compact). Its surface (`COMPOSER_SURFACE`) is also the lesson's course-link banner's (`../course-link-banner.tsx`), so the lesson's foot is one family. Its testids (`composer`, `composer-send`, `photo-attach`, `next-problem-button`), so focus-home, the photo shortcut and the tests find it.
+`<LessonComposer />` (`lesson-composer.tsx`): the lesson's box at the bottom, lifted from T3 Code's composer (`ChatComposer.tsx`, `ComposerSurface.tsx`; MIT, notice in `T3CODE_LICENSE.txt`). The one composer: the lesson draws it (`LessonSessionComposer` wraps it with its own keystroke state), and so do New lesson (`../start/start-screen.md`, the course chip in `leading`) and a course or topic page's foot (`../course-page/course-composer.md`, compact). Its surface (`COMPOSER_SURFACE`) is also the lesson's course-link banner's (`../course-link-banner.tsx`), so the lesson's foot is one family. Its testids (`composer`, `composer-send`, `photo-attach`, `next-problem-button`), so focus-home, the photo shortcut and the tests find it.
 
 ## Anatomy
 

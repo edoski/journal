@@ -165,7 +165,7 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 					}
 				/>
 			)}
-			{!enlarged && <CourseComposer course={view.course} />}
+			{!enlarged && <CourseComposer course={{ workspace: map.workspace, title: map.title }} />}
 		</PageFrame>
 	);
 }

@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
-import { SetupDialog } from "@/components/setup-dialog";
 import { lessonCreation, useLessonStart } from "@/components/start/use-lesson-start";
+import { StartScope } from "@/components/start/start-scope";
 import { topicSessions } from "@/components/unit-inbox/units";
 import { HybridTopic } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { PageReading } from "@/components/page-frame/page-frame";
@@ -25,11 +25,12 @@ export interface TopicPageProps {
 }
 
 /**
- * The topic page (spec: topic-page.md): the start around the hybrid body,
- * whose history pane holds the action, so it has no composer: a new
- * lesson starts from the sidebar's New lesson, and a start that fails
- * says so under the head. The page appears once the topic read has
- * answered, so nothing shifts in afterwards.
+ * The topic page (spec: topic-page.md): the page's one start (`StartScope`)
+ * around the hybrid body, whose history pane holds the action and whose
+ * foot the course page's composer with the topic chosen, so the action,
+ * a task and the composer share one sign-in and one failure line under the
+ * head. The page appears once the topic read has answered, so nothing
+ * shifts in afterwards.
  */
 export function TopicPage({
 	course,
@@ -64,9 +65,8 @@ export function TopicPage({
 		else start(action.opening, "from" in action ? action.from : undefined);
 	};
 	return (
-		<>
-			<HybridTopic facts={facts} busy={lesson.busy} error={lesson.error} onAct={act} onTask={press} />
-			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
-		</>
+		<StartScope lesson={lesson}>
+			<HybridTopic facts={facts} busy={lesson.busy} onAct={act} onTask={press} />
+		</StartScope>
 	);
 }

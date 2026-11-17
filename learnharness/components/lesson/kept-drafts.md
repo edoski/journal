@@ -19,6 +19,7 @@
 |---|---|
 | `new` | the New lesson box |
 | `course:<workspace>` | a course page's composer |
+| `topic:<workspace>:<topic>` | a topic page's composer |
 | `<chat>:composer` | a lesson's message box |
 | `<chat>:q:<question key>` | an open check or question (its whole form: choice, thinking, answer, confidence) |
 | `<chat>:p:<problem call id>` | an open practice problem's thinking and confidence |

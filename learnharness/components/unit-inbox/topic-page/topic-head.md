@@ -1,6 +1,6 @@
 # Topic head
 
-`TopicHead`, the topic page's head: the course page's head's twin (`PageHead` `compact`, `../../page-frame/page-frame.md`; Edo picked Road as the course page on 17 Nov 2026), so both pages share the title's place and weight, level with the rail's open button with no line above it, and the two pages' columns start at the same height. Props: `{ facts, children? }` (`children`: lines under the mistake, the start's error). It has no button: the page's action is Now in the history pane (`pickup/pickup.md`).
+`TopicHead`, the topic page's head: the course page's head's twin (`PageHead` `compact`, `../../page-frame/page-frame.md`; Edo picked Road as the course page on 17 Nov 2026), so both pages share the title's place and weight, level with the rail's open button with no line above it, and the two pages' columns start at the same height. Props: `{ facts, children? }` (`children`: lines under the mistake, the page's start failure, `StartFailure`). It has no button: the page's action is Now in the history pane (`pickup/pickup.md`).
 
 | Line | Content | Style |
 |---|---|---|

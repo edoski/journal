@@ -14,6 +14,8 @@ import { lessonBegun } from "@/components/unit-inbox/topic-page/pickup/pickup-fa
 import { BuildsOnMap } from "@/components/unit-inbox/topic-page/hybrid/builds-on-map";
 import { useMapTie } from "@/components/course-map/use-map-tie";
 import { useListWalk } from "@/components/list-walk/use-list-walk";
+import { StartFailure } from "@/components/start/start-scope";
+import { CourseComposer } from "@/components/course-page/course-composer";
 
 /** What the history pane is given (`../pickup/pickup.md`). */
 export interface HybridPaneProps {
@@ -33,17 +35,17 @@ export interface HybridPaneProps {
 /**
  * The topic page's body (spec: hybrid.md): the page fits the window, in
  * the shared page frame (`PageFrame`, page-frame.md) the course page
- * wears. The shared head, with a start's error under it, over two bounded
- * panes side by side, each the
- * full height under it: the topic's history sorted into Pick up's sections
- * on the left, which holds the page's action, and the steps of the lesson
- * picked in it as a map on the right, since a lesson's steps run down with
- * little branching, in the app's linked columns. A topic not started, or
- * one a lesson he began has not introduced yet, shows what it builds on
- * there instead. With neither, the history takes
- * the width.
+ * wears. The shared head, with the page's start failure under it, over two
+ * bounded panes side by side, each the full height under it: the topic's
+ * history sorted into Pick up's sections on the left, which holds the
+ * page's action, and the steps of the lesson picked in it as a map on the
+ * right, since a lesson's steps run down with little branching, in the
+ * app's linked columns. A topic not started, or one a lesson he began has
+ * not introduced yet, shows what it builds on there instead. With neither,
+ * the history takes the width. At its foot, the course page's composer
+ * with the topic chosen. Its starts go through the page's `StartScope`.
  */
-export function HybridTopic({ facts, busy, error = null, onAct, onTask }: TopicPageProps & { error?: string | null }) {
+export function HybridTopic({ facts, busy, onAct, onTask }: TopicPageProps) {
 	const planned = facts.sessions.filter(isPlanned);
 	const [chosen, setChosen] = useState(() => mapLessonAtFirst(facts.sessions, facts.action));
 	// A row of Builds on lights its topic alone: the map is already the chain the topic builds on.
@@ -77,11 +79,7 @@ export function HybridTopic({ facts, busy, error = null, onAct, onTask }: TopicP
 			<div ref={head} className="contents" onKeyDown={walk.onHeadKeyDown}>
 				{/* Now and Scheduled say the review, so the head does not. */}
 				<TopicHead facts={{ ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review") }}>
-					{error && (
-						<p role="alert" data-slot="topic-lesson-error" className="flex min-h-5 items-center text-body text-danger">
-							{error}
-						</p>
-					)}
+					<StartFailure className="flex min-h-5 items-center text-body" />
 				</TopicHead>
 			</div>
 			{shown ? (
@@ -95,6 +93,7 @@ export function HybridTopic({ facts, busy, error = null, onAct, onTask }: TopicP
 			) : (
 				side("flex-1")
 			)}
+			<CourseComposer course={facts.course} topic={facts.topic} />
 		</PageFrame>
 	);
 }

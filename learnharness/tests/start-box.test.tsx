@@ -130,7 +130,7 @@ function CoursePage() {
 	return (
 		<StartScope lesson={lesson}>
 			<StartFailure />
-			<CourseComposer course={LINALG} />
+			<CourseComposer course={{ workspace: WORKSPACE, title: LINALG.map.title }} />
 		</StartScope>
 	);
 }

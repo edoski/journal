@@ -63,7 +63,7 @@ Topics and sessions whose titles match, under Topics and Sessions. Every topic f
 
 ## The topic page
 
-What a topic row or a map node opens: the head, the history sorted into Now, Next, Scheduled and Earlier, which holds the page's action, and the map of the lesson picked in it. See `topic-page/topic-page.md`. A new lesson starts from the sidebar's New lesson; the page has no composer.
+What a topic row or a map node opens: the head, the history sorted into Now, Next, Scheduled and Earlier, which holds the page's action, and the map of the lesson picked in it. See `topic-page/topic-page.md`. At its foot, the course page's composer with the topic chosen starts a new lesson on it (`../course-page/course-composer.md`).
 
 ## Sessions to topics
 

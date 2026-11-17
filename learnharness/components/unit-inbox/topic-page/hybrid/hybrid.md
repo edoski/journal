@@ -2,7 +2,7 @@
 
 The topic page's body (`../topic-page.md`), which Edo picked. Thesis: Steps and Trail in one page that fits the window, each with one job. The history, sorted by relevance into Pick up's sections, says what to pick up and what happened, and holds the page's action (`../pickup/pickup.md`); the map says where one lesson stands and what comes next.
 
-Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps` and the start's `error`), `history.tsx` (`HistoryPane` and its rows), `lesson-map.tsx` (`LessonMap`), `builds-on-map.tsx` (`BuildsOnMap`, a topic not started), `hybrid-facts.ts` (pure). Tests: `tests/topic-page-hybrid.test.tsx`.
+Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps`), `history.tsx` (`HistoryPane` and its rows), `lesson-map.tsx` (`LessonMap`), `builds-on-map.tsx` (`BuildsOnMap`, a topic not started), `hybrid-facts.ts` (pure). Tests: `tests/topic-page-hybrid.test.tsx`.
 
 ## Roles
 
@@ -13,7 +13,7 @@ Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps` and the start's
 
 ## Anatomy
 
-The shared page frame (`PageFrame`, `../../../page-frame/page-frame.md`), the course page's: centred up to 80rem, `px-6 pt-6 pb-6`, blocks `gap-5`, root `data-testid="unit-page"` `data-topic-candidate="hybrid"`, `flex-1 min-h-0`: nothing on the page scrolls. A start that fails says so under the head (`data-slot="topic-lesson-error"`), where the course page says it.
+The shared page frame (`PageFrame`, `../../../page-frame/page-frame.md`), the course page's: centred up to 80rem, `px-6 pt-6 pb-6`, blocks `gap-5`, root `data-testid="unit-page"` `data-topic-candidate="hybrid"`, `flex-1 min-h-0`: nothing on the page scrolls. Its starts go through the page's one start (`StartScope`, in `TopicPage`): one that fails says so under the head (`StartFailure`, `data-slot="start-failure"`), where the course page says it. At the foot, the course page's composer with the topic chosen (`CourseComposer`, `../../../course-page/course-composer.md`).
 
 | Block | Shown when | Size |
 |---|---|---|
