@@ -274,7 +274,10 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 	});
 	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: { ...patch, observations: ruled.observations } });
 	if (result.ok) for (const key of problem ? [problem.id] : named.questions) if (key) saved.add(key);
-	if (result.ok && !problem) keepLinks(ctx, named.questions, result.json);
+	// A problem's attempts are kept under its conclude, so its card shows while
+	// the turn still runs (round 15, 2 D2: First try / Then came only after a
+	// slow turn-end read).
+	if (result.ok) keepLinks(ctx, problem ? listed.map(() => problem.id) : named.questions, result.json);
 	const note = shownHelpNote(ruled.helped);
 	if (!result.ok || !note || typeof result.json !== "object" || result.json === null) return result;
 	const receipt = result.json as Record<string, unknown>;

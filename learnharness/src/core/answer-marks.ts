@@ -60,16 +60,20 @@ function placesOf(messages: readonly LhMessage[]): Map<string, number> {
  *  In transcript order. The record's kept save links (`answerSaves`) fill
  *  in only the attempts no save in the transcript links, so a save the
  *  transcript lost to a restart still marks its answer, and a link the
- *  transcript holds is never copied onto another answer. Every reader of
- *  the links passes the whole record, so none leaves the kept ones out. */
-export function markLinks(record: { readonly messages: readonly LhMessage[]; readonly answerSaves?: AnswerSaves }): Record<string, string[]> {
+ *  transcript holds is never copied onto another answer. A kept link to an
+ *  answer the lesson does not hold marks nothing, except while a turn runs
+ *  (`running`): its calls, a problem's conclude among them, reach the
+ *  transcript only when it ends, and the card shows as soon as the engine
+ *  holds the attempts (round 15, 2 D2). Every reader of the links passes
+ *  the whole record, so none leaves the kept ones out. */
+export function markLinks(record: { readonly messages: readonly LhMessage[]; readonly answerSaves?: AnswerSaves }, { running = false }: { running?: boolean } = {}): Record<string, string[]> {
 	const { messages, answerSaves: saves = {} } = record;
 	const links = transcriptLinks(messages);
 	const answered = answeredQuestionsOf(messages);
 	const place = placesOf(messages);
 	const linked = new Set(Object.values(links).flat());
 	for (const [key, ids] of Object.entries(saves)) {
-		if (!(answered.has(key) || messages.some((m) => m.role === "user" && m.id === key))) continue;
+		if (!(answered.has(key) || messages.some((m) => m.role === "user" && m.id === key) || (running && !place.has(key)))) continue;
 		const found = ids.filter((id) => typeof id === "string" && !linked.has(id));
 		for (const id of found) linked.add(id);
 		if (found.length) links[key] = [...(links[key] ?? []), ...found];
