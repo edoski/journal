@@ -305,7 +305,7 @@ export function Chat({
 	// turn it sets up itself and his stop. The lesson's line, Stop and box
 	// all follow it, so a handoff between agents never looks finished.
 	const attachIfRunningRef = useRef<() => void>(() => {});
-	const { busy, serverTurnRef, askStop, stopSpent, noTurnRunning } = useSessionBusy({
+	const { busy, serverTurnRef, stopAskedRef, askStop, stopSpent, noTurnRunning } = useSessionBusy({
 		chatId,
 		status,
 		attached: turnInFlight,
@@ -606,7 +606,8 @@ export function Chat({
 			if (!res.ok) return;
 			const record = (await res.json()) as { turnInFlight?: boolean };
 			if (record.turnInFlight === true) {
-				if (!localStreamRef.current && !turnInFlightRef.current) attachToRunningTurn();
+				// The turn he stopped is aborting, not one to read (round 15, m21).
+				if (!localStreamRef.current && !turnInFlightRef.current && !stopAskedRef.current) attachToRunningTurn();
 			} else noTurnRunning();
 		} catch {
 			/* unreachable: the resync asks again */
@@ -1359,6 +1360,7 @@ export function Chat({
 		// agent): the end of our stream attaches to it (useSessionBusy).
 		if (localStreamRef.current) return; // the 409-race guard
 		if (turnInFlightRef.current) return; // already attached
+		if (stopAskedRef.current) return; // the turn he stopped (round 15, m21)
 		attachToRunningTurn();
 	});
 	useServerEvent("turn-settled", (p) => {
