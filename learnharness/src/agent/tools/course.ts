@@ -184,6 +184,9 @@ function namedQuestions(
 			);
 			return rest;
 		}
+		if (answer.dropped && !("corrects" in rest)) {
+			refuse(`observations[${i}].question: the problem he left was dropped with nothing recorded (Done for today, or his discard), so nothing of it is saved, and his newest message answers nothing since. Save nothing for it.`);
+		}
 		if (questions.slice(0, -1).includes(named) && !("corrects" in rest)) {
 			refuse(`observations[${i}].question: ${JSON.stringify(named)} is named by an earlier observation of this save, and one answer is one observation with one result: list every topic it was asked on in that observation's topics, and send it once.`);
 		}

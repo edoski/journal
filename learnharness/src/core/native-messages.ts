@@ -541,7 +541,10 @@ export function newUngradedAnswerMessage(question: string): LhMarkerMessage {
  * rule Done for today states, an answer he sent before pressing it is
  * still graded, so this problem is graded, not dropped (round 13, 4 M2:
  * ⌘⇧D 2.5 s after a right answer dropped the problem, and the closing
- * turn saved the attempt on no card and without his Guessing). Pure.
+ * turn saved the attempt on no card and without his Guessing). A reply
+ * with no words and no call, thinking at most, answered nothing (round
+ * 15, M4: the cut grading turn left an empty reply that read as ended,
+ * and the answer was dropped). Pure.
  */
 export function workAwaitingGradeOf(messages: readonly LhMessage[], problemCallId: string): boolean {
 	for (let i = messages.length - 1; i >= 0; i--) {
@@ -549,6 +552,7 @@ export function workAwaitingGradeOf(messages: readonly LhMessage[], problemCallI
 		if (m.role === "user") return false;
 		if (m.role === "assistant") {
 			if (m.content.some((b) => b.type === "toolCall" && b.id === problemCallId)) return false;
+			if (!m.content.some((b) => (b.type === "text" && b.text.trim() !== "") || b.type === "toolCall")) continue;
 			if (m.stopReason !== "aborted" && m.stopReason !== "error" && m.stopReason !== "toolUse") return false;
 			continue;
 		}
@@ -911,6 +915,11 @@ export interface AnsweredQuestion {
 	/** A save that went through already recorded it, or its problem's
 	 *  conclude did. */
 	recorded: boolean;
+	/** For an answer in words: a problem posed after his newest message was
+	 *  dropped (Done for today, or his discard) with nothing recorded, so
+	 *  nothing of it is saved (round 15, M4: the closing turn saved the
+	 *  dropped problem's answer as "his-message"). */
+	dropped?: true;
 }
 
 /** The name a save gives an answer he gave in words, in a message of his
@@ -975,14 +984,23 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 	const recorded = new Set<string>();
 	let problem: string | null = null;
 	let lastSaid: string | null = null;
+	// A problem posed since his newest message, and whether one was dropped.
+	let posedSinceSaid = false;
+	let droppedSinceSaid = false;
 	const pose = (callId: string, text: unknown, type?: unknown) => {
 		if (typeof text !== "string") return;
 		const key = sameQuestionKey(text);
 		posed.set(callId, { key, seen: revealed.has(key), predicted: normalizeQuestionType(type) === "predict" });
 	};
 	for (const m of messages) {
-		if (m.role === "user") lastSaid = m.id;
-		else if (m.role === "custom" && m.customType === "problem-dismissed") problem = null;
+		if (m.role === "user") {
+			lastSaid = m.id;
+			posedSinceSaid = false;
+			droppedSinceSaid = false;
+		} else if (m.role === "custom" && m.customType === "problem-dismissed") {
+			problem = null;
+			if (posedSinceSaid) droppedSinceSaid = true;
+		}
 		else if (m.role === "assistant") {
 			for (const block of m.content) {
 				if (block.type !== "toolCall") continue;
@@ -993,6 +1011,7 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 				} else if (block.name === PRACTICE_PROBLEM_TOOL && clean.has(block.id)) {
 					pose(block.id, args.statement);
 					problem = block.id;
+					posedSinceSaid = true;
 				} else if (block.name === PRACTICE_CONCLUDE_TOOL && clean.has(block.id) && problem) {
 					const asked = posed.get(problem);
 					problem = null;
@@ -1015,7 +1034,7 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 		}
 	}
 	for (const [key, answer] of answered) answer.recorded = recorded.has(key);
-	if (lastSaid) answered.set(HIS_MESSAGE, { tool: "message", seenBefore: false, confidence: null, recorded: recorded.has(`${HIS_MESSAGE}:${lastSaid}`) });
+	if (lastSaid) answered.set(HIS_MESSAGE, { tool: "message", seenBefore: false, confidence: null, recorded: recorded.has(`${HIS_MESSAGE}:${lastSaid}`), ...(droppedSinceSaid ? { dropped: true as const } : {}) });
 	return { posed, answered };
 }
 
