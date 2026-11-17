@@ -27,7 +27,6 @@ import {
 	layoutTopicMap,
 	neighbourOf,
 	openingCamera,
-	routePath,
 	type Camera,
 	type TopicMapLayout,
 } from "../components/course-map/topic-map/topic-map-layout.ts";
@@ -222,12 +221,6 @@ describe("topic map geometry", () => {
 				}
 			}
 		}
-	});
-
-	it("draws a route as S-curves between layers and straight lines past the layers it skips", () => {
-		assert.equal(routePath([[0, 0], [40, 56]]), "M0,0 C0,28 40,28 40,56");
-		assert.equal(routePath([[0, 0], [40, 56], [40, 120], [10, 176]]), "M0,0 C0,28 40,28 40,56 L40,120 C40,148 10,148 10,176");
-		assert.equal(routePath([]), "");
 	});
 
 	it("stacks a course with no needs in one column, in the engine's order", () => {

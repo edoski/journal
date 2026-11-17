@@ -17,7 +17,7 @@ export interface NodeSize {
 	height: number;
 }
 
-/** The box a lesson's step map draws its steps in (224×64). */
+/** The layered drawing's default box (224×64). */
 export const NODE_SIZE: NodeSize = { width: NODE_WIDTH, height: NODE_HEIGHT };
 /** Space between topics in a layer, and between layers. */
 export const NODE_GAP = 24;
@@ -124,28 +124,6 @@ export function layoutTopicMap(topics: readonly { handle: TopicHandle }[], edges
 	return { node, width, height, topics: placed, routes, layers };
 }
 
-/**
- * A route as an SVG path: between layers one smooth S-curve that leaves and
- * arrives vertically, and straight down past a layer it skips. Pure.
- */
-export function routePath(points: readonly Point[]): string {
-	const [start, ...rest] = points;
-	if (!start) return "";
-	let d = `M${start[0]},${start[1]}`;
-	let from = start;
-	rest.forEach((to, index) => {
-		// The first step and every second one after it cross a layer gap; the others run down past a skipped layer.
-		if (index % 2 === 0) {
-			const mid = (from[1] + to[1]) / 2;
-			d += ` C${from[0]},${mid} ${to[0]},${mid} ${to[0]},${to[1]}`;
-		} else {
-			d += ` L${to[0]},${to[1]}`;
-		}
-		from = to;
-	});
-	return d;
-}
-
 /** A topic with every prerequisite it has, transitively. */
 export function chainOf(handle: TopicHandle, edges: readonly CourseMapEdge[]): Set<TopicHandle> {
 	const found = new Set<TopicHandle>([handle]);
@@ -207,8 +185,6 @@ export const WHOLE_COURSE_ZOOM = 0.75;
  *  which keeps a full 11px: on Edo's window Linear Algebra cannot open
  *  there without a card cut at the frame's edge, on Home or on its page. */
 export const READABLE_ZOOM = 0.8;
-/** The furthest the map zooms out by hand. */
-export const MIN_ZOOM = 0.4;
 
 /** The scale at which the whole drawing, with `room` around it, fits a
  *  frame. `room` is in the frame's pixels at any scale, as is every room

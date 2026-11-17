@@ -1,6 +1,6 @@
 import type { CourseMapEdge, PlanNodeStatus, SessionPlan, TopicHandle } from "@/src/core";
 import { layoutCanvas } from "@/components/course-map/topic-map/canvas/canvas-layout";
-import { NODE_GAP, WHOLE_COURSE_ZOOM, type Camera, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
+import { NODE_GAP, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import { PLAN_MAP_CAP } from "@/src/core";
 import { dayWords } from "@/components/unit-inbox/topic-page/topic-facts";
 
@@ -88,49 +88,6 @@ export function stepCard(across: number, frameWidth: number, fade: { x: number }
 	const width = Math.max(1, Math.min(column, Math.max(STEP_SIZE.width, Math.ceil(oneLine))));
 	return { width, height: Math.max(STEP_SIZE.height, Math.ceil(heightAt(width))) };
 }
-/** A step's tag ("Next", "Left off here") sits this far above its card. */
-export const TAG_ROOM = 20;
-
-type Frame = { width: number; height: number };
-type Fade = { x: number; y: number };
-
-/** One axis of the opening view: the plan's span `lo`..`hi` in the
- *  frame's clear middle when it fits there, centred, or on its start edge
- *  with `top` (the vertical axis: a plan sits at the top of the pane, by
- *  the list's first row, never floating mid-pane; round 14, m39, Kernel's
- *  two sheet parts); else `at` at the frame's middle, pulled back so the
- *  plan's edge never leaves the clear middle. */
-function along(lo: number, hi: number, at: number, frame: number, fade: number, zoom: number, top = false): number {
-	if ((hi - lo) * zoom <= frame - fade * 2) return top ? fade - lo * zoom : frame / 2 - ((lo + hi) / 2) * zoom;
-	return Math.min(fade - lo * zoom, Math.max(frame - fade - hi * zoom, frame / 2 - at * zoom));
-}
-
-/** The scale at which a plan and the tags over its top row fit a frame's
- *  clear middle (inside the fade), up to full size. */
-function fitZoom(layout: TopicMapLayout, frame: Frame, fade: Fade): number {
-	if (layout.width === 0 || layout.height === 0) return 1;
-	return Math.min(1, (frame.width - fade.x * 2) / layout.width, (frame.height - fade.y * 2) / (layout.height + TAG_ROOM));
-}
-
-/**
- * Where a lesson's step map opens in a frame whose edges fade by `fade`:
- * the whole plan, tags included, clear of the fade at the largest scale up
- * to full size, centred across and at the top of the frame; never below
- * the topic map's whole-course scale, where a plan still too big is framed
- * on the step `current` (the first step when none), the plan's edges kept
- * inside the clear middle. Pure.
- */
-export function stepsCamera(layout: TopicMapLayout, current: TopicHandle | null, frame: Frame, fade: Fade): Camera {
-	const zoom = Math.max(WHOLE_COURSE_ZOOM, fitZoom(layout, frame, fade));
-	const at = (current && layout.topics.get(current)) ?? layout.topics.get(layout.layers[0]?.[0] as TopicHandle);
-	const [cx, cy] = at ? [at.x + layout.node.width / 2, at.y + layout.node.height / 2] : [layout.width / 2, layout.height / 2];
-	return {
-		x: along(0, layout.width, cx, frame.width, fade.x, zoom),
-		y: along(-TAG_ROOM, layout.height, cy, frame.height, fade.y, zoom, true),
-		zoom,
-	};
-}
-
 export interface StepMark {
 	status: PlanNodeStatus;
 	/** The words above the ringed step: "Your turn" while the lesson waits on
