@@ -1,12 +1,13 @@
 # Course page candidates
 
-The `coursepage` switch (`../course-page-variant.ts`, registry in `../../design-variant.ts`) offers Current and three candidates for the course page's head and left column (Edo, 17 Nov 2026: the facts row is "unbearably messy", the left column "ridiculously messy"). The map on the right is the settled `ArcMap` on every candidate. Each candidate is `SplitBody` (`../split/split-course.tsx`) with its own `head` and `list`, so the linked columns, the hover tie to the map, the arrow walk and the course frame's states are one implementation. Production draws Current until one ships; shipping deletes Current, the other folders and the switch.
+The `coursepage` switch (`../course-page-variant.ts`, registry in `../../design-variant.ts`) offers Current and the candidates for the course page's head and left column (Edo, 17 Nov 2026: the facts row is "unbearably messy", the left column "ridiculously messy"). The map on the right is the settled `ArcMap` on every candidate. Each candidate is `SplitBody` (`../split/split-course.tsx`) with its own `head` and `list` (and `rows` for the map over the list), so the linked columns, the hover tie to the map, the arrow walk and the course frame's states are one implementation. Production draws Current until one ships; shipping deletes Current, the other folders and the switch.
 
 | Option | Thesis | Spec |
 |---|---|---|
 | `overview` | Linear's project overview: the head says what to do next and why, then three facts; the list is the course's arcs, quiet unless he has something to do there | `overview/overview.md` |
 | `agenda` | Anki's deck overview and the topic page's Now: the list answers only "what now" (Now, Then, the arc the map shows) and leaves the arcs to the map's own list | `agenda/agenda.md` |
 | `road` | Things' deadline and Duolingo's path: the arcs in study order on one track, each with the one fact the road needs, the exam a stop where the plan reaches it | `road/road.md` |
+| `roadrows` | Road in two rows: the map across the top, the road under it left to right, each arc's topics hanging under its stop | `roadrows/roadrows.md` |
 
 ## Shared rules
 

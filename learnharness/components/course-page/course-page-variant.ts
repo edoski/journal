@@ -7,7 +7,7 @@ import { onPolishChange, polishVariant } from "@/components/dev/polish-variant.j
  *  (design-variant.ts), each in its own folder under `candidates/` with its
  *  spec. Current is the page as it is. Every candidate reads the same
  *  course, draws the same map and opens the same pages. */
-export const COURSE_PAGE_OPTIONS = ["overview", "agenda", "road"] as const;
+export const COURSE_PAGE_OPTIONS = ["overview", "agenda", "road", "roadrows"] as const;
 export type CoursePageVariant = "current" | (typeof COURSE_PAGE_OPTIONS)[number];
 
 const DEV = process.env.NODE_ENV === "development";
