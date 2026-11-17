@@ -420,6 +420,19 @@ function assertExamWarnings(s: Survey) {
 			if (noRoom && said.length > 0 && !warned) problems.push(`${topic.title}: ${said.join(" and ")} say there is no room before the exam to start it, its page says nothing of the exam ("${page.note || page.scheduled || page.now}")`);
 			if (warned && !leftOut && !noRoom && !(exam.unreviewed ?? []).includes(topic.handle)) problems.push(`${topic.title}: its page warns of the exam ("${page.text.match(EXAM_WARNING)?.[0]}"), the plan leaves nothing of it out`);
 		}
+		// The course page says each loss in the topic page's own words, an exam topic with no room apart from one the
+		// exam leaves out, and its head names every exam topic with no room (round 15, M7: all three read "After the
+		// exam", the loss behind "Not all of it fits").
+		for (const topic of course.map.topics) {
+			const row = s.rows.get(keyOf(course.map.workspace, topic.handle));
+			if (!row || !topic.starts || topic.starts <= exam.date) continue;
+			const want = exam.leavesOut?.includes(topic.handle) ? "Not on the exam" : exam.doesNotFit?.includes(topic.handle) ? "Not before the exam" : null;
+			if (want && row !== want) problems.push(`${topic.title}: its course page row says "${row}", not "${want}"`);
+		}
+		for (const handle of exam.doesNotFit ?? []) {
+			const title = course.map.topics.find((t) => t.handle === handle)?.title ?? handle;
+			if (!names(head, title)) problems.push(`${title}: the exam has no room for it, the course head does not name it ("${head}")`);
+		}
 	}
 	assert.ok(problems.length === 0, `${s.label}:\n  ${problems.join("\n  ")}`);
 }

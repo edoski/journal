@@ -498,10 +498,14 @@ export function leftOutWords(topic: Pick<CourseMapTopic, "handle" | "starts">, e
 	return topic.starts && topic.starts > exam.date ? "Not on the exam; after it" : "Not on the exam";
 }
 
-/** A course page row's status for a topic the exam's plan has no room to
- *  start before the exam, its planned day in the row's hint (round 12,
- *  1 m11). */
-export const AFTER_EXAM = "After the exam";
+/** A course page row's status for a topic the exam ahead puts after it,
+ *  its planned day in the row's hint (round 12, 1 m11), in the topic
+ *  page's own short words: an exam topic the plan has no room to start
+ *  before the exam is "Not before the exam", one the exam leaves out "Not
+ *  on the exam" (round 15, M7: on the exam eve Geometric and Variance,
+ *  which the exam needs, and Covariance, which it leaves out, all read
+ *  "After the exam"). */
+export const ARC_ROW_EXAM_WORDS = { noRoom: "Not before the exam", leftOut: "Not on the exam" } as const;
 
 /** What the exam's plan means for a topic it leaves out (`examGaps`), on
  *  the topic's own page, in the engine's reason (`exam.reasons`). A
@@ -511,11 +515,11 @@ export const EXAM_GAP_TOPIC_WORDS: {
 	review: Readonly<Record<ExamGapReason | "none", string>>;
 } = {
 	start: {
-		none: "Not before the exam",
+		none: ARC_ROW_EXAM_WORDS.noRoom,
 		no_study_day: "Not before the exam, no study day is left",
 		not_ready: "Not before the exam, what it needs won’t be solid in time",
 		full: "Not before the exam, every study day is full at your pace",
-		too_late: "Not before the exam",
+		too_late: ARC_ROW_EXAM_WORDS.noRoom,
 	},
 	// The final review has no slot for it, whatever reviews come before
 	// it: "No review before the exam" read false beside "Review Wed 11 Nov"
@@ -792,11 +796,12 @@ export const READY_WORDS = {
 
 /** Where he stands for the exam as one fact of a head, a few words (the
  *  course page's head): the whole answer opens under it. "No exam"
- *  for a course without one. */
+ *  for a course without one. When the plan cannot fit all of it, the head
+ *  says what it loses in its own words (`ExamReady`'s), never "Not all of
+ *  it fits" (round 15, M7). */
 export const READY_FACT_WORDS = {
 	ready: "Ready for the exam",
 	notYet: "Not ready yet",
-	short: "Not all of it fits",
 	none: "No exam",
 } as const;
 

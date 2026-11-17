@@ -153,13 +153,14 @@ describe("the course head", () => {
 });
 
 describe("the readiness fact", () => {
-	it("says No exam for a course without one, Not all of it fits in the warning ink when the plan has no room", () => {
+	it("says No exam for a course without one, and what the plan loses in the warning ink when it has no room (round 15, M7: \"Not all of it fits\")", () => {
 		const none = viewOf(course({ exam: null }));
 		assert.equal(text(render(<ReadyFact view={none} ready={null} />).querySelector('[data-slot="course-ready-fact"]')), READY_FACT_WORDS.none);
 		const view = viewOf(course());
 		const short = examReady(readiness(part({ arc: a("eigen"), wontFit: [h("diag")] })), view.course.map, view.arcs, []);
 		const fact = render(<ReadyFact view={view} ready={short} />).querySelector('[data-slot="course-ready-fact"]')!;
-		assert.equal(text(fact), READY_FACT_WORDS.short);
+		const diag = view.course.map.topics.find((t) => t.handle === "diag")!.title;
+		assert.equal(text(fact), `No room before the exam to start ${diag}`);
 		assert.match(fact.className, /text-warning/);
 	});
 });

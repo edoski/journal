@@ -6,7 +6,7 @@ import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said, type SidebarPlace, type TopicFact } from "@/components/unit-inbox/sidebar-says";
-import { AFTER_EXAM, ARC_EXAM_WORDS, courseShareWords, firstLessonWords, reviewWords, shortDay, shortReviewWords } from "@/components/study-words";
+import { ARC_EXAM_WORDS, ARC_ROW_EXAM_WORDS, courseShareWords, firstLessonWords, reviewWords, shortDay, shortReviewWords } from "@/components/study-words";
 import { nowFor } from "@/components/unit-inbox/now-inbox";
 import { todayTop } from "@/components/unit-inbox/today/today-top";
 import { buildInbox } from "@/components/unit-inbox/units";
@@ -106,10 +106,11 @@ function courseRows(course: StudyCourse, chats: readonly ChatListItem[], courses
 		// its day in the hint (round 12, 1 m11: "Geometric · Planned 29 Nov" on the exam's own course page while
 		// its topic page said "Not before the exam"), where he is too (round 13, 1 n2: "You are here" beside the
 		// head's no room before the exam to start it).
-		const waits = [...(map.exam?.doesNotFit ?? []), ...(map.exam?.leavesOut ?? [])].includes(topic.handle);
+		const leftOut = map.exam?.leavesOut?.includes(topic.handle) ?? false;
+		const waits = leftOut || (map.exam?.doesNotFit?.includes(topic.handle) ?? false);
 		const afterExam = planned && topic.starts && map.exam && map.exam.daysLeft >= 0 && topic.starts > map.exam.date && waits;
 		const shown = here && !afterExam ? HERE : (planned ?? fact);
-		const words = afterExam ? AFTER_EXAM : planned && shown === planned && topic.starts && topic.starts > map.today ? `Planned ${shortDay(topic.starts)}` : shownWords(shown, topic, map.today);
+		const words = afterExam ? ARC_ROW_EXAM_WORDS[leftOut ? "leftOut" : "noRoom"] : planned && shown === planned && topic.starts && topic.starts > map.today ? `Planned ${shortDay(topic.starts)}` : shownWords(shown, topic, map.today);
 		return { topic, group, fact: shown, factWords: words, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
 	});
 	return { rows, said };
