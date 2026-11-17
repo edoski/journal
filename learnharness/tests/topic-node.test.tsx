@@ -63,7 +63,7 @@ describe("the card", () => {
 		{ name: "mixed up with a method", topic: weak("attempted", { choiceErrors: { cramer: 1 } }), fact: { kind: "slip", words: "Mixed up with Cramer's rule", slip: "mixed" }, line: "Mixed up with Cramer's rule" },
 		{ name: "an open task", topic: topic({ level: "attempted", tasks: ["sheet-4"] }), fact: { kind: "task", words: "Left off 3d ago" }, line: "Left off 3d ago" },
 	];
-	const line = (doc: Document) => (doc.querySelector('[data-slot="topic-need"]') ?? doc.querySelector('[data-slot="topic-standing"]'))!.textContent;
+	const line = (doc: Document) => (doc.querySelector('[data-slot="topic-need"] [data-slot="status-words"]') ?? doc.querySelector('[data-slot="topic-standing"]'))!.textContent;
 
 	for (const state of STATES) {
 		it(`says it for ${state.name}`, () => {

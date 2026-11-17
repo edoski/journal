@@ -199,7 +199,7 @@ export type UnitStatus =
 	| { kind: "your-turn" }
 	| { kind: "working" }
 	| { kind: "slip"; words: string; slip: SlipKey }
-	| { kind: "review" | "task" | "returns" | "studied" | "stopped"; words: string }
+	| { kind: "review" | "task" | "back" | "studied" | "stopped"; words: string }
 	/** Nothing to say; `words` names a topic he has not started ("Not
 	 *  started"), which search lists beside the topics he has. */
 	| { kind: "none"; words?: string };
@@ -265,7 +265,7 @@ export function unitStatus(unit: Unit, today: string, asked = false): UnitStatus
 	if (unit.task && !(studied && unit.task.updated && dayOf(studied) > unit.task.updated)) return { kind: "task", words: taskWords(unit.task, today) };
 	// A review held past memory's day is due already ("Due since 6 Nov"):
 	// a fact that needs him, which the map's card shows, never a date ahead.
-	if (topic.review?.kind === "scheduled") return { kind: topic.review.held && topic.review.held.since < today ? "review" : "returns", words: reviewWords(topic.review, today) };
+	if (topic.review?.kind === "scheduled") return { kind: topic.review.held && topic.review.held.since < today ? "review" : "back", words: reviewWords(topic.review, today) };
 	const at = unit.sessions[0]?.updatedAt ?? topic.introduced;
 	if (at) return { kind: "studied", words: studiedWords(at, today) };
 	return topic.level === "new" ? { kind: "none", words: STANDING_WORDS[0] } : { kind: "none" };

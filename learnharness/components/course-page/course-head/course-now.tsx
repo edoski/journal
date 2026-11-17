@@ -7,9 +7,10 @@ import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { standingOf } from "@/components/course-map/topic-map/topic-standing";
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
 import { ProgressRing } from "@/components/study-home/agenda-rows/progress-ring";
-import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
 import { lessonOf } from "@/components/study-home/lesson-facts";
 import { PagePress } from "@/components/page-frame/page-frame";
+import { reasonMark } from "@/components/unit-inbox/fact-icon";
+import { StatusMark } from "@/components/unit-inbox/status-mark";
 import type { CourseColumns } from "@/components/course-page/split/split-course";
 
 const NOW_ROW = "group/press -mx-3 flex h-14 w-[calc(100%+1.5rem)] items-center gap-4 rounded-lg px-3 text-left font-normal whitespace-normal";
@@ -32,8 +33,9 @@ export function CourseNow({ view, busy, onContinue }: CourseColumns) {
 		<>
 			<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 				<MathLine className="min-w-0 text-headline text-foreground">{title}</MathLine>
-				<span className="flex min-w-0 overflow-hidden [&_[data-slot=today-why]]:max-w-full">
-					<WhyMark why={why} />
+				<span className="flex min-w-0 overflow-hidden">
+					{/* A new topic's reason only while it fits on one line; cut, its plain words, since the topic page says the whole reason. */}
+					{why && <StatusMark data-slot="today-why" {...reasonMark(why)} short={why.starts ? reasonMark(why, why.short) : undefined} className="max-w-full" />}
 				</span>
 			</span>
 			<PagePress word={word} />

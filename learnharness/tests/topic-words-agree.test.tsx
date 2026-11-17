@@ -38,7 +38,7 @@ function sidebarWords(courses: readonly StudyCourse[], chats: readonly ChatListI
 	for (const u of [...shelves.working, ...shelves.learning, ...shelves.known]) {
 		const status = shelfStatus(u as Unit, inbox.today, plannedKeys(courses));
 		const words = status.kind === "your-turn" ? "Your turn" : status.kind === "working" ? "Tutor writing" : ("words" in status ? status.words : undefined) ?? "";
-		said.set(u.key, { words, when: status.kind === "returns" || status.kind === "studied" });
+		said.set(u.key, { words, when: status.kind === "back" || status.kind === "studied" });
 	}
 	return said;
 }
@@ -49,7 +49,7 @@ function cardLines(course: StudyCourse, chats: readonly ChatListItem[], courses:
 	return new Map(
 		course.map.topics.map((t) => {
 			const node = document.querySelector(`[data-testid="map-node-${t.handle}"]`)!;
-			const line = node.querySelector('[data-slot="topic-need"], [data-slot="topic-standing"]')!;
+			const line = node.querySelector('[data-slot="topic-need"] [data-slot="status-words"], [data-slot="topic-standing"]')!;
 			return [t.handle, line.textContent ?? ""];
 		}),
 	);

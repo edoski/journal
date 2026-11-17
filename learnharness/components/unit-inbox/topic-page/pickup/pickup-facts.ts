@@ -15,10 +15,10 @@ import { FIRST_LESSON, TUTOR_WRITING, overdueWords, pressWord, startsAfterWords,
  * the day the plan starts it, and the pane says why it comes now.
  */
 
-/** The icon Now leads with, the one the rest of the app uses for the same
- *  thing: the reply mark, the tutor's spinner, the review clock, the task
- *  bookmark, or the topic's pie. */
-export type NowIconKind = "reply" | "writing" | "review" | "task" | "standing";
+/** The fact Now leads with, in the one icon table's kinds (`FACT_ICON`):
+ *  a turn that waits, the tutor writing, a review, an open task, or the
+ *  topic's pie. */
+export type NowIconKind = "your-turn" | "working" | "review" | "task" | "standing";
 
 /** The one thing to pick up now, whichever row of the action table holds:
  *  what it is in a few words, where it stands in fewer, and the press. */
@@ -127,7 +127,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 			const left = entry?.state === "left";
 			return {
 				...base,
-				icon: action.kind === "open" ? "writing" : left ? "task" : "reply",
+				icon: action.kind === "open" ? "working" : left ? "task" : "your-turn",
 				words: sessionName(action.chat, facts),
 				note: action.kind === "open" ? TUTOR_WRITING : left ? leftWords(action.chat, facts.today) : entry?.state === "paused" ? pausedWords(action.chat) : "Your turn",
 				chat: action.chat.id,

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
-import { BookmarkIcon, BookOpenIcon, ChevronDownIcon, CircleDashedIcon, HistoryIcon, MessageCircleQuestionIcon } from "lucide-react";
+import { BookOpenIcon, ChevronDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FIRST_LESSON, LESSON_GOES_ON, moreWords } from "@/components/study-words";
 import { daysThatFit } from "@/components/unit-inbox/topic-page/pickup/earlier-fit";
@@ -10,13 +10,13 @@ import { Button } from "@/components/ui/button";
 import { PagePress } from "@/components/page-frame/page-frame";
 import { AttemptEntry, SessionItem, type Ends } from "@/components/unit-inbox/topic-page/hybrid/history";
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
-import { BrailleSpinner } from "@/components/braille-spinner";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { BLEED, GUTTER, HAIRLINE, NOW_RULE, ONE_LINE_ROW, TWO_LINE_ROW, WRAPPING_ROW } from "@/components/unit-inbox/topic-page/row-classes";
 import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
-import type { NextItem, NowIconKind, NowItem } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
-import type { BuildsOn, StartsReason, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
-import { STARTS_ICON } from "@/components/study-home/agenda-rows/why-mark";
+import type { NextItem, NowItem } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
+import type { BuildsOn, StartsReason } from "@/components/unit-inbox/topic-page/topic-facts";
+import { startsFact } from "@/components/unit-inbox/fact-icon";
+import { FactIcon } from "@/components/unit-inbox/status-mark";
 import type { TopicRef } from "@/src/core";
 import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
@@ -72,27 +72,11 @@ export function NowPress({ now, busy, onAct, className }: { now: NowItem; busy: 
 	);
 }
 
-/** The icon Now leads with, the app's own for the same thing: the reply mark in the accent, the tutor's spinner, the review
- *  clock, the task bookmark, or the topic's pie (a dashed ring while the
- *  head line is silent). */
-export function NowIconMark({ icon, facts, className = "size-4" }: { icon: NowIconKind; facts: TopicFacts; className?: string }) {
-	switch (icon) {
-		case "reply":
-			return <MessageCircleQuestionIcon aria-hidden className={`${className} shrink-0 text-link`} />;
-		case "writing":
-			return <BrailleSpinner className="shrink-0 text-muted-foreground" />;
-		case "review":
-			return <HistoryIcon aria-hidden className={`${className} shrink-0 text-muted-foreground`} />;
-		case "task":
-			return <BookmarkIcon aria-hidden className={`${className} shrink-0 text-muted-foreground`} />;
-		case "standing":
-			return facts.standing ? <TopicGlyph standing={facts.standing} /> : <CircleDashedIcon aria-hidden className={`${className} shrink-0 text-muted-foreground`} />;
-	}
-}
-
-/** The icon Now leads with. */
+/** The icon Now leads with, the one every surface wears for the same fact
+ *  (`FactIcon`): Your turn in the accent, the tutor's spinner, a review, an
+ *  open task, or the topic's pie (a dashed ring while the head is silent). */
 export function NowIcon({ now, facts }: { now: NowItem; facts: HybridPaneProps["facts"] }) {
-	return <NowIconMark icon={now.icon} facts={facts} />;
+	return <FactIcon fact={now.icon === "standing" ? { kind: "standing", standing: facts.standing } : { kind: now.icon }} className="size-4" />;
 }
 
 /** Next: each other place that waits, in Home's one-line row. A session
@@ -101,11 +85,11 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 	return (
 		<ul className="flex flex-col">
 			{items.map((item) => {
-				if (item.kind === "session") return <SessionItem key={item.entry.chat.id} entry={item.entry} shown={item.entry.chat.id === shown} onShow={onShow} ends={{ above: false, below: false }} writing="Tutor writing" />;
+				if (item.kind === "session") return <SessionItem key={item.entry.chat.id} entry={item.entry} shown={item.entry.chat.id === shown} onShow={onShow} ends={{ above: false, below: false }} />;
 				return (
 					<li key={item.kind === "task" ? item.key : "review"}>
 						<Button variant="quiet" data-slot="pickup-next" data-kind={item.kind} disabled={busy} onClick={() => onTask(item.press)} className={item.kind === "task" && item.step ? TWO_LINE_ROW : ONE_LINE_ROW}>
-							{item.kind === "task" ? <BookmarkIcon aria-label="Unfinished" className={ICON} /> : <HistoryIcon aria-label="Review" className={ICON} />}
+							<FactIcon fact={{ kind: item.kind }} label={item.kind === "task" ? "Unfinished" : "Review"} className="size-4" />
 							<span className="col-span-2 truncate text-body text-foreground"><LineText>{item.kind === "task" ? item.title : item.words}</LineText></span>
 							{item.kind === "task" && item.step && (
 								<span data-slot="pickup-next-step" className="col-span-2 col-start-2 truncate text-callout text-muted-foreground">
@@ -174,10 +158,9 @@ export function MaterialList({ refs }: { refs: readonly TopicRef[] }) {
  *  say it: its icon and the whole sentence, 12 muted, wrapping rather than
  *  cut. */
 export function StartsWhyLine({ why, className }: { why: StartsReason; className?: string }) {
-	const Icon = STARTS_ICON[why.kind];
 	return (
 		<span data-slot="topic-starts-why" data-kind={why.kind} className={cn("flex items-start gap-1.5 text-callout text-muted-foreground", className)}>
-			<Icon aria-hidden className="mt-0.5 size-3 shrink-0" />
+			<FactIcon fact={startsFact(why.kind)} className="mt-0.5 size-3" />
 			<MathText>{why.words}</MathText>
 		</span>
 	);
@@ -185,12 +168,13 @@ export function StartsWhyLine({ why, className }: { why: StartsReason; className
 
 /** Scheduled: the engine's next review or a topic's first lesson, why it
  *  waits when something comes first, and its day in the date column; a
- *  first lesson also says why it comes then. A date, not a control. */
+ *  first lesson also says why it comes then. Each wears the calendar's
+ *  icon for the same thing: a review, a new topic's arrow, a lesson that
+ *  goes on. A date, not a control. */
 export function ScheduledEntry({ kind, day, waits, why }: { kind: "review" | "start" | "lesson"; day: string; waits: string | null; why?: StartsReason | null }) {
-	const Icon = kind === "review" ? HistoryIcon : BookOpenIcon;
 	return (
 		<p data-slot="pickup-scheduled" data-kind={kind} className={cn("grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4", GUTTER, (waits || why) && "py-2")}>
-			<Icon aria-hidden className={ICON} />
+			<FactIcon fact={{ kind: kind === "start" ? "next" : kind }} className="size-4" />
 			<span className="truncate text-body text-muted-foreground">{kind === "review" ? "Review" : kind === "lesson" ? LESSON_GOES_ON : FIRST_LESSON}</span>
 			<span data-slot="topic-history-date" className="text-callout text-muted-foreground tabular-nums">
 				{day}
@@ -264,7 +248,7 @@ export function EarlierDays({ days, shown, onShow, titleOf }: { days: readonly T
 					day.rows.map((row, i) => {
 						const date = i === 0 ? day.label : null;
 						return row.kind === "session" ? (
-							<SessionItem key={row.entry.chat.id} entry={row.entry} shown={row.entry.chat.id === shown} onShow={onShow} ends={ends()} date={date} writing="Tutor writing" />
+							<SessionItem key={row.entry.chat.id} entry={row.entry} shown={row.entry.chat.id === shown} onShow={onShow} ends={ends()} date={date} />
 						) : (
 							<AttemptEntry key={row.attempt.id} attempt={row.attempt} title={row.title} titleOf={titleOf} ends={ends()} date={date} />
 						);

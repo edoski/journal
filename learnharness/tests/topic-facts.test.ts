@@ -398,7 +398,7 @@ describe("where to pick the topic back up", () => {
 		assert.equal(pickups(TOPICS.determinant, [chat({ kind: "practice", pendingProblem: true })])[0]!.where, "Problem waiting");
 		const writing = pickups(TOPICS.determinant, [chat({ busy: true, pendingQuestion: true })])[0]!;
 		assert.equal(writing.kind === "session" && writing.waits, false);
-		assert.equal(writing.where, "The tutor is writing");
+		assert.equal(writing.where, "Tutor writing", "the one word for it (`TUTOR_WRITING`), never a second phrasing");
 	});
 
 	it("names the step a lesson is on while the tutor writes in it", () => {

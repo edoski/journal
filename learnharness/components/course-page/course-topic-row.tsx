@@ -1,42 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { BrailleSpinner } from "@/components/braille-spinner";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { Hint } from "@/components/ui/hint";
-import { factIcon } from "@/components/unit-inbox/fact-icon";
+import { StatusMark } from "@/components/unit-inbox/status-mark";
 import type { CourseTopic } from "@/components/course-page/course-model";
-import type { TopicFact } from "@/components/unit-inbox/sidebar-says";
 import { cn } from "@/lib/utils";
 import { MathText } from "@/components/ui/math-text";
 import { MathLine } from "@/components/ui/math-line";
 
 /** A hairline above every row but the first, across the column. */
 const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border/50";
-
-/** The row's fact: its icon, then its words, whole on every row (round
- *  11, 1 N8: a bare arrow, bookmark or check-circle beside rows with
- *  words); a turn that waits wears the accent, as in the sidebar and on
- *  Today. The row shows `words` ("Due 6 Nov"); the hint always holds the
- *  whole sentence (`fact.words`, "Due since 6 Nov, back 20 Nov"). */
-function Fact({ fact, words }: { fact: TopicFact; words: string }) {
-	const Icon = factIcon(fact);
-	return (
-		<Hint label={fact.words} side="left">
-			<span
-				data-slot="course-topic-fact"
-				data-kind={fact.kind}
-				className={cn("inline-flex h-5 shrink-0 items-center gap-x-1.5 text-callout", fact.kind === "your-turn" ? "text-link" : "text-muted-foreground")}
-			>
-				{Icon ? <Icon aria-hidden className="size-3.5 shrink-0" /> : fact.kind === "working" && <BrailleSpinner />}
-				<span data-slot="course-topic-fact-words" className="whitespace-nowrap">
-					{words}
-				</span>
-			</span>
-		</Hint>
-	);
-}
 
 /**
  * One topic of a course page (spec: course-topic-row.md): the map's pie,
@@ -93,7 +68,13 @@ export function CourseTopicRow({
 						</span>
 					)}
 				</span>
-				{row.fact && <Fact fact={row.fact} words={row.factWords ?? row.fact.words} />}
+				{/* Its fact's words whole on every row (round 11, 1 N8: a bare arrow, bookmark or check-circle beside rows with words);
+				    the row says its shortest words ("Due 6 Nov"), the hint the whole sentence ("Due since 6 Nov, back 20 Nov"). */}
+				{row.fact && (
+					<Hint label={row.fact.words} side="left">
+						<StatusMark data-slot="course-topic-fact" fact={row.fact} words={row.factWords ?? row.fact.words} whole className="h-5 shrink-0" />
+					</Hint>
+				)}
 			</Link>
 		</li>
 	);

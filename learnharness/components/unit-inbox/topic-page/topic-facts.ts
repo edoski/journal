@@ -1,6 +1,6 @@
 import { isReviewSession, markHow, topicOpening, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, lessonBegun, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, lessonBegun, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -320,10 +320,6 @@ export function sessionEntries(sessions: readonly ChatListItem[], plans: readonl
 	});
 }
 
-/** What the pick-up row says while the tutor writes and no step is known. */
-export const WRITING = "The tutor is writing";
-
-
 /** Where a session stands: the step its newest tagged question is about;
  *  else, while the tutor writes, that it writes; else that it stopped
  *  mid-reply; else that he left it for next time; else a practice problem
@@ -331,7 +327,7 @@ export const WRITING = "The tutor is writing";
 function whereOf(entry: SessionEntry): string {
 	const step = entry.plan?.tree.nodes.find((node) => node.id === entry.plan?.current);
 	if (step) return step.title;
-	if (entry.state === "working") return WRITING;
+	if (entry.state === "working") return TUTOR_WRITING;
 	if (entry.state === "paused") return pausedWords(entry.chat);
 	if (entry.state === "left") return LESSON_WORDS.leftForTonight;
 	return entry.chat.pendingProblem ? "Problem waiting" : "Question waiting";

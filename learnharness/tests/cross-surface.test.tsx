@@ -284,7 +284,7 @@ function assertOneStatus(s: Survey) {
 		// for Home's "Not right last time: Matrix multiplication as composition"): the same status.
 		// A new topic's reason shows in its own words on Home's row ("Back to Linear maps and matrices", "Next in …") and in
 		// its plain words on the card ("Planned today"): one fact at two sizes, since a size `slot` mark keeps the plain
-		// words and a sidebar card names no arc (why-mark.md; Edo, 14 Nov; round 13, 1 n5). Seen once the demo world formed
+		// words and a sidebar card names no arc (status-mark.md; Edo, 14 Nov; round 13, 1 n5). Seen once the demo world formed
 		// its arcs (Logbook seed f315875, 16 Nov).
 		const same = (a: string, b: string) =>
 			a === b || (b.startsWith(`${a}: `) && line.title.includes(b.slice(a.length + 2))) || (line.starts !== null && b === line.status && /^(Planned today|Next up)$/.test(a));

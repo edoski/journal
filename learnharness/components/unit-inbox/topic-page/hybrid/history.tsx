@@ -6,11 +6,11 @@ import { CheckIcon, CircleDotIcon, CircleXIcon, DumbbellIcon, MessageSquareIcon 
 import type { TopicAttempt } from "@/src/core";
 import { cn } from "@/lib/utils";
 import { GUTTER } from "@/components/unit-inbox/topic-page/row-classes";
-import { ATTEMPT_WORDS } from "@/components/study-words";
+import { ATTEMPT_WORDS, TUTOR_WRITING } from "@/components/study-words";
 import { Button } from "@/components/ui/button";
 import { attemptMark, type SessionEntry } from "@/components/unit-inbox/topic-page/topic-facts";
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
-import { WhyMark } from "@/components/unit-inbox/topic-page/why-mark";
+import { StatusMark } from "@/components/unit-inbox/status-mark";
 import { LineText } from "@/components/line-text";
 
 const ICON = "size-4 text-muted-foreground";
@@ -94,26 +94,23 @@ export function AttemptEntry({ attempt, title, titleOf, ends, date }: { attempt:
  *  when he points at it (pointer or focus), as Home's map follows the row
  *  he points at; the lesson on the map has its row filled. Round 10, 1 m8:
  *  the button that did it was a glyph with no words.
- *  Given `date`, it carries the date column; `writing` is what it says
- *  while the tutor writes. */
+ *  Given `date`, it carries the date column. */
 export function SessionItem({
 	entry,
 	shown,
 	onShow,
 	ends,
 	date,
-	writing = "The tutor is writing",
 }: {
 	entry: SessionEntry;
 	shown: boolean;
 	onShow: (id: string) => void;
 	ends: Ends;
 	date?: string | null;
-	writing?: string;
 }) {
 	const { chat, state } = entry;
 	const planned = isPlanned(entry);
-	const why = state === "your-turn" ? <WhyMark kind="reply" words="Your turn" /> : state === "working" ? <WhyMark kind="writing" words={writing} /> : null;
+	const why = state === "your-turn" ? { fact: { kind: "your-turn" } as const, words: "Your turn" } : state === "working" ? { fact: { kind: "working" } as const, words: TUTOR_WRITING } : null;
 	return (
 		<li data-slot="topic-history-session" data-shown={shown || undefined} data-on-map={planned ? "point" : undefined} className={cn("grid gap-x-4", GUTTER, date === undefined ? "grid-cols-[1rem_minmax(0,1fr)_auto]" : DATED, spine(ends))}>
 			<Button
@@ -133,7 +130,11 @@ export function SessionItem({
 					<span data-slot="topic-history-session-title" className="text-pretty text-body text-foreground">
 						<LineText>{chat.title}</LineText>
 					</span>
-					{why && <span className="flex h-5 items-center gap-2 justify-self-end">{why}</span>}
+					{why && (
+						<span className="flex h-5 items-center justify-self-end">
+							<StatusMark data-slot="topic-why" {...why} className="max-w-56" />
+						</span>
+					)}
 					{date !== undefined && <DateCell date={date} className="leading-5" />}
 				</Link>
 			</Button>

@@ -11,7 +11,8 @@ import { MathText } from "@/components/ui/math-text";
 import { entryCaption } from "../arc-view";
 import { TopicGlyph } from "../topic-glyph";
 import type { CardFact } from "../topic-standing";
-import { LineMark, RECEDED, TopicMapContext, type CardData } from "../topic-node";
+import { RECEDED, TopicMapContext, type CardData } from "../topic-node";
+import { StatusMark } from "@/components/unit-inbox/status-mark";
 import { Hint } from "@/components/ui/hint";
 import { BaseNode, BaseNodeContent, BaseNodeHeader } from "./base-node";
 import { NodeAppendix } from "./node-appendix";
@@ -143,7 +144,7 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 							</span>
 						</span>
 					) : data.line ? (
-						<LineMark line={data.line} />
+						<StatusMark data-slot="topic-need" size="slot" fact={data.line} words={data.line.words} className="flex h-lh min-w-0 items-center gap-1" />
 					) : (
 						<span data-slot="topic-standing" className="truncate text-callout text-muted-foreground">
 							{data.standing.words}

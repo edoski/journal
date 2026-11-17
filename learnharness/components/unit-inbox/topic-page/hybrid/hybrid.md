@@ -28,7 +28,7 @@ Measured at 1440x900 and 1280x720 with the sidebar open: the document is the win
 
 - Earlier restates Trail's line, by day: the attempts of no session it lists, then each session followed by the attempts it saved (`trailDays`), the 1px spine in the map's edge ink, attempts as plain entries: the result icon (`attemptMark`'s result) and the tutor's sentence, and under it, only when the answer was not his own plain work, how it counted in the answer card's words (With help), or Gave up, Prediction, not counted, Sure, but wrong, Mixed up with a method. "With a hint" told him nothing on 13 Nov, when nearly every lesson answer was saved helped; round 4 found a helped ✓ indistinguishable from an unaided one once the marks were true. Every row is one grid, the icon column, the text in its own column, an attempt's sentence wrapping whole (round 13, 1 n11: two lines cut "…4, n…" beside an empty half-pane), and in Pick up's Earlier the date flush right in one column; an attempt's sentence and date share a baseline. No "Earlier" fold: the pane scrolls instead.
 - Bounded: `HistoryPane`: a plain scroller with no bar (`data-slot="topic-history"`), a flex column whose viewport shrinks to the pane. The pane reaches 12px past the column on each side (`-mx-3`) and its list pads them back (`px-3`), so a row's 12px bleed (`../row-classes.ts`, Home's row) keeps its rounded fill and the icon's inset inside the clip; the section labels stay on the head's edge, and the rows' icons sit past the shared gutter (`GUTTER`, `../pickup/pickup.md`). An edge fades 32px only while more of the history lies past it, so at rest the first day is never dimmed.
-- A session row (`data-slot="topic-history-session"`, link `data-testid="unit-page-session"`): kind icon, title, `WhyMark` ("Your turn", or the spinner), and a lesson that planned puts its steps on the map when he points at it, by pointer or focus (`data-on-map="point"`), as Home's map follows the row he points at; Now's row does the same for its lesson. The lesson on the map has its row filled `bg-fill-selected` (`data-shown`). Round 10, 1 m8: a map button did this, a glyph with no words beside Resume and on every lesson row.
+- A session row (`data-slot="topic-history-session"`, link `data-testid="unit-page-session"`): kind icon, title, `StatusMark` (`../../status-mark.md`: "Your turn", or the spinner and "Tutor writing"), and a lesson that planned puts its steps on the map when he points at it, by pointer or focus (`data-on-map="point"`), as Home's map follows the row he points at; Now's row does the same for its lesson. The lesson on the map has its row filled `bg-fill-selected` (`data-shown`). Round 10, 1 m8: a map button did this, a glyph with no words beside Resume and on every lesson row.
 
 ## Lesson map (`lesson-map.tsx`)
 
@@ -60,7 +60,7 @@ The lesson on the map is kept while its session is listed; a lesson the history 
 
 ## Shared parts it needs
 
-It reads `TopicHead`, `WhyMark`, `trailDays` (`../trail/trail-facts.ts`), `lessonWords`, `stepsLayout`, `stepMarks` (`../steps/steps-facts.ts`), the parts of the deleted steps and trail candidates it kept, and the course map's `CardMap`.
+It reads `TopicHead`, `StatusMark`, `trailDays` (`../trail/trail-facts.ts`), `lessonWords`, `stepsLayout`, `stepMarks` (`../steps/steps-facts.ts`), the parts of the deleted steps and trail candidates it kept, and the course map's `CardMap`.
 
 ## Layouts tried (13 Nov 2026, throwaway sketches)
 

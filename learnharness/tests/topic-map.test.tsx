@@ -424,7 +424,7 @@ describe("topic map drawing", () => {
 	it("shows a title and its pie on every node, and under it what the sidebar says when it needs him, or else where he stands", () => {
 		assert.equal(document.querySelectorAll('[data-slot="topic-glyph"]').length, 16);
 		assert.deepEqual(
-			[...document.querySelectorAll('[data-slot="topic-need"]')].map((line) => line.textContent),
+			[...document.querySelectorAll('[data-slot="topic-need"] [data-slot="status-words"]')].map((line) => line.textContent),
 			["Due since 29 Oct", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Sure, but wrong"],
 		);
 		assert.ok(node("determinant").querySelector('[data-slot="topic-need"]') === null);

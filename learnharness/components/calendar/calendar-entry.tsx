@@ -1,22 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import {
-	BookOpenIcon,
-	CircleDashedIcon,
-	ClipboardListIcon,
-	DumbbellIcon,
-	GraduationCapIcon,
-	HistoryIcon,
-	MessageCircleQuestionIcon,
-	MessageSquareIcon,
-	type LucideIcon,
-} from "lucide-react";
+import { CircleDashedIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { unitHref } from "@/components/unit-inbox/unit-href";
+import type { Fact } from "@/components/unit-inbox/fact-icon";
+import { FactIcon, StatusMark } from "@/components/unit-inbox/status-mark";
 import { dayAndNearWords, distanceWords, finalReviewWords, longDayWords, lookOf, lookWords, LOOKS, misfitWords, roadLines, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
 import { finalReviewGapWords, pressWord } from "@/components/study-words";
 import { planDay } from "@/components/study-home/study-facts";
@@ -26,28 +18,19 @@ import { cn } from "@/lib/utils";
 import { continueHref } from "@/components/nav/session-state";
 import type { ChatListItem } from "@/src/core";
 
-/** One icon per look. An overdue review wears the review's History icon,
- *  muted, as Home and the sidebar draw it (round 8: a red alarm here
- *  against the history arrow everywhere else). */
-export const ICONS: Record<EntryLook, LucideIcon> = {
-	exam: GraduationCapIcon,
-	overdue: HistoryIcon,
-	review: HistoryIcon,
-	new: BookOpenIcon,
-	task: ClipboardListIcon,
-	lesson: MessageSquareIcon,
-	practice: DumbbellIcon,
-};
+/** A look as the fact it marks, so it wears the icon every surface wears
+ *  for it (`FactIcon`): an overdue review the review's History, muted
+ *  (round 8: a red alarm here against the history arrow everywhere else),
+ *  a new topic Today's arrow, an open task the bookmark. */
+export function lookFact(look: EntryLook): Fact {
+	return { kind: look === "overdue" ? "review" : look === "new" ? "next" : look };
+}
 
 /** What a press on an entry can start: a session whose first message is
  *  `opening`, in `workspace`, on `topics`, picking up the finished lesson
  *  `from`. */
 export type StartSession = (opening: string, workspace: string, how: { topics: readonly string[]; from?: string }) => void;
 
-/** The look's ink: an exam in full ink, the rest muted, an overdue
- *  review included, since its words say how late. */
-const LOOK_INK: Partial<Record<EntryLook, string>> = { exam: "text-foreground" };
-export const ICON_INK: Partial<Record<EntryLook, string>> = { exam: "text-foreground" };
 
 function Mark({ entry }: { entry: CalendarEntry }) {
 	return entry.course ? <CourseMark title={entry.course.title} /> : <CircleDashedIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />;
@@ -60,14 +43,13 @@ function Mark({ entry }: { entry: CalendarEntry }) {
  *  still on two lines at most, so the topic reads. */
 function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; compact: boolean }) {
 	const look = lookOf(entry);
-	const Icon = ICONS[look];
 	const waits = entry.kind === "session" && entry.waits;
 	if (compact) {
 		return (
 			<>
 				<span className="flex h-4.5 shrink-0 items-center gap-1.5">
 					<Mark entry={entry} />
-					<Icon aria-label={LOOKS[look].words} className={cn("size-3.5 shrink-0 text-muted-foreground", ICON_INK[look])} />
+					<FactIcon fact={lookFact(look)} label={LOOKS[look].words} className="size-3.5" />
 				</span>
 				<span data-slot="calendar-entry-title" className="line-clamp-2 min-w-0 flex-1 text-foreground">
 					<LineText>{entry.title}</LineText>
@@ -82,17 +64,13 @@ function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; 
 			</span>
 			<span className="flex min-w-0 items-center gap-1.5 text-callout text-muted-foreground">
 				<Mark entry={entry} />
-				<Icon aria-hidden={!waits} aria-label={waits ? LOOKS[look].words : undefined} className={cn("size-3.5 shrink-0", ICON_INK[look])} />
-				{!waits && (
-					<span className={cn("truncate", LOOK_INK[look], look === "exam" && "")}>
-						{entry.kind === "exam" ? examDayWords(entry.day, today) : lookWords(entry, today)}
-					</span>
-				)}
-				{waits && (
-					<span className="flex shrink-0 items-center gap-1 text-link">
-						<MessageCircleQuestionIcon aria-hidden className="size-3.5" />
-						Your turn
-					</span>
+				{waits ? (
+					<>
+						<FactIcon fact={lookFact(look)} label={LOOKS[look].words} className="size-3.5" />
+						<StatusMark fact={{ kind: "your-turn" }} words="Your turn" whole className="shrink-0 gap-1" />
+					</>
+				) : (
+					<StatusMark fact={lookFact(look)} words={entry.kind === "exam" ? examDayWords(entry.day, today) : lookWords(entry, today)} className="min-w-0" />
 				)}
 			</span>
 		</>
@@ -159,7 +137,6 @@ function examDayWords(day: string, today: string): string {
  *  words, then the actions. */
 function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarEntry, { kind: "session" }>; today: string; busy: boolean; onStart: StartSession }) {
 	const look = lookOf(entry);
-	const Icon = ICONS[look];
 	const lines: string[] = [];
 	if (entry.kind === "exam") {
 		lines.push(dayAndNearWords(entry.day, longDayWords(entry.day), today));
@@ -187,9 +164,8 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 				<p className="text-headline text-foreground">
 					<LineText>{entry.title}</LineText>
 				</p>
-				<p className={cn("flex items-center gap-1 text-callout text-muted-foreground", LOOK_INK[look])}>
-					<Icon aria-hidden className={cn("size-3.5 shrink-0", ICON_INK[look])} />
-					{lookWords(entry, today)}
+				<p className="flex">
+					<StatusMark fact={lookFact(look)} words={lookWords(entry, today)} whole className="gap-1" />
 				</p>
 				{lines.map((line) => (
 					<p key={line} className="text-callout text-muted-foreground">
@@ -216,7 +192,7 @@ function Road({ entry, today }: { entry: Extract<CalendarEntry, { kind: "exam" }
 				{roadLines(entry.road, entry.finalReview).map((line) =>
 					line.kind === "week" ? (
 						<li key={line.week.from} className="flex gap-2 text-callout">
-							<BookOpenIcon aria-hidden className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+							<FactIcon fact={{ kind: "next" }} className="mt-0.5 size-3.5" />
 							<span className="min-w-0">
 								<span className="text-muted-foreground">{spanWords(line.week)}</span>{" "}
 								<span className="text-foreground">
@@ -226,7 +202,7 @@ function Road({ entry, today }: { entry: Extract<CalendarEntry, { kind: "exam" }
 						</li>
 					) : (
 						<li key="final" className="flex gap-2 text-callout text-muted-foreground">
-							<HistoryIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+							<FactIcon fact={{ kind: "review" }} className="mt-0.5 size-3.5" />
 							<span className="min-w-0">
 								{finalReview}
 								{unreviewed.map((words) => (

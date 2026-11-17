@@ -2,12 +2,11 @@ import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
 import { CourseBadge } from "@/components/study-home/agenda-rows/progress-ring";
 import { courseTitle, foldLines, lessonTitle, lineKey, pointProps, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
-import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
-import { rowStatus, rowWords, type RowStanding } from "@/components/study-home/agenda-rows/row-standing";
-import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
+import { rowStatus, rowWords, type RowStatus } from "@/components/study-home/agenda-rows/row-standing";
+import { reasonMark } from "@/components/unit-inbox/fact-icon";
+import { StatusMark } from "@/components/unit-inbox/status-mark";
 import { cn } from "@/lib/utils";
 import { MathLine } from "@/components/ui/math-line";
-import { MathText } from "@/components/ui/math-text";
 
 /** The badge or pie beside both lines: the course line, then the lesson
  *  line with the row's one status at its end, flush right and whole, so
@@ -22,9 +21,6 @@ const ROW =
  *  beside an empty column). */
 const COLUMNS = "grid-cols-[2.5rem_minmax(0,1fr)_auto]";
 
-/** A standing fact: a 14px mark, as the reason's, then its words. */
-const FACT = "flex items-center justify-self-end gap-1.5 text-callout text-muted-foreground";
-
 /** A hairline above every row but the first, inset to the text's edges. */
 const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border/50";
 
@@ -37,36 +33,31 @@ export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 	const { shown, also } = foldLines(rows);
 	return (
 		<ul data-slot="hybrid-rows" className="flex flex-col">
-			{shown.map((row) => {
-				const status = rowStatus(row);
-				return (
-					<li key={lineKey(row)} className={HAIRLINE}>
-						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, COLUMNS)} {...pointProps(row, point)}>
-							{/* The course's badge at the row's height with its progress round its edge, where a lone ring read as a checkbox. */}
-							<span className="row-span-2 self-center">{row.course && <CourseBadge course={row.course} />}</span>
-							<MathLine className="col-span-2 text-callout text-muted-foreground">{courseTitle(row)}</MathLine>
-							<MathLine className="text-headline text-foreground">{lessonTitle(row)}</MathLine>
-							{status?.kind === "standing" ? <StandingFact facts={status.facts} /> : <WhyMark why={status?.why ?? null} whole />}
-						</LineTarget>
-					</li>
-				);
-			})}
+			{shown.map((row) => (
+				<li key={lineKey(row)} className={HAIRLINE}>
+					<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, COLUMNS)} {...pointProps(row, point)}>
+						{/* The course's badge at the row's height with its progress round its edge, where a lone ring read as a checkbox. */}
+						<span className="row-span-2 self-center">{row.course && <CourseBadge course={row.course} />}</span>
+						<MathLine className="col-span-2 text-callout text-muted-foreground">{courseTitle(row)}</MathLine>
+						<MathLine className="text-headline text-foreground">{lessonTitle(row)}</MathLine>
+						<RowMark status={rowStatus(row)} />
+					</LineTarget>
+				</li>
+			))}
 			{also.length > 0 && <TodayAlso rows={also} busy={busy} onContinue={onContinue} className={HAIRLINE} />}
 		</ul>
 	);
 }
 
-/** The row's one status on its topic: the map's pie, then the slip he
- *  would act on, else where he stands (`rowWords`); empty on a row of
- *  several topics. */
-export function StandingFact({ facts }: { facts: RowStanding | null }) {
-	if (!facts) return <span />;
-	return (
-		<span data-slot="today-standing" data-slip={facts.slip?.key} className={FACT}>
-			<TopicGlyph standing={facts.standing} className="size-3.5" />
-			<span className="whitespace-nowrap">
-				<MathText>{rowWords(facts)}</MathText>
-			</span>
-		</span>
-	);
+/** The row's one status, flush right and whole: why the row is there
+ *  (`reasonMark`, a new topic by why it starts), else, on its topic, the
+ *  map's pie and the slip he would act on or where he stands (`rowWords`);
+ *  nothing to say, an empty cell. */
+export function RowMark({ status }: { status: RowStatus | null }) {
+	if (!status) return <span />;
+	if (status.kind === "standing") {
+		const { facts } = status;
+		return <StatusMark data-slot="today-standing" data-slip={facts.slip?.key} fact={{ kind: "standing", standing: facts.standing }} words={rowWords(facts)} whole className="justify-self-end" />;
+	}
+	return <StatusMark data-slot="today-why" data-starts={status.why.starts?.kind} {...reasonMark(status.why)} whole className="justify-self-end" />;
 }

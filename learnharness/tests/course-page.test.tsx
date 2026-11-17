@@ -338,7 +338,7 @@ describe("the course topic row and group", () => {
 		const cramer = groupOf(groups, "learning").topics.find((t) => t.topic.handle === "cramer")!;
 		const document = render(<ul><CourseTopicRow row={cramer} compact /></ul>);
 		assert.equal(document.querySelector('[data-slot="course-topic-row"]')!.getAttribute("aria-current"), "location");
-		assert.equal(document.querySelector('[data-slot="course-topic-fact-words"]')!.textContent, "You are here");
+		assert.equal(document.querySelector('[data-slot="course-topic-fact"] [data-slot="status-words"]')!.textContent, "You are here");
 	});
 
 	it("heads a group with its name and no count, folds it, and shows the first rows then Show the rest", () => {
@@ -413,7 +413,7 @@ describe("a topic row's status in words, whole (round 11, 1 N8 and 2 n9)", () =>
 		const document = render(<ul><CourseTopicRow row={row} className="h-8" /></ul>);
 		const title = document.querySelector('[data-slot="course-topic-title"]')!.parentElement!;
 		const fact = document.querySelector('[data-slot="course-topic-fact"]')!;
-		const words = fact.querySelector('[data-slot="course-topic-fact-words"]')!;
+		const words = fact.querySelector('[data-slot="status-words"]')!;
 		assert.match(title.className, /\bmin-w-0\b/);
 		assert.match(title.className, /\bflex-1\b/, "the title takes what the status leaves");
 		assert.doesNotMatch(title.className, /\bshrink-0\b/);
@@ -437,6 +437,6 @@ describe("a topic row's status in words, whole (round 11, 1 N8 and 2 n9)", () =>
 	it("shows the words on every row, the compact one included", () => {
 		const row = rowOf("matmul", course({ topics: [...TOPICS, held] }));
 		const document = render(<ul><CourseTopicRow row={row} compact /></ul>);
-		assert.doesNotMatch(document.querySelector('[data-slot="course-topic-fact-words"]')!.className, /\bsr-only\b/);
+		assert.doesNotMatch(document.querySelector('[data-slot="course-topic-fact"] [data-slot="status-words"]')!.className, /\bsr-only\b/);
 	});
 });

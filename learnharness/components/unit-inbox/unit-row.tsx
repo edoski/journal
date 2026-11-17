@@ -8,7 +8,8 @@ import { continueHref, pausedWords, sessionState } from "@/components/nav/sessio
 import { localDay } from "@/components/day-change";
 import { topicPress, useStartSession } from "@/components/unit-inbox/start-unit";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { UnitStatusText } from "@/components/unit-inbox/unit-status";
+import { StatusMark } from "@/components/unit-inbox/status-mark";
+import { TUTOR_WRITING } from "@/components/study-words";
 import { leftWords, monogram, studiedWords, unitStatus, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
 import { CARD_ACTION_PLACE, ROW_ACTION, ROW_BODY, ROW_FRAME, ROW_ITEM, RowCard, rowSurface, rowTitle, STATUS_LINE, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
 import { Button } from "@/components/ui/button";
@@ -95,7 +96,7 @@ export function TopicCard({ unit, map, chats, today, active, parent }: { unit: U
 			parent={parent}
 			mark={<CourseMark title={unit.course.title} />}
 			course={unit.course.title}
-			status={<UnitStatusText status={unitStatus(unit, today)} />}
+			status={<UnitStatusMark status={unitStatus(unit, today)} />}
 			title={unit.topic.title}
 			action={<RowAction unit={unit} map={map} chats={chats} className={CARD_ACTION_PLACE} />}
 			recede={unit.now === "working"}
@@ -115,6 +116,15 @@ export function TopicCard({ unit, map, chats, today, active, parent }: { unit: U
  *  (session-state.md): Your turn, Tutor writing, "Left off today" for a
  *  session he left with Done for today, the cut reply's words, else when
  *  he last studied in it. Pure. */
+/** A row's status (`unitStatus`) in its status slot, T3 Code's status
+ *  label: the one mark (`StatusMark`) at size `slot`; a topic not started
+ *  says so in words alone, and nothing to say draws nothing. */
+export function UnitStatusMark({ status }: { status: UnitStatus }) {
+	if (status.kind === "none") return status.words ? <StatusMark data-slot="unit-status" size="slot" fact={{ kind: "unstarted" }} words={status.words} /> : null;
+	const words = status.kind === "your-turn" ? "Your turn" : status.kind === "working" ? TUTOR_WRITING : status.words;
+	return <StatusMark data-slot="unit-status" size="slot" fact={status} words={words} />;
+}
+
 export function sessionRowStatus(chat: ChatListItem, state: ReturnType<typeof sessionState>, today: string): UnitStatus {
 	if (state === "working" || state === "your-turn") return { kind: state };
 	if (state === "left") return { kind: "task", words: leftWords(chat, today || localDay(new Date())) };
@@ -185,7 +195,7 @@ export function SessionSlimRow({
 				data-testid={state === "your-turn" ? "session-waiting" : undefined}
 				className={cn(TRAILING_SLOT, STATUS_LINE, "mt-1 self-end")}
 			>
-				<UnitStatusText status={sessionRowStatus(chat, state, today)} />
+				<UnitStatusMark status={sessionRowStatus(chat, state, today)} />
 			</span>
 		</Button>
 	);

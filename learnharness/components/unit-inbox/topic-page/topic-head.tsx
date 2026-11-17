@@ -1,15 +1,17 @@
 import Link from "next/link";
-import { ChevronRightIcon, CircleXIcon, HistoryIcon, type LucideIcon } from "lucide-react";
+import { ChevronRightIcon } from "lucide-react";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { MathText } from "@/components/ui/math-text";
 import { PageFact, PageHead } from "@/components/page-frame/page-frame";
 import { arcHref, courseHref } from "@/components/unit-inbox/unit-href";
 import type { HeadMark, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
-import { SLIP_ICON } from "@/components/slip-icons";
+import type { Fact } from "@/components/unit-inbox/fact-icon";
+import { FactIcon } from "@/components/unit-inbox/status-mark";
 
-/** One icon per kind of mark, the ones the map's nodes and Today's rows
- *  use; a slip wears its own (`SLIP_ICON`). */
-const MARK_ICON: Record<HeadMark["kind"], LucideIcon> = { slip: CircleXIcon, review: HistoryIcon };
+/** A mark as the fact it states, its icon the one every surface wears for
+ *  it: a slip by its own kind (a miss when the engine names none), else
+ *  the review. */
+const markFact = (mark: HeadMark): Fact => (mark.kind === "slip" ? { kind: "slip", slip: mark.slip ?? "lapsed" } : { kind: "review" });
 
 /** A pause for a screen reader between the line's facts, which the eye
  *  separates by space and icons. */
@@ -65,15 +67,12 @@ export function TopicHead({ facts, children }: { facts: TopicFacts; children?: R
 							{standing.words}
 						</PageFact>
 					)}
-					{marks.map((mark) => {
-						const Icon = mark.slip ? SLIP_ICON[mark.slip] : MARK_ICON[mark.kind];
-						return (
-							<PageFact key={mark.kind} icon={<Icon aria-hidden className="size-4 shrink-0" />} data-kind={mark.kind}>
-								{PAUSE}
-								<MathText>{mark.words}</MathText>
-							</PageFact>
-						);
-					})}
+					{marks.map((mark) => (
+						<PageFact key={mark.kind} icon={<FactIcon fact={markFact(mark)} className="size-4" />} data-kind={mark.kind}>
+							{PAUSE}
+							<MathText>{mark.words}</MathText>
+						</PageFact>
+					))}
 				</>
 			}
 		>

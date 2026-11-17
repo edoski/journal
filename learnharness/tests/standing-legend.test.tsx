@@ -24,8 +24,7 @@ import { MapCard } from "./helpers/map-card.tsx";
 import { CourseTopicRow } from "../components/course-page/course-topic-row.tsx";
 import { TopicHead } from "../components/unit-inbox/topic-page/topic-head.tsx";
 import { topicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
-import { StandingFact } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
-import { WHY_ICON } from "../components/study-home/agenda-rows/why-mark.tsx";
+import { RowMark } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
 import { FACT_ICON, factIcon } from "../components/unit-inbox/fact-icon.ts";
 import { SLIP_ICON } from "../components/slip-icons.ts";
 import type { SlipKey } from "../components/study-words.ts";
@@ -67,7 +66,7 @@ const lucideName = (Icon: (typeof SLIP_ICON)[SlipKey]) => icon(render(<Icon />))
 function drawn(t: CourseMapTopic) {
 	const standing = standingOf(t);
 	const slip = slipBeside(t, titleOf);
-	const home = render(<StandingFact facts={{ standing, slip }} />);
+	const home = render(<RowMark status={{ kind: "standing", facts: { standing, slip } }} />);
 	const card = render(<MapCard topic={t} standing={standing} line={null} />);
 	const row = render(<ul><CourseTopicRow row={{ topic: t, group: "learning" as never, standing, current: false, fact: null, factWords: null, href: "/" }} /></ul>);
 	const head = render(<TopicHead facts={topicFacts({ course: COURSE, topic: t, chats: [], read: null })} />);
@@ -125,15 +124,14 @@ describe("one standing legend on every surface", () => {
 			assert.equal(slips.home?.words ?? null, slips.head?.words ?? null, t.handle);
 			const slip = slipBeside(t, titleOf);
 			if (slip) assert.equal(slips.home?.key, slip.key, t.handle);
-			if (slip) assert.equal(slips.head?.icon, lucideName(factIcon({ kind: "slip", words: slip.words, slip: slip.key })!), `${t.handle}: the sidebar's and the map's icon`);
+			if (slip) assert.equal(slips.head?.icon, lucideName(factIcon({ kind: "slip", slip: slip.key })!), `${t.handle}: the sidebar's and the map's icon`);
 		}
 		const keys = new Set(table.flatMap((r) => (r.slips.home ? [slipBeside(r.t, titleOf)!.key] : [])));
 		assert.deepEqual([...keys].sort(), ["confident", "gap", "lapsed", "mixed"], "every slip of a mistake still open; a fixed one or a check left is said by the standing");
 	});
 
 	it("marks a review due with one icon: Home's reason, the map, the sidebar and the topic page", () => {
-		assert.equal(FACT_ICON.review, WHY_ICON.review);
 		const kept = table.find((r) => r.t.handle === "kept")!;
-		assert.equal(icon(kept.head.querySelector('[data-slot="page-fact"][data-kind="review"]')), lucideName(WHY_ICON.review));
+		assert.equal(icon(kept.head.querySelector('[data-slot="page-fact"][data-kind="review"]')), lucideName(FACT_ICON.review));
 	});
 });

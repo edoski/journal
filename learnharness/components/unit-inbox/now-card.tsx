@@ -5,20 +5,18 @@ import { CircleDashedIcon, PlayIcon } from "lucide-react";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { sessionState, continueHref } from "@/components/nav/session-state";
 import { courseTitle } from "@/components/study-home/agenda-rows/row-facts";
-import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
-import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
-import { MathText } from "@/components/ui/math-text";
 import { lessonOf } from "@/components/study-home/lesson-facts";
 import type { NowLine } from "@/components/study-home/needs-you";
 import { courseMove, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 import type { ChatListItem } from "@/src/core";
 import type { PressWord } from "@/components/study-words";
 import { useContinueCourse } from "@/components/unit-inbox/continue-course";
-import { CARD_ACTION_PLACE, ROW_ACTION, RowCard, SLOT_WORDS } from "@/components/unit-inbox/row-card";
-import { CourseMark } from "@/components/unit-inbox/unit-row";
+import { CARD_ACTION_PLACE, ROW_ACTION, RowCard } from "@/components/unit-inbox/row-card";
+import { CourseMark, UnitStatusMark } from "@/components/unit-inbox/unit-row";
 import { courseKey, sessionKey } from "@/components/unit-inbox/now-inbox";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { UnitStatusText } from "@/components/unit-inbox/unit-status";
+import { reasonMark } from "@/components/unit-inbox/fact-icon";
+import { StatusMark } from "@/components/unit-inbox/status-mark";
 import type { Unit } from "@/components/unit-inbox/units";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -98,17 +96,11 @@ export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowL
 	const { status } = line;
 	const reason =
 		status?.kind === "standing" ? (
-			<span data-slot="why-mark" data-kind="standing" className="contents text-callout text-muted-foreground">
-				<span className="flex h-4 shrink-0 items-center">
-					<TopicGlyph standing={status.facts.standing} className="size-3" />
-				</span>
-				<span className="sr-only">, </span>
-				<span className={SLOT_WORDS}>
-					<MathText>{line.slot ?? ""}</MathText>
-				</span>
-			</span>
+			<StatusMark data-slot="why-mark" size="slot" fact={{ kind: "standing", standing: status.facts.standing }} words={line.slot ?? ""} />
+		) : status ? (
+			<StatusMark data-slot="why-mark" size="slot" {...reasonMark(status.why, line.slot ?? status.why.short)} />
 		) : (
-			<WhyMark why={status?.why ?? null} size="slot" words={line.slot} />
+			<span />
 		);
 	const { row } = line;
 	const { take } = useContinueCourse();
@@ -122,7 +114,7 @@ export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowL
 				parent={parent}
 				mark={<CourseMark title={unit.course.title} />}
 				course={unit.course.title}
-				status={working ? <UnitStatusText status={{ kind: "working" }} /> : reason}
+				status={working ? <UnitStatusMark status={{ kind: "working" }} /> : reason}
 				title={line.title}
 				action={<NowAction line={line} title={line.title} className={CARD_ACTION_PLACE} chats={chats} />}
 				recede={working}
@@ -156,7 +148,7 @@ export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowL
 			parent={parent}
 			mark={chat.course ? <CourseMark title={chat.course.title} /> : <CircleDashedIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />}
 			course={courseTitle(row)}
-			status={running ? <UnitStatusText status={{ kind: "working" }} /> : reason}
+			status={running ? <UnitStatusMark status={{ kind: "working" }} /> : reason}
 			title={line.title}
 			recede={running}
 		/>

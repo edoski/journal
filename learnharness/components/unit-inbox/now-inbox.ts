@@ -104,7 +104,7 @@ const NONE: ReadonlySet<string> = new Set();
  *  review is due, in Home's words ("Due today", "3d overdue"). Pure. */
 export function shelfStatus(unit: Unit, today: string, planned: ReadonlySet<string> = NONE): UnitStatus {
 	const own = unitStatus(unit, today, planned.has(unit.key));
-	const dated = own.kind === "returns" || (own.kind === "review" && unit.topic.review?.kind === "scheduled");
+	const dated = own.kind === "back" || (own.kind === "review" && unit.topic.review?.kind === "scheduled");
 	if (!planned.has(unit.key) || !(dated || own.kind === "studied" || own.kind === "none")) return own;
 	return { kind: "review", words: overdueWords(unit.topic.review?.kind === "due" ? unit.topic.review.overdue : 0, today) };
 }

@@ -25,7 +25,7 @@ Now's words per row (Edo's copy ruling, 13 Nov 2026: literal words, icons with a
 | Open | the same | Tutor writing |
 | Review | "Due since 5 Nov", the head's mark | |
 | Continue a task | the task's title | its step, "Part (c)" |
-| Start | First lesson (the head already says Not started) | the day the plan starts it (`plannedWords`): Planned today, Planned Wed 11 Nov, then what the exam ahead means for it, as the head and the calendar say it ("Planned Sat 28 Nov · Not before the exam, every study day is full at your pace", "Planned Tue 24 Nov · Not on the exam; after it"), else the courses whose new topics come first ("Planned Wed 11 Nov, after Probability's new topics"); nothing when the plan has no day for it. A line under it says why it comes then, whole, in every course (but plain next in a course without arcs, which only names the course) (`facts.startsWhy`, `startsWhyWords`, `data-slot="topic-starts-why"`): its `STARTS_ICON` and "After Expectation and linearity, which it needs"; Scheduled's first lesson carries the same line |
+| Start | First lesson (the head already says Not started) | the day the plan starts it (`plannedWords`): Planned today, Planned Wed 11 Nov, then what the exam ahead means for it, as the head and the calendar say it ("Planned Sat 28 Nov · Not before the exam, every study day is full at your pace", "Planned Tue 24 Nov · Not on the exam; after it"), else the courses whose new topics come first ("Planned Wed 11 Nov, after Probability's new topics"); nothing when the plan has no day for it. A line under it says why it comes then, whole, in every course (but plain next in a course without arcs, which only names the course) (`facts.startsWhy`, `startsWhyWords`, `data-slot="topic-starts-why"`): its icon (`startsFact`) and "After Expectation and linearity, which it needs"; Scheduled's first lesson carries the same line |
 | Continue | the task's title, else the newest lesson that planned by its name, which the new session continues from; "Next lesson" when none planned | Left off yesterday |
 | Study | Nothing due (Scheduled holds the date); since when it is due ("Due since 6 Nov"), as the sidebar and the map's card say it, when the plan holds a review memory asked for already | |
 
@@ -47,7 +47,7 @@ Dates in Earlier: tried on 13 Nov as a trailing column aligned with the rows (ke
 
 ## Moved here
 
-`resumeLine` (now in `pickup-facts.ts`) and `NowIconMark` (now in `pickup-parts.tsx`) moved here from the deleted Resume options.
+`resumeLine` (now in `pickup-facts.ts`) moved here from the deleted Resume options. Now's icon, Next's, Scheduled's and the why-it-starts line's are `FactIcon` (`../../status-mark.md`).
 
 Round 4 (14 Nov 2026) found the unstarted page saying "First lesson" twice (Now and Scheduled) in one wide row with nothing on why the topic comes now: Now carries the day, and Builds on and In your material give the reason, in engine facts only. Round 13 (1 n6) found the begun Poisson page Now and Earlier only on the day the lesson went on: while a lesson he began has not introduced the topic (`lessonBegun`), the page keeps Builds on, In your material and the map of what it builds on, and Scheduled says the lesson continues today.
 

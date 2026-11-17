@@ -3,7 +3,7 @@ import { slotWords } from "@/components/study-home/needs-you";
 import { nowFor, plannedKeys, restTopics, shelfStatus } from "@/components/unit-inbox/now-inbox";
 import { askedKeys, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
 import { buildInbox, unitKey, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
-import type { Why } from "@/components/study-home/agenda-rows/row-facts";
+import { whyFact } from "@/components/unit-inbox/fact-icon";
 import { lapsedNow, overdueWords, SLIP_WORDS, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
 
 /** The one fact a topic says, in the words the sidebar's row or Today's
@@ -42,8 +42,6 @@ export interface Said {
 	fact: TopicFact | null;
 }
 
-const WHY_FACT: Record<Why["kind"], TopicFact["kind"]> = { reply: "your-turn", working: "working", stopped: "stopped", missed: "slip", review: "review", task: "task", next: "next" };
-
 /** A topic Today takes up says Today's reason, as the sidebar's card for
  *  its line does (`slotWords`), except a review's: a line reviewing two
  *  topics gives its most overdue one's days or its lapse, so each topic
@@ -59,7 +57,7 @@ function todayFact(item: NowItem, topic: CourseMapTopic, today: string): TopicFa
 	}
 	const words = slotWords(why, topic);
 	if (!why || !words) return null;
-	return why.kind === "missed" ? { kind: "slip", words, slip: "lapsed" } : { kind: WHY_FACT[why.kind] as Exclude<TopicFact["kind"], "slip">, words };
+	return { ...whyFact(why.kind), words };
 }
 
 /** A topic's fact off the top (`shelfStatus`) as a fact. Pure. */
@@ -71,8 +69,6 @@ function shelfFact(status: UnitStatus): TopicFact | null {
 			return { kind: "your-turn", words: "Your turn" };
 		case "working":
 			return { kind: "working", words: TUTOR_WRITING };
-		case "returns":
-			return { kind: "back", words: status.words };
 		case "slip":
 			return { kind: "slip", words: status.words, slip: status.slip };
 		default:

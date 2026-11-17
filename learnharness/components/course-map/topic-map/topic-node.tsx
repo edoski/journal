@@ -3,9 +3,6 @@
 import { createContext, type KeyboardEvent } from "react";
 import type { ArcHandle, CourseMapTopic, PlanNodeStatus, TopicHandle } from "@/src/core";
 import type { CardFact, Standing } from "./topic-standing";
-import { BrailleSpinner } from "@/components/braille-spinner";
-import { factIcon } from "@/components/unit-inbox/fact-icon";
-import { MathText } from "@/components/ui/math-text";
 
 /** What every card on a map says, a course's topic or a lesson's step (topic-map.md, Node): one card draws both. */
 type CardBase = {
@@ -67,19 +64,3 @@ export const TopicMapContext = createContext<TopicMapState | null>(null);
  *  card (WCAG AA; tests/topic-map.test.tsx works it out from the tokens),
  *  so a receded card still reads (round 5: 50% drew it at 2.8:1). */
 export const RECEDED = 0.8;
-
-/** A card's line as Home's rows draw a reason: a 12px icon (the
- *  sidebar's and the course page's, a spinner while the tutor writes),
- *  then its words, on a caption line whose middle is the words' cap
- *  height. */
-export function LineMark({ line }: { line: CardFact }) {
-	const Icon = factIcon(line);
-	return (
-		<span data-slot="topic-need" data-kind={line.kind} className="flex h-lh min-w-0 items-center gap-1 text-callout text-muted-foreground">
-			{Icon ? <Icon aria-hidden="true" className="size-3 shrink-0" /> : <BrailleSpinner />}
-			<span className="truncate">
-				<MathText>{line.words}</MathText>
-			</span>
-		</span>
-	);
-}

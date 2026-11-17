@@ -14,8 +14,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { RowCard } from "../components/unit-inbox/row-card.tsx";
-import { WhyMark } from "../components/study-home/agenda-rows/why-mark.tsx";
-import { UnitStatusText } from "../components/unit-inbox/unit-status.tsx";
+import { StatusMark } from "../components/unit-inbox/status-mark.tsx";
+import { UnitStatusMark } from "../components/unit-inbox/unit-row.tsx";
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
 const render = (node: React.ReactNode) =>
@@ -30,7 +30,7 @@ function card(status: React.ReactNode) {
 
 describe("a sidebar card's status at the card's edge (m35)", () => {
 	it("lets the slot shrink once the course name has given way, so the words end in an ellipsis", () => {
-		const doc = card(<WhyMark why={{ kind: "next", short: "Planned today", starts: { kind: "after", words: LONG } }} size="slot" words={LONG} />);
+		const doc = card(<StatusMark data-slot="why-mark" size="slot" fact={{ kind: "after" }} words={LONG} />);
 		const slot = doc.querySelector('[data-slot="unit-status-slot"]');
 		assert.ok(slot !== null, "the status slot");
 		assert.ok(!classes(slot).includes("shrink-0"), `the slot shrinks past the name's room: ${classes(slot).join(" ")}`);
@@ -50,7 +50,7 @@ describe("a sidebar card's status at the card's edge (m35)", () => {
 			{ kind: "studied", words: "3d ago" },
 			{ kind: "working" },
 		] as const) {
-			const doc = card(<UnitStatusText status={status as never} />);
+			const doc = card(<UnitStatusMark status={status as never} />);
 			const words = [...doc.querySelectorAll('[data-slot="unit-status"] > span')].filter((el) => !classes(el).includes("sr-only") && !el.querySelector("svg") && !classes(el).includes("flex"));
 			assert.ok(words.length === 1, `${status.kind}: one run of words`);
 			assert.ok(classes(words[0]).includes("truncate"), `${status.kind}: ${classes(words[0]).join(" ")}`);

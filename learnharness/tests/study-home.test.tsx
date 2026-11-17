@@ -328,7 +328,7 @@ describe("Today", () => {
 		);
 		assert.equal(lines[2]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1], ["task", 1]]);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["your-turn", 1], ["task", 1]]);
 		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
 		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/i);
 		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What are we studying (this morning|this afternoon|this evening|today)\?$/);
@@ -443,7 +443,7 @@ describe("what a line of Today reads", () => {
 		]);
 		assert.equal(doc.querySelectorAll('[data-slot="course-badge"]').length, 5, "the course's badge on every line");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1], ["task", 1]]);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["your-turn", 1], ["task", 1]]);
 		plain(doc);
 	});
 });
