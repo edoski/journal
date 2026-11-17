@@ -146,14 +146,30 @@ export function UnitSidebar() {
 				ref={sidebarRef}
 				id={sidebarId}
 				style={{ "--sidebar-width": `${width}px` } as React.CSSProperties}
-				className={cn("sidebar-motion shrink-0 overflow-hidden duration-200 motion-reduce:transition-none", open ? "w-(--sidebar-width)" : "w-12")}
+				className={cn("sidebar-width-motion relative z-20 shrink-0", open ? "w-(--sidebar-width)" : "w-12")}
 				data-testid="sidebar"
 				data-state={open ? "open" : "folded"}
 			>
-				{!open ? (
-					<SidebarRail pathname={s.pathname} onOpen={toggle} onNewLesson={() => s.router.push("/chat/new")} onSettings={openSettings} />
-				) : (
-				<div className="flex h-full w-(--sidebar-width) flex-col border-r bg-background">
+				{/* One sidebar, folded by its edge (unit-inbox.md, "Folded"): the
+				    rail lies under the panel, always drawn, and the panel's right
+				    edge sweeps between its width and the window's left while
+				    everything in it holds still, cut off by the moving edge, so
+				    the rail is uncovered (or covered) in the same motion. No layer
+				    fades. Only transforms move: the page takes its new width once
+				    and never re-lays out frame by frame, so a heavy page (Home's
+				    map) cannot stall the sweep. The hidden one is inert. */}
+				<div inert={open} className="absolute inset-y-0 left-0 w-12">
+					<SidebarRail pathname={s.pathname} onNewLesson={() => s.router.push("/chat/new")} onSettings={openSettings} />
+				</div>
+				<div
+					inert={!open}
+					data-slot="sidebar-panel"
+					className={cn(
+						"sidebar-motion absolute inset-y-0 left-0 w-(--sidebar-width) overflow-hidden border-r bg-background",
+						!open && "invisible -translate-x-(--sidebar-width)",
+					)}
+				>
+				<div data-slot="sidebar-panel-content" className={cn("sidebar-motion flex size-full flex-col", !open && "translate-x-(--sidebar-width)")}>
 					<div className="lh-drag lh-lights-band shrink-0" />
 
 					<div className="lh-drag mb-px flex shrink-0 items-center gap-1 px-2 pt-2">
@@ -293,7 +309,7 @@ export function UnitSidebar() {
 						</Hint>
 					</div>
 				</div>
-				)}
+				</div>
 
 				<DeleteSessionDialog chat={s.deleting} onClose={() => s.setDeleting(null)} onDeleted={s.onDeleted} />
 			</aside>

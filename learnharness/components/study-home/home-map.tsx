@@ -5,8 +5,12 @@ import { useRouter } from "next/navigation";
 import { Maximize2Icon, Minimize2Icon } from "lucide-react";
 import { currentArc, type ArcHandle, type ChatListItem, type StudyCourse, type TopicHandle } from "@/src/core";
 import { ArcStrip } from "@/components/course-map/arc-strip";
+import { ArcSelector } from "@/components/course-map/arc-selector";
+import { useArcKeys } from "@/components/course-map/arc-keys";
+import { ArcIndex } from "@/components/course-map/arc-index";
 import { arcShare, shownArcs } from "@/components/course-page/course-model";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
+import { useMapSkin } from "@/components/course-map/topic-map/map-skins";
 import { WholeCourseButton } from "@/components/course-map/topic-map/whole-course-button";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
@@ -16,6 +20,9 @@ import { mapFade } from "@/components/study-home/map-frame";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
 import { cn } from "@/lib/utils";
+
+/** How many frames H waits for "You are here"'s card to be drawn, about a second. */
+const FIND_HERE_FRAMES = 60;
 
 /** How far the fade reaches in from the sides and from the top and bottom. */
 const FADE = { x: 64, y: 40 };
@@ -32,12 +39,12 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
  * back. Enlarged, a course too big to open whole has the maps' Whole course
  * control (`WholeCourseButton`, and "-") that zooms out to every topic, and back to where he is. Enlarged or not, it is only the map: no List view and no More menu
  * (Edo, 12 Nov 2026). A course with arcs draws one arc (`TopicMap`'s
- * `arc`), with the arc strip under the course tabs: the arc Home's follow
- * names (`arc`, the Today row he points at, as the course tab slides to
- * its course; without it, the one arc `highlight`'s topics lie in), else
- * the arc he picked on the strip, else where he is (`currentArc`). Once
- * the follow names an arc, a pick is dropped, so leaving the row returns
- * to the arc of You are here. Enlarged, its Whole course shows every arc.
+ * `arc`), with the arc strip under the course tabs: the arc he picked on
+ * the strip, else the arc Home's follow names (`arc`, the Today row he
+ * points at, as the course tab slides to its course; without it, the one
+ * arc `highlight`'s topics lie in), else where he is (`currentArc`). Once
+ * the follow names another arc, a pick is dropped: a press always shows
+ * its arc, and pointing at another row follows it again. Enlarged, its Whole course shows every arc.
  * `framed` (the topics of the Today row he points at) brings them into
  * view on the chosen course's map (`TopicMap`'s `framed`).
  */
@@ -77,6 +84,10 @@ export function HomeMap({
 	const [opensWhole, setOpensWhole] = useState<ReadonlyMap<string, boolean>>(new Map());
 	const chosenCourse = courses.find((c) => c.map.workspace === chosen)!;
 	const arcs = shownArcs(chosenCourse.map);
+	// Every map style but Current names the arcs with the quiet selector (arc-selector.md); Stacked arcs with its rail.
+	const style = useMapSkin().style;
+	const quietSelector = style !== "current" && style !== "stack";
+	const indexed = arcs !== null && style === "stack";
 	// The arc he picked on the strip, per course, for the visit.
 	const [picked, setPicked] = useState<ReadonlyMap<string, ArcHandle>>(new Map());
 	const follow = (followed === undefined ? litArc(chosenCourse, highlight) : followed) ?? null;
@@ -90,7 +101,8 @@ export function HomeMap({
 		const own = shownArcs(course.map);
 		if (!own) return undefined;
 		const followedHere = shown && follow && own.some((a) => a.handle === follow) ? follow : null;
-		return followedHere ?? picked.get(course.map.workspace) ?? currentArc(course.map) ?? undefined;
+		// His press wins over the row Home follows (the top one at rest), until he points at another row.
+		return picked.get(course.map.workspace) ?? followedHere ?? currentArc(course.map) ?? undefined;
 	};
 	const shownArc = arcOf(chosenCourse, true);
 	const canZoomOut = enlarged && (arcs !== null || opensWhole.get(chosen) === false);
@@ -99,6 +111,20 @@ export function HomeMap({
 		if (!enlarged) setWhole(false);
 	}, [enlarged]);
 	const toggleWhole = useCallback(() => setWhole((w) => !w), []);
+	const goHere = useCallback(() => {
+		const here = currentArc(chosenCourse.map);
+		if (here) setPicked((was) => new Map(was).set(chosen, here));
+		setWhole(false);
+		// The card mounts once its arc is drawn, so look for it each frame until it is there.
+		let frames = FIND_HERE_FRAMES;
+		const find = () => {
+			const card = document.querySelector<HTMLElement>('[data-slot="home-map-course"][data-shown] [data-slot="course-map-node"][data-current]:not([data-slot="course-map-trail"] *)');
+			if (card) card.focus({ preventScroll: true });
+			else if (--frames > 0) requestAnimationFrame(find);
+		};
+		requestAnimationFrame(find);
+	}, [chosen, chosenCourse.map]);
+	useArcKeys(arcs, shownArc ?? null, (arc) => setPicked((was) => new Map(was).set(chosen, arc)), goHere, style === "stack");
 	useEffect(() => {
 		if (!enlarged) return;
 		// Anything open over the map claims Esc first (Radix marks it handled).
@@ -130,7 +156,19 @@ export function HomeMap({
 					</Hint>
 				</div>
 			</div>
-			{arcs && (
+			{arcs && quietSelector && (
+				<ArcSelector
+					className="shrink-0"
+					arcs={arcs.map((a) => ({ handle: a.handle, title: a.title, share: arcShare(chosenCourse, a.handle) }))}
+					value={shownArc ?? null}
+					here={currentArc(chosenCourse.map)}
+					onSelect={(arc) => {
+						setPicked((was) => new Map(was).set(chosen, arc));
+						setWhole(false);
+					}}
+				/>
+			)}
+			{arcs && style === "current" && (
 				<ArcStrip
 					quiet
 					className="shrink-0"
@@ -142,7 +180,20 @@ export function HomeMap({
 					}}
 				/>
 			)}
-			<div data-slot="home-map-frame" className="relative flex min-h-0 flex-1 flex-col" style={VIGNETTE}>
+			{indexed && (
+				<ArcIndex
+					className="absolute top-16 left-0 z-10 w-64"
+					arcs={arcs}
+					value={zoomedOut ? null : (shownArc ?? null)}
+					here={currentArc(chosenCourse.map)}
+					onSelect={(arc) => {
+						setPicked((was) => new Map(was).set(chosen, arc));
+						setWhole(false);
+					}}
+				/>
+			)}
+			{/* Stacked arcs keeps its arc list in a column of its own, so the map frames each arc beside it. */}
+			<div data-slot="home-map-frame" className={cn("relative flex min-h-0 flex-1 flex-col", indexed && "ml-72")} style={VIGNETTE}>
 				{courses.map((course) => {
 					const shown = course.map.workspace === chosen;
 					return (
@@ -164,6 +215,10 @@ export function HomeMap({
 								highlight={shown ? highlight : null}
 								framed={shown ? framed : null}
 								whole={shown && zoomedOut}
+								onOpenArc={(arc) => {
+									setPicked((was) => new Map(was).set(course.map.workspace, arc));
+									setWhole(false);
+								}}
 								onOpensWhole={(fits) =>
 									setOpensWhole((was) => (was.get(course.map.workspace) === fits ? was : new Map(was).set(course.map.workspace, fits)))
 								}
@@ -262,6 +317,7 @@ function CourseDrawing({
 	highlight,
 	framed,
 	whole,
+	onOpenArc,
 	onOpensWhole,
 }: {
 	course: StudyCourse;
@@ -270,12 +326,13 @@ function CourseDrawing({
 	highlight: ReadonlySet<TopicHandle> | null;
 	framed: ReadonlySet<TopicHandle> | null;
 	whole: boolean;
+	onOpenArc: (arc: ArcHandle) => void;
 	onOpensWhole: (fits: boolean) => void;
 }) {
 	const { map } = course;
 	if (map.topics.length === 0) return <p className="m-auto text-body text-muted-foreground">Topics appear as you study this course.</p>;
 	// As much room as the fade, so a topic at the edge scrolls clear of it.
-	return <TopicMap map={map} arc={arc} said={said} margin={FADE} highlight={highlight} framed={framed} whole={whole} onOpensWhole={onOpensWhole} />;
+	return <TopicMap map={map} arc={arc} said={said} margin={FADE} highlight={highlight} framed={framed} whole={whole} onOpenArc={onOpenArc} onOpensWhole={onOpensWhole} />;
 }
 
 /** The one arc a set of lit topics lies in, or undefined when they span

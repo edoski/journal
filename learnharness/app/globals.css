@@ -108,6 +108,12 @@
 	--lh-danger: oklch(0.7 0.19 22);
 	--lh-success: oklch(0.76 0.15 155);
 	--lh-warning: oklch(0.82 0.15 80);
+	/* The course map's lines, opaque so a track several lines share reads
+	   as one line, never brighter (Edo, 16 Nov 2026). White over the page at
+	   33% at rest (3:1, WCAG 1.4.11), 70% lit, 10% receded. */
+	--lh-map-line: color-mix(in srgb, white 33%, var(--background));
+	--lh-map-line-lit: color-mix(in srgb, white 70%, var(--background));
+	--lh-map-line-receded: color-mix(in srgb, white 10%, var(--background));
 
 	/* Shape: 8 controls and rows, 12 cards, docks and menus, 20 the composer. */
 	--lh-radius-sm: 8px;
@@ -308,6 +314,9 @@ body {
  * bg-sidebar / border-sidebar): map it onto the app's card surface. */
 @theme inline {
 	--color-sidebar: var(--card);
+	--color-map-line: var(--lh-map-line);
+	--color-map-line-lit: var(--lh-map-line-lit);
+	--color-map-line-receded: var(--lh-map-line-receded);
 }
 
 /* Mermaid diagrams: keep wide charts inside the content column. Mermaid
@@ -461,8 +470,9 @@ body {
    Electron merged chrome (owner, 2026-09-17). The system title bar is
    hidden (hiddenInset in electron/main.cjs); the app's 60px bands are the
    drag surface.
-   Everything here is inert in the plain browser — it keys off <html class="lh-electron">, which
-   SidebarProvider sets after mount when it detects the Electron shell.
+   Everything here is inert in a browser — it keys off <html class="lh-electron">, which
+   SidebarProvider sets after mount when the Mac app's preload bridge is there
+   (window.lh), never from the user agent: T3 Code's preview is Electron too.
 
    - .lh-drag        window-drag region — on a dedicated mask div
                        placed FIRST in the page DOM (the mask
@@ -499,6 +509,14 @@ body {
 .lh-electron .lh-drag :is(button, input, textarea, select, a, summary, [contenteditable]) {
 	-webkit-app-region: no-drag;
 }
+/* The sidebar's hidden layer (its panel while folded, its rail and open
+   button while open) stays mounted and inert: it marks no drag or no-drag
+   region, so it never changes what the shown layer and the page mark,
+   whatever their page order. `initial`, not `none`: Electron 44 computes a
+   declared `none` as no-drag. */
+.lh-electron [inert] :is(.lh-drag, .lh-no-drag, button, input, textarea, select, a, summary, [contenteditable]) {
+	-webkit-app-region: initial;
+}
 /* 92px = measured lights' right edge (~75pt) + the lights' own 16px
    inset from the window edge — comfortable, symmetric air (owner).
    PHYSICAL-CONSTANT under zoom (owner round 7, 2026-10-05): ⌘±/⌘0 scale
@@ -520,21 +538,44 @@ body {
 	display: block;
 	height: calc(52px / var(--lh-zoom));
 }
-/* The folded rail stays 48px in the Mac app too (Edo, 16 Nov 2026: the
-   92px rail looked "extremely thick"). The lights sit over its 52px head,
-   so its open button stands where T3 Code's sidebar toggle stands on
-   macOS: in the window's band beside the lights, 90px in
-   (`--desktop-window-controls-inset`, the T3 Code app's bundle), level
-   with the lights (Edo, 16 Nov 2026: "yes lined up"): centred on their
-   centre (--lh-lights-centre, from electron/main.cjs). Both lengths are
-   physical under zoom, as the lights are. The page's band content starts
-   a 12px gap past it (T3 Code's `--workspace-titlebar-control-gap`) while
-   the sidebar is folded. */
-.lh-electron .lh-rail-toggle {
+/* The folded rail's open button (RailOpenButton, drawn after the page).
+   In a browser it is centred in the rail's 52px head, at the top of the
+   48px rail where T3 Code's web build puts its toggle, level with the
+   rail's icons inside its 1px border.
+   The rail stays 48px in the Mac app too (Edo, 16 Nov 2026: the 92px rail
+   looked "extremely thick"). The lights sit over its head, so the button
+   stands where T3 Code's sidebar toggle stands on macOS: in the window's
+   band beside the lights, 90px in (`--desktop-window-controls-inset`, the
+   T3 Code app's bundle), level with the lights (Edo, 16 Nov 2026: "yes
+   lined up"): centred on their centre (--lh-lights-centre, from
+   electron/main.cjs). Both lengths are physical under zoom, as the lights
+   are. The page's band content starts a 12px gap past it (T3 Code's
+   `--workspace-titlebar-control-gap`) while the sidebar is folded. */
+/* The band's centre line: half the window's 52px band in a browser, the
+   traffic lights' centre in the Mac app. The rail's open button, Home's
+   course tabs and the rail's rule all take their places from it, so the
+   button stands level with the tabs and the rule falls on their underline. */
+:root {
+	--lh-band-centre: 1.625rem;
+}
+.lh-electron {
+	--lh-band-centre: calc(var(--lh-lights-centre) / var(--lh-zoom));
+}
+/* The rail's head ends half a 32px row under the centre line, where Home's
+   tab underline runs; its first icon is then one 32px step under the
+   button, the step between all its icons. */
+.lh-rail-head {
+	height: calc(var(--lh-band-centre) + 1rem);
+}
+.lh-rail-toggle {
 	position: fixed;
-	top: calc(var(--lh-lights-centre) / var(--lh-zoom));
-	left: calc(90px / var(--lh-zoom));
+	top: var(--lh-band-centre);
+	left: calc((3rem - 1px) / 2);
 	z-index: 20;
+	transform: translate(-50%, -50%);
+}
+.lh-electron .lh-rail-toggle {
+	left: calc(90px / var(--lh-zoom));
 	transform: translateY(-50%);
 }
 /* The lights sit over the rail's head, so its edge starts under the band:
@@ -546,6 +587,30 @@ body {
 }
 .lh-electron main[data-sidebar="folded"] .lh-band-start {
 	padding-left: calc(90px / var(--lh-zoom) + 1.75rem + 0.75rem - 3rem);
+}
+
+/* The sidebar's fold (unit-inbox.md, "Folded"): the panel's edge sweeps
+   over the rail while its contents hold still (the panel and its contents
+   translate by the same length in opposite directions, on one curve, so
+   they cancel), 200ms as shadcn's sidebar, and nothing fades. The rail's
+   open button shows once the sweep has passed and goes as it starts back.
+   No width moves, so the page beside it never re-lays out frame by frame.
+   On only once SidebarProvider has mounted (.lh-sidebar-motion), so
+   nothing slides in on page load, and never under reduced motion, where
+   the sidebar folds at once. */
+@media (prefers-reduced-motion: no-preference) {
+	.lh-sidebar-motion .sidebar-motion {
+		transition: translate 200ms ease-in-out, visibility 200ms;
+	}
+	.lh-sidebar-motion .rail-toggle-motion {
+		transition: visibility 0s 200ms;
+	}
+	.lh-sidebar-motion .sidebar-width-motion {
+		transition: width 200ms ease-in-out;
+	}
+	.lh-sidebar-motion .rail-toggle-motion[inert] {
+		transition: visibility 0s;
+	}
 }
 
 .lh-electron .lh-wco-gutter {

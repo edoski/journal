@@ -20,7 +20,7 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import { SidebarRail } from "../components/unit-inbox/sidebar-rail.tsx";
+import { RailOpenButton, SidebarRail } from "../components/unit-inbox/sidebar-rail.tsx";
 import { TopBar } from "../components/top-bar.tsx";
 import { TooltipProvider } from "../components/ui/tooltip.tsx";
 
@@ -52,6 +52,8 @@ const lightSize = Number(main.match(/const LIGHT_SIZE = ([\d.]+);/)?.[1]);
 const [lightsX, lightsY] = [Number(lights?.[1]), Number(lights?.[2])];
 const LIGHTS_RIGHT = lightsX + 3 * lightSize + 2 * 9;
 const LIGHTS_CENTRE = lightsY + lightSize / 2;
+/** The band's centre line (`--lh-band-centre`): a browser's, then the Mac app's. */
+const [BROWSER_CENTRE, MAC_CENTRE] = [...css.matchAll(/--lh-band-centre:\s*([^;]+);/g)].map(([, value]) => value!);
 const ZOOMS = JSON.parse(main.match(/const ZOOM_LADDER = (\[[^\]]+\]);/)?.[1] ?? "[]") as number[];
 /** A length in CSS px, the renderer's custom properties put in: + - * / and
  *  parentheses over px and rem (16px). */
@@ -89,7 +91,8 @@ describe("the folded sidebar", () => {
 		`<html><body>${renderToStaticMarkup(
 			<AppRouterContext.Provider value={router as never}>
 				<TooltipProvider>
-					<SidebarRail pathname="/" onOpen={() => {}} onNewLesson={() => {}} onSettings={() => {}} />
+					<SidebarRail pathname="/" onNewLesson={() => {}} onSettings={() => {}} />
+					<RailOpenButton shown onOpen={() => {}} />
 				</TooltipProvider>
 			</AppRouterContext.Provider>,
 		)}</body></html>`,
@@ -106,8 +109,16 @@ describe("the folded sidebar", () => {
 	it("puts the open button in the band, above its line", () => {
 		const head = rail.firstElementChild!;
 		assert.ok(!rail.querySelector(".lh-lights-band"), "no lights band above the button's head: it pushed the button under the line");
-		assert.ok(classes(head).includes("h-13"), "the head is the window's 52px band");
-		assert.ok(head.contains(open), "the open button is in the head");
+		const centre = cssPx(BROWSER_CENTRE, {});
+		assert.equal(centre, 52 / 2, "a browser's centre line halves the window's 52px band");
+		assert.equal(cssPx(rule(".lh-rail-head").height, { "--lh-band-centre": centre }), centre + 32 / 2, "the head ends half a 32px row under the centre line, on Home's tab underline (Edo, 16 Nov 2026: the rule was off the underline, with extra space under the button)");
+		// In a browser the button is centred in the head, inside the rail's
+		// 1px edge (tests/sidebar-rail-browser.test.ts measures it in Chrome).
+		const place = rule(".lh-rail-toggle");
+		assert.equal(place.position, "fixed");
+		assert.equal(place.transform, "translate(-50%, -50%)");
+		assert.equal(cssPx(place.top, { "--lh-band-centre": cssPx(BROWSER_CENTRE, {}) }), 52 / 2, "centred on the band's centre line, level with Home's course tabs");
+		assert.equal(cssPx(place.left, {}), (RAIL - 1) / 2, "centred on the rail's width, inside its edge");
 		const line = head.querySelector('[data-slot="sidebar-rail-rule"]')!;
 		assert.ok(classes(line).includes("bottom-0"), "the line is the band's bottom edge, under the button");
 		assert.ok(classes(head).includes("lh-rail-head"));
@@ -116,13 +127,13 @@ describe("the folded sidebar", () => {
 
 	it("stands the button beside the traffic lights in the Mac app, where T3 Code puts its toggle", () => {
 		assert.ok(open.closest(".lh-rail-toggle"), "the button wears the Mac app's place");
-		const place = rule(".lh-electron .lh-rail-toggle");
+		const place = { ...rule(".lh-rail-toggle"), ...rule(".lh-electron .lh-rail-toggle") };
 		assert.equal(place.position, "fixed");
 		// The button's centre in window points, at every zoom: its top, less
 		// half its height when it is translated up by half.
 		const centre = (zoom: number) => {
 			const vars = { "--lh-lights-centre": LIGHTS_CENTRE, "--lh-zoom": zoom };
-			const top = cssPx(place.top, vars);
+			const top = cssPx(place.top, { ...vars, "--lh-band-centre": cssPx(MAC_CENTRE, vars) });
 			const centred = place.transform === "translateY(-50%)";
 			const height = centred ? 0 : cssPx(place.height, vars);
 			return (top + height / 2) * zoom;

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import type { ArcHandle, CourseMap, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
+import { MapScrollContext, mapScroll } from "@/components/course-map/topic-map/frame-left";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
 import { framedCamera, wholeZoom, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import { mapFade } from "@/components/study-home/map-frame";
@@ -64,6 +65,7 @@ export function SplitMap({
 	reveal,
 	onPoint,
 	onLeave,
+	onOpenArc,
 	ref,
 }: {
 	map: CourseMap;
@@ -84,10 +86,14 @@ export function SplitMap({
 	reveal: TopicHandle | null;
 	onPoint: (handle: TopicHandle | null) => void;
 	onLeave: (handle: TopicHandle) => void;
+	/** Shows another arc, which a card's "From <arc>" line asks for. */
+	onOpenArc?: (arc: ArcHandle) => void;
 	ref?: Ref<SplitMapHandle>;
 }) {
 	const root = useRef<HTMLElement>(null);
 	const scroller = useRef<HTMLDivElement>(null);
+	// How far the pane is scrolled across, for the names a map style holds at its visible left edge.
+	const [scroll] = useState(mapScroll);
 	const pointed = useRef<TopicHandle | null>(null);
 	const revealed = useRef<TopicHandle | null>(reveal);
 	revealed.current = reveal;
@@ -279,10 +285,13 @@ export function SplitMap({
 			}}
 		>
 			<div className="absolute inset-0" style={mapFade(fade.x, fade.y)}>
-				<div ref={scroller} data-slot="course-split-map-scroller" className="size-full overflow-auto overscroll-contain">
+				<div ref={scroller} data-slot="course-split-map-scroller" className="size-full overflow-auto overscroll-contain" onScroll={(e) => scroll.set(e.currentTarget.scrollLeft)}>
 					{/* The surface's size, from the course's layout: the map fits it whole. */}
 					<div className="flex flex-col" style={{ width: surface.width, height: surface.height }}>
-						<TopicMap map={map} arc={zoomedOut ? undefined : arc} said={said} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} />
+						{/* The map's names that stay on screen read how far the pane is scrolled (frame-left.ts). */}
+						<MapScrollContext.Provider value={scroll}>
+							<TopicMap map={map} arc={zoomedOut ? undefined : arc} said={said} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} onOpenArc={onOpenArc} />
+						</MapScrollContext.Provider>
 					</div>
 				</div>
 			</div>

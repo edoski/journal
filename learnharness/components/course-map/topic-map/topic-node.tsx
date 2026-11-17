@@ -4,7 +4,7 @@ import { createContext, useContext, type KeyboardEvent } from "react";
 import { CornerLeftUpIcon } from "lucide-react";
 import Link from "next/link";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import type { CourseMapTopic, TopicHandle } from "@/src/core";
+import type { ArcHandle, CourseMapTopic, TopicHandle } from "@/src/core";
 import { cn } from "@/lib/utils";
 import { TopicGlyph } from "./topic-glyph";
 import { CURRENT_TAG, type CardFact, type Standing } from "./topic-standing";
@@ -46,6 +46,9 @@ export interface TopicMapState {
 	onFocus: (handle: TopicHandle) => void;
 	onKeyDown: (handle: TopicHandle, event: KeyboardEvent<HTMLAnchorElement>) => void;
 	register: (handle: TopicHandle, el: HTMLAnchorElement | null) => void;
+	/** Shows another arc of the course on this map, for a card's "From <arc>" line; unset where a page has no arc to
+	 *  show. */
+	openArc?: (arc: ArcHandle) => void;
 }
 
 export const TopicMapContext = createContext<TopicMapState | null>(null);
@@ -60,7 +63,7 @@ export const RECEDED = 0.8;
  *  sidebar's and the course page's, a spinner while the tutor writes),
  *  then its words, on a caption line whose middle is the words' cap
  *  height. */
-function LineMark({ line }: { line: CardFact }) {
+export function LineMark({ line }: { line: CardFact }) {
 	const Icon = factIcon(line);
 	return (
 		<span data-slot="topic-need" data-kind={line.kind} className="flex h-lh min-w-0 items-center gap-1 text-callout text-muted-foreground">

@@ -59,16 +59,12 @@ describe("the page frame", () => {
 		assert.ok(press.hasAttribute("disabled"));
 	});
 
-	it("gives every page's head the same rows, so the title and the body sit at one height on every page", () => {
-		const rows = (node: React.ReactNode) => {
-			const head = render(node).querySelector('[data-slot="page-head"]')!;
-			return [...head.children].map((el) => `${el.getAttribute("data-slot") ?? el.tagName}:${el.className}`);
-		};
-		const course = rows(<PageHead title="Linear Algebra" lead="Every topic fits before the exam" standing={<PageFact icon={<i />}>Exam in 25 days</PageFact>} />);
-		const topic = rows(<PageHead eyebrow="Linear Algebra" title="Kernel" standing={<PageFact icon={<i />}>Right with help</PageFact>} />);
-		assert.deepEqual(course, topic, "the same rows with the same room, whatever a page fills them with");
-		const bare = render(<PageHead title="Probability" />).querySelector('[data-slot="page-eyebrow"]')!;
-		assert.equal(bare.textContent, "", "a page with no line above the title keeps its room, empty");
-		assert.equal(bare.getAttribute("aria-hidden"), "true", "and a screen reader skips it");
+	it("stands the head's first row on the band's centre line: the title, or the line above it when a page has one", () => {
+		const bare = render(<PageHead title="Probability" />).querySelector('[data-slot="page-head"]')!;
+		assert.equal(bare.firstElementChild!.querySelector('[data-slot="page-title"]')?.textContent, "Probability", "no empty line above a title (Edo, 16 Nov 2026)");
+		const topic = render(<PageHead eyebrow="Linear Algebra" title="Kernel" />).querySelector('[data-slot="page-eyebrow"]')!;
+		assert.ok(topic.className.includes("h-8"), "the line above a title is a 32px row, so it centres on the line as a title row does");
+		const frame = render(<PageFrame />).querySelector('[data-slot="page-frame"]')!;
+		assert.ok(frame.className.includes("pt-[calc(var(--lh-band-centre)-1rem)]"), "the first 32px row's centre is the band's centre line");
 	});
 });
