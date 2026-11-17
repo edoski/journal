@@ -1,6 +1,6 @@
 # Lessons
 
-Today's lines as lessons in plain words, which the study home, the course page and the sidebar read, and the pieces that draw one: `lesson-facts.ts` (`lessonOf`, `arcPlace`), `lesson-button.tsx`, `day-heading.tsx` (`day-heading`), `map-frame.ts`, and the page frame `home-frame.tsx`. The lines and their order are Today's (today.md, `todayRows`).
+Today's lines as lessons in plain words, which the study home, the course page and the sidebar read, and the pieces that draw one: `lesson-facts.ts` (`lessonOf`, `arcPlace`), `lesson-button.tsx`, `day-heading.tsx` (`day-heading`), and the page frame `home-frame.tsx`. The lines and their order are Today's (today.md, `todayRows`).
 
 ## A lesson
 
@@ -28,7 +28,7 @@ A waiting session sits at the course topics its transcript worked on (`ChatListI
 | one course unreadable | the others, then one line per unreadable course under Today: its name (the title a linked session carries, else its folder's), then "Couldn't read this course's record." and why in plain words: "Its file is damaged.", "macOS won't let the app open its files: Get Info on the course folder in Finder shows who can read it." or "Its file can't be opened." (`unreadable-course.tsx`); with no readable course, only those lines |
 | a start failed | "Couldn't open the session. Try again." under the home |
 
-`DayHeading` is a home's title: one question in 20 at 500, "What are we studying this morning?" ("this afternoon", "this evening", "tonight" by the learner's clock, `studyQuestion`); never the date (Edo, 13 Nov 2026: one line, dynamic, not about the date). `LessonButton` opens a lesson: a link to the session that waits, or a button that takes up the course's next step; it takes the shadcn button's props for its look. `mapFade` frames an embedded topic map with faded edges.
+`DayHeading` is a home's title: one question in 20 at 500, "What are we studying this morning?" ("this afternoon", "this evening", "tonight" by the learner's clock, `studyQuestion`); never the date (Edo, 13 Nov 2026: one line, dynamic, not about the date). `LessonButton` opens a lesson: a link to the session that waits, or a button that takes up the course's next step; it takes the shadcn button's props for its look.
 
 ## Sources
 

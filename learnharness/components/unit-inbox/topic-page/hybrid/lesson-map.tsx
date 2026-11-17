@@ -9,13 +9,13 @@ import type { NodeSize } from "@/components/course-map/topic-map/topic-map-layou
 import type { StepData } from "@/components/course-map/topic-map/topic-node";
 import { BaseNode } from "@/components/course-map/topic-map/canvas/base-node";
 import { CardContent } from "@/components/course-map/topic-map/canvas/canvas-node";
-import { PANE_FADE, mapFade } from "@/components/study-home/map-frame";
+import { MAP_FADE, vignette } from "@/components/course-map/map-fade";
 import { STEP_SIZE, ringedStep, stepCard, stepsAcross, stepsLayout } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { hybridMarks, type PlannedEntry } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { cn } from "@/lib/utils";
 import { mathPlain } from "@/components/ui/math-text";
 
-const VIGNETTE = mapFade(PANE_FADE.x, PANE_FADE.y);
+const VIGNETTE = vignette("pane");
 
 /**
  * Each step's card sized to the pane (`stepCard`, round 14, m34): the
@@ -49,7 +49,7 @@ function useStepCard(steps: readonly StepData[], across: number) {
 			const tallest = (): number => Math.max(0, ...cards.map((card) => card.getBoundingClientRect().height));
 			for (const card of cards) card.style.width = "max-content";
 			const oneLine = widest();
-			const next = stepCard(across, paneWidth, PANE_FADE, oneLine, (width) => {
+			const next = stepCard(across, paneWidth, MAP_FADE.pane, oneLine, (width) => {
 				for (const card of cards) card.style.width = `${width}px`;
 				return tallest();
 			});
@@ -138,7 +138,7 @@ export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string
 			</div>
 			{/* Shown once the cards are sized to the pane, so no card jumps. */}
 			<div className={cn("relative flex min-h-0 flex-1 flex-col", size === null && "invisible")}>
-				<CardMap graph={graph} layout={drawing.layout} nodes={nodes} edges={edges} margin={PANE_FADE} opensOn={ring} fitsDown="top" />
+				<CardMap graph={graph} layout={drawing.layout} nodes={nodes} edges={edges} margin={MAP_FADE.pane} opensOn={ring} fitsDown="top" />
 			</div>
 		</div>
 	);

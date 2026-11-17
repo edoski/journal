@@ -11,12 +11,13 @@ import { PLAN_MAP_CAP, type PlanTree } from "../src/core/contracts/plan.ts";
 import { planDepth, planMapTooBig } from "../src/core/plan-tree.ts";
 import { planTools } from "../src/agent/tools/plan.ts";
 import { stepsLayout } from "../components/unit-inbox/topic-page/steps/steps-facts.ts";
+import { MAP_FADE } from "../components/course-map/map-fade.ts";
 import { READABLE_ZOOM, TAG_ROOM, cardFit, framedCamera } from "../components/course-map/topic-map/topic-map-layout.ts";
 
 /** The lesson map's pane at 1512×982 with the sidebar open, measured in the
- *  running app on 17 Nov 2026, and its fade (`PANE_FADE`). */
+ *  running app on 17 Nov 2026, and its fade (`MAP_FADE.pane`). */
 const PANE = { width: 864, height: 787 };
-const FADE = { x: 24, y: 40 };
+const FADE = MAP_FADE.pane;
 
 /** Whether the lesson map opens with every step and the tags over the first row clear of the fade, at a scale its
  *  titles stay readable at: the course map's camera (`framedCamera`), a plan that fits sitting at the pane's top. */
