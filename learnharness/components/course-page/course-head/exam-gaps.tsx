@@ -11,7 +11,10 @@ import { useStartScope } from "@/components/start/start-scope";
 import { examGaps } from "@/components/course-page/course-head/head-facts";
 import { continueHref } from "@/components/nav/session-state";
 
-const PRESS = "text-body text-link hover:text-link";
+/** A way in, as a link in the line: its words start on the body's left
+ *  edge and wrap inside the popover (round 15, 1 m7: the first ran past
+ *  the popover's edge, 8px right of the line above it). */
+const PRESS = "h-auto min-h-6 min-w-0 shrink justify-start px-0 has-[>svg]:px-0 text-left whitespace-normal text-body text-link hover:text-link";
 
 /**
  * Under the head's first line, when the exam's plan leaves topics out
@@ -54,9 +57,9 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 	// and 11: the tutor's and Home's order).
 	const [pick, ...others] = ways;
 	return (
-		<p data-slot="course-exam-gaps" className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-1 text-body font-normal text-muted-foreground">
+		<p data-slot="course-exam-gaps" className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-4 text-body font-normal text-muted-foreground">
 			{why && (
-				<span data-slot="exam-gaps-why" className="mr-1">
+				<span data-slot="exam-gaps-why" className="w-full">
 					<MathText>{why}</MathText>
 				</span>
 			)}
