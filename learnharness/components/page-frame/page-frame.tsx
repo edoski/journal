@@ -49,10 +49,15 @@ export function PageHead({
 	actions,
 	lead,
 	standing,
+	compact = false,
 	children,
 	className,
 	...rest
 }: {
+	/** The lines under the title take the room they fill, one line's at
+	 *  least, not two (the course page's Agenda and Road candidates, and the
+	 *  topic page beside them). */
+	compact?: boolean;
 	eyebrow?: ReactNode;
 	title: ReactNode;
 	/** The page's actions, right to left in weight: `PageAction` last. */
@@ -80,7 +85,7 @@ export function PageHead({
 					</div>
 				)}
 			</div>
-			<div data-slot="page-lines" className="mt-1 flex min-h-12 flex-col gap-2">
+			<div data-slot="page-lines" className={cn("mt-1 flex flex-col gap-2", compact ? "min-h-5" : "min-h-12")}>
 				{lead && (
 					<div data-slot="page-lead" className="flex min-h-5 min-w-0 items-center text-headline text-foreground">
 						{lead}

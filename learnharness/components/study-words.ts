@@ -783,6 +783,24 @@ export const READY_WORDS = {
 	rest: "and the rest",
 } as const;
 
+/** Where he stands for the exam as one fact of a head, a few words (the
+ *  course page's candidates): the whole answer opens under it. "No exam"
+ *  for a course without one. */
+export const READY_FACT_WORDS = {
+	ready: "Ready for the exam",
+	notYet: "Not ready yet",
+	short: "Not all of it fits",
+	none: "No exam",
+} as const;
+
+/** The arcs not ready yet, heading their list under the head's fact. */
+export const NOT_READY_ARCS_WORDS = "Not ready yet in";
+
+/** When an arc's first new topic starts, on the road's line: "Starts 15 Nov". */
+export function arcStartsWords(day: string): string {
+	return `Starts ${shortDay(day)}`;
+}
+
 /** A course without arcs, not ready: the topics not yet solid, else those
  *  still to start. "Not yet solid for the exam: Basis and Rank". */
 export function notReadyWords(kind: "notYet" | "toStart", names: string): string {

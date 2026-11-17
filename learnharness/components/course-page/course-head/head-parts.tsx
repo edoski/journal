@@ -25,8 +25,8 @@ export const CourseLessonError = createContext<string | null>(null);
 
 /** A fact of the standing line that goes somewhere: its 16px mark and
  *  words, muted at rest and in full ink under the pointer. */
-const PRESS = "inline-flex h-5 min-w-0 items-center gap-1.5 whitespace-nowrap rounded-sm outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:text-foreground motion-reduce:transition-none";
-const MARK = "size-4 shrink-0";
+export const PRESS = "inline-flex h-5 min-w-0 items-center gap-1.5 whitespace-nowrap rounded-sm outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:text-foreground motion-reduce:transition-none";
+export const MARK = "size-4 shrink-0";
 
 /** Context, in the page's actions: a quiet button that opens the sheet
  *  with what the tutor and the map read about the course. A head that
@@ -50,7 +50,7 @@ export function ContextButton({ course, open: shown, onOpenChange }: { course: S
  *  The day, whether he is ready in the head's own words (`ready`, the
  *  readiness line's, so the two never disagree), each week's new topics,
  *  the final review, and the calendar one press away. */
-export function ExamFact({ course, runup, words, ready }: { course: StudyCourse; runup: CalendarCourse | null; words: string; ready: ExamReady | null }) {
+export function ExamFact({ course, runup, words, ready, className }: { course: StudyCourse; runup: CalendarCourse | null; words: string; ready: ExamReady | null; className?: string }) {
 	const { map } = course;
 	const exam = map.exam;
 	if (!exam) return null;
@@ -59,7 +59,7 @@ export function ExamFact({ course, runup, words, ready }: { course: StudyCourse;
 	const finalReview = finalReviewWords(runup?.finalReview ?? null, map.today);
 	return (
 		<Popover>
-			<PopoverTrigger data-slot="course-exam" className={PRESS}>
+			<PopoverTrigger data-slot="course-exam" className={cn(PRESS, className)}>
 				<CalendarIcon aria-hidden className={MARK} />
 				{words}
 			</PopoverTrigger>
