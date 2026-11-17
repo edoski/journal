@@ -59,10 +59,14 @@ describe("the cheat sheet groups them in plain words", () => {
 		]);
 	});
 
-	it("Home: the map's course and its enlarge, and Today's rows (Edo's notes, N2 and N3)", () => {
+	it("Home: the map's course, its enlarge and its arcs, and Today's rows (Edo's notes, N2 and N3; Stacked arcs, 17 Nov 2026)", () => {
+		const shift = IS_MAC ? "⇧" : "Shift+";
 		assert.deepEqual(rows("Home"), [
 			["The course left or right on the map", "← →"],
 			["Enlarge the map, and back", "F"],
+			["The arc above on the map", `${shift}↑`],
+			["The arc below on the map", `${shift}↓`],
+			["Go to You are here on the map", "H"],
 			["Move between Today's rows", "↑ ↓"],
 			["Open the row", "O"],
 			["Open the row's course page, else the map's", "C"],

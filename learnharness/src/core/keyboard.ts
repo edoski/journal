@@ -54,6 +54,9 @@ export type KeyAction =
 	| "question-ask-instead"
 	| "home-course"
 	| "home-map-enlarge"
+	| "home-arc-up"
+	| "home-arc-down"
+	| "home-here"
 	| "home-rows"
 	| "home-open"
 	| "home-course-page";
@@ -141,6 +144,10 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	// Home owns its keys (components/study-home/home-keys.ts), so they never leak to other pages.
 	{ id: "home-course", label: "The course left or right on the map", scope: "global", binding: "arrows-lr", displayOnly: true, group: "home" },
 	{ id: "home-map-enlarge", label: "Enlarge the map, and back", scope: "global", binding: "f", displayOnly: true, group: "home" },
+	// The map's arcs (components/course-map/arc-keys.ts).
+	{ id: "home-arc-up", label: "The arc above on the map", scope: "global", binding: "shift+arrowup", displayOnly: true, group: "home" },
+	{ id: "home-arc-down", label: "The arc below on the map", scope: "global", binding: "shift+arrowdown", displayOnly: true, group: "home" },
+	{ id: "home-here", label: "Go to You are here on the map", scope: "global", binding: "h", displayOnly: true, group: "home" },
 	{ id: "home-rows", label: "Move between Today's rows", scope: "global", binding: "arrows-ud", displayOnly: true, group: "home" },
 	{ id: "home-open", label: "Open the row", scope: "global", binding: "o", displayOnly: true, group: "home" },
 	{ id: "home-course-page", label: "Open the row's course page, else the map's", scope: "global", binding: "c", displayOnly: true, group: "home" },
