@@ -8,7 +8,7 @@ Edo, 13 Nov 2026: "i hate on both the card outline bg in overall container". So:
 
 | Part | Notes |
 |---|---|
-| grid | the list up to 20rem, the map the rest, 24px apart, both the full height under the page's head (`grid-cols-[minmax(0,20rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-6`). At Edo's 1512x982 in the page frame: the list 320px, the map 864px, wide enough for four topics in a row at 80% (Probability's next topics, 851px), where a 24rem list left the map 696px. The cost is in the list: a long topic title drops its last word or two sooner (6 of the demo courses' 56 rows, from 1 at 24rem), and the topic page's history notes reach their two-line clamp sooner. The root keeps the page's slot: `course-split` on the course page, `topic-panes` on the topic page |
+| grid | the list up to 24rem, the map the rest, 24px apart, both the full height under the page's head (`LINKED_GRID`: `grid-cols-[minmax(0,24rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-6`), one value for both pages so the twins' left columns match (Edo, 17 Nov 2026). At Edo's 1512x982 in the page frame: the list 384px, so the road's arc names and facts show whole, and the map 800px. The root keeps the page's slot: `course-split` on the course page, `topic-panes` on the topic page |
 | columns | a flex column each; the list and the map fill them. No outline, no surface, no fill: the left column takes plain rows (a row's own hover and selection fills stay the row's) |
 
 ## Sources

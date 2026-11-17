@@ -19,7 +19,7 @@ describe("the linked columns", () => {
 
 	it("lays the list beside the map with nothing around or between them, keeping the page's slot", () => {
 		const root = render().querySelector('[data-slot="topic-panes"]')!;
-		assert.match(root.getAttribute("class")!, /grid-cols-\[minmax\(0,20rem\)_minmax\(0,1fr\)\]/);
+		assert.match(root.getAttribute("class")!, /grid-cols-\[minmax\(0,24rem\)_minmax\(0,1fr\)\]/);
 		assert.match(root.getAttribute("class")!, /gap-6/);
 		assert.doesNotMatch(root.getAttribute("class")!, /border|rounded|bg-/, "no frame and no fill");
 		assert.deepEqual([...root.children].map((column) => column.firstElementChild!.getAttribute("data-slot")), ["topic-history", "topic-lesson-map"]);

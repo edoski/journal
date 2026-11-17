@@ -1,9 +1,10 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** The list up to 20rem on the left, the map filling the rest, 24px apart,
- *  both the full height. */
-export const LINKED_GRID = "grid min-h-0 flex-1 grid-cols-[minmax(0,20rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-6";
+/** The list up to 24rem on the left, the map filling the rest, 24px apart,
+ *  both the full height. The course page and the topic page share it, so
+ *  their left columns are one width. */
+export const LINKED_GRID = "grid min-h-0 flex-1 grid-cols-[minmax(0,24rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-6";
 
 /**
  * Two columns, a list beside a map, with nothing around them (spec:

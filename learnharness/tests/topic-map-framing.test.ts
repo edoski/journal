@@ -25,11 +25,11 @@ const COURSES = [
 	{ title: "Real Analysis", current: "series", needs: { sequences: [], cauchy: ["sequences"], series: ["sequences"], continuity: ["sequences"], uniform: ["continuity"] } },
 ] as const satisfies readonly { title: string; current: string; needs: Record<string, readonly string[]> }[];
 
-/** The frames at 1512×982 with the sidebar at its default width, measured in the running app. The course page's
- *  map is the frame's 1208px of content beside the 256px sidebar, less the 320px list and the 24px gap: at 80%
- *  Random variables' four next topics in a row take 851px. */
+/** The frames at 1512×982 with the sidebar at its default width, measured in the running app (17 Nov 2026). The
+ *  course page's map is the frame's 1208px of content beside the 256px sidebar, less the 384px road and the 24px
+ *  gap, under the head and Now and above the composer. */
 const TAG = 20;
-const PAGE = { width: 864, height: 737 };
+const PAGE = { width: 800, height: 662 };
 const PAGE_FADE = { x: 48, y: 32 };
 const HOME = { width: 896, height: 413 };
 const ENLARGED = { width: 1192, height: 866 };
