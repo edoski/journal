@@ -1,7 +1,7 @@
 /**
  * Road in rows (course-page/candidates/roadrows/roadrows.md): the road's
- * track left to right, the arcs folded away a press on the track where they
- * would be, the exam at its place, and the open arc's topics under its stop.
+ * track left to right, every arc on it and the exam at its place, the strip
+ * held inside its window, and the selected arc's topics under its stop.
  * Same tsx classic-JSX shim as the other render tests.
  */
 import React from "react";
@@ -17,27 +17,26 @@ import type { ArcHandle, CourseMapTopic, StudyCourse, TopicHandle } from "../src
 import { courseRead, type CourseArcSection, type CourseView } from "../components/course-page/course-model.ts";
 import type { CourseColumns } from "../components/course-page/split/split-course.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
-import { trackItems, type TrackItem } from "../components/course-page/candidates/roadrows/track-model.ts";
-import { FOLD_WORDS, RoadTrack } from "../components/course-page/candidates/roadrows/road-track.tsx";
+import { stripOffset, trackItems, type TrackItem } from "../components/course-page/candidates/roadrows/track-model.ts";
+import { RoadTrack } from "../components/course-page/candidates/roadrows/road-track.tsx";
 
 const a = (handle: string) => handle as ArcHandle;
 const section = (handle: string) => ({ arc: { handle: a(handle) }, topics: [] }) as unknown as CourseArcSection;
 const road = ["a", "b", "c", "d", "e"].map(section);
-const kinds = (items: TrackItem[]) => items.map((i) => (i.kind === "stop" ? i.section.arc.handle : i.kind === "fold" ? `fold:${i.side}` : "exam"));
+const kinds = (items: TrackItem[]) => items.map((i) => (i.kind === "stop" ? i.section.arc.handle : "exam"));
 
 describe("the road's track", () => {
-	it("folds each run of arcs away into one press where it would be: earlier, between, later", () => {
-		assert.deepEqual(kinds(trackItems(road, [road[1]!, road[3]!], undefined, true)), ["fold:earlier", "b", "fold:between", "d", "fold:later"]);
+	it("holds every arc in study order, the exam at its place", () => {
+		assert.deepEqual(kinds(trackItems(road, a("d"))), ["a", "b", "c", "exam", "d", "e"]);
+		assert.deepEqual(kinds(trackItems(road, null)), ["a", "b", "c", "d", "e", "exam"], "after every arc");
+		assert.deepEqual(kinds(trackItems(road, undefined)), ["a", "b", "c", "d", "e"], "no exam ahead");
 	});
 
-	it("puts the exam at its place on the whole road, never folded away", () => {
-		assert.deepEqual(kinds(trackItems(road, [road[0]!, road[1]!], a("d"), true)), ["a", "b", "fold:later", "exam", "fold:later"], "the exam stays between the arcs folded before and after it");
-		assert.deepEqual(kinds(trackItems(road, road, a("d"), true)), ["a", "b", "c", "exam", "d", "e", "fold:near"]);
-		assert.deepEqual(kinds(trackItems(road, road, null, false)), ["a", "b", "c", "d", "e", "exam"], "after every arc, and no fold back when nothing folds");
-	});
-
-	it("says Earlier, Later and Only what's near in plain words", () => {
-		assert.deepEqual([FOLD_WORDS.earlier, FOLD_WORDS.later, FOLD_WORDS.near], ["Earlier", "Later", "Only what's near"]);
+	it("centres the selected arc but never lets the strip leave its window", () => {
+		assert.equal(stripOffset({ start: 0, width: 224 }, 1840, 1232), 0, "the first arc holds the strip at its left end");
+		assert.equal(stripOffset({ start: 1000, width: 352 }, 1840, 1232), 1000 + 176 - 616, "a middle arc is centred");
+		assert.equal(stripOffset({ start: 1696, width: 144 }, 1840, 1232), 1840 - 1232, "the last item holds it at its right end");
+		assert.equal(stripOffset({ start: 600, width: 224 }, 900, 1232), 0, "a strip that fits never moves");
 	});
 });
 
@@ -108,9 +107,9 @@ describe("the road under the map", () => {
 		assert.equal(document.querySelectorAll('[data-slot="course-topic-row"]').length, 2, "only the open arc's topics");
 	});
 
-	it("shows only the stretch near him, the arcs before it one Earlier press on the track", () => {
-		assert.deepEqual([...document.querySelectorAll('[data-slot="road-stop"]')].map((s) => s.getAttribute("data-arc")), ["maps", "eigen"]);
-		assert.equal(document.querySelector('[data-slot="road-fold"]')?.getAttribute("data-side"), "earlier");
+	it("shows every arc on the road, with no fold presses", () => {
+		assert.deepEqual([...document.querySelectorAll('[data-slot="road-stop"]')].map((s) => s.getAttribute("data-arc")), ["spaces", "maps", "eigen"]);
+		assert.ok(document.querySelector('[data-slot="road-fold"]') === null);
 	});
 
 	it("ends each stop in its one fact: Check it on a ready arc, the day a new arc starts, and the exam a stop", () => {
@@ -134,12 +133,11 @@ describe("the road under the map", () => {
 		assert.equal(row.children.length, 4, "pie, where he stands, the topic, its fact");
 	});
 
-	it("scrolls natively sideways, the track stopping short of every marker", () => {
-		const scroller = document.querySelector<HTMLElement>('[data-slot="road-scroller"]')!;
-		assert.match(scroller.className, /\boverflow-x-auto\b/, "a swipe or the wheel moves it freely");
+	it("slides inside a window that never scrolls, the track stopping short of every marker", () => {
+		assert.match(document.querySelector('[data-slot="road-window"]')!.className, /\boverflow-hidden\b/, "the window itself never scrolls");
 		const stop = document.querySelector('[data-slot="road-stop"]')!;
 		assert.match(stop.className, /before:w-\[calc\(50%-14px\)\]/, "the stretch before stops 6px short of the marker's 16px box");
 		assert.match(stop.className, /after:left-\[calc\(50%\+14px\)\]/, "the stretch after starts 6px past it");
-		assert.equal(document.querySelectorAll('[data-slot="road-stop"]').length, 2);
+		assert.equal(document.querySelectorAll('[data-slot="road-stop"]').length, 3);
 	});
 });

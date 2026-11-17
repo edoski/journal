@@ -10,16 +10,15 @@ It follows the road's topic rows the way Home's map follows Today (`road-follow.
 
 ## The road
 
-- A row that scrolls natively sideways (a trackpad swipe glides with momentum, a wheel turned up or down moves it sideways; no scrollbar, no snap), one item per arc shown, items edge to edge: a folded arc's slot 14rem, the open arc's 22rem for its rows: its ring, its whole name (wrapping, never cut), and its one fact: "Needs you" when Today takes up one of its topics, "Ready for its check", "Check passed", or "Starts 20 Nov" for an arc not started; nothing otherwise. Its press shows the arc on the map and opens it. Pointing at a stop only brightens its words (no fill, no map change; Edo, 17 Nov: hovering an arc that swapped the map "looks so bad"); the focus ring stays for keys. An arc past the exam is muted.
-- The track runs through the items and stops `MARK_GAP` (6px) short of every marker on either side, the exam's included.
-- The exam is an item (`road-exam`, its run-up on press) at its place on the whole road (`examStop`).
-- The arc the page shows is open, its topics under it as Home's Today rows at their compact size (`hybridRow({ size: "compact" })`, `../../../study-home/agenda-rows/hybrid/hybrid.md`): the pie beside where he stands, then the topic and its fact flush right; Check it heads them on an arc ready for its check. The row keeps the height of the course's longest arc, so the map never moves when another opens; the room under the open arc's topics is that reserve (117px to the window's bottom on Linear Algebra, 182px on Calculus and Probability).
-- Only the stretch near him shows first (`roadWindow`); the arcs folded away are the carousel's ends, "Earlier" and "Later" ("More" between two shown arcs), any of which shows the whole road, which ends in "Only what's near" (`trackItems`).
-- The arc the page shows is centred on arrival and whenever another is shown; focusing an item glides it to the centre with a gentle snap (at once under reduced motion); items beyond fade at the row's sides. No scrollbar and no arrows over the items.
+- Every arc of the course on one track, left to right, the exam a stop where the plan reaches it (`trackItems`, `road-exam`). No folds, no Earlier, Later, More or "Only what's near" presses (Edo, 17 Nov 2026: "Scrap all of that").
+- A fixed window that never scrolls (`road-window`, overflow hidden). The strip inside it slides (a transform, 300ms ease-out, none under reduced motion) so the selected arc sits in the window's centre, held at the strip's ends so it never leaves the window (`stripOffset`). Its sides fade only where the strip runs on beyond them.
+- The selected arc is the one the page shows. It is open and 352px wide, its topics under it as Home's Today rows at their compact size (`hybridRow({ size: "compact" })`). Every other arc is 224px, its ring, its whole name and its one fact: "Needs you", "Ready for its check", "Check passed" or "Starts 20 Nov". Widths are fixed numbers, so the strip's place is worked out, never measured mid-glide.
+- A wheel or swipe steps the selection one arc per gesture: its travel builds to 30px, then the gesture (momentum included) must rest 180ms before the next step. It is listened to directly, so the page never scrolls or swipes back. Pressing a stop selects it. Pointing at a stop only brightens its words; pointing at a topic row lights its card on the map, as Home does.
+- The track runs through the items and stops `MARK_GAP` (6px) short of every marker on either side, the exam's included. The row keeps the height of the course's longest arc, so the map never moves.
 
 ## Keys
 
-← and → step one item and glide it to the centre; Home and End jump to the ends; Down enters the open arc's topics (opening the arc first); Up leaves them for their stop and, from a stop, for the head's press; Enter or Space opens a topic's page.
+← and → select the arc before or after (from a topic row too), gliding it to the centre; Down enters the open arc's topics (opening the arc first); Up leaves them for their stop and, from a stop, for the head's press; Enter or Space opens a topic's page.
 
 ## The topic page
 
