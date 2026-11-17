@@ -15,6 +15,7 @@ import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { createRoot } from "./helpers/app-render.tsx";
 import { AppearanceSection } from "../components/settings/appearance-section.tsx";
 import { INK_SWATCHES } from "../components/settings/controls.tsx";
+import { formatBinding } from "../src/core/index.ts";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { Dialog } from "../components/ui/dialog.tsx";
 import { SettingsDialogBody, SettingsDialogProvider } from "../components/settings/settings-dialog.tsx";
@@ -191,10 +192,13 @@ describe("KeyboardSection (thin SSR)", () => {
 		assert.equal(def?.binding, "mod+,");
 	});
 
-	it("displayOnly actions are left to the cheat sheet and never offer Rebind", () => {
+	it("lists the keys a screen owns as fixed, never offering Rebind (round 15, 3 free: no ⌥↑ ⌥↓, no Esc)", () => {
 		const html = renderToStaticMarkup(<KeyboardSection />);
-		assert.ok(!html.includes(`data-testid="kbd-row-question-next-row"`), "a screen's own keys are not listed");
-		assert.ok(!html.includes(`data-testid="kbd-rebind-question-next-row"`), "surface keys stay put");
+		for (const id of ["confidence-up", "confidence-down", "stop-reply", "question-ask-instead"]) {
+			assert.ok(html.includes(`data-testid="kbd-row-${id}"`), `${id} is listed`);
+			assert.ok(!html.includes(`data-testid="kbd-rebind-${id}"`), `${id} stays put`);
+		}
+		for (const binding of ["alt+arrowup", "alt+arrowdown", "escape"]) assert.ok(html.includes(formatBinding(binding)), formatBinding(binding));
 		// The model-menu entries are GONE entirely (owner, 2026-10-10):
 		// obvious in-field navigation, not settings material.
 		assert.ok(!html.includes("Model menu"), "model-menu rows removed");
