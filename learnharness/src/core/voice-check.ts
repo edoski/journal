@@ -66,7 +66,11 @@ export type VoiceRule =
 	| "card-words"
 	| "unbuilt"
 	| "day-part"
-	| "below";
+	| "below"
+	| "pointer"
+	| "arrival"
+	| "own-words"
+	| "mark-case";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -123,6 +127,17 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// above").
 	{ rule: "reprint", re: /\b(?:still|stays|remains) (?:open )?below\b|\bopen below\b/i },
 	{ rule: "reprint", re: /\bhere it is again\b|\bhere(?:'s| is) (?:the |that |your |this )?(?:question|it|check) (?:again|once more)\b|\b(?:I'?ll|I will|let me) (?:repeat|re-?ask|ask) (?:it|the question|that question|the check)(?: again| below)?\b|\b(?:repeating|asking) (?:it|the question) again\b/i },
+	// His answer's card shows it came and how it was marked, so a line
+	// saying it arrived tells him nothing (round 15, m17: "Your answer on
+	// D arrived.").
+	{ rule: "arrival", re: /\b(?:your|his|the) (?:answer|message|work|reply|photo)(?: (?:on|to|for|about) [^.?!\n]{1,40}?)? (?:has |have )?(?:arrived|came (?:through|in)|went through|got through|reached me|was received)\b|\bI (?:got|received|have received|'ve received|'ve got) your (?:answer|message|work|reply|photo)\b/i },
+	// Its own earlier words are nothing he acts on: what is true is said
+	// as itself (round 15, m17: "My earlier line saying the set was done
+	// was wrong, since one problem is not a set.").
+	{ rule: "own-words", re: /\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b/i },
+	// His card's words, inside a sentence, are plain lowercase words
+	// (round 15, m18: "The mark stands as With help").
+	{ rule: "mark-case", re: /(?<=[a-z0-9,;)]\s+)(?:With help|On your own|Partly right|Not right|Gave up|Not yet confirmed|Prediction, not counted|Guessing|Confident)\b/ },
 ];
 
 /** A sentence that puts a question or his answer to it below the message

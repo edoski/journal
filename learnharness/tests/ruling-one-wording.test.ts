@@ -20,8 +20,8 @@ const withheld = (guard: VoiceGuard, call: ToolCall) => {
 	return (guard as unknown as { decisions: Map<string, { details: { withheld: string } } | null> }).decisions.get(call.id) ?? null;
 };
 
-const STAMP = "The mark stays Right, With help: the hint gave you the free variable, so your answer came after help on the very part that was missing.";
-const REPLY = "The mark stays Right, With help. The hint named the free variable, so the answer counts as given after help.";
+const STAMP = "The mark stays right, with help: the hint gave you the free variable, so your answer came after help on the very part that was missing.";
+const REPLY = "The mark stays right, with help. The hint named the free variable, so the answer counts as given after help.";
 
 describe("one ruling, in the reply and on his card (2 n6)", () => {
 	it("refuses a reply that words the saved ruling differently", () => {

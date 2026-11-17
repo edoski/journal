@@ -193,9 +193,20 @@ export const HANDOFF_TEXT =
 	"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
-	"When it's genuinely reasoned out, call plan_init and, in that same reply, start teaching with the first step alone: one idea in two to four sentences, then its question, never waiting for plan_init's result; I'll interrupt if I want something else. " +
-	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again. " +
-	"My last probe answer got only its mark, with no words: when it was not right, the first step's first sentence names the part it missed, and the step builds from there.";
+	"When it's genuinely reasoned out, call plan_init and, in that same reply, start teaching with the first step alone: one idea in two to four sentences, then its question, never waiting for plan_init's result; I'll interrupt if I want something else.";
+
+/** What the wake says of the probe's last answer, read from the record
+ *  once the probe's turn has landed (round 15, m13: the first step opened
+ *  "Your answer took the limit of the base alone…" under the feedback
+ *  "The base and the exponent change together…", since the wake said only
+ *  "the probe's feedback above"): the feedback he read after it, quoted as
+ *  already said; or that it got only its mark (round 14); or nothing when
+ *  the probe asked nothing. */
+export function probeFeedbackText(said: readonly string[] | null): string {
+	if (said === null) return "";
+	if (said.length === 0) return "My last probe answer got only its mark, with no words: when it was not right, the first step's first sentence names the part it missed, and the step builds from there.";
+	return `I have already read the probe's feedback on my last answer: ${said.map((t) => `"${t.trim()}"`).join(" ")} That is said: the first step builds on it with something new, and never says its point again, in any words.`;
+}
 
 /** The wake in a session that continues an open task (round 11, 2 N2: the
  *  lesson's wake turned Problem sheet 4, answered right at part (c), into a
@@ -205,8 +216,7 @@ export const HANDOFF_TEXT =
  *  material waits for it. */
 export const TASK_HANDOFF_TEXT =
 	"Next: carry on with my open task at the step the assessment says comes next. It is my task, not a lesson: plan only that step with plan_init, one node named for the part it is, with a node before it only for a gap the assessment names, never a lesson on the topic from its basics. " +
-	"If the step needs something from me first, such as a part's text, ask me for it in one plain line, unless that is already asked above, and end your turn; work the step once I send it. Otherwise pose the step straight away. " +
-	"I have already read the probe's feedback above, so never say it again.";
+	"If the step needs something from me first, such as a part's text, ask me for it in one plain line, unless that is already asked above, and end your turn; work the step once I send it. Otherwise pose the step straight away.";
 
 /** The model-facing words of Continue pressed on an open task this session
  *  holds, when nothing in it waits on him (round 13, 2 M1): Continue
@@ -334,7 +344,7 @@ const PROPOSED_WORDS: Readonly<Record<MarkResult, string>> = {
  *  already counts as your own work, with no help" sat on a card that said
  *  otherwise). */
 const CARD_WORDS_FOR_RULING =
-	'His card says how each attempt went: help given reads "With help"; a prediction before its step was taught reads "Prediction, not counted"; an answer he gave up on reads "Gave up"; a right answer recorded as uncertain reads "Not yet confirmed"; any other attempt with no help reads "On your own", a guess or a partly right one included, with his confidence beside it as "Guessing" or "Confident", never "sure" or "guess". In your ruling and in `ruling`, say how it went in the card\'s words for the attempt as you re-mark it.';
+	'His card says how each attempt went: help given reads "With help"; a prediction before its step was taught reads "Prediction, not counted"; an answer he gave up on reads "Gave up"; a right answer recorded as uncertain reads "Not yet confirmed"; any other attempt with no help reads "On your own", a guess or a partly right one included, with his confidence beside it as "Guessing" or "Confident", never "sure" or "guess". In your ruling and in `ruling`, say how it went in the card\'s words for the attempt as you re-mark it, lowercase inside a sentence ("it stays with help").';
 
 /** The longest question excerpt a dispute quotes. */
 const DISPUTE_QUOTE = 400;
@@ -389,10 +399,13 @@ export const PRACTICE_REQUEST_TEXT: Readonly<Record<PracticeRequest, string>> = 
 };
 
 /** Which rung a Hint request asks for, by how many hints this problem has
- *  had: the first is a question, the second a nudge, the third and later
- *  one step. Show me reveals the rest. */
+ *  had: the first says where to look, the second a nudge, the third and
+ *  later one step. Show me reveals the rest. Every rung is a statement:
+ *  the first asked "one question that points at where to look", and the
+ *  hint only rephrased the problem (round 15, m16: "Does a row of A with
+ *  nonzero entries still have to be nonzero once elimination is done?"). */
 export function hintRungText(nth: number): string {
-	if (nth <= 1) return "This is his first hint on this problem: ask him one question that points at where to look (R0 or R1). No method, no step, no answer.";
+	if (nth <= 1) return "This is his first hint on this problem: say where to look (R0 or R1), as one statement in this problem's own terms of what it did not give him, never a question and never the problem in other words. No method, no step, no answer.";
 	if (nth === 2) return "This is his second hint on this problem: one nudge that names the pattern or the idea (R2 or R3). Carrying it out stays his.";
 	return `This is hint ${nth} on this problem: one step, worked or outlined (R4 or R5), never the rest of the solution. Show me is how he sees the rest.`;
 }

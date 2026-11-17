@@ -35,7 +35,7 @@ import { beginTurn, endTurn, isTurnRunning } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
-import { answeredQuestionsOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, type LhMessage } from "../core/native-messages.ts";
+import { answeredQuestionsOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
 import { remarkableOf } from "../core/answer-marks.ts";
 import { reviewRecord } from "../core/session-opening.ts";
 import { compactionInstructions, planTreeToText } from "../core/compaction.ts";
@@ -315,7 +315,7 @@ export async function handleChatInput(
 	try {
 		appends =
 			input.type === "steers"
-				? input.steers.filter((s) => !steerDelivered(record.messages, s.id))
+				? input.steers.filter((s) => !steerDelivered(record.messages, s.id)).map((s) => withProbeFeedback(s, record.messages))
 				: inputAppends(record, input);
 	} catch (err) {
 		if (err instanceof ChatInputError) {

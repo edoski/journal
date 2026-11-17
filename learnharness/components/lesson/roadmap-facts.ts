@@ -4,7 +4,7 @@
  * done, and where in the transcript each step was first taught. Pure.
  */
 
-import { normalizeQuestionType, POSITION_QUESTION_TOOLS, type DerivedPlanStatuses, type PlanNodeStatus, type PlanTree } from "@/src/core";
+import { derivePlanStatuses, POSITION_QUESTION_TOOLS, type DerivedPlanStatuses, type PlanNodeStatus, type PlanTree } from "@/src/core";
 import { topoFor, type PopupMessage } from "@/components/lesson/plan-facts";
 
 export interface RoadmapStep {
@@ -19,25 +19,14 @@ export interface RoadmapStep {
 	next: boolean;
 	/** It has a place in the transcript to open. */
 	taught: boolean;
-	/** Its title waits: his prediction on it is open, and a title can read
-	 *  as its answer (round 9: "Pivots in every column" above the question
-	 *  asking what the echelon form must look like). */
-	held?: boolean;
 }
 
-/** The step whose prediction waits on him: the open question is a
- *  `predict` tagged with that step. Null for a check or no question. */
-export function predictionOpenOn(pending: { tool: string; input: unknown } | null): string | null {
-	if (!pending || !POSITION_QUESTION_TOOLS.includes(pending.tool)) return null;
-	const input = pending.input as { type?: unknown; nodeId?: unknown } | null;
-	if (normalizeQuestionType(input?.type) !== "predict") return null;
-	return typeof input?.nodeId === "string" ? input.nodeId : null;
-}
-
-/** The steps in teaching order (each after everything it rests on).
- *  `predicting` is the step whose prediction is open (`predictionOpenOn`):
- *  while it is the one he is on, its title is held. */
-export function roadmapSteps(tree: Pick<PlanTree, "nodes" | "edges">, statuses: DerivedPlanStatuses, taught: ReadonlySet<string>, predicting: string | null = null): RoadmapStep[] {
+/** The steps in teaching order (each after everything it rests on). A
+ *  step always shows its title, which names the idea learned: `plan_init`
+ *  refuses a title that states its result (round 9, M1), so none is held
+ *  while his prediction is open (round 15, m15: the row then read "Your
+ *  prediction first", a move, not the idea). */
+export function roadmapSteps(tree: Pick<PlanTree, "nodes" | "edges">, statuses: DerivedPlanStatuses, taught: ReadonlySet<string>): RoadmapStep[] {
 	const steps = topoFor(tree.nodes, tree.edges).order.map((n): RoadmapStep => ({
 		id: n.id,
 		title: n.title,
@@ -45,7 +34,6 @@ export function roadmapSteps(tree: Pick<PlanTree, "nodes" | "edges">, statuses: 
 		done: statuses.done.has(n.id),
 		next: false,
 		taught: taught.has(n.id),
-		...(statuses.current === n.id && predicting === n.id ? { held: true } : {}),
 	}));
 	const current = steps.findIndex((s) => s.status === "current");
 	steps.forEach((s, i) => {
@@ -56,13 +44,19 @@ export function roadmapSteps(tree: Pick<PlanTree, "nodes" | "edges">, statuses: 
 	return steps;
 }
 
-/** The words beside the strip: the step he is on, none while its title
- *  is held, else the next one, else that every step was taught. Null with
- *  no steps. */
+/** The lesson's steps from its transcript, as the strip and panel draw
+ *  them: where he is is the newest tagged question's step, a prediction
+ *  on it open or not. `taught` are the steps with a place to open. */
+export function lessonRoadmapSteps(tree: PlanTree, messages: Parameters<typeof derivePlanStatuses>[1], taught: ReadonlySet<string>): RoadmapStep[] {
+	return roadmapSteps(tree, derivePlanStatuses(tree, messages), taught);
+}
+
+/** The words beside the strip: the step he is on, else the next one,
+ *  else that every step was taught. Null with no steps. */
 export function roadmapLabel(steps: readonly RoadmapStep[]): string | null {
 	if (steps.length === 0) return null;
 	const current = steps.find((s) => s.status === "current");
-	if (current) return current.held ? "" : current.title;
+	if (current) return current.title;
 	const next = steps.find((s) => s.next);
 	return next ? `Next: ${next.title}` : "Every step taught";
 }

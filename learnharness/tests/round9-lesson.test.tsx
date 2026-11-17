@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { LessonRoadmap } from "../components/lesson/lesson-roadmap.tsx";
-import { predictionOpenOn, roadmapLabel, roadmapSteps } from "../components/lesson/roadmap-facts.ts";
+import { lessonRoadmapSteps, roadmapLabel, roadmapSteps } from "../components/lesson/roadmap-facts.ts";
 import { planTitlesGiveAway } from "../src/core/plan-tree.ts";
 import type { PlanTree } from "../src/core/contracts/plan.ts";
 
@@ -45,45 +45,45 @@ function element(selector: string): HTMLElement {
 const TREE: Pick<PlanTree, "nodes" | "edges"> = {
 	nodes: [
 		{ id: "kernel", title: "What the kernel holds" },
-		{ id: "pivots", title: "Pivots in every column" },
+		{ id: "pivots", title: "What the echelon form needs" },
 		{ id: "square", title: "One-to-one against onto for square matrices" },
 	],
 	edges: [{ from: "kernel", to: "pivots" }, { from: "pivots", to: "square" }],
 };
 const ON_PIVOTS = { current: "pivots", visited: new Set(["kernel", "pivots"]), done: new Set(["kernel"]) };
-const PREDICTION = {
-	tool: "explain",
-	input: { type: "predict", nodeId: "pivots", question: "What must the echelon form of an n × n matrix look like for Ax = 0 to have only x = 0?" },
-};
 
-describe("a step's title never answers its own open prediction (round 9 M1)", () => {
-	it("the open question is a prediction on the step he is on", () => {
-		assert.equal(predictionOpenOn(PREDICTION), "pivots");
-		assert.equal(predictionOpenOn({ ...PREDICTION, input: { ...PREDICTION.input, type: "check" } }), null, "a check is asked after the teaching");
-		assert.equal(predictionOpenOn(null), null);
-	});
+describe("a step's title names its idea, a prediction on it open or not (round 9 M1; round 15, m15)", () => {
+	const TREE_15: Pick<PlanTree, "nodes" | "edges"> = {
+		nodes: [
+			{ id: "undo-map", title: "What it takes to undo a map" },
+			{ id: "flattening", title: "Maps that flatten space" },
+			{ id: "det-test", title: "The determinant as a test for an inverse" },
+		],
+		edges: [{ from: "undo-map", to: "flattening" }, { from: "flattening", to: "det-test" }],
+	};
 
-	it("the strip shows the dots and no title while the prediction is open", async () => {
-		const steps = roadmapSteps(TREE, ON_PIVOTS, new Set(["kernel", "pivots"]), predictionOpenOn(PREDICTION));
-		assert.equal(roadmapLabel(steps), "");
+	/** The lesson as the transcript holds it: the first two steps done, and
+	 *  his prediction on the third open, its question not answered. */
+	const transcript = [
+		{ parts: [{ type: "tool-explain", input: { type: "check", nodeId: "undo-map", question: "q1" } }, { type: "tool-lesson_progress", input: { done: ["undo-map"] } }] },
+		{ parts: [{ type: "tool-explain", input: { type: "check", nodeId: "flattening", question: "q2" } }, { type: "tool-lesson_progress", input: { done: ["flattening"] } }] },
+		{ parts: [{ type: "tool-explain", input: { type: "predict", nodeId: "det-test", question: "What do you expect has to give when a map flattens space?" } }] },
+	];
+	const tree = { ...TREE_15, goal: { title: "Invertible matrices" } } as unknown as PlanTree;
+
+	it("the strip names the step he is on while his prediction on it is open", async () => {
+		const steps = lessonRoadmapSteps(tree, transcript as never, new Set(["undo-map", "flattening", "det-test"]));
+		assert.equal(roadmapLabel(steps), "The determinant as a test for an inverse");
 		await mount(<LessonRoadmap steps={steps} open={false} onOpenChange={() => {}} onJump={() => {}} />);
-		const trigger = element('[data-testid="roadmap"]');
-		assert.equal(trigger.querySelectorAll('[data-slot="roadmap-strip"] > span').length, 3, "the dots stay");
-		assert.doesNotMatch(trigger.textContent ?? "", /every column/);
-		assert.doesNotMatch(trigger.getAttribute("aria-label") ?? "", /every column/);
+		assert.match(element('[data-testid="roadmap"]').textContent ?? "", /The determinant as a test for an inverse/);
 	});
 
-	it("the panel names the step's place, not its title, while the prediction is open", async () => {
-		const steps = roadmapSteps(TREE, ON_PIVOTS, new Set(["kernel", "pivots"]), predictionOpenOn(PREDICTION));
+	it("the panel's Now row names the idea, never a move (the recorded \"Your prediction first\")", async () => {
+		const steps = lessonRoadmapSteps(tree, transcript as never, new Set(["undo-map", "flattening", "det-test"]));
 		await mount(<LessonRoadmap steps={steps} open onOpenChange={() => {}} onJump={() => {}} />);
-		const row = element('[data-testid="roadmap-step-pivots"]');
-		assert.doesNotMatch(row.textContent ?? "", /every column/);
-		assert.match(row.textContent ?? "", /Your prediction first.*Now$/);
-	});
-
-	it("the title comes back once he has answered, and a check never holds it", () => {
-		assert.equal(roadmapLabel(roadmapSteps(TREE, ON_PIVOTS, new Set(["pivots"]), null)), "Pivots in every column");
-		assert.equal(roadmapLabel(roadmapSteps(TREE, ON_PIVOTS, new Set(["pivots"]), "kernel")), "Pivots in every column", "a prediction on another step holds nothing here");
+		const row = element('[data-testid="roadmap-step-det-test"]');
+		assert.match(row.textContent ?? "", /The determinant as a test for an inverse.*Now$/);
+		assert.doesNotMatch(document.body.textContent ?? "", /Your prediction first/);
 	});
 
 	it("plan_init refuses a title that states a condition in words", () => {

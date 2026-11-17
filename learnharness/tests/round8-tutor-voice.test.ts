@@ -24,7 +24,7 @@ after(() => {
 const { VoiceGuard } = await import("../src/agent/voice-guard.ts");
 const { voiceBreaks, SENTENCE_WORDS } = await import("../src/core/voice-check.ts");
 const { SEND_TO_USER_TOOL, newUserMessage, newHandoffMessage } = await import("../src/core/native-messages.ts");
-const { HANDOFF_TEXT } = await import("../src/core/contracts/chat.ts");
+const { HANDOFF_TEXT, probeFeedbackText } = await import("../src/core/contracts/chat.ts");
 
 let n = 0;
 const send = (message: string): ToolCall => ({ type: "toolCall", id: `send-${++n}`, name: SEND_TO_USER_TOOL, arguments: { message } });
@@ -163,7 +163,7 @@ describe("the first teaching step builds on the probe (M2, m11)", () => {
 	it("refuses the \"Today: …\" goal line, and the handoff no longer asks for it", () => {
 		assert.ok(ruled("Today: why $\\ker A = \\{0\\}$, full rank and $\\det A \\neq 0$ all say that $A$ can be undone.").includes("plan"));
 		assert.doesNotMatch(HANDOFF_TEXT, /goal in one line/);
-		assert.match(HANDOFF_TEXT, /already read the probe's feedback/);
+		assert.match(probeFeedbackText(["The base and the exponent change together."]), /already read the probe's feedback/);
 	});
 });
 

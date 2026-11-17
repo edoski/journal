@@ -48,6 +48,7 @@ import {
 	NEXT_PROBLEM_TEXT,
 	PRACTICE_REQUEST_TEXT,
 	hintRungText,
+	probeFeedbackText,
 	THINKING_LABEL,
 	type PracticeRequest,
 	type SessionMode,
@@ -253,6 +254,26 @@ export function newHandoffMessage(chatId: string, review = false, task = false):
 		details: { chatId },
 		timestamp: Date.now(),
 	};
+}
+
+/** The probe-handoff wake as the teacher reads it: its text, then what
+ *  the probe's last answer got, read from `record`, where the probe's
+ *  turn has landed (`probeFeedbackText`). Every other steer as it is. */
+export function withProbeFeedback<T extends LhMessage>(steer: T, record: readonly LhMessage[]): T {
+	if (steer.role !== "custom" || steer.customType !== "probe-handoff" || typeof steer.content !== "string") return steer;
+	const line = probeFeedbackText(probeFeedbackOf(record));
+	return line ? { ...steer, content: `${steer.content} ${line}` } : steer;
+}
+
+/** What the tutor told him after his last answer to a question: its
+ *  messages, as he read them. Null when no answer came. Pure. */
+export function probeFeedbackOf(messages: readonly LhMessage[]): string[] | null {
+	const at = messages.findLastIndex((m) => m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName) && !m.isError && isRealAnswer(m.details));
+	if (at < 0) return null;
+	const failed = failedOutputCallIds(messages);
+	return messages.slice(at + 1).flatMap((m) =>
+		m.role !== "assistant" ? [] : m.content.flatMap((b) => (b.type === "toolCall" && b.name === SEND_TO_USER_TOOL && !failed.has(b.id) ? [sendToUserText(b)].filter((t): t is string => !!t?.trim()) : [])),
+	);
 }
 
 // ─── the session's mode: teaching or practice ───────────────────────────────
@@ -527,7 +548,7 @@ export function newUngradedAnswerMessage(question: string): LhMarkerMessage {
 		id: newMessageId(),
 		role: "custom",
 		customType: UNGRADED_ANSWER,
-		content: `[UNGRADED ANSWER] His answer${which} was submitted and its answer shown to him, but your turn stopped before you graded it. It is an attempt, not a question left open: grade it and save it with course_save in this turn, before anything else, then answer what follows.`,
+		content: `[UNGRADED ANSWER] His answer${which} was submitted and its answer shown to him, but your turn stopped before you graded it. It is an attempt, not a question left open: grade it and save it with course_save in this turn, before anything else, then answer what follows. The mark the save puts under his answer tells him it came through, so never say it arrived or was received.`,
 		display: false,
 		details: {},
 		timestamp: Date.now(),
@@ -1556,6 +1577,18 @@ function closedInTurn(messages: readonly LhMessage[], end: number): boolean {
 	return false;
 }
 
+/** Whether the turn holding the batch at `end` handed the session on
+ *  before it: a clean mode handoff or concluded probe since the input
+ *  that opened the turn. Pure. */
+function handedOffInTurn(messages: readonly LhMessage[], end: number): boolean {
+	for (let i = end - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "toolResult" && (MODE_HANDOFF_TOOLS[m.toolName] !== undefined || m.toolName === "probe_done") && !m.isError && (m.details as { ok?: unknown } | null)?.ok === true) return true;
+		if (m.role !== "assistant" && nativeInputCause(m as AgentMessage, messages.slice(0, i) as AgentMessage[]) !== "neutral") return false;
+	}
+	return false;
+}
+
 export function needsContinuation(record: readonly LhMessage[]): boolean {
 	// Context markers written after an answer (the course brief rides every
 	// learner input) carry no input of their own: what is owed is read from
@@ -1598,6 +1631,12 @@ export function needsContinuation(record: readonly LhMessage[]): boolean {
 		(m) => (MODE_HANDOFF_TOOLS[m.toolName] !== undefined || m.toolName === "probe_done") && !m.isError && (m.details as { ok?: unknown } | null)?.ok === true,
 	);
 	if (handedOff) return false;
+	// A handoff beside a message the voice guard refused ends its turn on
+	// the rewrite, so the record ends on that message, not on the handoff:
+	// a continuation then ran the next agent, and the handoff's wake ran it
+	// again (round 15, m14: problem M posed, then "Your rank problem on the
+	// matrix M is still open above." under it).
+	if (handedOffInTurn(messages, start)) return false;
 	// Closing words end their turn on purpose (teacher-agent `endsTurnFor`),
 	// so the record ends on their result and nothing is owed (round 14, M1:
 	// a continue after the close asked the left question again).

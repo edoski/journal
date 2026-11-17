@@ -24,7 +24,7 @@ const withheld = (guard: VoiceGuard, call: ToolCall) => {
 describe("a ruling words his confidence as his card does", () => {
 	it("the recorded ruling is refused", () => {
 		const refused = withheld(new VoiceGuard(turn(), undefined, true, true), send("The mark stays Partly right, on your own, sure. You wrote $0.2 \\cdot 0.8^5 \\approx 0.066$, so the arithmetic was done without the 6."));
-		assert.deepEqual(refused?.details.rules, ["card-words"]);
+		assert.deepEqual(refused?.details.rules, ["mark-case", "card-words"], "and its capitals mid-sentence (round 15, m18)");
 	});
 
 	it("the same words in the save's ruling are refused", () => {
@@ -32,10 +32,10 @@ describe("a ruling words his confidence as his card does", () => {
 		assert.equal(refused?.details.withheld, "card-words");
 	});
 
-	it("the card's own words pass", () => {
+	it("the card's own words pass, lowercase inside the sentence (round 15, m18)", () => {
 		const guard = new VoiceGuard(turn(), undefined, true, true);
-		assert.equal(withheld(guard, save("The mark stays Partly right, On your own, Confident.")), null);
-		assert.equal(withheld(guard, send("The mark stays Partly right, On your own, Confident. You wrote $0.328$, so the sum was worked without the 6.")), null);
+		assert.equal(withheld(guard, save("The mark stays partly right, on your own, confident.")), null);
+		assert.equal(withheld(guard, send("The mark stays partly right, on your own, confident. You wrote $0.328$, so the sum was worked without the 6.")), null);
 	});
 
 	it("the dispute names the card's confidence words", () => {

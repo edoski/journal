@@ -39,7 +39,7 @@ import { LESSON_PROGRESS_TOOL } from "../core/contracts/plan.ts";
 import { normalizeQuestionType, PREDICT_RULE } from "../core/question-core.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
-import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
+import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
 import { adviceSentences, partialDay, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
@@ -76,6 +76,9 @@ export interface TurnInput {
 	/** His message asks to guess first ("let me guess first"): the guess
 	 *  is a prediction, never a counted attempt (round 12, 2 M1). */
 	guess?: string;
+	/** He pressed Hint on a practice problem: its rung sets the length, and
+	 *  the hint is a statement, as a check's is (round 15, m16). */
+	hint?: boolean;
 	/** A demo the tutor called for has just been built and drawn in the
 	 *  lesson: the turn's first message points him into it (round 14, m13:
 	 *  the slots demo landed above a reply that never mentioned it). */
@@ -164,7 +167,7 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 		case "practice-request": {
 			// A hint's rung and a shown solution set their own length.
 			const request = isRecord(input.details) ? input.details.request : undefined;
-			return { kind: request === "explain" ? "teach" : undefined, answers: false, words: null };
+			return { kind: request === "explain" ? "teach" : undefined, answers: false, words: null, ...(request === "hint" ? { hint: true } : {}) };
 		}
 		case UNGRADED_ANSWER:
 			return { kind: "wrong", answers: true, words: textOf(input.content) };
@@ -203,6 +206,26 @@ function standingQuestion(messages: readonly LhMessage[]): boolean {
 		if (!call) continue;
 		const result = messages.find((r) => r.role === "toolResult" && r.toolCallId === call.id);
 		return result?.role !== "toolResult" || !isRealAnswer(result.details);
+	}
+	return false;
+}
+
+/** Whether the last thing he read before this turn is a question or a
+ *  problem still open: nothing of his came after it, and nothing the
+ *  tutor showed him. A pointer to it then points at the line right above
+ *  (round 15, m14: "Your rank problem on the matrix M is still open
+ *  above." directly under M). */
+function posedLast(messages: readonly LhMessage[]): boolean {
+	const failed = failedOutputCallIds(messages);
+	const posing: readonly string[] = [...QUESTION_TOOLS, PRACTICE_PROBLEM_TOOL];
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "assistant") {
+			if (nativeInputCause(m as never, messages.slice(0, i) as never) === "learner") return false;
+			continue;
+		}
+		const shown = m.content.findLast((b): b is ToolCall => b.type === "toolCall" && !failed.has(b.id) && (posing.includes(b.name) || b.name === PRACTICE_CONCLUDE_TOOL || (b.name === SEND_TO_USER_TOOL && !!sendToUserText(b))));
+		if (shown) return posing.includes(shown.name);
 	}
 	return false;
 }
@@ -297,6 +320,14 @@ const RULING_WORDS = (slip: string): AgentToolResult<unknown> => ({
 	content: [{ type: "text", text: `Not saved: the ruling words his confidence as the record does, "${slip}", but his card says "Guessing" or "Confident". Send the save again with the ruling in the card's words.` }],
 	isError: true,
 	details: { withheld: "card-words" },
+});
+
+/** A ruling with the card's word capitalised inside its sentence: his
+ *  card's Disputed line would read "stands as With help" (round 15, m18). */
+const RULING_CASE = (word: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not saved: the ruling capitalises his card's word "${word}" inside its sentence. Inside a sentence the card's words are plain lowercase words ("it stays with help"). Send the save again with them lowercase.` }],
+	isError: true,
+	details: { withheld: "mark-case" },
 });
 
 /** A ruling as the reply and the card compare it: case, spacing and the
@@ -419,6 +450,14 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `His open question stays above as it was, and the app shows no copy of it: ${quoted(b.excerpt)}. Say it is still open above ("Your question is still open above."), never that you give it again.`;
 		case "below":
 			return `His open question is above this message, where he reads it, never below: ${quoted(b.excerpt)}. Say it is still open above, or name the question with no direction.`;
+		case "pointer":
+			return `His open question is the last thing he reads, right above this message, so a pointer to it tells him nothing: ${quoted(b.excerpt)}. Leave it out, and send nothing when nothing else is left to say.`;
+		case "arrival":
+			return `His answer's card already shows it came and how it was marked: ${quoted(b.excerpt)}. Leave the line out; when he asked whether it went through, the mark under his answer says so.`;
+		case "own-words":
+			return `Never talk about your own earlier words: ${quoted(b.excerpt)}. When what you said earlier changes what he should do, say what is true as itself ("This problem is the first of the set."); otherwise leave it out.`;
+		case "mark-case":
+			return `His card's words inside a sentence are plain lowercase words, not the card's capitals: ${quoted(b.excerpt)}. Write them lowercase ("it stays with help").`;
 		case "machinery":
 			return `Never name the app's parts or how his words reached you: ${quoted(b.excerpt)}. Speak to what he wrote.`;
 		case "exclamation":
@@ -675,6 +714,8 @@ export class VoiceGuard {
 	/** A question he was asked before this turn is still open: the turn
 	 *  asks it again, drawn above as "Your turn, on the question above". */
 	private readonly standing: boolean;
+	/** The open question or problem is the last thing he read. */
+	private readonly posedLast: boolean;
 	private readonly earlier: string[];
 	/** The messages he read before this turn, questions aside. */
 	private readonly told: string[];
@@ -771,6 +812,7 @@ export class VoiceGuard {
 	) {
 		this.input = turnInputOf(messages);
 		this.standing = standingQuestion(messages);
+		this.posedLast = posedLast(messages);
 		this.stepsAhead = stepsNotDone(messages);
 		this.unsaved = saves ? unsavedAnswerOf(messages) : null;
 		const earlier = earlierTexts(messages);
@@ -939,6 +981,11 @@ export class VoiceGuard {
 				this.heldRuling = true;
 				return RULING_WORDS(slip);
 			}
+			const capital = this.heldRuling ? undefined : rulings.flatMap((r) => voiceBreaks(r).filter((b) => b.rule === "mark-case")).at(0);
+			if (capital) {
+				this.heldRuling = true;
+				return RULING_CASE(capital.excerpt);
+			}
 			this.rulings.push(...rulings);
 		}
 		if (this.probeEnded && (QUESTION_TOOLS as readonly string[]).includes(call.name)) return ASKED_AFTER_PROBE(questionText(call) ?? "");
@@ -1069,8 +1116,9 @@ export class VoiceGuard {
 		// A hint gives what the question did not; asked as a question, it
 		// asked the same thing again (round 14, m17: "What does R3 − R1 − R2
 		// give you?" became "What happens to row 3 during elimination if it
-		// really is row 1 plus row 2?").
-		const hintAsks = kind === "hint" ? sentences(text).find((s) => s.trim().endsWith("?")) : undefined;
+		// really is row 1 plus row 2?"), on a practice problem as on a check
+		// (round 15, m16).
+		const hintAsks = kind === "hint" || this.input.hint ? sentences(text).find((s) => s.trim().endsWith("?")) : undefined;
 		if (hintAsks) out.push({ rule: "hint-question", excerpt: hintAsks.trim() });
 		const replying = this.input.answers && (this.sent === 0 || (this.concluded && this.sent === this.sentAtConclude));
 		const echo = replying ? echoOf(text, this.input.words) : null;
@@ -1096,6 +1144,8 @@ export class VoiceGuard {
 		if (this.input.demo && this.sent === 0 && !POINTS_AT_DEMO.test(text)) out.push({ rule: "demo-unused", excerpt: first });
 		const below = this.standing ? questionBelow(text) : null;
 		if (below) out.push({ rule: "below", excerpt: below });
+		const pointer = this.posedLast && this.sent === 0 ? sentences(text).map((s) => s.trim()).find((s) => /\b(?:still )?open above\b|\babove,? (?:still )?open\b|\bis (?:still )?(?:waiting|there) above\b/i.test(s)) : undefined;
+		if (pointer) out.push({ rule: "pointer", excerpt: pointer });
 		const asLesson = this.review ? SESSION_AS_LESSON.exec(text) : null;
 		if (asLesson) out.push({ rule: "review-lesson", excerpt: asLesson[0] });
 		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;
