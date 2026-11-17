@@ -4,8 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useRouter } from "next/navigation";
 import { Maximize2Icon, Minimize2Icon } from "lucide-react";
 import { currentArc, type ArcHandle, type ChatListItem, type StudyCourse, type TopicHandle } from "@/src/core";
-import { useArcKeys } from "@/components/course-map/arc-keys";
-import { ArcIndex } from "@/components/course-map/arc-index";
+import { ArcMap } from "@/components/course-map/arc-map";
 import { shownArcs } from "@/components/course-page/course-model";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { WholeCourseButton } from "@/components/course-map/topic-map/whole-course-button";
@@ -17,9 +16,6 @@ import { mapFade } from "@/components/study-home/map-frame";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
 import { cn } from "@/lib/utils";
-
-/** How many frames H waits for "You are here"'s card to be drawn, about a second. */
-const FIND_HERE_FRAMES = 60;
 
 /** How far the fade reaches in from the sides and from the top and bottom. */
 const FADE = { x: 64, y: 40 };
@@ -36,7 +32,7 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
  * back. Enlarged, a course too big to open whole has the maps' Whole course
  * control (`WholeCourseButton`, and "-") that zooms out to every topic, and back to where he is. Enlarged or not, it is only the map: no List view and no More menu
  * (Edo, 12 Nov 2026). A course with arcs draws one arc (`TopicMap`'s
- * `arc`), with its arc list (`ArcIndex`) left of the map: the arc he picked
+ * `arc`), with its arc list left of the map (`ArcMap`, as on the course page): the arc he picked
  * on the list, by ⇧↑ or ⇧↓ or on a card's "From" line, else the arc Home's follow names (`arc`, the Today row he
  * points at, as the course tab slides to its course; without it, the one
  * arc `highlight`'s topics lie in), else where he is (`currentArc`). Once
@@ -104,20 +100,14 @@ export function HomeMap({
 		if (!enlarged) setWhole(false);
 	}, [enlarged]);
 	const toggleWhole = useCallback(() => setWhole((w) => !w), []);
-	const goHere = useCallback(() => {
-		const here = currentArc(chosenCourse.map);
-		if (here) setPicked((was) => new Map(was).set(chosen, here));
-		setWhole(false);
-		// The card mounts once its arc is drawn, so look for it each frame until it is there.
-		let frames = FIND_HERE_FRAMES;
-		const find = () => {
-			const card = document.querySelector<HTMLElement>('[data-slot="home-map-course"][data-shown] [data-slot="course-map-node"][data-current]:not([data-slot="course-map-trail"] *)');
-			if (card) card.focus({ preventScroll: true });
-			else if (--frames > 0) requestAnimationFrame(find);
-		};
-		requestAnimationFrame(find);
-	}, [chosen, chosenCourse.map]);
-	useArcKeys(arcs, shownArc ?? null, (arc) => setPicked((was) => new Map(was).set(chosen, arc)), goHere);
+	const leaveWhole = useCallback(() => setWhole(false), []);
+	const pick = useCallback(
+		(arc: ArcHandle) => {
+			setPicked((was) => new Map(was).set(chosen, arc));
+			setWhole(false);
+		},
+		[chosen],
+	);
 	useEffect(() => {
 		if (!enlarged) return;
 		// Anything open over the map claims Esc first (Radix marks it handled).
@@ -149,53 +139,42 @@ export function HomeMap({
 					</Hint>
 				</div>
 			</div>
-			{arcs && (
-				<ArcIndex
-					className="absolute top-16 left-0 z-10 w-64"
-					arcs={arcs}
-					value={zoomedOut ? null : (shownArc ?? null)}
-					here={currentArc(chosenCourse.map)}
-					onSelect={(arc) => {
-						setPicked((was) => new Map(was).set(chosen, arc));
-						setWhole(false);
-					}}
-				/>
-			)}
-			{/* The arc list keeps a column of its own, so the map frames each arc beside it. */}
-			<div data-slot="home-map-frame" className={cn("relative flex min-h-0 flex-1 flex-col", arcs && "ml-72")} style={VIGNETTE}>
-				{courses.map((course) => {
-					const shown = course.map.workspace === chosen;
-					return (
-						<div
-							key={course.map.workspace}
-							data-slot="home-map-course"
-							data-shown={shown || undefined}
-							aria-hidden={!shown || undefined}
-							inert={!shown}
-							className={cn(
-								"absolute inset-0 flex flex-col transition-opacity duration-200 ease-out motion-reduce:transition-none",
-								shown ? "opacity-100" : "pointer-events-none opacity-0",
-							)}
-						>
-							<CourseDrawing
-								course={course}
-								arc={shown && zoomedOut ? undefined : arcOf(course, shown)}
-								said={said.get(course.map.workspace)!}
-								highlight={shown ? highlight : null}
-								framed={shown ? framed : null}
-								whole={shown && zoomedOut}
-								onOpenArc={(arc) => {
-									setPicked((was) => new Map(was).set(course.map.workspace, arc));
-									setWhole(false);
-								}}
-								onOpensWhole={(fits) =>
-									setOpensWhole((was) => (was.get(course.map.workspace) === fits ? was : new Map(was).set(course.map.workspace, fits)))
-								}
-							/>
-						</div>
-					);
-				})}
-			</div>
+			<ArcMap arcs={arcs} value={shownArc ?? null} here={currentArc(chosenCourse.map)} whole={zoomedOut} onSelect={pick} onHere={leaveWhole}>
+				<div data-slot="home-map-frame" className="relative flex min-h-0 flex-1 flex-col" style={VIGNETTE}>
+					{courses.map((course) => {
+						const shown = course.map.workspace === chosen;
+						return (
+							<div
+								key={course.map.workspace}
+								data-slot="home-map-course"
+								data-shown={shown || undefined}
+								aria-hidden={!shown || undefined}
+								inert={!shown}
+								className={cn(
+									"absolute inset-0 flex flex-col transition-opacity duration-200 ease-out motion-reduce:transition-none",
+									shown ? "opacity-100" : "pointer-events-none opacity-0",
+								)}
+							>
+								<CourseDrawing
+									course={course}
+									arc={shown && zoomedOut ? undefined : arcOf(course, shown)}
+									said={said.get(course.map.workspace)!}
+									highlight={shown ? highlight : null}
+									framed={shown ? framed : null}
+									whole={shown && zoomedOut}
+									onOpenArc={(arc) => {
+										setPicked((was) => new Map(was).set(course.map.workspace, arc));
+										setWhole(false);
+									}}
+									onOpensWhole={(fits) =>
+										setOpensWhole((was) => (was.get(course.map.workspace) === fits ? was : new Map(was).set(course.map.workspace, fits)))
+									}
+								/>
+							</div>
+						);
+					})}
+				</div>
+			</ArcMap>
 		</section>
 	);
 }

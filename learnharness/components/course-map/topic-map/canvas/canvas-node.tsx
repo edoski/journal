@@ -151,7 +151,7 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
  * the pointer the strip fills and its words read in the foreground ink.
  * Its press reaches 8 above the card, so it stays 24 tall at the map's
  * smallest readable scale (WCAG 2.5.8). Pointer only, like the card's
- * other shortcuts: the arc selector above the map is the keyboard's way
+ * other shortcuts: ⇧↑ and ⇧↓ are the keyboard's way
  * to another arc.
  */
 function FromLink({ title, arc, onOpen }: { title: string; arc: ArcHandle; onOpen: (arc: ArcHandle) => void }) {

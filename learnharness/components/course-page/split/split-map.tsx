@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
-import type { ArcHandle, CourseMap, TopicHandle } from "@/src/core";
+import { currentArc, type ArcHandle, type CourseMap, type CourseMapArc, type TopicHandle } from "@/src/core";
+import { ArcMap } from "@/components/course-map/arc-map";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
 import { framedCamera, wholeZoom, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
@@ -49,13 +50,14 @@ function reducedMotion(): boolean {
  * the page its topic (`onPoint`), so the list marks its row; Escape on a
  * focused node hands the walk back to that row (`onLeave`). With `arc`,
  * the map draws that arc (`layout` is its drawing) and Whole course always
- * shows: it swaps in every topic of the course (`wholeLayout`). `header`
- * (the arc selector) is a row above the pane, holding Whole course at its end.
+ * shows: it swaps in every topic of the course (`wholeLayout`). A course with
+ * `arcs` lists them left of the map, as Home's map does (`ArcMap`): a press
+ * there, ⇧↑ or ⇧↓ shows another arc (`onOpenArc`), and H goes to You are here.
  */
 export function SplitMap({
 	map,
 	arc,
-	header,
+	arcs = null,
 	said,
 	layout: arcLayout,
 	wholeLayout = arcLayout,
@@ -70,8 +72,8 @@ export function SplitMap({
 	map: CourseMap;
 	/** The arc the map draws; unset, the whole course. */
 	arc?: ArcHandle;
-	/** A row above the map (the arc selector), with Whole course at its end. */
-	header?: React.ReactNode;
+	/** The course's arcs, listed beside the map; null for a course without them. */
+	arcs?: readonly CourseMapArc[] | null;
 	/** What the sidebar says for each topic (`sidebarSays`), for the cards. */
 	said: ReadonlyMap<TopicHandle, Said>;
 	/** The map's layout (`drawingOf`; with `arc`, that arc's drawing), which sizes the surface. */
@@ -85,7 +87,7 @@ export function SplitMap({
 	reveal: TopicHandle | null;
 	onPoint: (handle: TopicHandle | null) => void;
 	onLeave: (handle: TopicHandle) => void;
-	/** Shows another arc, which a card's "From <arc>" line asks for. */
+	/** Shows another arc: a press on the arc list, ⇧↑ or ⇧↓, H, or a card's "From <arc>" line. */
 	onOpenArc?: (arc: ArcHandle) => void;
 	ref?: Ref<SplitMapHandle>;
 }) {
@@ -125,6 +127,14 @@ export function SplitMap({
 	/** Where the pane rests: the opening view, or the whole course from the top left. */
 	const home = useMemo<Scroll | null>(() => (zoomedOut ? { left: 0, top: 0 } : opening ? scrollOfCamera(layout, surface, pane, opening) : null), [zoomedOut, layout, surface, pane, opening]);
 	const toggleWhole = useCallback(() => setWhole((w) => !w), []);
+	const leaveWhole = useCallback(() => setWhole(false), []);
+	const pick = useCallback(
+		(to: ArcHandle) => {
+			setWhole(false);
+			onOpenArc?.(to);
+		},
+		[onOpenArc],
+	);
 
 	/** Glides the pane to `to` (the browser's smooth scroll), at once under
 	 *  reduced motion. The rests before it moves, and before it glides back,
@@ -245,54 +255,46 @@ export function SplitMap({
 		[],
 	);
 
-	const wholeButton = wholeSurface && <WholeCourseButton whole={zoomedOut} onToggle={toggleWhole} className={header ? "-mr-2 shrink-0" : "absolute top-0 right-0"} />;
 	return (
-		<>
-		{header && (
-			<div data-slot="course-split-map-head" className="mb-2 flex min-h-9 shrink-0 items-start gap-4 py-1">
-				<div className="flex min-w-0 flex-1">{header}</div>
-				{/* On the selector's row. */}
-				<div className="flex h-7 shrink-0 items-center">{wholeButton}</div>
-			</div>
-		)}
-		<section
-			ref={root}
-			aria-label={`${map.title} map`}
-			data-slot="course-split-map"
-			className="relative min-h-0 flex-1"
-			onPointerOver={(e) => point(topicAt(e.target))}
-			onPointerLeave={() => point(null)}
-			onFocus={(e) => {
-				const handle = topicAt(e.target);
-				point(handle);
-				// The map's own follow has nothing to do on a surface it fits; the pane brings the topic in instead.
-				if (handle && (e.target as Element).matches(":focus-visible")) {
-					show(handle);
-					strayed.current = false;
-				}
-			}}
-			onBlur={(e) => {
-				if (!e.currentTarget.contains(e.relatedTarget as Node | null)) point(null);
-			}}
-			onKeyDown={(e) => {
-				const handle = e.key === "Escape" ? topicAt(e.target) : null;
-				if (!handle) return;
-				e.preventDefault();
-				e.stopPropagation();
-				onLeave(handle);
-			}}
-		>
-			<div className="absolute inset-0" style={mapFade(fade.x, fade.y)}>
-				<div ref={scroller} data-slot="course-split-map-scroller" className="size-full overflow-auto overscroll-contain">
-					{/* The surface's size, from the course's layout: the map fits it whole. */}
-					<div className="flex flex-col" style={{ width: surface.width, height: surface.height }}>
-						<TopicMap map={map} arc={zoomedOut ? undefined : arc} said={said} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} onOpenArc={onOpenArc} />
+		<ArcMap arcs={arcs} value={arc ?? null} here={currentArc(map)} whole={zoomedOut} onSelect={pick} onHere={leaveWhole}>
+			<section
+				ref={root}
+				aria-label={`${map.title} map`}
+				data-slot="course-split-map"
+				className="relative min-h-0 flex-1"
+				onPointerOver={(e) => point(topicAt(e.target))}
+				onPointerLeave={() => point(null)}
+				onFocus={(e) => {
+					const handle = topicAt(e.target);
+					point(handle);
+					// The map's own follow has nothing to do on a surface it fits; the pane brings the topic in instead.
+					if (handle && (e.target as Element).matches(":focus-visible")) {
+						show(handle);
+						strayed.current = false;
+					}
+				}}
+				onBlur={(e) => {
+					if (!e.currentTarget.contains(e.relatedTarget as Node | null)) point(null);
+				}}
+				onKeyDown={(e) => {
+					const handle = e.key === "Escape" ? topicAt(e.target) : null;
+					if (!handle) return;
+					e.preventDefault();
+					e.stopPropagation();
+					onLeave(handle);
+				}}
+			>
+				<div className="absolute inset-0" style={mapFade(fade.x, fade.y)}>
+					<div ref={scroller} data-slot="course-split-map-scroller" className="size-full overflow-auto overscroll-contain">
+						{/* The surface's size, from the course's layout: the map fits it whole. */}
+						<div className="flex flex-col" style={{ width: surface.width, height: surface.height }}>
+							<TopicMap map={map} arc={zoomedOut ? undefined : arc} said={said} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} onOpenArc={onOpenArc} />
+						</div>
 					</div>
 				</div>
-			</div>
-			{/* Outside the fade, in the pane's top right corner, where the fade leaves the map clear. */}
-			{!header && wholeButton}
-		</section>
-		</>
+				{/* Outside the fade, in the pane's top right corner, where the fade leaves the map clear. */}
+				{wholeSurface && <WholeCourseButton whole={zoomedOut} onToggle={toggleWhole} className="absolute top-0 right-0" />}
+			</section>
+		</ArcMap>
 	);
 }

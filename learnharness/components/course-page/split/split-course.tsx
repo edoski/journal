@@ -3,9 +3,8 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { LinkedColumns } from "@/components/linked-columns/linked-columns";
-import { currentArc, type ArcHandle, type CourseStanding, type TopicHandle } from "@/src/core";
+import type { ArcHandle, CourseStanding, TopicHandle } from "@/src/core";
 import { drawingOf } from "@/components/course-map/topic-map/map-drawing";
-import { ArcSelector } from "@/components/course-map/arc-selector";
 import { useStartArcCheck } from "@/components/unit-inbox/start-unit";
 import { CourseFrame } from "@/components/course-page/course-frame";
 import { PageFrame } from "@/components/page-frame/page-frame";
@@ -24,9 +23,9 @@ import { OPEN_AT_FIRST, aimOf, litOf, markedOf, revealOf, shownGroups, type Poin
  * view; pointing at a node marks its row. A click on either opens the
  * topic's page. The page fits the window; each pane scrolls inside itself.
  * A course with arcs lists its arcs instead, where he is open on arrival,
- * and the map draws one arc under the arc selector (arc-selector.md):
- * opening an arc, or picking one on the selector, shows it on the map, and
- * a pick opens its arc in the list.
+ * and the map draws one arc with the course's arcs listed beside it, as
+ * Home's map does: opening an arc shows it on the map, and showing one on
+ * the map (its list, ⇧↑ ⇧↓, H) opens it in the list.
  * Above its arcs, where he picks up and what comes next (`WhatNextRows`).
  */
 export function SplitCourse({ workspace }: { workspace: string }) {
@@ -75,7 +74,7 @@ function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; sta
 		setOpen((was) => ({ ...was, [id]: to }));
 		if (arcs && to) show(id as ArcHandle);
 	};
-	/** A pick on the selector shows its arc and opens it in the list. */
+	/** An arc shown on the map (its list, ⇧↑ ⇧↓, H, a card's "From" line) opens in the list. */
 	const showArc = (arc: ArcHandle) => {
 		show(arc);
 		setOpen((was) => (was[arc] ? was : { ...was, [arc]: true }));
@@ -138,7 +137,7 @@ function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; sta
 							ref={drawing}
 							map={map}
 							arc={shownArc ?? undefined}
-							header={arcs && <ArcSelector arcs={arcs.map((a) => ({ handle: a.arc.handle, title: a.arc.title, share: a.share }))} value={shownArc} here={currentArc(map)} onSelect={showArc} />}
+							arcs={arcs?.map((a) => a.arc) ?? null}
 							said={view.said}
 							layout={layout}
 							wholeLayout={wholeLayout}
