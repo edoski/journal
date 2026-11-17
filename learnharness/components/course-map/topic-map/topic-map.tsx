@@ -132,7 +132,8 @@ export function TopicMap({
 		[map, said, layout, titleOf, view, trail],
 	);
 	const edges = useMemo<Edge[]>(() => mapEdges(layout, trail), [layout, trail]);
-	const here = map.current ? titleOf(map.current) : null;
+	// The course's own title for where he is, whichever arc is drawn (round 15, 2 free: "You are at eigen.").
+	const here = course.current ? (course.topics.find((t) => t.handle === course.current)?.title ?? null) : null;
 	const graph = useMemo<MapGraph>(
 		() => ({ edges: map.edges, current: map.current, caption: `${map.title}: ${map.topics.length} topics, prerequisites above the topics that need them.${here ? ` You are at ${here}.` : ""}` }),
 		[map.edges, map.current, map.title, map.topics.length, here],
