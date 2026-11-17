@@ -23,7 +23,8 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { askSurface, navigatingTo, pageShown } from "@/components/held-asks";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Hint } from "@/components/ui/hint";
 import { Kbd } from "@/components/ui/kbd";
@@ -56,6 +57,8 @@ function modalOpen(): boolean {
 
 export function KeyboardShortcuts() {
 	const router = useRouter();
+	const pathname = usePathname();
+	useEffect(() => pageShown(pathname), [pathname]);
 	const [cheatOpen, setCheatOpen] = useState(false);
 	const { open: openSettings } = useSettingsDialog();
 	useSpatialArrows();
@@ -119,6 +122,7 @@ export function KeyboardShortcuts() {
 			// ride the window event for the mounted surface to catch.
 			switch (action) {
 				case "new-session":
+					navigatingTo("/chat/new");
 					handlersRef.current.router.push("/chat/new");
 					break;
 				case "open-settings":
@@ -143,12 +147,17 @@ export function KeyboardShortcuts() {
 					window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
 					break;
 				case "find":
-				case "pick-course":
-					// The mounted surface owns Find (session text / graph nodes)
-					// and the course picker. Claim the chord so Chromium's own
-					// finder or Open File cannot open too.
+					// The mounted surface owns Find (session text / graph nodes).
+					// Claim the chord so Chromium's own finder cannot open too.
 					e.preventDefault();
 					window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
+					break;
+				case "pick-course":
+					// The course picker owns it, and one on a page still on its way
+					// (⌘N, then ⌘O) takes it as it mounts (held-asks.ts). Claim the
+					// chord so Open File cannot open too.
+					e.preventDefault();
+					askSurface(action);
 					break;
 				default:
 					window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
