@@ -1521,6 +1521,18 @@ function closedInTurn(messages: readonly LhMessage[], end: number): boolean {
 	return false;
 }
 
+/** Whether the turn holding the batch at `end` handed the session on
+ *  before it: a clean mode handoff or concluded probe since the input
+ *  that opened the turn. Pure. */
+function handedOffInTurn(messages: readonly LhMessage[], end: number): boolean {
+	for (let i = end - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "toolResult" && (MODE_HANDOFF_TOOLS[m.toolName] !== undefined || m.toolName === "probe_done") && !m.isError && (m.details as { ok?: unknown } | null)?.ok === true) return true;
+		if (m.role !== "assistant" && nativeInputCause(m as AgentMessage, messages.slice(0, i) as AgentMessage[]) !== "neutral") return false;
+	}
+	return false;
+}
+
 export function needsContinuation(record: readonly LhMessage[]): boolean {
 	// Context markers written after an answer (the course brief rides every
 	// learner input) carry no input of their own: what is owed is read from
@@ -1563,6 +1575,12 @@ export function needsContinuation(record: readonly LhMessage[]): boolean {
 		(m) => (MODE_HANDOFF_TOOLS[m.toolName] !== undefined || m.toolName === "probe_done") && !m.isError && (m.details as { ok?: unknown } | null)?.ok === true,
 	);
 	if (handedOff) return false;
+	// A handoff beside a message the voice guard refused ends its turn on
+	// the rewrite, so the record ends on that message, not on the handoff:
+	// a continuation then ran the next agent, and the handoff's wake ran it
+	// again (round 15, m14: problem M posed, then "Your rank problem on the
+	// matrix M is still open above." under it).
+	if (handedOffInTurn(messages, start)) return false;
 	// Closing words end their turn on purpose (teacher-agent `endsTurnFor`),
 	// so the record ends on their result and nothing is owed (round 14, M1:
 	// a continue after the close asked the left question again).
