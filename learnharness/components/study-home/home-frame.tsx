@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { PageNotice, PageReading } from "@/components/page-frame/page-frame";
+import { WindowPage } from "@/components/page-frame/window-page";
 import { CoursesUnavailable } from "@/components/course-picker";
 import { SetupDialog } from "@/components/setup-dialog";
 import { takeLine, useLessonStart, type TakeLine } from "@/components/start/use-lesson-start";
@@ -52,8 +53,7 @@ export function HomeFrame({
 	const lesson = useLessonStart();
 
 	return (
-		<div className="relative flex h-dvh min-w-0 flex-col">
-			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
+		<WindowPage>
 			<main data-slot="study-home" className="min-h-0 flex-1 overflow-hidden">
 				<HomeBody state={state} onRetry={retry}>
 					{({ courses, chats, failed, readAt }) => (
@@ -75,7 +75,7 @@ export function HomeFrame({
 				</HomeBody>
 			</main>
 			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
-		</div>
+		</WindowPage>
 	);
 }
 

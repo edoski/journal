@@ -6,6 +6,7 @@ import dayGridPlugin from "@fullcalendar/react/daygrid";
 import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, MoonIcon, XIcon } from "lucide-react";
 import { kbdEventForAction, type CalendarCourse, type KeyAction, type ScheduledDay } from "@/src/core";
 import { Button } from "@/components/ui/button";
+import { WindowPage } from "@/components/page-frame/window-page";
 import { Hint } from "@/components/ui/hint";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EventCalendarViews } from "@/components/ui/event-calendar-views";
@@ -192,8 +193,7 @@ export function CalendarView({
 	const words = CALENDAR_VIEWS.find((v) => v.id === viewId) ?? CALENDAR_VIEWS[0];
 
 	return (
-		<div data-slot="calendar" className="relative flex h-dvh min-w-0 flex-col">
-			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
+		<WindowPage data-slot="calendar">
 			<header data-slot="calendar-toolbar" className="lh-band-start relative z-10 flex h-13 shrink-0 items-center gap-3 px-3">
 				<div className="lh-no-drag flex items-center gap-1">
 					<Button variant="quiet" size="sm" onClick={() => controller.today()} className="text-foreground">
@@ -292,6 +292,6 @@ export function CalendarView({
 					</p>
 				)}
 			</main>
-		</div>
+		</WindowPage>
 	);
 }

@@ -7,6 +7,7 @@ import { useFieldCycle } from "@/components/field-cycle";
 import { SetupDialog } from "@/components/setup-dialog";
 import { useModelSetup } from "@/components/setup-cta";
 import { Button } from "@/components/ui/button";
+import { WindowPage } from "@/components/page-frame/window-page";
 import { NEW_LESSON_BOX } from "@/components/lesson/kept-drafts";
 import { lessonCreation, useLessonStart, useStartDraft } from "@/components/start/use-lesson-start";
 
@@ -49,10 +50,7 @@ export function StartScreen() {
 	const { state } = courseChoice;
 
 	return (
-		<div className="relative flex h-dvh min-w-0 flex-col">
-			{/* Window drag strip, first in the DOM: carved controls later in the
-			    tree subtract from it (Electron resolves the mask by DOM order). */}
-			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
+		<WindowPage>
 			<main data-slot="start-screen" className="relative flex min-h-0 flex-1 flex-col px-5">
 				<div className="flex min-h-0 flex-1 flex-col justify-end pb-8">
 					<h1 className="text-center text-large-title font-normal text-foreground">{START_HEADING}</h1>
@@ -98,6 +96,6 @@ export function StartScreen() {
 				</div>
 			</main>
 			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
-		</div>
+		</WindowPage>
 	);
 }

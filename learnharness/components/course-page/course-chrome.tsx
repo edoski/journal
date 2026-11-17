@@ -1,12 +1,9 @@
 "use client";
 
-/** The page's chrome with nothing in it: the 52px band, the window's drag
- *  region, before the course is read. */
+import { WindowPage } from "@/components/page-frame/window-page";
+
+/** The page's chrome with nothing in it: the window's page under its 52px
+ *  band (`WindowPage`), before the course is read. */
 export function CourseChrome({ children }: { children?: React.ReactNode }) {
-	return (
-		<div className="relative flex h-dvh min-w-0 flex-col">
-			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
-			{children}
-		</div>
-	);
+	return <WindowPage>{children}</WindowPage>;
 }

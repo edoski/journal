@@ -32,9 +32,11 @@ export interface Shell {
 	close(): Promise<void>;
 }
 
-export async function startShell(): Promise<Shell> {
+/** `entry`, the page to bundle (the app's frame by default), and `ready`,
+ *  the selector its first frame shows. */
+export async function startShell({ entry = "tests/helpers/app-shell-page.tsx", ready = '[data-testid="sidebar"]' }: { entry?: string; ready?: string } = {}): Promise<Shell> {
 	const bundle = await build({
-		entryPoints: [`${root}tests/helpers/app-shell-page.tsx`],
+		entryPoints: [`${root}${entry}`],
 		bundle: true,
 		write: false,
 		format: "esm",
@@ -81,7 +83,7 @@ export async function startShell(): Promise<Shell> {
 			}
 			await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: reducedMotion ? "reduce" : "no-preference" }]);
 			await page.goto(`${origin}/?open=${sidebar === "open" ? 1 : 0}`, { waitUntil: "load" });
-			await page.waitForSelector('[data-testid="sidebar"]');
+			await page.waitForSelector(ready);
 			// The provider's mount effects: the Mac app's class, then motion on.
 			await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 			return page;

@@ -6,6 +6,7 @@ import { useServerEvent } from "@/components/server-events";
 import { useDayChange } from "@/components/day-change";
 import { TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
 import { PageNotice, PageReading } from "@/components/page-frame/page-frame";
+import { WindowPage } from "@/components/page-frame/window-page";
 import { CoursesUnavailable } from "@/components/course-picker";
 import { withLessonHere } from "@/components/study-home/study-facts";
 
@@ -54,8 +55,7 @@ export function UnitPage({ workspace, handle }: { workspace: string; handle: str
 	const read = useUnitRead(workspace);
 	const topic = read.status === "ready" ? read.course.map.topics.find((t) => t.handle === handle) : undefined;
 	return (
-		<div className="relative flex h-dvh min-w-0 flex-col">
-			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
+		<WindowPage>
 			{read.status === "loading" ? (
 				<PageReading />
 			) : read.status === "unavailable" ? (
@@ -67,6 +67,6 @@ export function UnitPage({ workspace, handle }: { workspace: string; handle: str
 			) : (
 				<PageNotice>This topic is not in the course record.</PageNotice>
 			)}
-		</div>
+		</WindowPage>
 	);
 }
