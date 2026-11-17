@@ -311,6 +311,7 @@ export function Chat({
 		attached: turnInFlight,
 		initiallyInFlight: initiallyInFlight ?? false,
 		attachIfRunning: () => attachIfRunningRef.current(),
+		dropped: status === "error" && droppedError(error),
 	});
 
 	// Session title: click-to-rename (owner, 2026-09-17). Clicking the header

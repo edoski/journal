@@ -44,12 +44,24 @@ export function useSessionBusy(o: {
 	attached: boolean;
 	initiallyInFlight: boolean;
 	attachIfRunning: () => void;
+	/** The connection dropped the turn this view read, and nothing says yet
+	 *  what became of it. */
+	dropped?: boolean;
 }) {
 	const [serverTurn, setServerTurn] = useState(o.initiallyInFlight);
 	const [waking, setWaking] = useState(false);
 	const [stopAsked, setStopAsked] = useState(false);
 	const serverTurnRef = useRef(serverTurn);
 	serverTurnRef.current = serverTurn;
+	// A dropped connection leaves the turn's fact unknown: no settle may
+	// ever come (the app restarted), so the lesson stops looking busy, and
+	// the heal asks the record (round 15, m20: "Thinking…" and Stop stood
+	// through the outage under "Press Enter to try again").
+	useEffect(() => {
+		if (!o.dropped) return;
+		setServerTurn(false);
+		setWaking(false);
+	}, [o.dropped]);
 	useServerEvent("turn-started", (p) => {
 		if (p.chatId === o.chatId) setServerTurn(true);
 	});
