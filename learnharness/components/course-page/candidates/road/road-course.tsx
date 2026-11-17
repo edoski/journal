@@ -20,7 +20,7 @@ import { CalendarIcon, ChevronsUpDownIcon } from "lucide-react";
 /** Road's head (spec: road.md): the title with Mistakes, Context and the
  *  press, and one line, whether he is ready (`ReadyFact`) and when he last
  *  studied; the exam is a stop on the road below. */
-export function RoadHead({ view, standing, busy, onContinue }: CourseColumns) {
+function RoadHead({ view, standing, busy, onContinue }: CourseColumns) {
 	const { course, facts } = view;
 	const { ready, mistakes } = useHeadStanding(view, standing);
 	return (

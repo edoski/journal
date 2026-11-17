@@ -5,7 +5,7 @@ import { ReactFlow, ReactFlowProvider, useReactFlow, useStore, useStoreApi, type
 import type { ArcHandle, CourseMap, CourseMapEdge, TopicHandle } from "@/src/core";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
-import { READABLE_ZOOM, TAG_ROOM, type FitsDown, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, neighbourOf, showsWhole, slackOf, wholeExtent, wholeZoom, type Camera, type TopicMapLayout } from "./topic-map-layout";
+import { READABLE_ZOOM, TAG_ROOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, neighbourOf, showsWhole, slackOf, wholeExtent, wholeZoom, type Camera, type TopicMapLayout } from "./topic-map-layout";
 import { TopicMapContext, type CardData, type TopicMapState } from "./topic-node";
 import { CURRENT_TAG, cardLine, standingOf, topicLabel } from "./topic-standing";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
@@ -80,7 +80,6 @@ export function TopicMap({
 	onOpensWhole,
 	opensOn,
 	onOpenArc,
-	fitsDown,
 }: {
 	map: CourseMap;
 	/** The one arc to draw; unset, the whole course. */
@@ -113,8 +112,6 @@ export function TopicMap({
 	opensOn?: TopicHandle | null;
 	/** Shows another arc of the course, which a card's "From <arc>" line asks for; unset, that line is words only. */
 	onOpenArc?: (arc: ArcHandle) => void;
-	/** Where a drawing shorter than the frame sits (`CardMap`'s). */
-	fitsDown?: FitsDown;
 }) {
 	const [shownArc, setShownArc] = useState(arc);
 	// The arc the map just left, drawn beside the shown one while the camera glides over.
@@ -139,7 +136,7 @@ export function TopicMap({
 		[map.edges, map.current, map.title, map.topics.length, here],
 	);
 	return (
-		<CardMap graph={graph} layout={layout} nodes={nodes} edges={edges} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed} trail={trail} onTravelled={endTravel} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} fitsDown={fitsDown} />
+		<CardMap graph={graph} layout={layout} nodes={nodes} edges={edges} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed} trail={trail} onTravelled={endTravel} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} />
 	);
 }
 
@@ -172,9 +169,9 @@ type CardMapProps = {
 	/** The card the map opens framed on. */
 	opensOn: TopicHandle | null;
 	onOpenArc?: (arc: ArcHandle) => void;
-	/** Where a drawing shorter than the frame sits: in its middle, at its top (a lesson's steps, by the list's
-	 *  first row), or at its bottom (a map with the road right under it). */
-	fitsDown?: FitsDown;
+	/** Where a drawing shorter than the frame sits: in its middle, or at its top (a lesson's steps, by the list's
+	 *  first row). */
+	fitsDown?: "middle" | "top";
 };
 
 /**

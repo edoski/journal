@@ -99,8 +99,6 @@ export function SplitBody({
 	onContinue,
 	head = currentHead,
 	list: listOf = currentList,
-	map: mapOf,
-	rows = false,
 }: {
 	view: CourseView;
 	standing: CourseStanding | null;
@@ -108,10 +106,6 @@ export function SplitBody({
 	onContinue: (workspace: string) => void;
 	head?: (columns: CourseColumns) => ReactNode;
 	list?: (columns: CourseColumns) => ReactNode;
-	/** The map, in place of the split page's own (`SplitMap`). */
-	map?: (columns: CourseColumns) => ReactNode;
-	/** The map across the column with the list under it, in place of the linked columns; each sizes itself, and the room left stays under them. */
-	rows?: boolean;
 }) {
 	const { map } = view.course;
 	const { arcs } = view;
@@ -199,36 +193,6 @@ export function SplitBody({
 		onExitTop: () => action()?.focus(),
 	};
 
-	const drawn = mapOf ? (
-		mapOf(columns)
-	) : (
-		<SplitMap
-			key={map.workspace}
-			ref={drawing}
-			map={map}
-			arc={shownArc ?? undefined}
-			arcs={arcs?.map((a) => a.arc) ?? null}
-			said={view.said}
-			layout={layout}
-			wholeLayout={wholeLayout}
-			lit={lit}
-			aim={aim}
-			reveal={revealOf(pointed)}
-			onPoint={pointFrom("map")}
-			onLeave={(to) => list.current?.focus(to)}
-			onOpenArc={showArc}
-		/>
-	);
-	const body = rows ? (
-		<div data-slot="course-rows" className="flex min-h-0 flex-1 flex-col">
-			{drawn}
-			{listOf(columns)}
-			<div className="min-h-0 flex-1" />
-		</div>
-	) : (
-		<LinkedColumns data-slot="course-split" list={listOf(columns)} map={drawn} />
-	);
-
 	return (
 		<PageFrame className="h-full">
 			<div ref={headerBox} className="contents" onKeyDown={onHeaderKeyDown}>
@@ -239,7 +203,28 @@ export function SplitBody({
 					Topics appear as you study this course.
 				</p>
 			) : (
-				body
+				<LinkedColumns
+					data-slot="course-split"
+					list={listOf(columns)}
+					map={
+						<SplitMap
+							key={map.workspace}
+							ref={drawing}
+							map={map}
+							arc={shownArc ?? undefined}
+							arcs={arcs?.map((a) => a.arc) ?? null}
+							said={view.said}
+							layout={layout}
+							wholeLayout={wholeLayout}
+							lit={lit}
+							aim={aim}
+							reveal={revealOf(pointed)}
+							onPoint={pointFrom("map")}
+							onLeave={(to) => list.current?.focus(to)}
+							onOpenArc={showArc}
+						/>
+					}
+				/>
 			)}
 		</PageFrame>
 	);

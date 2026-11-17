@@ -17,14 +17,11 @@ import { courseHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
 import { cn } from "@/lib/utils";
 
-/** How far the fade reaches in from the sides and from the top and bottom
- *  (the course page's Road in rows map wears it too). */
-export const HOME_MAP_FADE = { x: 64, y: 40 };
-const FADE = HOME_MAP_FADE;
+/** How far the fade reaches in from the sides and from the top and bottom. */
+const FADE = { x: 64, y: 40 };
 
 /** The map's edges fade into the page on every side, like a vignette. */
-export const HOME_MAP_VIGNETTE = mapFade(FADE.x, FADE.y);
-const VIGNETTE = HOME_MAP_VIGNETTE;
+const VIGNETTE = mapFade(FADE.x, FADE.y);
 
 /**
  * The selected course's map on Home (spec: home-map.md): course tabs over

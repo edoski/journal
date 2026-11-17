@@ -5,7 +5,6 @@ import { useCoursePageVariant } from "@/components/course-page/course-page-varia
 import { OverviewCourse } from "@/components/course-page/candidates/overview/overview-course";
 import { AgendaCourse } from "@/components/course-page/candidates/agenda/agenda-course";
 import { RoadCourse } from "@/components/course-page/candidates/road/road-course";
-import { RoadRowsCourse } from "@/components/course-page/candidates/roadrows/roadrows-course";
 
 /**
  * One course's page, `/unit/<course>` (spec: course-page.md): the topic
@@ -22,7 +21,5 @@ export function CoursePage({ workspace }: { workspace: string }) {
 			return <AgendaCourse workspace={workspace} />;
 		case "road":
 			return <RoadCourse workspace={workspace} />;
-		case "roadrows":
-			return <RoadRowsCourse workspace={workspace} />;
 	}
 }
