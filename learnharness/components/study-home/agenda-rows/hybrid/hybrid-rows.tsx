@@ -1,5 +1,5 @@
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
-import { CourseBadge } from "@/components/study-home/agenda-rows/progress-ring";
+import { CourseBadge } from "@/components/study-home/agenda-rows/course-badge";
 import { courseTitle, foldLines, lessonTitle, lineKey, pointProps, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 import { rowStatus, rowWords, type RowStatus } from "@/components/study-home/agenda-rows/row-standing";

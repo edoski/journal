@@ -19,17 +19,23 @@ import { MathText, mathPlain } from "@/components/ui/math-text";
 
 export { rowSurface };
 
-/** A course's 16px mark, T3 Code's project monogram: its initials in a
- *  rounded tile tinted 14% by its own ink, in SF Pro at 500. The letters
- *  span the tile and centre in it, trimmed to their cap height, so every
- *  badge's letters sit on the same centre whatever their width. */
-export function CourseMark({ title, className }: { title: string; className?: string }) {
+/** The mark's sizes: 16px beside a line (the sidebar, the calendar, search,
+ *  the course filter), 40px where a course leads a two-line row (Home's
+ *  Today rows and the course page's Now, as `CourseBadge`). */
+const MARK_SIZE = { line: "size-4 text-caption-2", badge: "size-10 text-title-3" } as const;
+
+/** A course's mark, T3 Code's project monogram: its initials in a rounded
+ *  tile tinted 14% by its own ink, in SF Pro at 500, at every size. The
+ *  letters span the tile and centre in it, trimmed to their cap height, so
+ *  every badge's letters sit on the same centre whatever their width. */
+export function CourseMark({ title, size = "line", className }: { title: string; size?: keyof typeof MARK_SIZE; className?: string }) {
 	return (
 		<span
 			aria-hidden
 			data-slot="course-mark"
 			className={cn(
-				"flex size-4 shrink-0 items-center justify-center rounded-[25%] bg-current/14 font-sans text-caption-2 leading-none text-muted-foreground transition-[opacity,filter] motion-reduce:transition-none",
+				"flex shrink-0 items-center justify-center rounded-[25%] bg-current/14 font-sans font-medium leading-none text-muted-foreground transition-[opacity,filter] motion-reduce:transition-none",
+				MARK_SIZE[size],
 				className,
 			)}
 		>

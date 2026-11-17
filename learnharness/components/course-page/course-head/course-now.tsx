@@ -6,7 +6,7 @@ import { MathLine } from "@/components/ui/math-line";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { standingOf } from "@/components/course-map/topic-map/topic-standing";
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
-import { ProgressRing } from "@/components/study-home/agenda-rows/progress-ring";
+import { CourseBadge } from "@/components/study-home/agenda-rows/course-badge";
 import { lessonOf } from "@/components/study-home/lesson-facts";
 import { PagePress } from "@/components/page-frame/page-frame";
 import { reasonMark } from "@/components/unit-inbox/fact-icon";
@@ -26,7 +26,7 @@ const NOW_ROW = "group/press -mx-3 flex h-14 w-[calc(100%+1.5rem)] items-center 
 export function CourseNow({ view, busy, onContinue }: CourseColumns) {
 	const { course, pickUp: line, next } = view;
 	const lead = line ? (line.lead ?? line.topics[0] ?? null) : null;
-	const glyph = lead ? <TopicGlyph standing={standingOf(lead)} /> : <ProgressRing course={course} />;
+	const glyph = lead ? <TopicGlyph standing={standingOf(lead)} /> : <CourseBadge course={course} />;
 	const word = line ? lessonOf(line.row).action : next.lesson.action;
 	// The title on the first line, the reason under it; the page's press sits centred at the row's end.
 	const lines = (title: string, why: typeof next.why) => (
