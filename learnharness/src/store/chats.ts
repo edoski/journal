@@ -17,13 +17,13 @@ import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, Sessi
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
-import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
 import { leftQuestionRepose, sessionEndOf } from "../core/session-end.ts";
 import { openedAsReview } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
 import { stoppedByHim } from "../core/turn-cut.ts";
 import { failedResponseAtEnd } from "../core/input-events.ts";
-import { onFirstTurn } from "../core/session-naming.ts";
+import { onFirstTurn, sessionTitleOf } from "../core/session-naming.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
 
@@ -105,12 +105,16 @@ function listChats(): ChatSummary[] {
 					// Its own topics: the ones it was started on or named after, else
 					// for practice its first problem's.
 					const kind = sessionModeOf(messages, summary.kind);
-					const own = summary.topics?.length ? summary.topics : kind === "practice" ? firstProblemTopicsOf(messages) : [];
+					// A session that took up a task belongs to the task's topics (round 15, m4).
+					const tasked = sessionTaskTopicsOf(messages);
+					const own = tasked.length > 0 ? tasked : summary.topics?.length ? summary.topics : kind === "practice" ? firstProblemTopicsOf(messages) : [];
 					return {
 						// turns stay out of the list payload (list =
 						// summaries; usage aggregates ride the full record, the picker
 						// never needs them).
 						...summary,
+						// Its one name on every surface (round 15, m5).
+						title: sessionTitleOf({ ...summary, messages }),
 						// The mode now, folded over the transcript from the
 						// mode an older record stored at creation.
 						kind,
@@ -138,7 +142,7 @@ function listChats(): ChatSummary[] {
 						...(learnerWords(messages).length <= 1 ? { untouched: true as const } : {}),
 						tasks: sessionTasksOf(messages),
 						...((t) => (t ? { taskTitle: t } : {}))(sessionTaskTitleOf(messages)),
-						review: openedAsReview({ topics: summary.topics, messages }),
+						review: openedAsReview({ title: summary.title, topics: summary.topics, messages }),
 						studied: studiedIn(messages),
 					};
 				} catch (err) {

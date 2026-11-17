@@ -87,9 +87,17 @@ describe("a review left between problems", () => {
 	const review = (...parts: LhMessage[][]): LhMessage[] => [newSessionModeMessage("practice") as LhMessage, newUserMessage("Review A, B"), ...parts.flat()];
 	const next = { id: `n${++n}`, role: "custom", customType: "practice-next", content: "[NEXT PROBLEM]", display: true, details: {}, timestamp: n } as unknown as LhMessage;
 
-	it("waits on him at Next problem while a topic it was opened on has no unaided solve", () => {
-		assert.equal(sessionEndOf(review(solve("1", ["a"], "solved")), undefined, "practice", ["a", "b"]), "mid-lesson");
-		assert.equal(sessionEndOf(review(solve("1", ["a"], "solved"), solve("2", ["b"], "solvedWithHints")), undefined, "practice", ["a", "b"]), "mid-lesson", "a hinted solve still owes the retest");
+	it("asks him nothing at Next problem, a topic it was opened on with no unaided solve or not (round 15, m7 and m8: Rank practice read \"Your turn\" with nothing asked)", () => {
+		assert.equal(sessionEndOf(review(solve("1", ["a"], "solved")), undefined, "practice", ["a", "b"]), "closed");
+		assert.equal(sessionEndOf(review(solve("1", ["a"], "solved"), solve("2", ["b"], "solvedWithHints")), undefined, "practice", ["a", "b"]), "closed");
+		const dispute = { id: `d${++n}`, role: "custom", customType: "dispute", content: "[DISPUTE]", display: true, details: {}, timestamp: n } as unknown as LhMessage;
+		assert.equal(sessionEndOf(review(solve("1", ["a"], "solved"), [dispute, assistant([text("The mark stands.")], "stop")]), undefined, "practice", ["a", "b"]), "closed", "after a dispute's ruling too");
+	});
+
+	it("is left for next time when he presses Done for today while a topic it was opened on has no unaided solve, and closed once each has one", () => {
+		const done = (parts: LhMessage[][]) => [...review(...parts), newDoneTonightMessage("practice") as LhMessage, assistant([text("Your review of B goes on tomorrow.")], "stop")];
+		assert.equal(sessionEndOf(done([solve("1", ["a"], "solved"), solve("2", ["b"], "solvedWithHints")]), undefined, "practice", ["a", "b"]), "left", "a hinted solve still owes the retest");
+		assert.equal(sessionEndOf(done([solve("1", ["a"], "solved"), solve("2", ["b"], "solved")]), undefined, "practice", ["a", "b"]), "closed");
 	});
 
 	it("ends once every topic it was opened on was solved without a hint, or the tutor wrapped the round", () => {

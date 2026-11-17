@@ -1,7 +1,8 @@
 import type { PlanTree } from "./contracts/plan.ts";
 import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, lessonProgressOf } from "./contracts/plan.ts";
 import type { SessionEnd, SessionMode } from "./contracts/chat.ts";
-import { activeProblemOf, danglingQuestionOf, endsInDismissal, nativeInputCause, isQuestionRepose, needsContinuation, NEUTRAL_MARKERS, newQuestionRepose, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, problemInputForConclude, sessionModeOf, sessionTasksOf, type LhMessage } from "./native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, endsInDismissal, nativeInputCause, isQuestionRepose, needsContinuation, NEUTRAL_MARKERS, newQuestionRepose, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, problemInputForConclude, sessionModeOf, sessionTaskStatesOf, type LhMessage } from "./native-messages.ts";
+import { picksStop } from "./question-core.ts";
 import { phaseAt3Lh } from "./phases.ts";
 import { topicResults, type PracticeConclusion } from "./practice-attempts.ts";
 
@@ -13,13 +14,13 @@ import { topicResults, type PracticeConclusion } from "./practice-attempts.ts";
  * partway through a lesson when it wrote the plan but taught no step, when he
  * dismissed its question, when a lesson it picked up has reached no step
  * yet, or when its turn ended in words that ask him something while the
- * step it stopped on leads to another: "mid-lesson". Practice waits on
- * him at Next problem while its work is unfinished: a lesson moved to
- * practice with plan steps left, or a session opened on topics (`topics`,
- * a review or a topic's practice) one of which he has not yet solved
- * without a hint in it, unless the tutor wrapped the round. His Done for
+ * step it stopped on leads to another: "mid-lesson". A lesson moved to
+ * practice waits on him at Next problem while its plan has steps left; any
+ * other practice round between problems asks him nothing. His Done for
  * today on work still open (a question or problem it set aside, a task it
- * holds, or a session that waited on him) leaves it for next time: "left". Words that
+ * holds, a session that waited on him, or a round opened on topics, a
+ * review or a topic's practice, one of which he has not yet solved without
+ * a hint in it, unless the tutor wrapped it) leaves it for next time: "left". Words that
  * end without a question ("Good place to stop") end the session there,
  * like anything else, as does the tutor's own close, and a practice round
  * with its work done: "closed". The questions the app posed again after
@@ -38,10 +39,10 @@ export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | unde
 	}
 	if (last.role !== "assistant" || last.stopReason !== "stop") return "cut";
 	if (closedTonight(messages)) return "closed";
-	if (sessionModeOf(messages, initial) === "practice") {
-		if (tree && stepsLeft(tree, messages)) return "mid-lesson";
-		return practiceUnfinished(messages, topics) ? "mid-lesson" : "closed";
-	}
+	// A practice round between problems asks him nothing: Next problem is his to press, so it is not his turn
+	// (round 15, m7 and m8: Rank practice read "Your turn" after a dispute with nothing asked, a 5 Nov practice on
+	// the calendar too). His Done for today still leaves its unfinished work for next time (`leftOpen`).
+	if (sessionModeOf(messages, initial) === "practice") return tree && stepsLeft(tree, messages) ? "mid-lesson" : "closed";
 	const phase = phaseAt3Lh(messages);
 	if (phase === "plan") return "mid-lesson";
 	if (phase !== "teach" || !tree) return "closed";
@@ -64,13 +65,18 @@ function closeSettled(messages: readonly LhMessage[], last: LhMessage): boolean 
 }
 
 /** Whether his Done for today stopped work still open: it set aside a
- *  question or a problem, the lesson's plan has a step still to teach
- *  after the tutor's close marked what he finished, the session still
- *  holds an open task (`sessionTasksOf`; round 12, 1 m10: a session that
- *  continued the Poisson lesson's task read finished, so Home put the
- *  task's own line back the day he said he was done), or the session,
- *  read up to just before he pressed it, waited on him or owed him a
- *  reply. `at` is the Done for today's index. Pure. */
+ *  question or a problem, the session still holds an open task
+ *  (`sessionTasksOf`; round 12, 1 m10: a session that continued the
+ *  Poisson lesson's task read finished, so Home put the task's own line
+ *  back the day he said he was done), the lesson's plan has a step still
+ *  to teach after the tutor's close marked what he finished, or the
+ *  session, read up to just before he pressed it, waited on him or owed
+ *  him a reply. Never once the session's own saves closed every task it
+ *  held: the engine has the lesson as done, whatever step its plan named
+ *  next (round 15, M1: the finished Eigen and Linear maps lessons came
+ *  back as "Continue … lesson" every later day). His pick of the tutor's
+ *  own "Stop here for today" is his Done for today, so the question it
+ *  answered owes him nothing. `at` is the Done for today's index. Pure. */
 function leftOpen(messages: readonly LhMessage[], at: number, tree: PlanTree | undefined, initial: SessionMode, topics: readonly string[]): boolean {
 	// The turn's course brief rides just before the marker, after what it set aside.
 	let start = at;
@@ -81,10 +87,27 @@ function leftOpen(messages: readonly LhMessage[], at: number, tree: PlanTree | u
 		if (!setAsideByDone(m)) break;
 		setAside = true;
 	}
-	if (setAside || (tree && stepsLeft(tree, messages)) || sessionTasksOf(messages).length > 0) return true;
+	if (setAside) return true;
+	const tasks = [...sessionTaskStatesOf(messages).values()];
+	if (tasks.some((open) => open)) return true;
+	if (tasks.length > 0) return false;
+	if (tree && stepsLeft(tree, messages)) return true;
+	if (stopPicked(messages, start)) return false;
 	const before = messages.slice(0, start);
+	if (sessionModeOf(before, initial) === "practice" && !activeProblemOf(before) && practiceUnfinished(before, topics)) return true;
 	const end = before.length > 0 ? sessionEndOf(before, tree, initial, topics) : "closed";
 	return end === "mid-lesson" || end === "cut";
+}
+
+/** Whether the message before index `at` is his pick of an option the
+ *  tutor marked as ending the session for today (`picksStop`), which the
+ *  app sends as his Done for today (`inputAppends`). Pure. */
+function stopPicked(messages: readonly LhMessage[], at: number): boolean {
+	const answer = messages[at - 1];
+	if (answer?.role !== "toolResult" || answer.toolName !== "ask_user_question") return false;
+	const asked = messages.findLast((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.id === answer.toolCallId));
+	const call = asked?.role === "assistant" ? asked.content.find((b) => b.type === "toolCall" && b.id === answer.toolCallId) : undefined;
+	return call?.type === "toolCall" && picksStop(call.arguments, (answer.details ?? {}) as { answers?: ReadonlyArray<{ index?: number }> });
 }
 
 /** What Done for today appends ahead of its marker for work it sets aside:

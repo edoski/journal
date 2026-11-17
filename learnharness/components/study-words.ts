@@ -287,18 +287,6 @@ export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today
 	return returnWords(review.date);
 }
 
-/** A review by its one day, for a row too narrow for the sentence
- *  (`reviewWords` stays its hint): "Due 6 Nov" for "Due since 6 Nov"; a
- *  review the plan holds past memory's day by the day it comes back,
- *  "Back 20 Nov" for "Due since 6 Nov, back 20 Nov" (round 11, 2 n9: "Due
- *  6 Nov" read as overdue while the map said back 20 Nov); "Due today" and
- *  any other dated review as `reviewWords`. */
-export function shortReviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
-	if (review.kind === "due" && review.overdue > 0) return `Due ${shortDay(dayBefore(today, review.overdue))}`;
-	if (review.kind === "scheduled" && review.held && review.held.since < today) return `Back ${shortDay(review.date)}`;
-	return reviewWords(review, today);
-}
-
 /** "A", "A and B", "A, B and C". */
 function listWords(names: readonly string[]): string {
 	return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
@@ -499,10 +487,14 @@ export function leftOutWords(topic: Pick<CourseMapTopic, "handle" | "starts">, e
 	return topic.starts && topic.starts > exam.date ? "Not on the exam; after it" : "Not on the exam";
 }
 
-/** A course page row's status for a topic the exam's plan has no room to
- *  start before the exam, its planned day in the row's hint (round 12,
- *  1 m11). */
-export const AFTER_EXAM = "After the exam";
+/** A course page row's status for a topic the exam ahead puts after it,
+ *  its planned day in the row's hint (round 12, 1 m11), in the topic
+ *  page's own short words: an exam topic the plan has no room to start
+ *  before the exam is "Not before the exam", one the exam leaves out "Not
+ *  on the exam" (round 15, M7: on the exam eve Geometric and Variance,
+ *  which the exam needs, and Covariance, which it leaves out, all read
+ *  "After the exam"). */
+export const ARC_ROW_EXAM_WORDS = { noRoom: "Not before the exam", leftOut: "Not on the exam" } as const;
 
 /** What the exam's plan means for a topic it leaves out (`examGaps`), on
  *  the topic's own page, in the engine's reason (`exam.reasons`). A
@@ -512,11 +504,11 @@ export const EXAM_GAP_TOPIC_WORDS: {
 	review: Readonly<Record<ExamGapReason | "none", string>>;
 } = {
 	start: {
-		none: "Not before the exam",
+		none: ARC_ROW_EXAM_WORDS.noRoom,
 		no_study_day: "Not before the exam, no study day is left",
 		not_ready: "Not before the exam, what it needs won’t be solid in time",
 		full: "Not before the exam, every study day is full at your pace",
-		too_late: "Not before the exam",
+		too_late: ARC_ROW_EXAM_WORDS.noRoom,
 	},
 	// The final review has no slot for it, whatever reviews come before
 	// it: "No review before the exam" read false beside "Review Wed 11 Nov"
@@ -797,11 +789,13 @@ export const READY_WORDS = {
 
 /** Where he stands for the exam as one fact of a head, a few words (the
  *  course page's head): the whole answer opens under it. "No exam"
- *  for a course without one. */
+ *  for a course without one. When the plan cannot fit all of it, the head
+ *  says what it loses in its own words (`ExamReady`'s), never "Not all of
+ *  it fits" (round 15, M7); not ready says for what (round 15, m10: "Not
+ *  ready yet" had no object). */
 export const READY_FACT_WORDS = {
 	ready: "Ready for the exam",
-	notYet: "Not ready yet",
-	short: "Not all of it fits",
+	notYet: "Not ready for the exam yet",
 	none: "No exam",
 } as const;
 

@@ -213,6 +213,9 @@ export function moreWords(hidden: readonly CalendarEntry[]): string {
 	return things.length > 0 ? `Also ${listWords(things)}` : "More";
 }
 
+/** A new topic's plan status on the day the plan starts it. */
+const PLANNED_TODAY = "Planned today";
+
 /** An entry's words beside its icon: its look's, except a review due
  *  today, which says how late as Home's rows and the sidebar do ("Due
  *  today", "Due since 5 Nov"), so one review never reads "Due since 5 Nov" on Home
@@ -224,6 +227,8 @@ export function lookWords(entry: CalendarEntry, today: string): string {
 	// does a lesson or practice left for next time, never its kind (round 13, 2 n4: "Eigenvalues and eigenvectors · Practice");
 	// a review stays Review (round 9, 2 m4).
 	if ((entry.kind === "task" || entry.kind === "session") && entry.status && (lookOf(entry) === "task" || lookOf(entry) === "lesson" || lookOf(entry) === "practice")) return entry.status;
+	// Today's new topic says its plan status, as Home, the sidebar and the course page's Now do (round 15, m1).
+	if (lookOf(entry) === "new" && entry.day === today) return PLANNED_TODAY;
 	return LOOKS[lookOf(entry)].words;
 }
 
@@ -393,8 +398,11 @@ export function calendarEntries({
 			}
 			for (const handle of day.new) {
 				const topic = topicOf(handle);
-				// A lesson he began goes on today under its open task's own entry: one piece of work, one entry.
-				if (topic && !(day.date === today && lessonBegun(topic))) fresh(topic, day.date);
+				// A lesson he began goes on today under its open task's own entry, and a lesson started on it today is its
+				// start, under the session's entry: one piece of work, one entry (round 15, m6: "Linear maps · Your turn"
+				// beside "Linear maps · New topic" on Sun 8).
+				const started = day.date === today && ofToday(map.workspace).some((chat) => chat.kind !== "practice" && !isReviewSession(chat) && (chat.ownTopics ?? []).includes(handle));
+				if (topic && !(day.date === today && lessonBegun(topic)) && !started) fresh(topic, day.date);
 			}
 		}
 		const reviewing = new Set<string>((due ?? []).filter((handle) => topicOf(handle)));

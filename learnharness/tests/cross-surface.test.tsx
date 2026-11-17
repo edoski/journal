@@ -282,12 +282,9 @@ function assertOneStatus(s: Survey) {
 		const card = s.sidebar.find((c) => c.title === line.title);
 		// The card names the topic in its title, so its slip says it without the topic ("Not right last time"
 		// for Home's "Not right last time: Matrix multiplication as composition"): the same status.
-		// A new topic's reason shows in its own words on Home's row ("Back to Linear maps and matrices", "Next in …") and in
-		// its plain words on the card ("Planned today"): one fact at two sizes, since a size `slot` mark keeps the plain
-		// words and a sidebar card names no arc (status-mark.md; Edo, 14 Nov; round 13, 1 n5). Seen once the demo world formed
-		// its arcs (Logbook seed f315875, 16 Nov).
-		const same = (a: string, b: string) =>
-			a === b || (b.startsWith(`${a}: `) && line.title.includes(b.slice(a.length + 2))) || (line.starts !== null && b === line.status && /^(Planned today|Next up)$/.test(a));
+		// A planned start says "Planned today" on both, never an arc's name on Home (round 15, m1: "Back to Linear maps and
+		// matrices" on Home beside the card's "Planned today").
+		const same = (a: string, b: string) => a === b || (b.startsWith(`${a}: `) && line.title.includes(b.slice(a.length + 2)));
 		if (card && !same(card.status, line.status)) problems.push(`"${line.title}": Home says "${line.status}", the sidebar "${card.status}"`);
 		const id = href?.startsWith("/chat/") ? href.slice(6) : null;
 		const task = /^Continue (.*)$/.exec(line.title)?.[1];
@@ -296,6 +293,10 @@ function assertOneStatus(s: Survey) {
 		);
 		if (entry && !entry.face.includes(line.status)) problems.push(`"${line.title}": Home says "${line.status}", the calendar "${entry.face}"`);
 	}
+	// Every line Home draws has its card on the sidebar's top, under the same name (round 15, m7: on 10 Nov the
+	// sidebar left out the Linear maps lesson Home listed).
+	const top = s.sidebar.filter((c) => c.shelf === "" && !c.el.matches('[data-testid="session-row"]'));
+	for (const line of s.home) if (!top.some((c) => c.title === line.title)) problems.push(`"${line.title}": on Home's Today, with no card on the sidebar's top (${top.map((c) => `"${c.title}"`).join(", ")})`);
 	assert.ok(problems.length === 0, `${s.label}: one session, two statuses:\n  ${problems.join("\n  ")}`);
 }
 
@@ -422,6 +423,19 @@ function assertExamWarnings(s: Survey) {
 			if (leftOut && !warned) problems.push(`${topic.title}: the exam leaves it out, its page says nothing of the exam ("${page.note || page.scheduled || page.now}")`);
 			if (noRoom && said.length > 0 && !warned) problems.push(`${topic.title}: ${said.join(" and ")} say there is no room before the exam to start it, its page says nothing of the exam ("${page.note || page.scheduled || page.now}")`);
 			if (warned && !leftOut && !noRoom && !(exam.unreviewed ?? []).includes(topic.handle)) problems.push(`${topic.title}: its page warns of the exam ("${page.text.match(EXAM_WARNING)?.[0]}"), the plan leaves nothing of it out`);
+		}
+		// The course page says each loss in the topic page's own words, an exam topic with no room apart from one the
+		// exam leaves out, and its head names every exam topic with no room (round 15, M7: all three read "After the
+		// exam", the loss behind "Not all of it fits").
+		for (const topic of course.map.topics) {
+			const row = s.rows.get(keyOf(course.map.workspace, topic.handle));
+			if (!row || !topic.starts || topic.starts <= exam.date) continue;
+			const want = exam.leavesOut?.includes(topic.handle) ? "Not on the exam" : exam.doesNotFit?.includes(topic.handle) ? "Not before the exam" : null;
+			if (want && row !== want) problems.push(`${topic.title}: its course page row says "${row}", not "${want}"`);
+		}
+		for (const handle of exam.doesNotFit ?? []) {
+			const title = course.map.topics.find((t) => t.handle === handle)?.title ?? handle;
+			if (!names(head, title)) problems.push(`${title}: the exam has no room for it, the course head does not name it ("${head}")`);
 		}
 	}
 	assert.ok(problems.length === 0, `${s.label}:\n  ${problems.join("\n  ")}`);
@@ -556,6 +570,33 @@ async function assertLeftToday(app: DemoApp, s: Survey, id: string, words: strin
 	assert.ok(problems.length === 0, `${s.label}: ${chat.title}, left for today:\n  ${problems.join("\n  ")}`);
 }
 
+// ─── 9. a finished lesson asks nothing ──────────────────────────────────────
+
+/** The lesson `id`, finished: its own save closed its task, then he picked the tutor's "Stop here for today".
+ *  On a later day nothing offers it again: no line of Home's Today, no sidebar card with a status, no row of
+ *  its course page's Needs you, and no Resume on its topic page (round 15, M1: 1 D1, "Continue Linear maps
+ *  and their matrices lesson · Left off 10 Nov" on the exam eve). */
+async function assertFinishedLesson(app: DemoApp, s: Survey, id: string) {
+	const { unitHref } = await import("../components/unit-inbox/unit-href.ts");
+	const problems: string[] = [];
+	const chat = s.chats.find((c) => c.id === id)!;
+	const state = sessionState(chat);
+	if (state !== "finished") problems.push(`it reads ${state}, not finished (ended ${chat.ended}, tasks ${JSON.stringify(chat.tasks)})`);
+	for (const line of s.home) if (chatOf(line.opens) === id) problems.push(`Home's Today offers it: "${line.title} · ${line.status}"`);
+	for (const [surface, status] of (await sessionStatuses(s)).get(id) ?? []) problems.push(`${surface} says "${status}"`);
+	const ws = chat.course!.workspace;
+	const own = new Set(chat.ownTopics ?? []);
+	for (const row of s.needsYou.get(ws) ?? []) if (own.has(row.handle) && /Left off|Your turn/.test(row.text)) problems.push(`its course page's Needs you lists "${row.text}"`);
+	for (const handle of own) {
+		await app.visit(unitHref(ws, handle), { fresh: true, ready: () => !!document.querySelector('[data-slot="pickup-now"]') });
+		const press = document.querySelector('[data-slot="pickup-now-press"]');
+		const opens = press ? await app.lookAt(press) : null;
+		if (chatOf(opens) === id) problems.push(`its topic page (${handle}) offers "${text(press)}" on it: "${text(document.querySelector('[data-slot="pickup-now"]'))}"`);
+	}
+	await app.unmount();
+	assert.ok(problems.length === 0, `${s.label}: ${chat.title}, finished:\n  ${problems.join("\n  ")}`);
+}
+
 // ─── the journey ───────────────────────────────────────────────────────────
 
 describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip, concurrency: false, timeout: 900_000 }, () => {
@@ -585,8 +626,6 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 
 	/** The Invertible lesson started from its topic page (the live-lesson step), its question still open. */
 	let invertible: { id: string; call: { tool: string; input: unknown } } | null = null;
-
-	const sessionOf = (title: string) => app.chats().find((c) => c.title === title);
 
 	it("Sun 8 Nov, as seeded", async () => {
 		await holds("Sun 8 Nov, as seeded");
@@ -634,7 +673,8 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 	});
 
 	it("Sun 8 Nov, after Problem sheet 4 is continued and left for next time (lens 2, steps 30 to 32)", async () => {
-		const sheet = sessionOf("Problem sheet 4")!;
+		// The sheet's session, by the task it holds: it is named after the task (round 15, m5).
+		const sheet = app.chats().find((c) => (c.tasks ?? []).includes("sheet-4"))!;
 		app.say(sheet.id, "ok, let us continue the sheet");
 		await app.save(sheet.id, {
 			observations: [
@@ -692,8 +732,11 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 
 	it("Mon 9 Nov, after the Linear Algebra review from Home (lens 1, step 15)", async () => {
 		await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 });
-		const line = app.homeLines().find((l) => l.course === "Linear Algebra" && l.title.startsWith("Review "));
+		// Eigen's review is due today, and the Eigen lesson left yesterday is open on it, so the review is that lesson's
+		// line, where his answers count as it (round 15, m6).
+		const line = app.homeLines().find((l) => l.course === "Linear Algebra" && (l.title.startsWith("Review ") || l.title.startsWith("Eigenvalues and eigenvectors")));
 		assert.ok(line, `Home offers a Linear Algebra review: ${app.homeLines().map((l) => l.title).join(" | ")}`);
+		assert.ok(app.homeLines().filter((l) => /Eigenvalues and eigenvectors/.test(l.title)).length === 1, `one line for Eigen: ${app.homeLines().map((l) => `${l.title} · ${l.status}`).join(" | ")}`);
 		const opened = await app.press(line.el);
 		assert.ok(opened?.startsWith("/chat/"), `the review opens a session (${opened})`);
 		const id = opened!.slice(6);
@@ -746,8 +789,29 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		await holds("Tue 10 Nov, after the Poisson lesson's Done for today");
 	});
 
+	/** The Linear maps lesson begun on Mon 9 Nov, finished on Tue 10 Nov. */
+	let finishedLesson: string | null = null;
+
+	it("Tue 10 Nov, the Linear maps lesson taught through, its task closed, then the tutor's Stop here for today (round 15, M1: 1 D1)", async () => {
+		const lesson = app.chats().find((c) => c.course?.title === "Linear Algebra" && (c.ownTopics ?? []).includes("linear-maps") && !c.review);
+		assert.ok(lesson, "Monday's Linear maps lesson");
+		const { id } = lesson;
+		app.answer(id, { words: "A matrix whose columns are the images of the basis vectors" });
+		await app.save(id, {
+			observations: [{ topics: ["linear-maps"], text: "Found the matrix of a map from the images of a basis", result: "correct", help: "none", sure: "confident" }],
+			tasks: { "linear-maps-lesson": { title: "Linear maps and their matrices lesson", topics: ["linear-maps"], step: "The matrix of a map on polynomials" } },
+		});
+		// Lens 1's 10 Nov record: the lesson's last save removes its task, then the tutor offers practice or a stop.
+		await app.save(id, { tasks: { "linear-maps-lesson": null } });
+		app.offerStop(id, "That finishes the Linear maps and their matrices lesson. Do you want some practice problems now?");
+		app.answer(id, { pick: 2 });
+		app.closes(id, "Tomorrow, Wednesday 11 November, brings your reviews.");
+		finishedLesson = id;
+		await holds("Tue 10 Nov, after the Linear maps lesson finished");
+	});
+
 	it("Tue 17 Nov, two days before the Probability exam", async () => {
 		app.day("2026-11-17");
-		await holds("Tue 17 Nov");
+		await holds("Tue 17 Nov", (s) => (finishedLesson ? assertFinishedLesson(app, s, finishedLesson) : assert.fail("the Tue 10 step finished the Linear maps lesson")));
 	});
 });

@@ -19,11 +19,12 @@ const MAP = courseMapOf("/study/probability", JSON.parse(fs.readFileSync(FIXTURE
 const COURSE: StudyCourse = { map: MAP, unready: null, due: null, newToday: [], lastActiveDaysAgo: 0 };
 
 describe("a course page row's start", () => {
-	it("says After the exam for a start the plan puts past the exam, its day kept for the hint", () => {
+	it("says Not on the exam for a start the exam leaves out and the plan puts past it, its day kept for the hint (round 15, M7)", () => {
 		const rows = courseGroups(COURSE).flatMap((group) => group.topics);
 		const covariance = rows.find((row) => row.topic.handle === "covariance")!;
 		assert.ok(covariance.topic.starts! > MAP.exam!.date, "the plan starts it after the exam");
-		assert.equal(covariance.factWords, "After the exam");
+		assert.ok(MAP.exam!.leavesOut?.includes(covariance.topic.handle), "the exam leaves it out");
+		assert.equal(covariance.factWords, "Not on the exam");
 		assert.match(covariance.fact?.words ?? "", /^Planned /, "the hint keeps its planned day");
 		const variance = rows.find((row) => row.topic.handle === "variance")!;
 		assert.ok(variance.topic.starts! < MAP.exam!.date);

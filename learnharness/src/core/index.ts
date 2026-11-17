@@ -25,6 +25,7 @@ export * from "./events.ts";
 export * from "./plan-tree.ts";
 export * from "./lesson-place.ts";
 export * from "./session-opening.ts";
+export { sessionTitleOf } from "./session-naming.ts";
 export * from "./phases.ts";
 export * from "./pending.ts";
 export * from "./prompt-segments.ts";

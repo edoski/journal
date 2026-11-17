@@ -1127,6 +1127,14 @@ export function sessionSavesOf(messages: readonly LhMessage[]): Record<string, u
  *  Which of them the engine still has open, and at which step, is the
  *  engine's to say. Pure. */
 export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
+	return [...sessionTaskStatesOf(messages)].filter(([, open]) => open).map(([key]) => key);
+}
+
+/** Every engine task the session's saves (or the lesson it picked up)
+ *  wrote, by key: true while it is open, false once a save removed it, so
+ *  a session whose own saves closed the work it held is told apart from
+ *  one that held none (round 15, M1). Pure. */
+export function sessionTaskStatesOf(messages: readonly LhMessage[]): Map<string, boolean> {
 	const clean = cleanToolCallIds(messages);
 	const held = new Map<string, boolean>();
 	for (const m of messages) {
@@ -1143,7 +1151,7 @@ export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
 			}
 		}
 	}
-	return [...held].filter(([, open]) => open).map(([key]) => key);
+	return held;
 }
 
 /** The title the session's saves gave the first task they opened, the
@@ -1170,6 +1178,32 @@ export function sessionTaskTitleOf(messages: readonly LhMessage[]): string | nul
 		}
 	}
 	return title;
+}
+
+/** The topics its saves gave the first task they opened (the one
+ *  `sessionTaskTitleOf` names), so a session that took up a task belongs
+ *  to the task's topics (round 15, m4: the Ask-the-tutor session that took
+ *  up the Expectation lesson stayed the Geometric page's Now). Empty when
+ *  its saves gave that task none. Pure. */
+export function sessionTaskTopicsOf(messages: readonly LhMessage[]): string[] {
+	const clean = cleanToolCallIds(messages);
+	let first: string | null = null;
+	let topics: string[] = [];
+	for (const m of messages) {
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const tasks = saveChanges(block.arguments as Record<string, unknown>)?.tasks;
+			if (typeof tasks !== "object" || tasks === null) continue;
+			for (const [key, patch] of Object.entries(tasks)) {
+				const named = (patch as { title?: unknown } | null)?.title;
+				if (first === null && typeof named === "string" && named.trim()) first = key;
+				const given = (patch as { topics?: unknown } | null)?.topics;
+				if (key === first && Array.isArray(given)) topics = given.filter((t): t is string => typeof t === "string" && t.length > 0);
+			}
+		}
+	}
+	return topics;
 }
 
 /** The conclusion's reveal (owner round, 2026-10-05): the hero of a

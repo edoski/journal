@@ -14,6 +14,7 @@ import { serverExecute } from "../tool-execute.ts";
 import { healToolRecord } from "./heal.ts";
 import type { CourseLink, CourseResult, CourseVerb } from "../../core/contracts/course.ts";
 import type { CourseRecords } from "../../core/ports.ts";
+import type { CourseMap } from "../../core/contracts/course-map.ts";
 import { sameQuestionKey, shownHelpNote, withShownHelp } from "../../core/shown-help.ts";
 import { engineConfidence } from "../../core/engine-confidence.ts";
 import { RUNG_HELP } from "../../core/practice-attempts.ts";
@@ -50,6 +51,10 @@ export interface CourseToolContext {
 	/** The steps of this session's lesson plan as they stand when a save
 	 *  runs (the plan may be written in the same turn). Absent: none. */
 	planSteps?: () => readonly { id: string; title: string }[];
+	/** Every course's map as the daily plan reads them, so a close names
+	 *  each day whole across his courses (round 15, m3). Absent: this
+	 *  course's alone. */
+	courses?: () => Promise<readonly CourseMap[]>;
 }
 
 /** A save that creates a course topic out of a step of the session's own
@@ -406,7 +411,9 @@ export function courseTools(ctx: CourseToolContext): Record<string, AgentTool<an
 			label: "course_save",
 			description:
 				`Record into ${course}'s shared study record. Applies one merge patch and returns a receipt: new observation ids, the reviews it set, ` +
-				"level changes, the focus and current path topic, the due count, and notes worth acting on. A refused patch saved nothing; " +
+				"level changes, the focus and current path topic, the due count, and notes worth acting on. " +
+				"Its `starts_moved` lists each first lesson his study today moved off a day he was told: your closing words say it, its new day and its `moved` cause as written. " +
+				"A refused patch saved nothing; " +
 				"the error names the field and the fix. Resending a save that failed is safe; an answer already saved is refused.",
 			parameters: saveInput,
 			execute: serverExecute("course_save", saveInput, (input) => call(ctx, { verb: "save", changes: input.changes })),

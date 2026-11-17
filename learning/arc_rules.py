@@ -301,15 +301,24 @@ def _check_exam(record: dict[str, Any]) -> None:
 
 def _check_left(record: dict[str, Any]) -> None:
     """H8 in every course: ``exam.leaves_out`` names topics the course studies
-    (of the exam's arcs, when it names some), and never all of them."""
+    (of the exam's arcs or of an arc after them, when it names some), and
+    never all of them. A topic the exam leaves out may sit in an arc of its
+    own after the exam's arcs, so no arc holds topics both inside and
+    outside the exam's scope (round 15, m11: Covariance in the exam's
+    Expectation arc), and it still waits for the exam's day."""
     exam = record.get("exam", {})
     left: list[str] = exam.get("leaves_out", [])
     named: list[str] | None = exam.get("arcs")
     topics = record["topics"]
+    arcs = order(record)
+    last = max((arcs.index(arc) for arc in named or () if arc in arcs), default=-1)
     for key in left:
-        if named is not None and topics.get(key, {}).get("arc") not in named:
+        arc = topics.get(key, {}).get("arc")
+        after = arc in arcs and arcs.index(arc) > last
+        if named is not None and arc not in named and not after:
             raise ValueError(
-                f'exam.leaves_out: "{key}" is not in the exam\'s arcs {_listed(named)}'
+                f'exam.leaves_out: "{key}" is in neither the exam\'s arcs '
+                f"{_listed(named)} nor an arc after them"
             )
         if key not in topics:
             raise ValueError(f'exam.leaves_out: no topic "{key}"{_close(key, topics)}')

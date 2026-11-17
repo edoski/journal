@@ -179,7 +179,8 @@ export async function openDemoApp(day = "2026-11-08") {
 	const { CalendarEntryView } = await import("../../components/calendar/calendar-entry.tsx");
 	const { TooltipProvider } = await import("../../components/ui/tooltip.tsx");
 	const { default: ChatPage } = await import("../../app/chat/[id]/page.tsx");
-	const { tonightAppends } = await import("../../src/core/input-events.ts");
+	const { inputAppends, tonightAppends } = await import("../../src/core/input-events.ts");
+	const { danglingQuestionOf } = await import("../../src/core/native-messages.ts");
 	const { newQuestionRepose } = await import("../../src/core/native-messages.ts");
 
 	// Every fetch the pages make, answered by the route that answers it in the app. A read can be held
@@ -579,6 +580,23 @@ export async function openDemoApp(day = "2026-11-08") {
 					? [assistant([{ type: "toolCall", id: `toolu_n6_${++n}`, name: end.tool, arguments: end.input }], "toolUse")]
 					: [assistant([{ type: "text", text: "" }], "stop"), ...(typeof end === "object" ? [{ ...newQuestionRepose(end.repose as never), timestamp: stamp() }] : [])]),
 			);
+		},
+		/** His answer to the question open in session `id`, as the app records it (`inputAppends`): a check
+		 *  answered in `words`, or `pick`, the 1-based option he picks on an ask. His pick of an option the tutor
+		 *  marked `stops` is his Done for today. */
+		answer(id: string, reply: { words: string } | { pick: number }) {
+			const open = danglingQuestionOf(record(id).messages);
+			if (!open) throw new Error(`no question waits in ${id}`);
+			const options = (open.input as { options?: Array<{ label: string }> }).options ?? [];
+			const answer = "pick" in reply
+				? { kind: "ask", answers: [{ index: reply.pick, label: options[reply.pick - 1]!.label, value: options[reply.pick - 1]!.label }] }
+				: { kind: "explain", text: reply.words, confidence: "confident" };
+			append(id, ...inputAppends(record(id), { type: "answer", toolCallId: open.toolCallId, answer } as never).map((m) => ({ ...m, timestamp: stamp() })));
+		},
+		/** The tutor's choice after the lesson's last step (round 15, M1: "That finishes the … lesson", then
+		 *  practice or "Stop here for today", the option it marks as ending the session). */
+		offerStop(id: string, question: string) {
+			append(id, assistant([{ type: "toolCall", id: `toolu_n6_${++n}`, name: "ask_user_question", arguments: { question, options: [{ label: "Yes, practice now" }, { label: "Stop here for today", stops: true }] } }], "toolUse"));
 		},
 		/** His message in session `id`. */
 		say(id: string, words: string) {

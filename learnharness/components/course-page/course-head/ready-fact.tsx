@@ -6,6 +6,7 @@ import { CalendarOffIcon, CircleCheckIcon, CircleDotDashedIcon, TriangleAlertIco
 import type { CourseStanding } from "@/src/core";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Hint } from "@/components/ui/hint";
+import { MathText } from "@/components/ui/math-text";
 import { ArcLabel } from "@/components/course-map/arc-label";
 import { NOT_READY_ARCS_WORDS, READY_FACT_WORDS, noExamWords } from "@/components/study-words";
 import type { CourseView } from "@/components/course-page/course-model";
@@ -29,9 +30,11 @@ export function useHeadStanding(view: CourseView, standing: CourseStanding | nul
 
 /**
  * Whether he is ready for the exam, as one fact of a head (spec:
- * course-head.md): an icon and a few words ("Not ready yet",
- * "Ready for the exam", "Not all of it fits" in the warning ink), never a
- * pill per arc. Pressed, it opens the whole answer under it: the readiness
+ * course-head.md): an icon and a few words ("Not ready for the exam yet",
+ * "Ready for the exam"), never a pill per arc; when the plan cannot fit all
+ * of it, what it loses in the warning ink ("No room before the exam to
+ * start Geometric distribution and Variance"; round 15, M7: "Not all of it
+ * fits" hid the loss behind a click). Pressed, it opens the whole answer under it: the readiness
  * words the run-up says (`ReadyWords`), the arcs not ready as a list, each
  * showing its arc on the page, and what the exam's plan leaves out with
  * its way in (`ExamGapLine`). A course without an exam says "No exam",
@@ -58,12 +61,12 @@ export function ReadyFact({ view, ready }: { view: CourseView; ready: ExamReady 
 		<Popover>
 			<PopoverTrigger data-slot="course-ready-fact" data-kind={ready.kind} className={cn(PRESS, ready.kind === "short" && "text-warning hover:text-warning data-[state=open]:text-warning")}>
 				<Icon aria-hidden className={MARK} />
-				{READY_FACT_WORDS[ready.kind]}
+				{ready.kind === "short" ? <MathText>{ready.words}</MathText> : READY_FACT_WORDS[ready.kind]}
 			</PopoverTrigger>
 			<PopoverContent data-slot="course-ready-detail" align="start" collisionPadding={12} className="flex flex-col gap-3">
-				<p className={cn("text-callout", ready.kind === "short" ? "text-warning" : "text-foreground")}>
-					{arcs.length > 0 ? NOT_READY_ARCS_WORDS : <ReadyWords ready={ready} workspace={map.workspace} />}
-				</p>
+				{ready.kind !== "short" && (
+					<p className="text-callout text-foreground">{arcs.length > 0 ? NOT_READY_ARCS_WORDS : <ReadyWords ready={ready} workspace={map.workspace} />}</p>
+				)}
 				{arcs.length > 0 && (
 					<ul className="-mx-1 -mt-2 flex flex-col">
 						{arcs.map((arc) => (

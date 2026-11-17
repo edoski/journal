@@ -1,6 +1,6 @@
 import { isReviewSession, markHow, namedArc, topicOpening, type ArcHandle, type NamedArc, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, lessonBegun, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
+import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, lessonBegun, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyShort, startsWhyTells, startsWhyWords, studiedDaysWords, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -97,6 +97,8 @@ export interface BuildsOn {
 export interface StartsReason {
 	kind: StartsWhy["kind"];
 	words: string;
+	/** The same cut to fit a line ("After Binomial distribution", `startsWhyShort`). */
+	short: string;
 }
 
 export interface TopicFacts {
@@ -208,8 +210,8 @@ const examWords = (topic: CourseMapTopic, map: CourseMap) => leftOutWords(topic,
  *  has no room for, waits for the exam whatever else it waits on. */
 function startsReason(topic: CourseMapTopic, map: CourseMap): StartsReason | null {
 	const exam = examWords(topic, map);
-	if (exam) return { kind: "after", words: exam };
-	return topic.startsWhy && startsWhyTells(topic.startsWhy) ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null;
+	if (exam) return { kind: "after", words: exam, short: exam };
+	return topic.startsWhy && startsWhyTells(topic.startsWhy) ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map), short: startsWhyShort(topic.startsWhy, map) } : null;
 }
 
 function waitsWords(topic: CourseMapTopic, today: string): string | null {

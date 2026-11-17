@@ -127,11 +127,11 @@ const surface = {
 };
 
 describe("one fact, one look on every surface (finding 3)", () => {
-	it("draws Your turn as the question bubble in the accent, map cards included", () => {
+	it("draws Your turn as the question bubble in the accent; a map card shows its topic's standing instead (round 15, m8)", () => {
 		const want = `${lucide(MessageCircleQuestionIcon)} text-link`;
 		assert.deepEqual(
 			{ home: look(surface.home("Eigenvalues lesson")), sidebar: look(surface.sidebar("Eigenvalues lesson")), course: look(surface.course("eigen")), map: look(surface.map("eigen")), topicNow: look(surface.topicNow("eigen")), topicSession: look(surface.topicSession("chat_eigen")), calendar: look(surface.calendar("session")) },
-			{ home: want, sidebar: want, course: want, map: want, topicNow: want, topicSession: want, calendar: want },
+			{ home: want, sidebar: want, course: want, map: "missing", topicNow: want, topicSession: want, calendar: want },
 		);
 	});
 
@@ -139,7 +139,8 @@ describe("one fact, one look on every surface (finding 3)", () => {
 		const want = "spinner text-foreground";
 		assert.deepEqual(
 			{ home: look(surface.home("Rank lesson")), sidebar: look(surface.sidebar("Rank lesson")), course: look(surface.course("rank")), map: look(surface.map("rank")), topicNow: look(surface.topicNow("rank")), topicSession: look(surface.topicSession("chat_rank")) },
-			{ home: want, sidebar: want, course: want, map: want, topicNow: want, topicSession: want },
+			{ home: want, sidebar: want, course: want, map: "missing", topicNow: want, topicSession: want },
+			"a map card shows its topic's standing, never the tutor writing (round 15, m8)",
 		);
 	});
 
@@ -147,7 +148,8 @@ describe("one fact, one look on every surface (finding 3)", () => {
 		const want = `${lucide(BookmarkIcon)} text-muted-foreground`;
 		assert.deepEqual(
 			{ home: look(surface.home("Problem sheet 4")), sidebar: look(surface.sidebar("Problem sheet 4")), course: look(surface.course("det")), map: look(surface.map("det")), topicNow: look(surface.topicNow("det")), calendar: look(surface.calendar("task")) },
-			{ home: want, sidebar: want, course: want, map: want, topicNow: want, calendar: want },
+			{ home: want, sidebar: want, course: want, map: "missing", topicNow: want, calendar: want },
+			"a map card shows its topic's standing, never Left off (round 15, m8)",
 		);
 	});
 

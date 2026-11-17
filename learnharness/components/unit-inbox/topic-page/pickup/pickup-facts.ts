@@ -1,10 +1,10 @@
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type StartsReason, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
-import { reviewAsked, type ChatListItem, type TopicRef } from "@/src/core";
+import type { ChatListItem, TopicRef } from "@/src/core";
 import { earlierSessions, trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { leftWords } from "@/components/unit-inbox/units";
 import { continueHref, pausedWords } from "@/components/nav/session-state";
-import { FIRST_LESSON, TUTOR_WRITING, overdueWords, pressWord, startsAfterWords, type PressWord } from "@/components/study-words";
+import { FIRST_LESSON, TUTOR_WRITING, movedWords, overdueWords, pressWord, startsAfterWords, type PressWord } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -31,8 +31,10 @@ export interface NowItem {
 	/** Where it stands: "Your turn", "Tutor writing", "Left off yesterday", a
 	 *  task's "Part (c)"; null when the words say it all. */
 	note: string | null;
-	/** The press, the head button's word: "Resume", "Start". */
-	press: PressWord;
+	/** The press, the head button's word: "Resume", "Start"; null when
+	 *  nothing is due, where a press would only compete with Scheduled's
+	 *  day (round 15, m9: "Nothing due · Study"). */
+	press: PressWord | null;
 	/** The session the press opens, which the map can show; null when the press starts one. */
 	chat: string | null;
 	/** Where the press goes when it opens a session (`continueHref`). */
@@ -70,38 +72,36 @@ export interface PickupSections {
  *  today", "Planned Wed 11 Nov", then what the exam ahead means for it,
  *  as the head and the calendar say it ("Planned Sat 28 Nov · Not before
  *  the exam, every study day is full at your pace", "Planned Tue 24 Nov ·
- *  Not on the exam; after it"), else which courses' new topics come first
- *  when it waits behind them (`startsAfterWords`); for a topic the course
- *  leaves out, which the plan never starts, the reason it is left out;
- *  null when the plan has no day for it. */
+ *  Not on the exam; after it"); else, for a day he was told that his
+ *  study moved, what moved it ("Planned Fri 13 Nov · Moved from Mon 9 Nov,
+ *  since Binomial distribution is not solid yet"), and once that day is
+ *  past, the topic it starts after ("Planned Fri 13 Nov · After Binomial
+ *  distribution"; round 15, m2: Poisson moved 9 → 13 Nov with no word
+ *  anywhere); else which courses' new topics come first when it waits
+ *  behind them (`startsAfterWords`); for a topic the course leaves out,
+ *  which the plan never starts, the reason it is left out; null when the
+ *  plan has no day for it. */
 export function plannedWords(facts: TopicFacts): string | null {
-	const { starts, startsAfter, excluded } = facts.topic;
+	const { starts, startsAfter, excluded, moved } = facts.topic;
 	// The plan starts no topic the course leaves out; its reason says why (round 5: Covariance read as ordinary work).
 	if (!starts) return excluded ?? null;
 	const day = starts <= facts.today ? "Planned today" : `Planned ${dayOf(starts)}`;
 	// The exam is why it comes when it does, whatever else it waits behind (round 13, 1 N1: Geometric read only
 	// "Planned Sat 28 Nov" while the head said no room before the exam to start it).
 	if (facts.exam) return `${day} · ${facts.exam}`;
+	if (moved) return `${day} · ${movedWords(null, facts.today, moved)}`;
+	if (facts.startsWhy?.kind === "after") return `${day} · ${facts.startsWhy.short}`;
 	const after = startsAfterWords(startsAfter);
 	return after ? `${day}, ${after.charAt(0).toLowerCase()}${after.slice(1)}` : day;
 }
 
-/** Now's words on a topic with nothing to take up today: nothing is due,
- *  or, for a review memory asked for already that the plan holds for a
- *  later day, since when it is due, as the sidebar and the map's card say
- *  it (round 4: "Nothing due" sat above "Due since 6 Nov"; round 8:
- *  "Nothing planned today" beside the sidebar's "Due since 13 Nov"). */
-export const NOTHING_DUE = "Nothing due";
-
-/** Now's words on a review memory asked for already that the plan holds
- *  for a later day: nothing today, since Scheduled gives the plan's day and
- *  the head memory's ("Due since 10 Nov, back 20 Nov"), never "Due today"
- *  beside "Review Mon 9 Nov" (round 12, 1 m1 and 2 n1). */
-export const NOTHING_TODAY = "Nothing today";
-
-function heldPastDue(review: TopicFacts["topic"]["review"], today: string): string | null {
-	return review?.kind === "scheduled" && review.held && reviewAsked(review, today) ? NOTHING_TODAY : null;
-}
+/** Now's words on a topic with nothing to take up today, one state in one
+ *  phrase on every topic page (round 15, m9: "Nothing due" on one page,
+ *  "Nothing today" on another): Scheduled gives the plan's day, and for a
+ *  review memory asked for already that the plan holds for a later day the
+ *  head says since when ("Due since 10 Nov, back 20 Nov"), so Now never
+ *  says "Due today" beside "Review Mon 9 Nov" (round 12, 1 m1 and 2 n1). */
+export const NOTHING_DUE = "Nothing due today";
 
 /** A session's one name, as Home's line names it: the title of the open
  *  task it holds, else its own title; never a step its tutor planned,
@@ -150,7 +150,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 		case "start":
 			return { ...base, icon: "standing", words: FIRST_LESSON, note: plannedWords(facts), why: facts.startsWhy };
 		case "study":
-			return { ...base, icon: "review", words: heldPastDue(facts.topic.review, facts.today) ?? NOTHING_DUE };
+			return { ...base, icon: "review", words: NOTHING_DUE, press: null };
 	}
 }
 

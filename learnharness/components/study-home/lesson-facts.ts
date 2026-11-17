@@ -28,7 +28,21 @@ export interface Lesson {
 	open: { kind: "session"; href: string } | { kind: "course"; workspace: string };
 }
 
-const PRESS: Record<NextStep["kind"], PressKind> = { review: "review", task: "continue", topic: "continue", none: "start" };
+/** A step's press, the verb its row says (`stepWords`): Review, Continue
+ *  an open task or a topic he began, Start a topic not started (round 15,
+ *  m1: "Start Linear maps and their matrices" carried a Continue press). */
+export function stepPress(step: NextStep): PressKind {
+	switch (step.kind) {
+		case "review":
+			return "review";
+		case "task":
+			return "continue";
+		case "topic":
+			return step.fresh ? "start" : "continue";
+		case "none":
+			return "start";
+	}
+}
 
 /** The arc some topics lie in, when every one of them lies in the same
  *  arc; null when they span arcs (a review mixes arcs by design), when
@@ -76,7 +90,7 @@ export function lessonOf(row: TodayRow): Lesson {
 		exam: runupExam(course),
 		title: stepWords(step),
 		detail: step.kind === "review" && then ? `Then ${then}` : null,
-		action: pressWord(step.kind === "topic" && course.lastActiveDaysAgo === null ? "start" : PRESS[step.kind]),
+		action: pressWord(stepPress(step)),
 		topics,
 		place: arcPlace(course.map, topics),
 		open: { kind: "course", workspace: course.map.workspace },

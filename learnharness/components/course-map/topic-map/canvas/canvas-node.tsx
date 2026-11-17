@@ -33,12 +33,11 @@ function focusRole(focus: Focus, handle: TopicHandle): "topic" | "need" | "leads
 	return focus.via.has(handle) ? "via" : null;
 }
 
-/** The header strip's tint: the accent where a session waits on him, the
- *  warning ink where the engine calls it weak, a whisper for a plan or a
- *  task, none where it only says where he stands (canvas.md, Node). */
+/** The header strip's tint: the warning ink where the engine calls it
+ *  weak, a whisper for a review or a plan, none where it only says where he
+ *  stands (canvas.md, Node). */
 function headerTone(line: CardFact | null): string {
 	if (!line) return "bg-transparent";
-	if (line.kind === "your-turn" || line.kind === "stopped" || line.kind === "working") return "bg-[color-mix(in_oklab,var(--ring)_14%,transparent)]";
 	if (line.kind === "slip") return "bg-[color-mix(in_oklab,var(--lh-warning)_10%,transparent)]";
 	return "bg-white/4";
 }
