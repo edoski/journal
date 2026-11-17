@@ -368,6 +368,11 @@ export class SessionModel {
 	}
 
 	private setError(message: string | null, dropped = false): void {
+		// A failure while a reply the connection cut is still owed keeps it
+		// owed, so the app's return still heals it (round 15, M8: a steer
+		// sent while the app was down replaced the drop, and the lesson
+		// never resumed).
+		dropped ||= message !== null && droppedError(this.errorValue);
 		const repeat = message !== null && this.retrying?.message === message ? this.retrying.repeat + 1 : 0;
 		this.errorValue = message === null ? null : { message, ...(repeat > 0 ? { repeat } : {}), ...(dropped ? { dropped: true as const } : {}) };
 		if (message !== null) this.retrying = null;
