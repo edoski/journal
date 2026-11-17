@@ -33,11 +33,12 @@ function Press({ words }: { words: string }) {
  * words, the press's word flush right beside them), which does what
  * Today's line does; Then, one quiet line naming the next new topic the
  * plan starts, why then in its hint, which opens its page. A hairline closes them off from the arc.
+ * Road shows Now alone, across the page under its head (`showThen` off).
  */
-export function AgendaNext({ view, busy, onContinue }: CourseColumns) {
+export function AgendaNext({ view, busy, onContinue, showThen = true }: CourseColumns & { showThen?: boolean }) {
 	const { course, whatNext, next } = view;
 	const line = whatNext?.pickUp?.line ?? null;
-	const then = whatNext?.then ?? null;
+	const then = showThen ? (whatNext?.then ?? null) : null;
 	const lead = line ? (line.lead ?? line.topics[0] ?? null) : null;
 	const glyph = lead ? <TopicGlyph standing={standingOf(lead)} /> : <ProgressRing course={course} />;
 	const action = line ? lessonOf(line.row).action : next.lesson.action;

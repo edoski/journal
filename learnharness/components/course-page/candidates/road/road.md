@@ -1,6 +1,6 @@
 # Road
 
-The course page as a road to its exam (`road-course.tsx`; `../candidates.md`), in one row of two columns: the road on the left, the map on the right. Head (`compact`): the title with Mistakes, Context and the press, then readiness (`ReadyFact`) and Studied.
+The course page as a road to its exam (`road-course.tsx`; `../candidates.md`), in one row of two columns: the road on the left, the map on the right. Head (`compact`): the title with Mistakes and Context, then readiness (`ReadyFact`) and Studied. Under its hairline, across the page, Agenda's Now (`AgendaNext` with `showThen` off): the step to take up, its reason, and the press (Continue, Resume, Review) flush right, so where he is and how to resume sit in one row (Edo, 17 Nov 2026). The head's own press moved there. At the page's foot, centred, New lesson's composer with this course chosen (`../../course-composer.md`).
 
 The road is the course's one list of arcs. The map beside it lists none (`SplitBody`'s `mapIndex={false}`, `ArcMap`'s `index`), so the arcs are never listed twice side by side (Edo, 17 Nov 2026: the two lists beside each other made the layout feel "not really laid out correctly"; he liked the map's arc list, so the road takes its look).
 

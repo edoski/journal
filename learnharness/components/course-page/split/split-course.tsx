@@ -101,6 +101,7 @@ export function SplitBody({
 	list: listOf = currentList,
 	mapIndex = true,
 	listWidth,
+	foot,
 }: {
 	view: CourseView;
 	standing: CourseStanding | null;
@@ -112,6 +113,8 @@ export function SplitBody({
 	mapIndex?: boolean;
 	/** The list column's width, where a page's list needs more than the linked columns' 20rem (Road). */
 	listWidth?: `${number}rem`;
+	/** What closes the page under the columns, across it (Road's composer). */
+	foot?: (columns: CourseColumns) => ReactNode;
 }) {
 	const { map } = view.course;
 	const { arcs } = view;
@@ -234,6 +237,7 @@ export function SplitBody({
 					}
 				/>
 			)}
+			{foot?.(columns)}
 		</PageFrame>
 	);
 }

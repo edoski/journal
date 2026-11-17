@@ -27,6 +27,7 @@ import { AgendaNext } from "../components/course-page/candidates/agenda/agenda-n
 import { RoadCourse } from "../components/course-page/candidates/road/road-course.tsx";
 import { RoadArc } from "../components/course-page/candidates/road/road-arc.tsx";
 import { ArcMap } from "../components/course-map/arc-map.tsx";
+import { courseComposerPlaceholder } from "../components/course-page/course-composer.tsx";
 import { arcStarts, examStop } from "../components/course-page/candidates/road/road-model.ts";
 import { ReadyFact } from "../components/course-page/candidates/shared/ready-fact.tsx";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
@@ -251,6 +252,14 @@ describe("the road", () => {
 			</ArcMap>,
 		);
 		assert.ok(map.querySelector('[data-slot="arc-index"]') === null, "Road's map lists no arcs of its own");
+	});
+
+	it("opens on Now alone across the page, and closes on New lesson's composer with this course chosen", () => {
+		const view = viewOf(course());
+		const now = render(<AgendaNext {...columns(view)} showThen={false} />);
+		assert.ok(now.querySelector('[data-slot="agenda-now"]'), "Now, the step to take up with its press");
+		assert.ok(now.querySelector('[data-slot="agenda-then"]') === null, "no Then on Road");
+		assert.equal(courseComposerPlaceholder("Linear Algebra"), "Name a topic, ask a question or paste a problem in Linear Algebra");
 	});
 });
 
