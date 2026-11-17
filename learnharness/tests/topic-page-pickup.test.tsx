@@ -241,10 +241,10 @@ describe("a topic not started", () => {
 		assert.deepEqual(
 			why?.builds.map((b) => [b.topic.handle, b.words, cardLine(facts.said.get(b.topic.handle))?.words]),
 			[
-				["rank", "Not right last time", "Unfinished"],
+				["rank", "Not right last time", undefined],
 				["kernel", "Tried, not right yet", "Sure, but wrong"],
 			],
-			"the card beside keeps the sidebar's fact under the same pie",
+			"the card beside keeps the sidebar's fact of the topic under the same pie, never a session's (round 15, m8)",
 		);
 		assert.equal(document.querySelector('[data-slot="pickup-material"]')!.textContent, "Section 4.7Blitzstein and Hwang");
 	});

@@ -58,20 +58,25 @@ export function slipBeside(topic: CourseMapTopic, titleOf: (handle: TopicHandle)
 }
 
 /** What a card can say under its title in place of where he stands: a
- *  fact that needs him. When a review comes back, when he last studied it
- *  and where he is never take the line. */
-export type CardFact = Exclude<TopicFact, { kind: "back" | "studied" | "here" }>;
+ *  fact about the topic that needs him. When a review comes back, when he
+ *  last studied it and where he is never take the line, nor does where a
+ *  session on it stands: a card is the topic's, as Builds on shows it
+ *  (round 15, m8: "Basis and dimension · Your turn" on Diagonalization's
+ *  map, "On your own" under its Builds on). */
+export type CardFact = Exclude<TopicFact, { kind: "back" | "studied" | "here" | "your-turn" | "working" | "stopped" | "task" }>;
+
+const NOT_ON_A_CARD: ReadonlySet<TopicFact["kind"]> = new Set(["back", "studied", "here", "your-turn", "working", "stopped", "task"]);
 
 /**
  * The one line a card says under its title (spec: topic-map.md, Node):
- * the sidebar's fact for the topic (`sidebarSays`) when it needs him,
- * else null, and the card says where he stands. One source, so a card
- * says what the sidebar's row and the course page's row say, a session
- * that waits on him included. Pure.
+ * the sidebar's fact for the topic (`sidebarSays`) when it is the topic's
+ * own and needs him (a slip, a review due, a start planned), else null,
+ * and the card says where he stands. One source, so a card says what the
+ * sidebar's row and the course page's row say of the topic. Pure.
  */
 export function cardLine(said: Said | undefined): CardFact | null {
 	const fact = said?.fact ?? null;
-	return fact && fact.kind !== "back" && fact.kind !== "studied" && fact.kind !== "here" ? fact : null;
+	return fact && !NOT_ON_A_CARD.has(fact.kind) ? (fact as CardFact) : null;
 }
 
 /** The current topic's tag on the map. */

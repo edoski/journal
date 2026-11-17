@@ -164,7 +164,7 @@ describe("why a topic needs him", () => {
 	});
 
 	it("names a node for a screen reader: title, that he is there, the standing, the card's line", () => {
-		assert.equal(topicLabel(byHandle("rank"), true, { kind: "your-turn", words: "Your turn" }), "Rank, You are here, Right with help, Your turn");
+		assert.equal(topicLabel(byHandle("rank"), true, { kind: "review", words: "Due today" }), "Rank, You are here, Right with help, Due today");
 		assert.equal(topicLabel(byHandle("vectors"), false, null), "Vectors, On your own");
 	});
 });

@@ -27,17 +27,22 @@ function topic(over: Partial<CourseMapTopic> = {}): CourseMapTopic {
 describe("a card's line", () => {
 	const said = (fact: TopicFact | null) => ({ place: "learning" as const, fact });
 
-	it("says the sidebar's fact when it needs him: a waiting turn, the tutor writing, a slip, a due review, an open task, Today's plan", () => {
+	it("says the sidebar's fact of the topic when it needs him: a slip, a due review, Today's plan", () => {
 		const needs: TopicFact[] = [
-			{ kind: "your-turn", words: "Your turn" },
-			{ kind: "working", words: "Working" },
-			{ kind: "stopped", words: "Stopped" },
 			{ kind: "slip", words: "Mistake to fix", slip: "gap" },
 			{ kind: "review", words: "3d overdue" },
-			{ kind: "task", words: "Left off 3d ago" },
 			{ kind: "next", words: "Planned today" },
 		];
 		for (const fact of needs) assert.deepEqual(cardLine(said(fact)), fact, fact.kind);
+	});
+
+	it("leaves the line to where he stands when the fact is where a session on it stands, as Builds on does (round 15, m8)", () => {
+		for (const fact of [
+			{ kind: "your-turn", words: "Your turn" },
+			{ kind: "working", words: "Working" },
+			{ kind: "stopped", words: "Stopped" },
+			{ kind: "task", words: "Left off 3d ago" },
+		] as TopicFact[]) assert.equal(cardLine(said(fact)), null, fact.kind);
 	});
 
 	it("leaves the line to where he stands when the sidebar says only when it comes back or when he last studied it, or has no row for it", () => {
@@ -57,11 +62,8 @@ describe("the card", () => {
 		{ name: "not started", topic: topic(), line: "Not started" },
 		{ name: "learning", topic: topic({ level: "attempted" }), line: "Tried, not right yet" },
 		{ name: "on his own, resting", topic: topic({ level: "retained", review: { kind: "scheduled", date: "2026-11-20" } }), line: "On your own" },
-		{ name: "a turn that waits on him", topic: weak("assisted", { gap: "sign error" }), fact: { kind: "your-turn", words: "Your turn" }, line: "Your turn" },
-		{ name: "the tutor writing", topic: topic({ level: "attempted" }), fact: { kind: "working", words: "Working" }, line: "Working" },
 		{ name: "review a week late", topic: topic({ level: "retained", review: due(9) }), fact: { kind: "review", words: "9d overdue" }, line: "9d overdue" },
 		{ name: "mixed up with a method", topic: weak("attempted", { choiceErrors: { cramer: 1 } }), fact: { kind: "slip", words: "Mixed up with Cramer's rule", slip: "mixed" }, line: "Mixed up with Cramer's rule" },
-		{ name: "an open task", topic: topic({ level: "attempted", tasks: ["sheet-4"] }), fact: { kind: "task", words: "Left off 3d ago" }, line: "Left off 3d ago" },
 	];
 	const line = (doc: Document) => (doc.querySelector('[data-slot="topic-need"] [data-slot="status-words"]') ?? doc.querySelector('[data-slot="topic-standing"]'))!.textContent;
 

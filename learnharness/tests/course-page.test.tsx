@@ -173,13 +173,13 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		assert.deepEqual(elsewhere.flatMap((g) => g.topics).find((t) => t.topic.handle === "rank")!.fact, { kind: "task", words: "Left off 1 Nov" });
 	});
 
-	it("puts unfinished work before a review the plan dates later, on the page, the sidebar and the map alike", () => {
+	it("puts unfinished work before a review the plan dates later, on the page and the sidebar; the map's card keeps the topic's standing (round 15, m8)", () => {
 		const held = { kind: "scheduled" as const, date: "2026-12-08", held: { exam: null, since: "2026-10-21" } };
 		const map = course({ topics: TOPICS.map((t) => (t.handle === "basis" ? { ...t, review: held, tasks: ["sheet-4"] } : t)) });
 		const row = groupOf(courseGroups(map), "on-your-own").topics.find((t) => t.topic.handle === "basis")!;
 		assert.deepEqual(row.fact, { kind: "task", words: "Left off 1 Nov" });
 		assert.equal(sidebar(map).get(`${WS}#basis`), "On your own: Left off 1 Nov");
-		assert.equal(cardLine(sidebarSays([map], [], WS).get(h("basis")))?.words, "Left off 1 Nov");
+		assert.equal(cardLine(sidebarSays([map], [], WS).get(h("basis"))), null);
 	});
 
 	it("says since when a review held past its day was due, in the words the sidebar and the topic page use", () => {

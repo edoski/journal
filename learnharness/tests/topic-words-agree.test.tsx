@@ -72,13 +72,17 @@ describe("every Linear Algebra topic says one thing on the sidebar, the course p
 		for (const r of rows) assert.equal(r.page, r.sidebar, r.topic.title);
 	});
 
-	it("a card says the sidebar's words when they need him, else where he stands", () => {
-		for (const r of rows) assert.equal(r.card, r.sidebar && !r.when ? r.sidebar : standingOf(r.topic).words, r.topic.title);
+	/** Where a session on the topic stands: the sidebar's and the course page's, never a card's (round 15, m8). */
+	const SESSION = new Set(["Your turn", "Tutor writing", "You stopped the tutor", "Reply cut off", "Couldn't reply"]);
+	const sessionWords = (words: string) => SESSION.has(words) || /^Left off /.test(words);
+
+	it("a card says the sidebar's words when they are the topic's own and need him, else where he stands", () => {
+		for (const r of rows) assert.equal(r.card, r.sidebar && !r.when && !sessionWords(r.sidebar) ? r.sidebar : standingOf(r.topic).words, r.topic.title);
 	});
 
-	it("Rank, whose session waits on him, says Your turn everywhere", () => {
+	it("Rank, whose session waits on him, says Your turn on the sidebar and the course page, and its standing on its card (round 15, m8)", () => {
 		const rank = rows.find((r) => r.topic.handle === "rank")!;
-		assert.deepEqual([rank.sidebar, rank.page, rank.card], ["Your turn", "Your turn", "Your turn"]);
+		assert.deepEqual([rank.sidebar, rank.page, rank.card], ["Your turn", "Your turn", standingOf(rank.topic).words]);
 	});
 });
 
