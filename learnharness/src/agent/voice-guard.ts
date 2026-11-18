@@ -40,7 +40,7 @@ import { normalizeQuestionType, PREDICT_RULE } from "../core/question-core.ts";
 import { sameQuestionKey } from "../core/shown-help.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
-import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
+import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, HIS_MESSAGE, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
 import { adviceSentences, partialDay, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, recordMarkWords, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
@@ -712,6 +712,46 @@ const RETRY = (question: string): AgentToolResult<unknown> => ({
 });
 const RETRY_NOTE = "His first try at your check was not right, and he has not tried it again. Ask the check again with explain, its question word for word, after one nudge toward his next move, never the correction.";
 
+/** The question he set aside to ask something from Ask, when this turn
+ *  answers that message: its tool, its words and their key. It is still
+ *  open above, so the turn asks it again word for word (round 17, 3 N1:
+ *  after "why does RS = I not force SR = I here…" the tutor posed a new
+ *  check on the same step, the screen drew it as "Your turn, on the
+ *  question above" over the SR question, and his SR answer was filed
+ *  under the hidden one). */
+function setAsideOf(messages: readonly LhMessage[]): { tool: string; question: string; key: string } | null {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "user" || m.role === "custom") continue;
+		if (m.role !== "toolResult" || !GRADED_QUESTION_TOOLS.includes(m.toolName) || !isRecord(m.details) || m.details.dismissed !== true || m.details.reason !== "asked") return null;
+		for (let j = i - 1; j >= 0; j--) {
+			const a = messages[j]!;
+			if (a.role !== "assistant") continue;
+			const call = a.content.find((b): b is ToolCall => b.type === "toolCall" && b.id === m.toolCallId);
+			const question = call ? questionText(call) : undefined;
+			if (call && question) return { tool: call.name, question, key: sameQuestionKey(question) };
+		}
+		return null;
+	}
+	return null;
+}
+
+/** His message asks to be taught or told instead of asked: the question
+ *  he set aside is set aside for good (ASKED_INSTEAD_TEXT). */
+const TAUGHT_INSTEAD = /\b(?:stop (?:quizzing|asking|testing)|no more (?:questions|quizzing)|just (?:explain|tell|teach|show)|teach (?:me|it) instead|explain (?:it )?instead|skip (?:it|this|the question))\b/i;
+
+/** A question other than the one he set aside to ask something. */
+const SET_ASIDE = (tool: string, question: string): AgentToolResult<unknown> => ({
+	content: [
+		{
+			type: "text",
+			text: `Not posed: he set the open question aside only to ask you something, and it is still open above, as he left it. Answer his message, then ask it again with ${tool}, its question word for word: ${JSON.stringify(question)}. A new question comes after he has answered that one.`,
+		},
+	],
+	isError: true,
+	details: { withheld: "set-aside" },
+});
+
 /** A question posed straight after an unsure answer, with no words. */
 const UNSURE = (why: string): AgentToolResult<unknown> => ({
 	content: [
@@ -813,6 +853,12 @@ export class VoiceGuard {
 	private readonly firstTry: { id: string; question: string } | null;
 	private retryOwed = false;
 	private heldRetry = false;
+	/** The question he set aside to ask the message this turn answers:
+	 *  the turn asks it again before any other, unless his message was
+	 *  his answer (a save names it), asked to guess first (a prediction
+	 *  goes through) or asked to be taught instead. Held once a turn. */
+	private readonly setAside: { tool: string; question: string; key: string } | null;
+	private heldSetAside = false;
 	/** Ordinary text this turn took out of a reply, and whether the turn
 	 *  posed a question he can answer, and was already told at its end. */
 	private plain = false;
@@ -865,6 +911,8 @@ export class VoiceGuard {
 		this.input = turnInputOf(messages);
 		this.standing = standingQuestion(messages);
 		this.firstTry = review ? null : firstTryAtCheck(messages);
+		const aside = setAsideOf(messages);
+		this.setAside = aside && !(this.input.words && TAUGHT_INSTEAD.test(this.input.words)) ? aside : null;
 		this.posedLast = posedLast(messages);
 		this.stepsAhead = stepsNotDone(messages);
 		this.unsaved = saves ? unsavedAnswerOf(messages) : null;
@@ -977,6 +1025,7 @@ export class VoiceGuard {
 		// names his answer keeps it, so the question after it goes through.
 		if (call.name === SAVE_TOOL && this.unsaved && savedQuestionsOf(call.arguments).includes(this.unsaved)) this.unsaved = null;
 		if (call.name === SAVE_TOOL && this.firstTry && savedNotRight(call.arguments, this.firstTry.id)) this.retryOwed = true;
+		if (call.name === SAVE_TOOL && this.setAside && savedQuestionsOf(call.arguments).includes(HIS_MESSAGE)) this.setAside = null;
 		if (this.unsaved && !this.heldUnsaved && (this.endsTurn(call.name) || call.name === PROBE_DONE_TOOL)) {
 			this.heldUnsaved = true;
 			return UNSAVED(call.name);
@@ -1067,6 +1116,13 @@ export class VoiceGuard {
 			this.heldUnsure = true;
 			return UNSURE(this.input.unsure);
 		}
+		const asksAside = !!this.setAside && GRADED_QUESTION_TOOLS.includes(call.name) && sameQuestionKey(text) === this.setAside.key;
+		const guessFirst = !!this.input.guess && normalizeQuestionType(isRecord(call.arguments) ? call.arguments.type : undefined) === "predict";
+		if (this.setAside && GRADED_QUESTION_TOOLS.includes(call.name) && !asksAside && !guessFirst && !this.heldSetAside) {
+			this.heldSetAside = true;
+			return SET_ASIDE(this.setAside.tool, this.setAside.question);
+		}
+		if (asksAside) this.setAside = null;
 		if (this.retryOwed && !this.heldRetry && !(call.name === "explain" && sameQuestionKey(text) === this.firstTry?.question)) {
 			this.heldRetry = true;
 			return RETRY(this.firstTry!.question);
