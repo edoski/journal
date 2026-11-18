@@ -41,7 +41,7 @@ import { sameQuestionKey } from "../core/shown-help.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, partialDay, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, partialDay, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, recordMarkWords, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -546,7 +546,7 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 		case "letter":
 			return `${b.excerpt.split(" ")[0]} already names another matrix in this session, so he cannot tell which one a step means. Name this matrix with a letter the session has not used yet: ${quoted(b.excerpt.slice(b.excerpt.indexOf(" ") + 1))}.`;
 		case "card-words":
-			return `His card words his confidence "Guessing" or "Confident", so the ruling does too, never the record's "sure" or "guess": ${quoted(b.excerpt)}.`;
+			return `His card says each mark in its own words, so you do too, in lowercase inside a sentence: right, partly right or not right; on your own or with help; guessing or confident. Never the record's words (correct, incorrect, partial, sure, guess): ${quoted(b.excerpt)}.`;
 		case "reason-twice":
 			return `A "Show that…" already asks for his reason, so it takes no ", and why?": ${quoted(b.excerpt)}. End it with a full stop, and pose a part he typed in his words, all of it.`;
 		case "maths-words":
@@ -562,9 +562,13 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `His answer card already says "${card}" above your reply, and your opening says it again: ${quoted(said)}. Open on where it broke, the fact itself, never on the verdict, and never soften it.`;
 		}
 		case "contrast":
-			return `"You held that…, whereas…" reads as a formula after the break is already said: ${quoted(b.excerpt)}. Leave it out; say one plain sentence of contrast only when it adds something the break did not.`;
+			return `"You …, whereas …" reads as a formula after the break is already said: ${quoted(b.excerpt)}. Leave it out; say one plain sentence of contrast only when it adds something the break did not, never one that opens on what he did.`;
 		case "hint-question":
 			return `A hint gives him what the question did not, said as a statement: the next move ("Subtract row 1 from row 3 and look at what is left") or a fact the question left out. This one asks him a question instead: ${quoted(b.excerpt)}. Say the move or the fact; his question is asked again after it.`;
+		case "not-yet":
+			return `Never tell him what he has not done yet: ${quoted(b.excerpt)}. Say what he picks up and when: a half answer he left waits for him at its question, and a topic not started is one he starts, on its day when the plan gives one.`;
+		case "hint-back":
+			return `A hint gives him a move or a fact he does not have yet, and this one hands his own idea back for him to check: ${quoted(b.excerpt)}. Say the next move past it ("Subtract row 1 and row 2 from row 3, column by column") or the fact it needs, never what his work or your last message already said.`;
 		case "credit": {
 			const [letter, said] = [b.excerpt.slice(0, b.excerpt.indexOf("|")), b.excerpt.slice(b.excerpt.indexOf("|") + 1)];
 			return `${quoted(said)} credits him with work on $${letter}$, which he never worked on in this lesson. Name the matrix he worked on, the one in the question he answered, or say whose work it was.`;
@@ -1174,6 +1178,8 @@ export class VoiceGuard {
 		// (round 15, m16).
 		const hintAsks = kind === "hint" || this.input.hint ? sentences(text).find((s) => s.trim().endsWith("?")) : undefined;
 		if (hintAsks) out.push({ rule: "hint-question", excerpt: hintAsks.trim() });
+		const handsBack = kind === "hint" || this.input.hint ? pointsBack(text) : null;
+		if (handsBack) out.push({ rule: "hint-back", excerpt: handsBack });
 		const replying = this.input.answers && (this.sent === 0 || (this.concluded && this.sent === this.sentAtConclude));
 		const echo = replying ? echoOf(text, this.input.words) : null;
 		if (echo) out.push({ rule: "echo", excerpt: echo });
@@ -1181,7 +1187,8 @@ export class VoiceGuard {
 		if (unsureEcho && !echo) out.push({ rule: "reason", excerpt: unsureEcho });
 		const moral = kind === "direct" ? closingMoral(text) : null;
 		if (moral) out.push({ rule: "moral", excerpt: moral });
-		const recordWord = this.input.ruling ? recordConfidenceWord(text) : null;
+		// A mark named anywhere is said in his card's words (round 16, m14).
+		const recordWord = recordMarkWords(text);
 		if (recordWord) out.push({ rule: "card-words", excerpt: recordWord });
 		const sure = kind === "close" ? narratedConfidence(text) : null;
 		if (sure) out.push({ rule: "confidence", excerpt: sure });

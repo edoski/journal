@@ -58,6 +58,7 @@ export type VoiceRule =
 	| "card"
 	| "contrast"
 	| "hint-question"
+	| "hint-back"
 	| "credit"
 	| "demo-unused"
 	| "unsaved"
@@ -70,7 +71,8 @@ export type VoiceRule =
 	| "pointer"
 	| "arrival"
 	| "own-words"
-	| "mark-case";
+	| "mark-case"
+	| "not-yet";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -93,6 +95,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// A handoff between teaching and practice needs no words of its own
 	// (round 12, 3 D4: "Switching to an explanation of when three vectors
 	// form a basis of ℝ³.").
+	// A step announced instead of taught (round 16, m10: "Let's re-teach
+	// the counting step." opening a review's first teaching step).
+	{ rule: "narration", re: /(?:^|[.!?]\s+|\n)(?:let'?s|let us|we(?:'ll| will)|I(?:'ll| will))(?: now| first)? (?:re-?teach|teach|go (?:back )?over|revisit|recap|review|redo|work through|cover|fix|repair)\b/i },
 	{ rule: "narration", re: /(?:^|[.!?]\s+|\n)(?:(?:let'?s|now,?|ok(?:ay)?,?) (?:switch|move|turn|go|head)|(?:now,? )?(?:switching|moving|turning|going|heading)|back)(?: (?:back|over|on|now))?(?: (?:to|into))? (?:(?:an?|the|some|your|more) )?(?:explanation|explaining|teaching|practice|practising|practicing|problems?|exercises?|lesson|review)\b/i },
 	// A confident miss's contrast as a formula, closing every such reply
 	// after the break was said (round 14, m15: "You held that extra freedom
@@ -135,6 +140,10 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// as itself (round 15, m17: "My earlier line saying the set was done
 	// was wrong, since one problem is not a set.").
 	{ rule: "own-words", re: /\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b/i },
+	// What he has not done yet is no step for him: it reads as a reproach
+	// (round 16, m13: "You still haven't started Linear maps and their
+	// matrices." closing a lesson under his half answer).
+	{ rule: "not-yet", re: /\byou still (?:haven't|have not)\b|\byou (?:haven't|have not)(?: yet)? (?:started|begun)\b|\byou have yet to (?:start|begin)\b/i },
 	// His card's words, inside a sentence, are plain lowercase words
 	// (round 15, m18: "The mark stands as With help").
 	{ rule: "mark-case", re: /(?<=[a-z0-9,;)]\s+)(?:With help|On your own|Partly right|Not right|Gave up|Not yet confirmed|Prediction, not counted|Guessing|Confident)\b/ },
@@ -147,6 +156,18 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 export function questionBelow(text: string): string | null {
 	return sentences(text).map((s) => s.trim()).find((s) => /\bbelow\b/i.test(s) && /\b(?:question|answer|check|prediction)s?\b/i.test(s)) ?? null;
 }
+
+/** A hint that hands his own idea back to him to check, instead of a move
+ *  or a fact he lacks (round 16, m12: "Your suspicion about row 3 is
+ *  something you can check yourself, entry by entry, across all five
+ *  columns." under the nudge that had asked him to check it). The
+ *  sentence, or null. */
+export function pointsBack(text: string): string | null {
+	return sentences(prose(text).text).map((s) => s.trim()).find((s) => POINTS_BACK.test(s)) ?? null;
+}
+
+const POINTS_BACK =
+	/\byour (?:own )?(?:suspicion|idea|hunch|instinct|guess|thought|intuition|claim|reasoning|draft|start|work(?:ing)?|answer)\b[^.?!]*\b(?:(?:is )?(?:something )?you can (?:check|test|verify|confirm)|can be (?:checked|tested|verified|confirmed)|is worth (?:checking|testing)|is (?:right|correct|on (?:the right )?track|a good start))\b|\b(?:check|test|verify|confirm) (?:it|this|that) (?:for )?yourself\b|\byou can (?:check|test|verify|confirm) (?:it|this|that)\b/i;
 
 /** Requests in an instruction text for a form the voice bans: each names
  *  what it asks for, so the fix is to ask within the voice instead. */
@@ -318,8 +339,17 @@ export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	if (kind === "right" && said[0] && /\b(?:is|are|was|were) (?:right|correct)\b|^(?:right|correct|yes)\b/i.test(said[0])) {
 		out.push({ rule: "feedback", excerpt: said[0] });
 	}
+	const formula = kind === "wrong" || kind === "close" ? said.find((s) => CONTRAST_FORMULA.test(s.trim())) : undefined;
+	if (formula && !out.some((b) => b.rule === "contrast")) out.push({ rule: "contrast", excerpt: formula.trim() });
 	return out;
 }
+
+/** A reply to his answer that sets what he did against what is true in
+ *  one "You …, whereas …" sentence: the formula round 14 removed for "You
+ *  held that", back with any verb after the break was already said (round
+ *  16, m10: "You counted one arrangement for one head, whereas the binomial
+ *  coefficient counts all six."). Teaching may contrast two cases freely. */
+const CONTRAST_FORMULA = /^you\b[^.?!]*\b(?:whereas|when in fact|but in fact|while in fact)\b/i;
 
 /** Each relation a display line can state, by kind: a chain of one kind
  *  ("a = b = c", "0 < x < 1") states one relation, a mix ("= … → … =")
@@ -513,6 +543,19 @@ export function asksAreHis(text: string, words: string | null): boolean {
 export function recordConfidenceWord(text: string): string | null {
 	return /\b(?:on your own|with help|partly right|not right|right|gave up)\s*,\s*(?:(?:not )?sure|unsure|a guess|guess|guessed)\b/i.exec(text)?.[0] ?? null;
 }
+
+/** A mark said in the record's words, not his card's: the confidence word
+ *  (`recordConfidenceWord`), or a result the record names, "marked
+ *  incorrect and sure", "correct with help" (round 16, m14: a save reply
+ *  read "The first … is marked incorrect and sure. The second … is marked
+ *  correct with help." over cards reading "Not right · Confident" and
+ *  "Right · With help"). */
+export function recordMarkWords(text: string): string | null {
+	return recordConfidenceWord(text) ?? RECORD_MARK.exec(prose(text).text)?.[0] ?? null;
+}
+
+const RECORD_MARK =
+	/\b(?:marked|saved|recorded|graded|counted)(?: as)? (?:correct|incorrect|partial(?:ly correct)?)\b(?:,? (?:and )?(?:sure|unsure|not sure|a guess|guess(?:ing)?|with help|on (?:your|his) own)\b)?|\b(?:correct|incorrect|partial)\b,? (?:and )?(?:sure|unsure|not sure|a guess|guessing|with help|on (?:your|his) own)\b/i;
 
 /** A "Show that…" or "Prove…" that also ends ", and why?": it already asks
  *  for his reason (round 12, 2 n5: "Show that dim ker A = 2, and why?"). */

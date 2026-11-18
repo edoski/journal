@@ -13,7 +13,7 @@ import { describe, it } from "node:test";
 import { PATHS } from "../config.ts";
 import { courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 import { composeInstructions } from "../src/agent/teacher-agent.ts";
-import { CONCLUDE_ACK_TEXT, DONE_TONIGHT_TEXT, HANDOFF_TEXT, MODE_HANDOFF_TEXT, NEXT_PROBLEM_TEXT, sessionResumeText } from "../src/core/contracts/chat.ts";
+import { CONCLUDE_ACK_TEXT, DONE_TONIGHT_TEXT, HANDOFF_TEXT, MODE_HANDOFF_TEXT, NEXT_PROBLEM_TEXT, REVIEW_HANDOFF_TEXT, sessionResumeText } from "../src/core/contracts/chat.ts";
 import { PROBE_DONE_ACK_TEXT } from "../src/core/contracts/probe.ts";
 import { promptVoiceBreaks, sessionVoiceBreaks, voiceBreaks, type TurnKind, type VoiceRule } from "../src/core/voice-check.ts";
 
@@ -97,6 +97,7 @@ const TEXTS: ReadonlyArray<[string, string]> = [
 	...Object.entries(DONE_TONIGHT_TEXT).map(([agent, text]): [string, string] => [`Done for today (${agent})`, text]),
 	...Object.entries(MODE_HANDOFF_TEXT).map(([mode, text]): [string, string] => [`handoff to ${mode}`, text]),
 	["plan handoff", HANDOFF_TEXT],
+	["review handoff", REVIEW_HANDOFF_TEXT],
 	["next problem", NEXT_PROBLEM_TEXT],
 	["conclude ack", CONCLUDE_ACK_TEXT],
 	["probe ack", PROBE_DONE_ACK_TEXT],

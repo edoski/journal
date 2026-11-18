@@ -333,8 +333,9 @@ export interface QuestionAnswerData {
 	/** What he had typed in the question's box when Done for today set it
 	 *  aside (reason "tonight"): kept with the lesson, so the line that says
 	 *  it was left shows it and the question asked again opens with it on
-	 *  every way back, in any window (round 15, 3 m1). His only: never in
-	 *  what the tutor reads (`compactAnswerForModel`), never graded. */
+	 *  every way back, in any window (round 15, 3 m1). His only: its words
+	 *  are never in what the tutor reads (`compactAnswerForModel`, which
+	 *  says only that one was kept), never graded. */
 	draft?: LeftDraft;
 	answeredAt: string;
 }
@@ -504,6 +505,13 @@ export function dismissedAnswer(kind: QuestionKind, questionText: string, reason
 	};
 }
 
+/** What the agent reads when he pressed Hint on a check. His draft rides
+ *  beside it as `text`: a hint that restates it, or the nudge before it,
+ *  gives him nothing (round 16, m12: after "y = 3x/2", the hint was "the
+ *  second entry is 3/2 times the first"). */
+export const HINT_REQUEST_TEXT =
+	"He pressed Hint: a request, not an answer. `text`, when present, is his draft so far. Give the next rung of the hint ladder above what his draft and your last message already give him: one move or fact neither says, never his draft or your nudge said again in other words. Then ask this check again.";
+
 /** What the agent reads when he pressed Show me on a check. */
 export const SHOW_ME_TEXT =
 	"He pressed Show me: he gives up on this question, with the work below if he wrote any. Save it as an attempt he gave up (result incorrect, gave_up true, his work as the response). Then show him the worked answer: where his work stopped, when he wrote some, then the steps. Ask nothing more about it.";
@@ -511,6 +519,13 @@ export const SHOW_ME_TEXT =
 /** What the agent reads for a question left open by Done for today. */
 export const LEFT_FOR_TONIGHT_TEXT =
 	"He stopped for today with this question open. Not an answer: no grade, no attempt recorded. Its answer was never shown to him.";
+
+/** What the agent reads beside a question Done for today set aside with
+ *  his half answer in its box: only that it was kept, never its words
+ *  (round 16, m13: with nothing to say so, the close read "You still
+ *  haven't started Linear maps and their matrices" under his half answer). */
+export const LEFT_DRAFT_TEXT =
+	"He had started an answer to it, kept in his box for when he comes back. It is not an attempt: grade nothing. In the close it is his half answer waiting for him there (\"Your half answer to the kernel question waits here for next time.\"), never a topic or question he has not started, and never what it says.";
 
 /** What the agent reads for a question he set aside to ask something
  *  (round 6: the question stays open, so it comes back as it was and the
@@ -533,13 +548,13 @@ export const ASKED_INSTEAD_TEXT =
  */
 export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, unknown> {
 	if (ad.dismissed) {
-		if (ad.reason === "tonight") return { kind: ad.kind, dismissed: true, reason: LEFT_FOR_TONIGHT_TEXT };
+		if (ad.reason === "tonight") return { kind: ad.kind, dismissed: true, reason: LEFT_FOR_TONIGHT_TEXT, ...(ad.draft?.text.trim() ? { draftKept: LEFT_DRAFT_TEXT } : {}) };
 		if (ad.reason === "asked") return { kind: ad.kind, dismissed: true, reason: ASKED_INSTEAD_TEXT };
 		return { kind: ad.kind, dismissed: true };
 	}
 	const out: Record<string, unknown> = { kind: ad.kind };
 	if (ad.hintRequested) {
-		out.hintRequested = "He pressed Hint: a request, not an answer. Give the next rung of the hint ladder, then ask this check again.";
+		out.hintRequested = HINT_REQUEST_TEXT;
 	}
 	if (ad.showMe) out.showMe = SHOW_ME_TEXT;
 	// Array.isArray: the seam is called with `unknown` answers (test

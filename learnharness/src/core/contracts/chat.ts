@@ -240,10 +240,12 @@ export function taskContinueText(tasks: readonly string[]): string {
 }
 
 /** What a review's wake adds (round 9, 2 m4): a review that turns into
- *  teaching said nothing of the switch and closed on "the lesson", since
- *  the wake asked only to start teaching. */
+ *  teaching closed on "the lesson", since the wake asked only to start
+ *  teaching. The step opens on its content (round 16, m10: the line this
+ *  wake asked for, "Let's re-teach the counting step.", told him nothing
+ *  his step strip did not). */
 export const REVIEW_HANDOFF_TEXT =
-	"This session is my review. Where its answers show I need part of the topic taught again, open the first step with one plain line saying you re-teach that part (\"Let's re-teach the counting step.\"), and call the session my review to its close, never the lesson.";
+	"This session is my review. Where its answers show I need part of the topic taught again, teach that part as the first step, opening on its content with no line announcing it, and call the session my review to its close, never the lesson.";
 
 /** The model-facing opening of a fresh session that picks up a finished
  *  lesson: its plan carries over, so the teacher neither probes nor plans
@@ -315,7 +317,7 @@ const DONE_LIMITS = "Never a step, cue, method or hint toward anything he left o
  *  turn; its card said "Partly right" with no reason, straight before the
  *  close (round 11, 4 minor 1). */
 const DONE_GRADED = "An answer he sent before pressing it is still graded and saved as usual; when it was not fully right, first say in one sentence what it missed, as its own message, then close.";
-const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
+const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one; a topic not started is one he starts, never a review; a question he left a half answer on (\`draftKept\`) is his half answer waiting for him there. ${DONE_LIMITS}`;
 /** Practice keeps nothing of a problem dropped at Done for today, so its
  *  close names only what the record keeps (round 9, 3 m7: "You still have
  *  the kernel problem you closed … to pick up"), and only this session's:
@@ -398,20 +400,23 @@ export function isPracticeRequest(value: unknown): value is PracticeRequest {
 
 /** What the agent reads for each request (the marker's content head). */
 export const PRACTICE_REQUEST_TEXT: Readonly<Record<PracticeRequest, string>> = {
-	hint: "[HINT] — the learner pressed Hint on the active problem. This is a request, not an answer: give the next rung of the hint ladder, one rung only, then wait for his work.",
+	hint: "[HINT] — the learner pressed Hint on the active problem. This is a request, not an answer: give the next rung of the hint ladder, one rung only, above what his work so far and your last message already give him: one move or fact neither says, never his work or your nudge said again in other words, and never his own idea handed back for him to check. Then wait for his work.",
 	show: "[SHOW ME] — the learner pressed Show me on the active problem. This is a request, not an answer: he stops working on it. Conclude it now (surrendered with rung R5, unless his work already solved it) so the committed solution shows, then point at the step where his work stopped.",
 	explain:
 		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`, with no words between: the problem's card shows how it ended, and the teaching follows.",
 };
 
 /** Which rung a Hint request asks for, by how many hints this problem has
- *  had: the first says where to look, the second a nudge, the third and
- *  later one step. Show me reveals the rest. Every rung is a statement:
+ *  had: the first says where to look, unless he was already told where
+ *  (round 16, m12: after "What does R3 − R1 − R2 give you?", the first hint
+ *  could only say "Your suspicion about row 3 is something you can check
+ *  yourself"), the second a nudge, the third and later one step. Show me
+ *  reveals the rest. Every rung is a statement:
  *  the first asked "one question that points at where to look", and the
  *  hint only rephrased the problem (round 15, m16: "Does a row of A with
  *  nonzero entries still have to be nonzero once elimination is done?"). */
 export function hintRungText(nth: number): string {
-	if (nth <= 1) return "This is his first hint on this problem: say where to look (R0 or R1), as one statement in this problem's own terms of what it did not give him, never a question and never the problem in other words. No method, no step, no answer.";
+	if (nth <= 1) return "This is his first hint on this problem: say where to look (R0 or R1), as one statement in this problem's own terms of what it did not give him, never a question and never the problem in other words. No method, no step, no answer. When his work or your last message already says where to look, that rung is given: name the pattern or the idea instead (R2 or R3).";
 	if (nth === 2) return "This is his second hint on this problem: one nudge that names the pattern or the idea (R2 or R3). Carrying it out stays his.";
 	return `This is hint ${nth} on this problem: one step, worked or outlined (R4 or R5), never the rest of the solution. Show me is how he sees the rest.`;
 }
