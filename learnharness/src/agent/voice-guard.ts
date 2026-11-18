@@ -41,7 +41,7 @@ import { sameQuestionKey } from "../core/shown-help.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, partialDay, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, partialDay, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, recordMarkWords, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -546,7 +546,7 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 		case "letter":
 			return `${b.excerpt.split(" ")[0]} already names another matrix in this session, so he cannot tell which one a step means. Name this matrix with a letter the session has not used yet: ${quoted(b.excerpt.slice(b.excerpt.indexOf(" ") + 1))}.`;
 		case "card-words":
-			return `His card words his confidence "Guessing" or "Confident", so the ruling does too, never the record's "sure" or "guess": ${quoted(b.excerpt)}.`;
+			return `His card says each mark in its own words, so you do too, in lowercase inside a sentence: right, partly right or not right; on your own or with help; guessing or confident. Never the record's words (correct, incorrect, partial, sure, guess): ${quoted(b.excerpt)}.`;
 		case "reason-twice":
 			return `A "Show that…" already asks for his reason, so it takes no ", and why?": ${quoted(b.excerpt)}. End it with a full stop, and pose a part he typed in his words, all of it.`;
 		case "maths-words":
@@ -1187,7 +1187,8 @@ export class VoiceGuard {
 		if (unsureEcho && !echo) out.push({ rule: "reason", excerpt: unsureEcho });
 		const moral = kind === "direct" ? closingMoral(text) : null;
 		if (moral) out.push({ rule: "moral", excerpt: moral });
-		const recordWord = this.input.ruling ? recordConfidenceWord(text) : null;
+		// A mark named anywhere is said in his card's words (round 16, m14).
+		const recordWord = recordMarkWords(text);
 		if (recordWord) out.push({ rule: "card-words", excerpt: recordWord });
 		const sure = kind === "close" ? narratedConfidence(text) : null;
 		if (sure) out.push({ rule: "confidence", excerpt: sure });

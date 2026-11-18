@@ -544,6 +544,19 @@ export function recordConfidenceWord(text: string): string | null {
 	return /\b(?:on your own|with help|partly right|not right|right|gave up)\s*,\s*(?:(?:not )?sure|unsure|a guess|guess|guessed)\b/i.exec(text)?.[0] ?? null;
 }
 
+/** A mark said in the record's words, not his card's: the confidence word
+ *  (`recordConfidenceWord`), or a result the record names, "marked
+ *  incorrect and sure", "correct with help" (round 16, m14: a save reply
+ *  read "The first … is marked incorrect and sure. The second … is marked
+ *  correct with help." over cards reading "Not right · Confident" and
+ *  "Right · With help"). */
+export function recordMarkWords(text: string): string | null {
+	return recordConfidenceWord(text) ?? RECORD_MARK.exec(prose(text).text)?.[0] ?? null;
+}
+
+const RECORD_MARK =
+	/\b(?:marked|saved|recorded|graded|counted)(?: as)? (?:correct|incorrect|partial(?:ly correct)?)\b(?:,? (?:and )?(?:sure|unsure|not sure|a guess|guess(?:ing)?|with help|on (?:your|his) own)\b)?|\b(?:correct|incorrect|partial)\b,? (?:and )?(?:sure|unsure|not sure|a guess|guessing|with help|on (?:your|his) own)\b/i;
+
 /** A "Show that…" or "Prove…" that also ends ", and why?": it already asks
  *  for his reason (round 12, 2 n5: "Show that dim ker A = 2, and why?"). */
 export function reasonAskedTwice(text: string): string | null {
