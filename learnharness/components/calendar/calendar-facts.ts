@@ -447,6 +447,11 @@ export function calendarEntries({
 			task: held,
 			status: held || sessionState(chat) === "left" ? openWorkStatus(listed, chat, held) : null,
 		});
+		// Every earlier day he worked in it shows it too, as what he did that day (round 16, m8: the Linear maps lesson
+		// begun on 9 Nov showed only on 10 Nov, the day he left it).
+		for (const earlier of (chat.studiedDays ?? []).filter((d) => d < day)) {
+			entries.push({ kind: "session", id: `session:${chat.id}@${earlier}`, day: earlier, title: chat.title, course, chat, type: sessionType(chat), waits: false, topic: sessionTopic(chat, courses), task: null, status: null });
+		}
 	}
 	return entries.sort((a, b) => a.day.localeCompare(b.day) || rankOf(a) - rankOf(b));
 }

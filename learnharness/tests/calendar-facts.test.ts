@@ -292,6 +292,14 @@ describe("calendar entries", () => {
 		assert.equal(sessionType(chat({ phase: "teach" })), "lesson");
 	});
 
+	it("shows a session on every day he worked in it, its status on the last alone (round 16, m8)", () => {
+		// The Linear maps lesson begun on Fri 6 Nov and left on Sat 7 Nov.
+		const lesson = chat({ title: "Linear maps lesson", updatedAt: "2026-11-07T15:00:00", studiedDays: ["2026-11-06", "2026-11-07"], ended: "left" });
+		const days = calendarEntries({ courses: [LINALG], chats: [lesson], scope: null }).filter((e) => e.kind === "session" && e.chat.id === lesson.id);
+		assert.deepEqual(days.map((e) => e.day), ["2026-11-06", "2026-11-07"]);
+		assert.ok(days[0]!.kind === "session" && days[0]!.status === null, "the earlier day is what he did, no status");
+	});
+
 	it("knows a quiet week", () => {
 		const entries = calendarEntries({ courses: [LINALG], chats: [], scope: null });
 		assert.equal(quietBetween(entries, "2026-11-30", "2026-12-07"), true);
