@@ -19,7 +19,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 APP="$(cd "$HERE/.." && pwd -P)"
 ENGINE="$(cd "$APP/.." && pwd -P)"
 : "${OUT:?OUT names an empty folder for the sandbox and the runs}" "${ACCOUNT:?ACCOUNT names the Claude account}" "${PY:?PY names the python with the engine packages}"
-SEED="${SEED:-$HOME/.claude/skills/logbook/adapters/journal/seed}"
+SEED="${SEED:-$HOME/.config/logbook/adapters/journal/seed}"
 VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/the-vault"
 COURSES="${COURSES:-calculus linear-algebra probability real-analysis}"
 real_of() {
