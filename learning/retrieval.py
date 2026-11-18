@@ -1325,17 +1325,18 @@ def moved(
     result: dict[str, dict[str, Any]] = {}
     for kind, days in (("review", now.reviews), ("starts", now.starts)):
         for key, day in days.items():
-            # This morning's plan is the day he was last told: after days off
-            # it is made afresh, and a save today moves a day from it (round
-            # 16, 1 M1: a slip on the eve moved Expectation off today, and the
-            # page said "no study since 10 Nov" while the close said nothing).
+            # A first lesson in a course he studied today was last told this
+            # morning: after days off that plan is made afresh, and his save
+            # today moves a start from it (round 16, 1 M1: a slip on the eve
+            # moved Expectation off today, and the page said "no study since
+            # 10 Nov" while the close said nothing).
             morning = told_on(began, kind, key)
             before = told_on(was, kind, key)
             if key in mine:
                 if before is not None and today < before != day:
                     result[key] = {"from": before.isoformat(), "by": "answered"}
                 continue
-            if morning is not None and morning != day:
+            if kind == "starts" and mine and morning is not None and morning != day:
                 before = morning
             if before is None or before == day:
                 continue
