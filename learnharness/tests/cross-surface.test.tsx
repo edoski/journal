@@ -37,7 +37,7 @@
  * It seeds its own copy of the world each run (about a minute) and reads
  * the real engine, so it runs where the seed and the engine are installed.
  */
-import { demoWorldMissing, NEW_SESSION, openDemoApp, text, type DemoApp } from "./helpers/demo-app.tsx";
+import { demoWorldMissing, hasDemoSeed, NEW_SESSION, openDemoApp, text, type DemoApp } from "./helpers/demo-app.tsx";
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { sessionState } from "../components/nav/session-state.ts";
@@ -46,8 +46,9 @@ import type { CalendarCourse, ChatListItem, CourseMapTask, CourseMapTopic } from
 import type { HomeLine, SidebarCard } from "./helpers/demo-app.tsx";
 
 const missing = demoWorldMissing();
-// CI sets LH_REQUIRE_REAL_ENGINE, so a moved seed or venv fails the gate instead of skipping this.
-const skip = missing && !process.env.LH_REQUIRE_REAL_ENGINE ? missing : false;
+// CI sets LH_REQUIRE_REAL_ENGINE, so a missing engine fails the gate instead of skipping this. The seed is the
+// Logbook's, outside this repository, so CI never has it and skips.
+const skip = missing && (!process.env.LH_REQUIRE_REAL_ENGINE || !hasDemoSeed()) ? missing : false;
 
 // ─── days in words ──────────────────────────────────────────────────────────
 

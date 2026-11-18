@@ -44,9 +44,12 @@ function enginePython(): string | null {
 	return candidates.find((p): p is string => !!p && fs.existsSync(p)) ?? null;
 }
 
+/** Whether the Logbook's seed is here. It lives outside this repository, so CI never has it. */
+export const hasDemoSeed = (): boolean => fs.existsSync(path.join(SEED, "seed.sh"));
+
 /** Why the demo world can't be seeded here, or null when it can. */
 export function demoWorldMissing(): string | null {
-	if (!fs.existsSync(path.join(SEED, "seed.sh"))) return `no demo world seed at ${SEED}`;
+	if (!hasDemoSeed()) return `no demo world seed at ${SEED}`;
 	if (!enginePython()) return "no Python with the learning engine's packages";
 	return null;
 }
