@@ -1,6 +1,6 @@
 /**
  * The whole app in this process, over the Logbook's seeded demo world
- * (`~/.claude/skills/logbook/adapters/journal/seed`, 8 Nov 2026): the real
+ * (`~/.config/logbook/adapters/journal/seed`, 8 Nov 2026): the real
  * engine on a fresh copy of the world, every `/api` route the pages fetch
  * answered by its own handler, the server's event bus wired into the
  * window's channel, and the pages mounted inside the app shell with its
@@ -31,7 +31,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "../../..");
 const API = path.resolve(HERE, "../../app/api");
 /** The Logbook's demo world seed (`seed.sh`), or another one named by `LH_DEMO_SEED`. */
-export const SEED = process.env.LH_DEMO_SEED ?? path.join(os.homedir(), ".claude", "skills", "logbook", "adapters", "journal", "seed");
+export const SEED = process.env.LH_DEMO_SEED ?? path.join(os.homedir(), ".config", "logbook", "adapters", "journal", "seed");
 
 /** The interpreter with the engine's packages: the app's own setting, else
  *  the checkout's `.venv`, else its main worktree's (a worktree has none). */
