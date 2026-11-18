@@ -39,6 +39,7 @@ import {
 	sortAnswerProblems,
 	sortMisses,
 	sortProblems,
+	standingMisses,
 	sortQuiz,
 	storedEdges,
 	type ArcPassView,
@@ -767,6 +768,8 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		const cut = await settled();
 		const edgesEntry = edges.applied.length > 0 ? lastEdgesEntry(cut.record) : undefined;
 		let sorted: SortMiss[] | null = null;
+		/** Every miss this run's readers found, for standingMisses. */
+		let seen: SortMiss[] = [];
 		const blindSort = async (a: ArcSubmit, formation: Formation): Promise<string | null> => {
 			const quiz = sortQuiz(a, cut.view, formation);
 			const reader = () => runSubmitAgent<SortAnswer>({
@@ -790,7 +793,9 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			});
 			const reads = (await Promise.all(Array.from({ length: SORT_READERS }, reader))).filter((r): r is SortAnswer => r !== null);
 			if (reads.length > 0) {
-				sorted = mergeMisses(...reads.map((read) => sortMisses(quiz, read, a)));
+				const now = mergeMisses(...reads.map((read) => sortMisses(quiz, read, a)));
+				sorted = standingMisses(seen, now, a);
+				seen = mergeMisses(seen, now);
 				log({ step: "sort", kind: "sorted", misses: sorted });
 				const misses = sortProblems(sorted, a);
 				if (misses) return misses;

@@ -910,6 +910,24 @@ export function mergeMisses(...readings: readonly SortMiss[][]): SortMiss[] {
 	return [...merged.values()];
 }
 
+/**
+ * The misses that stand against a cut: this sort's, plus each miss an
+ * earlier sort of the same run found whose names still stand (the topic's
+ * arc keeps the name it had, and a name it read as is still in the cut). A
+ * reader's sort is one sample, as each blind scorer's is: a cut sent back
+ * for a topic and then sent again unchanged would pass whenever the next
+ * readers happen to place it home. Pure.
+ */
+export function standingMisses(earlier: readonly SortMiss[], now: readonly SortMiss[], submit: ArcSubmit): SortMiss[] {
+	const home = new Map(submit.arcs.flatMap((a) => a.topics.map((t) => [t, a.title.trim()] as const)));
+	const names = new Set(submit.arcs.map((a) => a.title.trim()));
+	const still = earlier.flatMap((m) => {
+		const readsAs = m.readsAs.filter((n) => names.has(n) && n !== m.arc);
+		return home.get(m.topic) === m.arc && readsAs.length > 0 ? [{ ...m, readsAs }] : [];
+	});
+	return mergeMisses([...now], still);
+}
+
 /** One topic the reader sorted away from its arc. */
 export interface SortMiss {
 	topic: string;

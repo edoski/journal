@@ -45,6 +45,7 @@ import {
 	sortAnswerProblems,
 	sortMisses,
 	sortProblems,
+	standingMisses,
 	sortQuiz,
 	withProposed,
 	addCandidates,
@@ -433,6 +434,17 @@ describe("the cut's shape rules", () => {
 		const m = (topic: string, readsAs: string[]) => ({ topic, title: topic, arc: "A", readsAs });
 		assert.deepEqual(mergeMisses([m("x", ["B"])], [m("x", ["C"]), m("y", ["B"])]), [m("x", ["B", "C"]), m("y", ["B"])]);
 		assert.deepEqual(mergeMisses([], []), []);
+	});
+
+	it("a miss an earlier sort found stands while its names stand, so resending the same cut cannot pass on luckier readers", () => {
+		const riemann = { topic: "riemann", title: "Riemann sums", arc: "Derivatives", readsAs: ["Limits and continuity"] };
+		assert.deepEqual(standingMisses([riemann], [], good), [riemann], "the same cut again: the next readers placed it home, the miss stands");
+		const moved: ArcSubmit = { ...good, arcs: [arc("limits-continuity", "Limits and continuity", ["limits", "continuity", "riemann"]), arc("derivatives", "Derivatives", ["derivative", "chain"])] };
+		assert.deepEqual(standingMisses([riemann], [], moved), [], "moved to the arc it read as");
+		const renamed: ArcSubmit = { ...good, arcs: [arc("limits-continuity", "Limits", ["limits", "continuity"]), good.arcs[1]!] };
+		assert.deepEqual(standingMisses([riemann], [], renamed), [], "the name it read as is gone: fresh readers judge the new names");
+		const chain = { topic: "chain", title: "Chain rule", arc: "Derivatives", readsAs: ["Limits and continuity"] };
+		assert.deepEqual(standingMisses([riemann], [chain], good), [chain, riemann]);
 	});
 
 	it("in propose mode a drop the loop check made goes with the reversed use, so the cut holds the use", () => {
