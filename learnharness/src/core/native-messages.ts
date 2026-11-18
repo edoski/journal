@@ -1224,6 +1224,25 @@ export function sessionPlanTopicOf(messages: readonly LhMessage[]): string | nul
 	return null;
 }
 
+/** The topic not started that the session's answers started before any
+ *  plan: the first save that went through whose receipt moved a topic up
+ *  from "new" (its `levels`), as a probe's first answer on the topic he
+ *  asked to start does (round 17, M5). Null when a plan came first, or no
+ *  save started one. Pure. */
+export function firstStartedTopicOf(messages: readonly LhMessage[]): string | null {
+	const clean = cleanToolCallIds(messages);
+	for (const m of messages) {
+		if (m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === "plan_init" && clean.has(b.id))) return null;
+		if (m.role !== "toolResult" || m.isError || m.toolName !== "course_save") continue;
+		let receipt: unknown;
+		try { receipt = JSON.parse(resultText(m)); } catch { continue; }
+		const levels = (receipt as { levels?: unknown } | null)?.levels;
+		const started = Object.entries(typeof levels === "object" && levels !== null ? levels : {}).find(([, change]) => (change as { from?: unknown } | null)?.from === "new");
+		if (started) return started[0];
+	}
+	return null;
+}
+
 /** When the session's saved answers on each topic came: the time of the
  *  newest message whose save went through with an answer on it, by topic.
  *  Pure. */

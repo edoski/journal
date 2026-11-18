@@ -898,4 +898,30 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 			assert.ok(page?.opens?.split("?")[0] === `/chat/${id}`, `${other.title}'s page resumes its lesson: "${page?.now} · ${page?.press} · ${page?.note}" opens ${page?.opens}`);
 		});
 	});
+
+	it("Tue 17 Nov, a review whose probe starts a topic, left in the probe before any plan (round 17, M5: 3 M4)", async () => {
+		const { nameTakenUpLesson } = await import("../src/server/session-naming.ts");
+		const { stores } = await import("../src/server/stores.ts");
+		const { courses } = (await (await fetch("/api/calendar")).json()) as { courses: CalendarCourse[] };
+		const course = courses.find((c) => c.map.title === "Probability")!.map;
+		const taught = course.topics.find((t) => t.level !== "new")!;
+		const res = await fetch("/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: `Review ${taught.title}`, course: { workspace: course.workspace }, topics: [taught.handle] }) });
+		const { id } = (await res.json()) as { id: string };
+		const other = course.topics.find((t) => t.level === "new" && !app.chats().some((c) => (c.topics ?? []).includes(t.handle)))!;
+		assert.ok(other, "Probability has a topic no session touched");
+		app.say(id, `Can we start ${other.title} now instead?`);
+		// The probe's first answer on it, which starts it; no plan yet (lens 3: E(X), E(min)).
+		await app.save(id, { observations: [{ topics: [other.handle], text: `Probe question on ${other.title}`, result: "correct", help: "none", sure: "confident" }] });
+		await nameTakenUpLesson({ chatStore: stores.chatStore, courseRecords: stores.courseRecords }, id);
+		const left = app.pose(id, "Which envelope do you keep?");
+		app.leave(id);
+		app.closes(id, "We'll stop here for today.", left);
+		const listed = app.chats().find((c) => c.id === id)!;
+		assert.equal(listed.title, `${other.title} lesson`, "the session is named after the lesson its probe started");
+		assert.ok(!listed.review, "it is no longer the review it opened as");
+		await holds("Tue 17 Nov, after the review whose probe started a lesson", (s) => {
+			const page = s.pages.get(keyOf(course.workspace, other.handle));
+			assert.ok(page?.opens?.split("?")[0] === `/chat/${id}`, `${other.title}'s page resumes its lesson: "${page?.now} · ${page?.press} · ${page?.note}" opens ${page?.opens}`);
+		});
+	});
 });

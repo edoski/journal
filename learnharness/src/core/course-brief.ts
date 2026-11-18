@@ -425,7 +425,7 @@ export function projectCourseBrief(
 	if (str(course.goal)) lines.push(`About the course, in his words: ${course.goal}`);
 	if (studied) lines.push(studiedLine(studied));
 	// A review whose plan teaches another topic is that topic's lesson from then on (round 16, M4).
-	if (opened.length > 0 && takenUp) lines.push(`Opened on: ${opened.join(", ")}, as its review; its plan then took up ${takenUp}, so the session is now the ${takenUp} lesson, a lesson like any other: what is left of it at its close is that lesson's task, and the close calls it the lesson, never a review.`);
+	if (opened.length > 0 && takenUp) lines.push(`Opened on: ${opened.join(", ")}, as its review; it then took up ${takenUp}, so the session is now the ${takenUp} lesson, a lesson like any other: what is left of it at its close is that lesson's task, and the close calls it the lesson, never a review.`);
 	else if (opened.length > 0 && review) lines.push(`Opened on: ${opened.join(", ")}, as its review. He pressed its button, and the app posted his first message. The session is his review, whatever it re-teaches.`);
 	else if (opened.length > 0) lines.push(`Opened on: ${opened.join(", ")}. He pressed the action on its page, and the app posted his first message.`);
 	if (!review) lines.push(...aheadOfPlanLines(plan, opened, opening));
