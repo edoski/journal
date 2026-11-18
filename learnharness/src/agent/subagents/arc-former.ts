@@ -519,6 +519,12 @@ export type TranscriptEntry =
 
 export interface ArcPassOptions {
 	edges: EdgeMode;
+	/** In propose mode, the edges the cut must hold: every proposal
+	 *  (default), so any he accepts keeps the cut valid; or only the stored
+	 *  ones, so a proposal he has not accepted cannot reorder the material
+	 *  (a copy run of his course; an add the cut contradicts is then not
+	 *  accepted at --apply). */
+	cutOn?: "proposed" | "stored";
 	/** His words, or the copy run's statement, for a course he has studied
 	 *  (G5): `arc_change.asked`. */
 	asked?: string;
@@ -756,7 +762,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 
 		const settled = async () => {
 			const read = await viewNow(workspace);
-			return options.edges === "propose" ? { ...read, view: withProposed(read.view, diffs) } : read;
+			return options.edges === "propose" && options.cutOn !== "stored" ? { ...read, view: withProposed(read.view, diffs) } : read;
 		};
 		const cut = await settled();
 		const edgesEntry = edges.applied.length > 0 ? lastEdgesEntry(cut.record) : undefined;

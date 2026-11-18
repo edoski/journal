@@ -9,7 +9,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { describe, it } from "node:test";
-import { parsePageSpec, pdfExtract, pdfInfo, pdfProbe, pdfSearch } from "../src/agent/subagents/pdf-ops.ts";
+import { parsePageSpec, pdfExtract, pdfInfo, pdfProbe, pdfSearch, readPdf } from "../src/agent/subagents/pdf-ops.ts";
 import { tinyPdf } from "./helpers/tiny-pdf.ts";
 
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "sample-3page.pdf");
@@ -131,5 +131,40 @@ describe("pdf-ops — the pdfjs text layer", () => {
 		assert.deepEqual(parsePageSpec("1,3,7", 3), [1, 3]);
 		assert.deepEqual(parsePageSpec("3", 3), [3]);
 		assert.deepEqual(parsePageSpec(" 2 , 1 ", 3), [1, 2]);
+	});
+});
+// pdfjs in node reads every document on one fake worker, and a teardown clears that worker's shared caches: a
+// read still running in another document then never settles, and the process exits mid-await (18 Nov 2026, a
+// 1,127-page textbook measured beside an 80-page deck by the arc pass).
+describe("pdf-ops — a teardown never lands while another document is being read", () => {
+	it("a short PDF read beside a long one is torn down only once the long one is read", async () => {
+		const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+		const first = pdfjs.getDocument({ data: tinyPdf([{ runs: [{ text: "x", x: 72, y: 700 }] }]), verbosity: 0 });
+		await first.promise;
+		await first.destroy();
+		const proto = Object.getPrototypeOf(first) as { destroy: () => Promise<void> };
+		const destroy = proto.destroy;
+		let torn = 0;
+		proto.destroy = function (this: unknown) {
+			torn++;
+			return destroy.call(this);
+		};
+		try {
+			let finish!: () => void;
+			const held = new Promise<void>((resolve) => (finish = resolve));
+			const long = readPdf(tinyPdf([{ runs: [{ text: "Long one", x: 72, y: 700 }] }]), async (doc) => {
+				await held;
+				const page = await doc.getPage(1);
+				return (await page.getTextContent()).items.length;
+			});
+			await pdfProbe(FIXTURE);
+			assert.equal(torn, 0, "the short PDF's teardown waits while the long one is still being read");
+			finish();
+			assert.ok((await long) > 0, "the long read finishes");
+			await pdfProbe(FIXTURE);
+			assert.ok(torn >= 2, "both are torn down once no document is being read");
+		} finally {
+			proto.destroy = destroy;
+		}
 	});
 });

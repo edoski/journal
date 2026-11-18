@@ -6,7 +6,7 @@
  * for the engine:
  *
  *   npx tsx scripts/arc-pass.ts --workspace COPY --out RUN_DIR --engine-home SANDBOX_HOME \
- *     --account LABEL [--edges apply|propose] [--original REAL_WORKSPACE]
+ *     --account LABEL [--edges apply|propose] [--cut-on proposed|stored] [--original REAL_WORKSPACE]
  *
  * writes edges.json, answer.json, patch.json, report.json, run.json and
  * transcript.jsonl into RUN_DIR. On a course he has studied the formation
@@ -51,6 +51,7 @@ const { values } = parseArgs({
 		workspace: { type: "string" },
 		out: { type: "string" },
 		edges: { type: "string", default: "propose" },
+		"cut-on": { type: "string", default: "proposed" },
 		"engine-home": { type: "string" },
 		"engine-vault": { type: "string" },
 		account: { type: "string" },
@@ -89,6 +90,8 @@ async function copyRun(): Promise<void> {
 	if (realCourses().includes(workspace)) fail(`${workspace} is a registered real course; run on a copy`);
 	const mode = values.edges as EdgeMode;
 	if (mode !== "apply" && mode !== "propose") fail("--edges is apply or propose");
+	const cutOn = values["cut-on"];
+	if (cutOn !== "proposed" && cutOn !== "stored") fail("--cut-on is proposed or stored");
 	const label = values.account ?? fail("--account names the Claude account (its T3 label or instance id)");
 	const account = loadClaudeAccounts().find((a) => a.label === label || a.instanceId === label) ?? fail(`no Claude account ${label}`);
 	const engine = claudeEngine(account.providerId);
@@ -98,7 +101,7 @@ async function copyRun(): Promise<void> {
 	const transcript = fs.createWriteStream(path.join(out, "transcript.jsonl"));
 	const pass = createArcPass({ courseRecords, ledgers: arcPassLedgersAt(path.join(out, "ledger.json")), engine });
 	const started = new Date().toISOString();
-	const result = await pass.run(workspace, { edges: mode, asked: COPY_ASKED, transcript: (entry: TranscriptEntry) => transcript.write(`${JSON.stringify(entry)}\n`) });
+	const result = await pass.run(workspace, { edges: mode, cutOn: cutOn as "proposed" | "stored", asked: COPY_ASKED, transcript: (entry: TranscriptEntry) => transcript.write(`${JSON.stringify(entry)}\n`) });
 	transcript.end();
 	const shown = await courseRecords.run(workspace, { verb: "show", handles: "all" });
 	const record = shown.ok ? obj(shown.json) : {};
@@ -123,6 +126,7 @@ async function copyRun(): Promise<void> {
 		workspace,
 		...(values.original ? { original: path.resolve(values.original) } : {}),
 		edges: mode,
+		cutOn,
 		revision: record.revision ?? null,
 		topicArcs,
 	});

@@ -754,6 +754,19 @@ describe("the grouping pass (real engine, scripted model)", { skip: !realEngine 
 		assert.deepEqual(result.status === "formed" && result.edges.kinds?.map((k) => `${k.topic}<-${k.need} ${k.kind}`), ["continuity<-derivative placement", "chain<-continuity definition"]);
 	});
 
+	it("a copy run told to cut on the stored edges keeps the material's cut where a proposed add would refuse it, and still proposes the add", async () => {
+		const readers = { continuity: [{ need: "derivative", step: "a continuity exercise differentiates the function first" }] };
+		const kinds = { "continuity<-derivative": "method" } as const;
+		const stored = scriptedModel(EDGES, [CUT], undefined, {}, readers, [], [], {}, kinds);
+		const result = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: stored }).run(course("cut-stored"), { edges: "propose", cutOn: "stored" });
+		assert.equal(result.status, "formed", JSON.stringify(result));
+		assert.deepEqual(stored.refusals, [], "the cut puts continuity before the derivative, as the material does");
+		assert.deepEqual(result.status === "formed" && result.edges.diffs.filter((d) => d.change === "add").map((d) => `${d.topic}<-${d.need}`), ["continuity<-derivative"]);
+		const proposed = scriptedModel(EDGES, [CUT], undefined, {}, readers, [], [], {}, kinds);
+		await assert.rejects(createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: proposed }).run(course("cut-proposed"), { edges: "propose" }), /never submitted/);
+		assert.match(proposed.refusals.join("\n"), /needs "derivative", a prerequisite the edge step proposes/, "by default the cut holds every proposal");
+	});
+
 	it("the loop check settles a loop the readers' uses close, and a stored edge it rules against is dropped", async () => {
 		const dir = course("loops");
 		const keep = { ...EDGES, verdicts: EDGES.verdicts.map((v) => ({ ...v, keep: true })) };

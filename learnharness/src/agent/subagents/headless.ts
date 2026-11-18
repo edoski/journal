@@ -5,7 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { standardFontsDir } from "./pdf-ops";
+import { readPdf } from "./pdf-ops";
 
 /**
  * Verification engines for sub-agents: demos use the app's own Electron
@@ -540,15 +540,12 @@ async function renderPdfPages(
 	// that used to run in the Chrome shim tab; only the canvas host changed
 	// (Skia in-process instead of a DOM canvas). Text-side pdf tools never
 	// needed a browser; now renders don't either.
-	const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
 	const { createCanvas } = await import("@napi-rs/canvas");
 	const data = new Uint8Array(fs.readFileSync(path.resolve(pdfPath)));
-	// Standard-font data as a directory path (live-smoke finding 2026-09-19:
-	// without it pdfjs renders non-embedded standard fonts via fallback);
-	// verbosity 0 = errors only (JBIG2 noise on scanned PDFs).
-	const loadingTask = pdfjs.getDocument({ data, standardFontDataUrl: standardFontsDir(), verbosity: 0 });
-	const doc = await loadingTask.promise;
-	try {
+	// readPdf passes standard-font data as a directory path (live-smoke
+	// finding 2026-09-19: without it pdfjs renders non-embedded standard
+	// fonts via fallback) and tears the document down safely.
+	return readPdf(data, async (doc) => {
 		const out: RenderedPdfPage[] = [];
 		for (const pageNo of pages) {
 			if (pageNo < 1 || pageNo > doc.numPages) continue;
@@ -573,9 +570,7 @@ async function renderPdfPages(
 			});
 		}
 		return out;
-	} finally {
-		await loadingTask.destroy().catch(() => {});
-	}
+	});
 }
 
 // ─── the real API ────────────────────────────────────────────────────────────
