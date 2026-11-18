@@ -62,16 +62,21 @@ export function ownPlanOf(all: unknown, workspace: string): unknown {
 export async function readCourses(
 	days: number | ((course: CourseSummary) => number) = 1,
 ): Promise<{ available: true; read: CourseRead[]; failed: UnreadableCourse[] } | { available: false; reason: string }> {
+	const chats = stores.chatStore.listChats();
+	const mapOf = (workspace: string) => stores.courseRecords.map(workspace, lessonTopics(chats, workspace)[0]);
+	// Each registered course's map starts beside the listing's plan, not after
+	// it: each is the engine replaying every course, so one after the other
+	// doubled Home's wait (round 15, P7).
+	const early = new Map((stores.courseRecords.registered?.() ?? []).map((workspace) => [workspace, mapOf(workspace)]));
 	const listing = await listCoursesRead();
 	if (!listing.available) return listing;
-	const chats = stores.chatStore.listChats();
 	const all = "plan" in listing ? listing.plan : undefined;
 	const read = await Promise.all(
 		listing.courses.map(async (course): Promise<CourseRead | UnreadableCourse> => {
 			const horizon = typeof days === "number" ? days : days(course);
 			const listed = horizon === 1 ? ownPlanOf(all, course.workspace) : null;
 			const [map, plan] = await Promise.all([
-				stores.courseRecords.map(course.workspace, lessonTopics(chats, course.workspace)[0]),
+				early.get(course.workspace) ?? mapOf(course.workspace),
 				listed ? { ok: true as const, json: listed } : stores.courseRecords.run(course.workspace, { verb: "plan", days: horizon }),
 			]);
 			return map.ok

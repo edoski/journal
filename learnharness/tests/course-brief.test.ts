@@ -19,6 +19,8 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-brief-"));
 const PYTHON = path.join(TMP, "python");
 fs.writeFileSync(PYTHON, `#!/bin/sh\nexec "${process.execPath}" "${path.join(HERE, "fixtures", "fake-learning-engine.mjs")}" "$@"\n`, { mode: 0o755 });
 process.env.LH_DATA_DIR = path.join(TMP, "data");
+// The test's own HOME: no engine registry, never the registry of the person running it.
+process.env.HOME = path.join(TMP, "home");
 process.env.LH_LEARNING_ENGINE = TMP;
 process.env.LH_LEARNING_PYTHON = PYTHON;
 await signInTestClaude();

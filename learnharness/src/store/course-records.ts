@@ -411,13 +411,16 @@ function registered(registry: string): string[] {
 	}
 }
 
+/** The engine's support folder (`learning/workspace.py`): its registry and global preferences. */
+const supportOf = (env: NodeJS.ProcessEnv): string => path.join(env.HOME ?? "", "Library", "Application Support", "Learning");
+
 /** What one engine read reads besides its arguments, as one key: the study
  *  day (`learning/clock.py`), the engine's registry and global preferences
  *  in its support folder (`learning/workspace.py`), and for every registered
  *  course, every course's history feeding his pace, its `.study` marker,
  *  record and deleted records. The read is the same while this key is. */
 function readState(env: NodeJS.ProcessEnv): { key: string; listed: ReadonlySet<string> } {
-	const support = path.join(env.HOME ?? "", "Library", "Application Support", "Learning");
+	const support = supportOf(env);
 	const registry = path.join(support, "workspaces.json");
 	const workspaces = registered(registry);
 	const courses = workspaces.map((w) => folderState(w));
@@ -517,6 +520,8 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 	};
 	return {
 		forgotten: courseRecordForgotten,
+		// A deleted course stays registered with its record gone: it has no map.
+		registered: () => registered(path.join(supportOf(engine.env ?? process.env), "workspaces.json")).filter((w) => fs.existsSync(path.join(w, ".study", "course.json"))),
 		async list() {
 			const result = await shared(null, ["plan", "--all", "--days", "1"], "plan", journal(1));
 			if (!result.ok) return { available: false, reason: result.message };

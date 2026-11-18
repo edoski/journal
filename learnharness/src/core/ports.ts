@@ -173,6 +173,10 @@ export interface CourseRecords {
 	>;
 	/** Run one verb against one course workspace. */
 	run(workspace: string, verb: CourseVerb): Promise<CourseResult>;
+	/** The registered courses' workspaces, read from the engine's registry
+	 *  without running it, so a course's reads can start beside `list`.
+	 *  Absent where nothing keeps records on disk. */
+	registered?(): readonly string[];
 	/** Whether the course was deleted: its folder is a course whose record
 	 *  the engine forgot. A save there would bring the course back as an
 	 *  untitled ghost. Absent where nothing keeps records on disk. */
