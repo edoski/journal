@@ -222,9 +222,12 @@ function dayClaims(s: Survey): Claims {
 		// the entry of today's session that holds the task in its place (one piece of work, one entry): a lesson he
 		// worked on today stays today's (round 14, m2).
 		const begun = new Set(course.map.topics.filter((t) => t.startsWhy?.kind === "begun").map((t) => t.handle));
+		// A lesson started today on a topic the plan starts today is that start, drawn as the session alone (round 15, m6).
+		const startsToday = new Set<string>(course.planned.find((d) => d.date === s.today)?.new ?? []);
 		for (const { entry } of s.calendar) {
 			const goesOn = (entry.kind === "task" || (entry.kind === "session" && entry.task !== null)) && entry.topic && begun.has(entry.topic.handle);
-			const day = entry.kind === "review" || entry.kind === "new" ? entry.topic : goesOn ? entry.topic : null;
+			const starts = entry.kind === "session" && entry.type === "lesson" && entry.day === s.today && entry.topic && startsToday.has(entry.topic.handle) && (entry.chat.ownTopics ?? []).includes(entry.topic.handle);
+			const day = entry.kind === "review" || entry.kind === "new" ? entry.topic : goesOn || starts ? entry.topic : null;
 			if (day && entry.course?.workspace === ws && entry.day >= s.today) {
 				const by = claims.get(keyOf(ws, day.handle));
 				const had = by?.get("calendar");
