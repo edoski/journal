@@ -400,20 +400,23 @@ export function isPracticeRequest(value: unknown): value is PracticeRequest {
 
 /** What the agent reads for each request (the marker's content head). */
 export const PRACTICE_REQUEST_TEXT: Readonly<Record<PracticeRequest, string>> = {
-	hint: "[HINT] — the learner pressed Hint on the active problem. This is a request, not an answer: give the next rung of the hint ladder, one rung only, then wait for his work.",
+	hint: "[HINT] — the learner pressed Hint on the active problem. This is a request, not an answer: give the next rung of the hint ladder, one rung only, above what his work so far and your last message already give him: one move or fact neither says, never his work or your nudge said again in other words, and never his own idea handed back for him to check. Then wait for his work.",
 	show: "[SHOW ME] — the learner pressed Show me on the active problem. This is a request, not an answer: he stops working on it. Conclude it now (surrendered with rung R5, unless his work already solved it) so the committed solution shows, then point at the step where his work stopped.",
 	explain:
 		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`, with no words between: the problem's card shows how it ended, and the teaching follows.",
 };
 
 /** Which rung a Hint request asks for, by how many hints this problem has
- *  had: the first says where to look, the second a nudge, the third and
- *  later one step. Show me reveals the rest. Every rung is a statement:
+ *  had: the first says where to look, unless he was already told where
+ *  (round 16, m12: after "What does R3 − R1 − R2 give you?", the first hint
+ *  could only say "Your suspicion about row 3 is something you can check
+ *  yourself"), the second a nudge, the third and later one step. Show me
+ *  reveals the rest. Every rung is a statement:
  *  the first asked "one question that points at where to look", and the
  *  hint only rephrased the problem (round 15, m16: "Does a row of A with
  *  nonzero entries still have to be nonzero once elimination is done?"). */
 export function hintRungText(nth: number): string {
-	if (nth <= 1) return "This is his first hint on this problem: say where to look (R0 or R1), as one statement in this problem's own terms of what it did not give him, never a question and never the problem in other words. No method, no step, no answer.";
+	if (nth <= 1) return "This is his first hint on this problem: say where to look (R0 or R1), as one statement in this problem's own terms of what it did not give him, never a question and never the problem in other words. No method, no step, no answer. When his work or your last message already says where to look, that rung is given: name the pattern or the idea instead (R2 or R3).";
 	if (nth === 2) return "This is his second hint on this problem: one nudge that names the pattern or the idea (R2 or R3). Carrying it out stays his.";
 	return `This is hint ${nth} on this problem: one step, worked or outlined (R4 or R5), never the rest of the solution. Show me is how he sees the rest.`;
 }

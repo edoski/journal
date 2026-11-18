@@ -41,7 +41,7 @@ import { sameQuestionKey } from "../core/shown-help.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, partialDay, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, partialDay, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -565,6 +565,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `"You …, whereas …" reads as a formula after the break is already said: ${quoted(b.excerpt)}. Leave it out; say one plain sentence of contrast only when it adds something the break did not, never one that opens on what he did.`;
 		case "hint-question":
 			return `A hint gives him what the question did not, said as a statement: the next move ("Subtract row 1 from row 3 and look at what is left") or a fact the question left out. This one asks him a question instead: ${quoted(b.excerpt)}. Say the move or the fact; his question is asked again after it.`;
+		case "hint-back":
+			return `A hint gives him a move or a fact he does not have yet, and this one hands his own idea back for him to check: ${quoted(b.excerpt)}. Say the next move past it ("Subtract row 1 and row 2 from row 3, column by column") or the fact it needs, never what his work or your last message already said.`;
 		case "credit": {
 			const [letter, said] = [b.excerpt.slice(0, b.excerpt.indexOf("|")), b.excerpt.slice(b.excerpt.indexOf("|") + 1)];
 			return `${quoted(said)} credits him with work on $${letter}$, which he never worked on in this lesson. Name the matrix he worked on, the one in the question he answered, or say whose work it was.`;
@@ -1174,6 +1176,8 @@ export class VoiceGuard {
 		// (round 15, m16).
 		const hintAsks = kind === "hint" || this.input.hint ? sentences(text).find((s) => s.trim().endsWith("?")) : undefined;
 		if (hintAsks) out.push({ rule: "hint-question", excerpt: hintAsks.trim() });
+		const handsBack = kind === "hint" || this.input.hint ? pointsBack(text) : null;
+		if (handsBack) out.push({ rule: "hint-back", excerpt: handsBack });
 		const replying = this.input.answers && (this.sent === 0 || (this.concluded && this.sent === this.sentAtConclude));
 		const echo = replying ? echoOf(text, this.input.words) : null;
 		if (echo) out.push({ rule: "echo", excerpt: echo });

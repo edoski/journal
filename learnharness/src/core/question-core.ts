@@ -504,6 +504,13 @@ export function dismissedAnswer(kind: QuestionKind, questionText: string, reason
 	};
 }
 
+/** What the agent reads when he pressed Hint on a check. His draft rides
+ *  beside it as `text`: a hint that restates it, or the nudge before it,
+ *  gives him nothing (round 16, m12: after "y = 3x/2", the hint was "the
+ *  second entry is 3/2 times the first"). */
+export const HINT_REQUEST_TEXT =
+	"He pressed Hint: a request, not an answer. `text`, when present, is his draft so far. Give the next rung of the hint ladder above what his draft and your last message already give him: one move or fact neither says, never his draft or your nudge said again in other words. Then ask this check again.";
+
 /** What the agent reads when he pressed Show me on a check. */
 export const SHOW_ME_TEXT =
 	"He pressed Show me: he gives up on this question, with the work below if he wrote any. Save it as an attempt he gave up (result incorrect, gave_up true, his work as the response). Then show him the worked answer: where his work stopped, when he wrote some, then the steps. Ask nothing more about it.";
@@ -539,7 +546,7 @@ export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, un
 	}
 	const out: Record<string, unknown> = { kind: ad.kind };
 	if (ad.hintRequested) {
-		out.hintRequested = "He pressed Hint: a request, not an answer. Give the next rung of the hint ladder, then ask this check again.";
+		out.hintRequested = HINT_REQUEST_TEXT;
 	}
 	if (ad.showMe) out.showMe = SHOW_ME_TEXT;
 	// Array.isArray: the seam is called with `unknown` answers (test

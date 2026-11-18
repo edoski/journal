@@ -58,6 +58,7 @@ export type VoiceRule =
 	| "card"
 	| "contrast"
 	| "hint-question"
+	| "hint-back"
 	| "credit"
 	| "demo-unused"
 	| "unsaved"
@@ -150,6 +151,18 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 export function questionBelow(text: string): string | null {
 	return sentences(text).map((s) => s.trim()).find((s) => /\bbelow\b/i.test(s) && /\b(?:question|answer|check|prediction)s?\b/i.test(s)) ?? null;
 }
+
+/** A hint that hands his own idea back to him to check, instead of a move
+ *  or a fact he lacks (round 16, m12: "Your suspicion about row 3 is
+ *  something you can check yourself, entry by entry, across all five
+ *  columns." under the nudge that had asked him to check it). The
+ *  sentence, or null. */
+export function pointsBack(text: string): string | null {
+	return sentences(prose(text).text).map((s) => s.trim()).find((s) => POINTS_BACK.test(s)) ?? null;
+}
+
+const POINTS_BACK =
+	/\byour (?:own )?(?:suspicion|idea|hunch|instinct|guess|thought|intuition|claim|reasoning|draft|start|work(?:ing)?|answer)\b[^.?!]*\b(?:(?:is )?(?:something )?you can (?:check|test|verify|confirm)|can be (?:checked|tested|verified|confirmed)|is worth (?:checking|testing)|is (?:right|correct|on (?:the right )?track|a good start))\b|\b(?:check|test|verify|confirm) (?:it|this|that) (?:for )?yourself\b|\byou can (?:check|test|verify|confirm) (?:it|this|that)\b/i;
 
 /** Requests in an instruction text for a form the voice bans: each names
  *  what it asks for, so the fix is to ask within the voice instead. */
