@@ -90,7 +90,8 @@ function getChat(id: string): ChatRecord | null {
 function listChats(): ChatSummary[] {
 	try {
 		fs.mkdirSync(PATHS.chats, { recursive: true });
-		return fs
+		const work = new Map<string, Work>();
+		const listed = fs
 			.readdirSync(PATHS.chats)
 			.filter((f) => f.endsWith(".json"))
 			.map((f) => getChat(f.slice(0, -5)))
@@ -103,6 +104,7 @@ function listChats(): ChatSummary[] {
 				// zero-back-compat wipe makes these "corrupt") must not blank the
 				// whole sidebar — same isolation getChat's per-file catch gives.
 				try {
+					work.set(summary.id, workOf(messages));
 					// Its own topics follow what it did: the task it took up (round 15,
 					// m4), else the lesson its plan took up (round 16, M4), else the ones
 					// it was started on or named after, else for practice its first
@@ -158,9 +160,36 @@ function listChats(): ChatSummary[] {
 			})
 			.filter((s) => s !== null)
 			.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+		return listed.map((s) => closedByNewerReview(s, listed, work));
 	} catch {
 		return [];
 	}
+}
+
+/** When a session's work came, on the messages' own clock: its newest
+ *  message but a question the app posed again as he opened it (round 17,
+ *  M6), and its newest saved answer on each topic. */
+interface Work {
+	last: number;
+	answered: ReadonlyMap<string, number>;
+}
+
+function workOf(messages: readonly LhMessage[]): Work {
+	const last = messages.reduce((at, m) => (isQuestionRepose(m) || typeof m.timestamp !== "number" ? at : Math.max(at, m.timestamp)), 0);
+	return { last, answered: savedAnswerTimesOf(messages) };
+}
+
+/** A review left with a question open closes once a newer review of one
+ *  of its topics is done: another session of its course saved an answer on
+ *  that topic after his last word in this one. Every list reads it closed,
+ *  so Home, Sessions and the topic page keep no stale "Left off" row (Edo,
+ *  18 Nov 2026, round 17 m10: the 9 Nov review's "1 to 105" question stayed
+ *  "Left off 9 Nov" after the 10 Nov review answered its topic). */
+function closedByNewerReview(chat: ChatSummary, all: readonly ChatSummary[], work: ReadonlyMap<string, Work>): ChatSummary {
+	if (!chat.review || !chat.pendingQuestion) return chat;
+	const since = work.get(chat.id)?.last ?? 0;
+	const newer = all.some((other) => other.id !== chat.id && other.course?.workspace === chat.course?.workspace && (chat.ownTopics ?? []).some((t) => (work.get(other.id)?.answered.get(t) ?? 0) > since));
+	return newer ? { ...chat, pendingQuestion: false, ended: "closed" } : chat;
 }
 
 /** How a session stands in every list: as its tutor's last turn left it,
