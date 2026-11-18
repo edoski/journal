@@ -17,6 +17,7 @@ import {
 	SETTINGS_SECTIONS,
 	claudeAccountKnown,
 	readSettingsRecord,
+	releasePrestart,
 	writeSettingsRecord,
 	type SettingsBodyResult,
 } from "@/src/server";
@@ -50,5 +51,7 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 	const record = readSettingsRecord() ?? { version: 1 };
 	const next = { ...record, [section]: parsed.settings };
 	writeSettingsRecord(next);
+	// The next answer's process ran on the account he just left (prestart.ts).
+	if (section === "claude") releasePrestart();
 	return Response.json({ settings: next });
 }

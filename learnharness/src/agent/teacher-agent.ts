@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import { invalidInputResult, questionResult } from "./tool-execute.ts";
 import type { ToolCall, Usage } from "@earendil-works/pi-ai";
-import { SdkAgent } from "./sdk/agent.ts";
+import { SdkAgent, type SdkAgentConfig } from "./sdk/agent.ts";
 import type { SdkEngine } from "./sdk/engine.ts";
 import type { SessionStore } from "./sdk/session-files.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
@@ -99,6 +99,8 @@ export interface AgentBuildOptions {
 	 *  the registry and the course doctrine joins the prompt, for every
 	 *  agent kind. Absent = no course (nothing changes). */
 	course?: CourseToolContext;
+	/** The process started for this turn while he thought (prestart.ts). */
+	claim?: SdkAgentConfig["claim"];
 }
 
 /**
@@ -188,6 +190,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 		sessionStore: opts.sessionStore,
 		compactionInstructions: opts.compactionInstructions,
 		onUsage: opts.onUsage,
+		claim: opts.claim,
 	});
 }
 

@@ -41,6 +41,11 @@ export interface FakeSdk {
 	forget(id: string): void;
 	/** The instructions each compaction was given, in order. */
 	compactions: { instructions: string }[];
+	/** Every process `startup()` started, by its options, in order. */
+	started: Options[];
+	/** The processes `startup()` started that are still alive: each ends
+	 *  when it is closed or aborted, or when the turn it ran ends. */
+	live(): number;
 }
 
 /** Where Claude Code's automatic compaction would fire: before a request
@@ -122,6 +127,8 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 	const sessions = new Map<string, Entry[]>();
 	const calls: Options[] = [];
 	const compactions: { instructions: string }[] = [];
+	const started: Options[] = [];
+	const alive = new Set<object>();
 
 	const query = ({ prompt, options }: { prompt: SdkPrompt; options: Options }): SdkQuery => {
 		calls.push(options);
@@ -156,7 +163,11 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 				const at = history.findIndex((entry) => entry.uuid === options.resumeSessionAt);
 				if (at >= 0) history = history.slice(0, at + 1);
 			}
-			if (options.persistSession === false) id = randomUUID();
+			// A fork keeps the history it resumed under a session of its own.
+			if (options.persistSession === false || options.forkSession) {
+				id = randomUUID();
+				history = [...history];
+			}
 			const save = () => {
 				sessions.set(id, history);
 				if (options.persistSession === false) return;
@@ -262,12 +273,45 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 	};
 
 	return {
-		engine: { model: scripted.model, query, launch: () => ({ options: {}, configDir }) },
+		engine: {
+			model: scripted.model,
+			query,
+			// Claude Code started before its prompt: alive from here until it is
+			// closed or aborted, or the one query it serves has ended.
+			startup: async ({ options }) => {
+				started.push(options);
+				const process = {};
+				alive.add(process);
+				options.abortController?.signal.addEventListener("abort", () => alive.delete(process), { once: true });
+				let used = false;
+				return {
+					query: (prompt) => {
+						if (used) throw new Error("a started process takes one prompt");
+						used = true;
+						const served = query({ prompt, options });
+						const iterator = served[Symbol.asyncIterator]();
+						const finish = () => alive.delete(process);
+						return {
+							[Symbol.asyncIterator]: () => ({
+								next: async () => { const step = await iterator.next(); if (step.done) finish(); return step; },
+								return: async (value?: unknown) => { finish(); return iterator.return?.(value) ?? { done: true, value: undefined }; },
+							}) as AsyncIterator<SDKMessage>,
+							interrupt: served.interrupt,
+							close: () => { finish(); served.close(); },
+						};
+					},
+					close: () => alive.delete(process),
+				};
+			},
+			launch: () => ({ options: {}, configDir }),
+		},
 		sessions,
 		calls,
 		configDir,
 		forget: (id) => { sessions.delete(id); },
 		compactions,
+		started,
+		live: () => alive.size,
 	};
 }
 

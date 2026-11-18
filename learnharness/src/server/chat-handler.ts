@@ -34,8 +34,9 @@ import { providerKeyMissing as providerKeyMissingEnvelope } from "../core/settin
 import { beginTurn, endTurn, isTurnRunning } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn } from "./turn-runs.ts";
+import { claimPrestart, prestart } from "./prestart.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
-import { answeredQuestionsOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
+import { activeProblemOf, answeredQuestionsOf, danglingQuestionOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
 import { remarkableOf } from "../core/answer-marks.ts";
 import { reviewRecord } from "../core/session-opening.ts";
 import { compactionInstructions, planTreeToText } from "../core/compaction.ts";
@@ -206,6 +207,154 @@ async function stopRunningTurn(chatId: string): Promise<void> {
 	forgetStop(chatId);
 }
 
+/** The factory tests inject for the turn's agent (handleChatInput's seam). */
+export type TurnAgentFactory = (opts: AgentBuildOptions & { teaching: boolean; agent: AgentKind }) => TeachingAgent;
+
+type ChatRecord = NonNullable<ReturnType<typeof stores.chatStore.getChat>>;
+
+/**
+ * The turn's agent, off the record, as every turn builds it, and as the
+ * prestart builds the one his answer will start (prestart.ts): the
+ * transcript's seam picks the prober, the teacher or practice; the
+ * lesson's course adds its tools and doctrine.
+ */
+function turnAgent(
+	chatId: string,
+	record: ChatRecord,
+	agentMessages: LhMessage[],
+	merged: LhMessage[],
+	engine: SdkEngine,
+	courseArcs: Awaited<ReturnType<typeof fetchCourseArcs>>,
+	{ onUsage, claim, buildAgent }: { onUsage?: (usage: Usage) => void; claim?: AgentBuildOptions["claim"]; buildAgent?: TurnAgentFactory } = {},
+): TeachingAgent {
+	// AGENT CONSTRUCTION BRANCH (docs/probe-teach-split.md §2): the transcript
+	// is the seam. Its mode picks practice or teaching; in teaching a
+	// concluded probe_done means the TEACHER (planning + the full toolset),
+	// else the PROBER (quiz/ask + probe_done). All three share this whole
+	// composition (write-ahead persist, liveness, steers, usage) — only the
+	// agent differs.
+	const agentKind = respondingAgentOf(agentMessages, record.kind);
+	const teaching = agentKind === "teacher";
+	// Tests inject a factory: the agent is stateless per turn, so each
+	// request builds a fresh one off the record — the factory mirrors that
+	// seam exactly. Wave B: the record IS the agent state (native messages;
+	// the record's id field strips at the wire in toLlmMessages).
+	// His newest message: the one an answer in words names (HIS_MESSAGE).
+	const lastSaidId = merged.findLast((m) => m.role === "user")?.id ?? null;
+	const keepSaves = (links: { question: string; observation: string }[]) => {
+		const keyed: Record<string, string[]> = {};
+		for (const { question, observation } of links) {
+			const key = question === HIS_MESSAGE ? lastSaidId : question;
+			if (key) keyed[key] = [...(keyed[key] ?? []), observation];
+		}
+		try {
+			stores.chatStore.saveAnswerSaves(chatId, keyed);
+		} catch {
+			// The lesson was deleted mid-turn: nothing to keep the links with.
+		}
+	};
+	const agentOpts: AgentBuildOptions = {
+		engine,
+		messages: asAgentMessages(agentMessages),
+		onUsage,
+		claim,
+		// The lesson's Claude Code session: the model's memory of it.
+		session: record.session,
+		sessionStore: sessionStoreFor(chatId),
+		// What Claude Code's summary keeps when it compacts the session,
+		// with the plan tree as it stands then.
+		compactionInstructions: (messages) => compactionInstructions(agentKind === "practice" ? "practice" : agentKind === "teacher" ? "teach" : "probe", planTreeToText(stores.chatStore.getChat(chatId)?.tree ?? record.tree, messages)),
+		// A course-linked session reads and writes the learner's course
+		// record through the engine, whatever the agent kind, with the
+		// answers a save may name (answeredQuestionsOf), read from the
+		// whole record.
+		// The save links kept with the lesson count as saved, and each new
+		// save's links are kept the moment the engine takes it, so a restart
+		// before the transcript's write loses neither the mark nor the
+		// "already saved" (round 8).
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, review: reviewRecord(record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [], courses: keptCourseMaps } } : {}),
+	};
+	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
+	// practitioner — no plan/question tools; problem + conclude, and the
+	// handoff back to teaching. buildAgent stays honored (the test seam is
+	// uniform across agents).
+	return buildAgent
+		? buildAgent({ ...agentOpts, teaching, agent: agentKind })
+		: agentKind === "practice"
+			? createPracticeAgent(
+					{
+						chatId,
+						chatStore: stores.chatStore,
+						// THE RARELY-NEEDED SET (owner round 10): research + pdf jobs
+						// (same runner/gating as the teacher's — research honestly
+						// absent when no engine is live).
+						jobs: {
+							chatId,
+							jobStore: stores.jobStore,
+							spawn: (job, input) => void jobRunner.runJob(job.id, input),
+						},
+						deliver: (steer) => void deliverJobResult(steer),
+					},
+					agentOpts,
+				)
+			: teaching
+			? createTeacherAgent(
+					{
+						chatId,
+						chatStore: stores.chatStore,
+						jobStore: stores.jobStore,
+						spawn: (job, input) => void jobRunner.runJob(job.id, input),
+						deliver: (steer) => void deliverJobResult(steer),
+					},
+					agentOpts,
+				)
+			: createProberAgent(
+					{
+						chatId,
+						chatStore: stores.chatStore,
+						deliver: (steer) => void deliverJobResult(steer),
+						// Fix wave (2026-09-20): the prober carries research + pdf
+						// dispatch (owner ruling — phase-omnipresent), so its ctx
+						// needs the same job wiring as the teacher's.
+						jobStore: stores.jobStore,
+						spawn: (job, input) => void jobRunner.runJob(job.id, input),
+					},
+					agentOpts,
+				);
+}
+
+/** A lesson waits on his answer: a question he has not answered, or a
+ *  practice problem he has not handed in. */
+const waitsOnAnswer = (messages: readonly LhMessage[]) => danglingQuestionOf(messages) !== null || activeProblemOf(messages) !== null;
+
+/**
+ * Starts the Claude Code process of the turn his answer will start, while
+ * he thinks (prestart.ts): for a lesson that waits on his answer, with no
+ * turn running, on a signed-in account. The turn takes it only if it has
+ * every option the turn starts one with.
+ */
+export async function prestartAnswerTurn(chatId: string, buildAgent?: TurnAgentFactory): Promise<void> {
+	const waits = (id: string) => {
+		const record = stores.chatStore.getChat(id);
+		return record && !isTurnRunning(id) && !courseDeleted(id) && waitsOnAnswer(record.messages) ? record : undefined;
+	};
+	if (!waits(chatId)) return;
+	const account = effectiveSettings().claude.account;
+	await refreshClaudeConnections();
+	if (!providerKeyPresent(account)) return;
+	let engine: SdkEngine;
+	try { engine = claudeEngine(account); } catch { return; }
+	const asked = waits(chatId);
+	if (!asked) return;
+	const courseArcs = await fetchCourseArcs(asked);
+	const record = waits(chatId);
+	if (!record) return;
+	// His answer opens the turn: an input of his after the record, as the
+	// turn reads its effort.
+	const messages = [...record.messages, { id: "prestart", role: "user", content: "", timestamp: Date.now() } as LhMessage];
+	prestart(chatId, turnAgent(chatId, record, messages, messages, engine, courseArcs, { buildAgent }).prepare());
+}
+
 /**
  * The turn composition: one input event → native record appends → one
  * agent turn as a background object. Also the wake pipeline's entry
@@ -214,7 +363,7 @@ async function stopRunningTurn(chatId: string): Promise<void> {
 export async function handleChatInput(
 	chatId: string,
 	input: TurnInput,
-	buildAgent?: (opts: AgentBuildOptions & { teaching: boolean; agent: AgentKind }) => TeachingAgent,
+	buildAgent?: TurnAgentFactory,
 ): Promise<Response> {
 	let record = stores.chatStore.getChat(chatId);
 	if (!record) {
@@ -412,104 +561,14 @@ export async function handleChatInput(
 		});
 	};
 
-	// AGENT CONSTRUCTION BRANCH (docs/probe-teach-split.md §2): the transcript
-	// is the seam. Its mode picks practice or teaching; in teaching a
-	// concluded probe_done means the TEACHER (planning + the full toolset),
-	// else the PROBER (quiz/ask + probe_done). All three share this whole
-	// composition (write-ahead persist, liveness, steers, usage) — only the
-	// agent differs.
-	const agentKind = respondingAgentOf(agentMessages, record.kind);
-	const teaching = agentKind === "teacher";
 	// Built once above, on the account the connection gate read.
 	const engine = conversationEngine;
 	// Provider-qualified stamp: matches the price table's
 	// provider:id keys.
 	const modelId = `${engine.model.provider}:${engine.model.id}`;
-	// Tests inject a factory: the agent is stateless per turn, so each
-	// request builds a fresh one off the record — the factory mirrors that
-	// seam exactly. Wave B: the record IS the agent state (native messages;
-	// the record's id field strips at the wire in toLlmMessages).
-	// His newest message: the one an answer in words names (HIS_MESSAGE).
-	const lastSaidId = merged.findLast((m) => m.role === "user")?.id ?? null;
-	const keepSaves = (links: { question: string; observation: string }[]) => {
-		const keyed: Record<string, string[]> = {};
-		for (const { question, observation } of links) {
-			const key = question === HIS_MESSAGE ? lastSaidId : question;
-			if (key) keyed[key] = [...(keyed[key] ?? []), observation];
-		}
-		try {
-			stores.chatStore.saveAnswerSaves(chatId, keyed);
-		} catch {
-			// The lesson was deleted mid-turn: nothing to keep the links with.
-		}
-	};
-	const agentOpts: AgentBuildOptions = {
-		engine,
-		messages: asAgentMessages(agentMessages),
-		onUsage: collectUsage,
-		// The lesson's Claude Code session: the model's memory of it.
-		session: record.session,
-		sessionStore: sessionStoreFor(chatId),
-		// What Claude Code's summary keeps when it compacts the session,
-		// with the plan tree as it stands then.
-		compactionInstructions: (messages) => compactionInstructions(agentKind === "practice" ? "practice" : agentKind === "teacher" ? "teach" : "probe", planTreeToText(stores.chatStore.getChat(chatId)?.tree ?? record.tree, messages)),
-		// A course-linked session reads and writes the learner's course
-		// record through the engine, whatever the agent kind, with the
-		// answers a save may name (answeredQuestionsOf), read from the
-		// whole record.
-		// The save links kept with the lesson count as saved, and each new
-		// save's links are kept the moment the engine takes it, so a restart
-		// before the transcript's write loses neither the mark nor the
-		// "already saved" (round 8).
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, review: reviewRecord(record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [], courses: keptCourseMaps } } : {}),
-	};
-	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
-	// practitioner — no plan/question tools; problem + conclude, and the
-	// handoff back to teaching. buildAgent stays honored (the test seam is
-	// uniform across agents).
-	const constructed: TeachingAgent = buildAgent
-		? buildAgent({ ...agentOpts, teaching, agent: agentKind })
-		: agentKind === "practice"
-			? createPracticeAgent(
-					{
-						chatId,
-						chatStore: stores.chatStore,
-						// THE RARELY-NEEDED SET (owner round 10): research + pdf jobs
-						// (same runner/gating as the teacher's — research honestly
-						// absent when no engine is live).
-						jobs: {
-							chatId,
-							jobStore: stores.jobStore,
-							spawn: (job, input) => void jobRunner.runJob(job.id, input),
-						},
-						deliver: (steer) => void deliverJobResult(steer),
-					},
-					agentOpts,
-				)
-			: teaching
-			? createTeacherAgent(
-					{
-						chatId,
-						chatStore: stores.chatStore,
-						jobStore: stores.jobStore,
-						spawn: (job, input) => void jobRunner.runJob(job.id, input),
-						deliver: (steer) => void deliverJobResult(steer),
-					},
-					agentOpts,
-				)
-			: createProberAgent(
-					{
-						chatId,
-						chatStore: stores.chatStore,
-						deliver: (steer) => void deliverJobResult(steer),
-						// Fix wave (2026-09-20): the prober carries research + pdf
-						// dispatch (owner ruling — phase-omnipresent), so its ctx
-						// needs the same job wiring as the teacher's.
-						jobStore: stores.jobStore,
-						spawn: (job, input) => void jobRunner.runJob(job.id, input),
-					},
-					agentOpts,
-				);
+	// The turn takes the process started for it while he thought, when
+	// that process has every option this turn starts one with.
+	const constructed = turnAgent(chatId, record, agentMessages, merged, engine, courseArcs, { onUsage: collectUsage, claim: (key) => claimPrestart(chatId, key), buildAgent });
 
 	// A test-injected agent gets no usage collector (tests assert the
 	// transcript, not the money channel); when it's ours, usage flows through

@@ -576,6 +576,21 @@ export function Chat({
 	const localStream = status === "submitted" || status === "streaming";
 	const busyRef = useRef(busy);
 	busyRef.current = busy;
+	// The next answer's Claude Code process starts while he thinks, and ends
+	// when he leaves the lesson (src/server/prestart.ts). His answer never
+	// releases it: its turn takes it.
+	const waitsOnHim = proseOpen !== null && !busy;
+	useEffect(() => {
+		if (waitsOnHim) void fetch(`/api/chats/${chatId}/prestart`, { method: "POST" }).catch(() => undefined);
+	}, [chatId, waitsOnHim]);
+	useEffect(() => {
+		const release = () => navigator.sendBeacon(`/api/chats/${chatId}/prestart`, new Blob([JSON.stringify({ release: true })], { type: "application/json" }));
+		window.addEventListener("pagehide", release);
+		return () => {
+			window.removeEventListener("pagehide", release);
+			release();
+		};
+	}, [chatId]);
 	// The attach handoff (stream-reattach wave): the moment a resumed
 	// stream takes over the rendering — the SDK left "ready", so
 	// submitted/streaming means chunks are flowing — localStream covers

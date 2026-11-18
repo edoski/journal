@@ -9,9 +9,9 @@ import { CONTINUE_TEXT, owedMessages, sdkInputBlocks, sessionResume, sessionSeed
 import { CLAUDE_ABORTED, CLAUDE_API_KEY_REFUSAL, CLAUDE_MODEL_MISSING, CLAUDE_TOOLS_MISSING, NO_KEY, claudeErrorMessage, type ClaudeRateLimit } from "../claude-errors.ts";
 import { recordClaudeModelMissing, recordClaudeRateLimit } from "../claude-usage.ts";
 import { AssistantStream } from "./assistant-stream.ts";
-import { SDK_TOOL_PREFIX, SDK_TOOL_SERVER, isClaudeCodeTool, type ClaudeCodeTool, type SdkEngine, type SdkLaunch, type SdkQuery } from "./engine.ts";
+import { SDK_TOOL_PREFIX, SDK_TOOL_SERVER, isClaudeCodeTool, type ClaudeCodeTool, type SdkEngine, type SdkLaunch, type SdkQuery, type SdkWarmQuery } from "./engine.ts";
 import { keepSession, restoreSession, seedSession, type SessionStore } from "./session-files.ts";
-import { sdkToolServer } from "./tool-server.ts";
+import { sdkToolServer, type ToolRunHooks } from "./tool-server.ts";
 
 /** Shown when a lesson has no session to resume and none could be seeded
  *  from its record. */
@@ -61,6 +61,48 @@ export interface SdkAgentConfig {
 	/** Told of each message of his the running turn reads (a steer), as it
 	 *  joins the record: the voice guard lets one message answer it. */
 	heard?: (message: AgentMessage) => void;
+	/** The process started for this turn before it was asked for, when one
+	 *  was started with every option this turn starts one with (`key`,
+	 *  `processKey`); taken once (prestart.ts). */
+	claim?: (key: string) => PreparedProcess | undefined;
+}
+
+/** What a turn binds into the Claude Code process it runs on: its tools and
+ *  their hooks, and what Claude Code's own hooks ask of it. */
+interface RunBinding {
+	tools: readonly AgentTool<any>[];
+	hooks: ToolRunHooks;
+	preCompact: () => string;
+	postCompact: (summary: string | undefined) => void;
+	stop: () => string | undefined;
+}
+
+/** The turn a process runs, bound once: a process started before its turn
+ *  waits here for the turn that takes it. */
+class TurnBinding {
+	private resolve: ((run: RunBinding) => void) | undefined;
+	readonly run = new Promise<RunBinding>((resolve) => (this.resolve = resolve));
+	bind(run: RunBinding): void {
+		this.resolve?.(run);
+		this.resolve = undefined;
+	}
+}
+
+/** A turn's Claude Code process, started before the turn was asked for. */
+export interface PreparedProcess {
+	key: string;
+	binding: TurnBinding;
+	controller: AbortController;
+	warm: Promise<SdkWarmQuery>;
+}
+
+/** Every option a process starts with, as one string: two processes with
+ *  the same key are the same process. Its tools are read by their schemas,
+ *  its hooks by the events they answer, and the folder its sessions live in
+ *  with them. */
+export function processKey(options: Options, tools: readonly AgentTool<any>[], configDir: string): string {
+	const { abortController: _abort, spawnClaudeCodeProcess: _spawn, mcpServers: _servers, hooks, ...rest } = options;
+	return JSON.stringify({ ...rest, configDir, hooks: Object.keys(hooks ?? {}), tools: tools.map((tool) => [tool.name, tool.description, tool.parameters]) });
 }
 
 type Listener = (event: AgentEvent | CompactionEvent) => void;
@@ -156,6 +198,80 @@ export class SdkAgent {
 		this.emit({ type: "message_end", message: failing.message });
 	}
 
+	/** Every option of this turn's Claude Code process. Its tools and hooks
+	 *  run on the turn `binding` names, so a process started before the turn
+	 *  (`prepare`) is the one the turn would have started. */
+	private processOptions(launch: SdkLaunch, resume: { resume?: string; at?: string }, binding: TurnBinding): Options {
+		const builtins = [...(this.config.builtins ?? [])];
+		return {
+			...launch.options,
+			...(this.config.effort ? { effort: this.config.effort } : {}),
+			systemPrompt: { type: "custom", prompt: this.config.systemPrompt, snapshot: false },
+			tools: builtins,
+			allowedTools: [`mcp__${SDK_TOOL_SERVER}`, ...builtins],
+			mcpServers: { [SDK_TOOL_SERVER]: sdkToolServer(this.config.tools, async () => { const run = await binding.run; return { tools: run.tools, hooks: run.hooks }; }) },
+			hooks: {
+				...(this.config.compactionInstructions ? { PreCompact: [{ hooks: [async () => ({ systemMessage: (await binding.run).preCompact() })] }] } : {}),
+				PostCompact: [{ hooks: [async (input) => { if (input.hook_event_name === "PostCompact") (await binding.run).postCompact(input.compact_summary); return {}; }] }],
+				...(this.config.beforeEnd ? { Stop: [{ hooks: [async () => {
+					const note = (await binding.run).stop();
+					return note ? { decision: "block" as const, reason: note } : {};
+				}] }] } : {}),
+			},
+			...(this.config.ephemeral ? { persistSession: false, maxTurns: this.config.ephemeral.maxTurns } : {}),
+			...(resume.resume ? { resume: resume.resume } : {}),
+			...(resume.at ? { resumeSessionAt: resume.at } : {}),
+		};
+	}
+
+	/**
+	 * Starts this turn's Claude Code process before its prompt is known, with
+	 * every option the turn will start it with (prestart.ts): the turn takes
+	 * it when its options match, and starts its own otherwise. Undefined when
+	 * the engine cannot, or the lesson's session must first be seeded from its
+	 * record, which only the turn does.
+	 */
+	prepare(): { key: string; start: () => PreparedProcess } | undefined {
+		const { engine, sessionStore, session } = this.config;
+		const startup = engine.startup;
+		if (!startup || this.config.ephemeral) return undefined;
+		let launch: SdkLaunch;
+		try { launch = engine.launch(); } catch { return undefined; }
+		const resume = sessionResume(session);
+		if (owedMessages(this.state.messages as LhMessage[], session) === null) return undefined;
+		if (resume.resume && !restoreSession(sessionStore, launch.configDir, resume.resume)) return undefined;
+		const binding = new TurnBinding();
+		const controller = new AbortController();
+		const options: Options = { ...this.processOptions(launch, resume, binding), abortController: controller };
+		const key = processKey(options, this.config.tools, launch.configDir);
+		return {
+			key,
+			start: () => {
+				const warm = startup({ options });
+				// A process that never started is let go when it is taken or released.
+				warm.catch(() => undefined);
+				return { key, binding, controller, warm };
+			},
+		};
+	}
+
+	/** The turn's query: on the process started for it when there is one
+	 *  started with these very options, else on a process of its own. */
+	private async startQuery(options: Options, configDir: string, input: AsyncIterable<SDKUserMessage>, run: RunBinding): Promise<SdkQuery> {
+		const prepared = this.config.claim?.(processKey(options, this.config.tools, configDir));
+		if (prepared) {
+			this.controller.signal.addEventListener("abort", () => prepared.controller.abort(), { once: true });
+			try {
+				const warm = await prepared.warm;
+				prepared.binding.bind(run);
+				return warm.query(input);
+			} catch (error) {
+				console.info("[sdk] the process started for this turn could not take it; starting one:", (error as Error).message);
+			}
+		}
+		return this.config.engine.query({ prompt: input, options });
+	}
+
 	private async run(): Promise<void> {
 		const { engine, sessionStore } = this.config;
 		let session = this.config.session;
@@ -197,7 +313,7 @@ export class SdkAgent {
 		const appTools = new Set(this.config.tools.map((tool) => tool.name));
 		const outcomes = new Map<string, AgentToolCallOutcome>();
 		const context = (): AgentContext => ({ messages: this.state.messages, tools: this.config.tools });
-		const server = sdkToolServer(this.config.tools, {
+		const toolHooks: ToolRunHooks = {
 			callFor: (id) => calls.get(id),
 			context,
 			signal: this.controller.signal,
@@ -215,7 +331,8 @@ export class SdkAgent {
 				if (ends) endedByTool = true;
 				return ends;
 			},
-		});
+		};
+
 
 		let closed = false;
 		const pending: SDKUserMessage[] = [prompt];
@@ -231,7 +348,6 @@ export class SdkAgent {
 			}
 		};
 
-		const builtins = [...(this.config.builtins ?? [])];
 		const instructions = this.config.compactionInstructions;
 		// Claude Code's summary of a compaction, read by its PostCompact hook,
 		// which runs before the compact boundary reaches the stream.
@@ -242,28 +358,18 @@ export class SdkAgent {
 			compacting = active;
 			this.emit({ type: "compaction", active });
 		};
-		const options: Options = {
-			...launch.options,
-			...(this.config.effort ? { effort: this.config.effort } : {}),
-			systemPrompt: { type: "custom", prompt: this.config.systemPrompt, snapshot: false },
-			tools: builtins,
-			allowedTools: [`mcp__${SDK_TOOL_SERVER}`, ...builtins],
-			mcpServers: { [SDK_TOOL_SERVER]: server },
-			hooks: {
-				...(instructions ? { PreCompact: [{ hooks: [async () => ({ systemMessage: instructions(this.state.messages as LhMessage[]) })] }] } : {}),
-				PostCompact: [{ hooks: [async (input) => { if (input.hook_event_name === "PostCompact") summary = input.compact_summary; return {}; }] }],
-				// A steer Claude Code has not read yet goes on the run by itself; the
-				// note waits for the stop after it.
-				...(this.config.beforeEnd ? { Stop: [{ hooks: [async () => {
-					const note = !endedByTool && !this.aborted && this.inFlight.size === 0 ? this.config.beforeEnd!() : undefined;
-					return note ? { decision: "block" as const, reason: note } : {};
-				}] }] } : {}),
-			},
-			abortController: this.controller,
-			...(this.config.ephemeral ? { persistSession: false, maxTurns: this.config.ephemeral.maxTurns } : {}),
-			...(resume.resume ? { resume: resume.resume } : {}),
-			...(resume.at ? { resumeSessionAt: resume.at } : {}),
+		const binding = new TurnBinding();
+		const options: Options = { ...this.processOptions(launch, resume, binding), abortController: this.controller };
+		const run: RunBinding = {
+			tools: this.config.tools,
+			hooks: toolHooks,
+			preCompact: () => instructions?.(this.state.messages as LhMessage[]) ?? "",
+			postCompact: (text) => { summary = text; },
+			// A steer Claude Code has not read yet goes on the run by itself; the
+			// note waits for the stop after it.
+			stop: () => (!endedByTool && !this.aborted && this.inFlight.size === 0 ? this.config.beforeEnd?.() : undefined),
 		};
+		binding.bind(run);
 
 		let sessionId = resume.resume;
 		let anchor = resume.at ?? session?.anchor;
@@ -408,7 +514,7 @@ export class SdkAgent {
 			}
 		};
 
-		const query = engine.query({ prompt: input(), options });
+		const query = await this.startQuery(options, launch.configDir, input(), run);
 		this.query = query;
 		const failedBefore = this.state.messages.length;
 		let idle: ReturnType<typeof setTimeout> | undefined;
