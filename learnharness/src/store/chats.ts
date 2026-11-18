@@ -13,7 +13,7 @@ import { PATHS } from "../../config.ts";
 import { emit } from "../core/events.ts";
 import { studyNow } from "../core/day-words.ts";
 import type { ChatStore } from "../core/ports.ts";
-import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, SessionGoal, TurnUsage } from "../core/contracts.ts";
+import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, SessionEnd, SessionGoal, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
@@ -141,7 +141,7 @@ function listChats(): ChatSummary[] {
 						pendingProblem: activeProblemOf(messages) !== null,
 						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages), ...own])],
 						ownTopics: own,
-						ended: sessionEndOf(messages, tree, summary.kind, own),
+						ended: endedBy(sessionEndOf(messages, tree, summary.kind, own), summary.updatedAt, danglingQuestionOf(messages) !== null || leftQuestionRepose(messages).length > 0 || activeProblemOf(messages) !== null),
 						...(stoppedByHim(messages) ? { stopped: true as const } : {}),
 						...(failedResponseAtEnd(messages) ? { failed: true as const } : {}),
 						...(learnerWords(messages).length <= 1 ? { untouched: true as const } : {}),
@@ -161,6 +161,20 @@ function listChats(): ChatSummary[] {
 	} catch {
 		return [];
 	}
+}
+
+/** How a session stands in every list: as its tutor's last turn left it,
+ *  except one waiting on him since before yesterday, which Home's Today
+ *  has let go (`todayRows` lists one waiting since yesterday): it was left
+ *  on its day, so every surface says "Left off 8 Nov", never "Your turn"
+ *  (round 16, m7: Rank practice left Home on 10 Nov and still read "Your
+ *  turn", with its dot, in Sessions and on its topic page). */
+function endedBy(ended: SessionEnd, updatedAt: string, waits: boolean): SessionEnd {
+	if (ended === "left" || (ended !== "mid-lesson" && !waits)) return ended;
+	const day = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+	const yesterday = studyNow();
+	yesterday.setDate(yesterday.getDate() - 1);
+	return day(new Date(updatedAt)) < day(yesterday) ? "left" : ended;
 }
 
 /** When his input in a session came: its newest, and every local day it

@@ -110,3 +110,25 @@ describe("when he worked in a session (round 16, m8, m9)", () => {
 		assert.equal(item.studiedAt, new Date(at("2026-11-10T11:00:00")).toISOString());
 	});
 });
+
+describe("a session waiting on him from before yesterday (round 16, m7)", () => {
+	it("is listed as left on its day, so every surface says Left off, never Your turn, once Home has let it go", async () => {
+		const { sessionState } = await import("../components/nav/session-state.ts");
+		const { sessionRowStatus } = await import("../components/unit-inbox/unit-row.tsx");
+		const was = process.env.LEARNING_TODAY;
+		try {
+			process.env.LEARNING_TODAY = "2026-11-08";
+			const rank = chatStore.createChat("Rank practice", course, ["rank"]);
+			chatStore.saveMessages(rank.id, [newUserMessage("Practice rank"), ...call("problem", { statement: "Find rank A.", mode: "recall", topics: ["rank"], modelSolution: "2" })] as never);
+			process.env.LEARNING_TODAY = "2026-11-09";
+			assert.equal(sessionState({ ...listed(rank.id), busy: false }), "your-turn", "yesterday's is still on Home, and his turn");
+			process.env.LEARNING_TODAY = "2026-11-10";
+			const old = { ...listed(rank.id), busy: false };
+			assert.equal(sessionState(old), "left");
+			assert.deepEqual(sessionRowStatus(old, sessionState(old), "2026-11-10"), { kind: "task", words: "Left off 8 Nov" });
+		} finally {
+			if (was === undefined) delete process.env.LEARNING_TODAY;
+			else process.env.LEARNING_TODAY = was;
+		}
+	});
+});
