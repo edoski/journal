@@ -7,6 +7,7 @@
  */
 
 import type { ChatRecord } from "../core/contracts/chat.ts";
+import { lessonTopics } from "../core/course-map-build.ts";
 import { lessonPlaceOf, type LessonPlace } from "../core/lesson-place.ts";
 import { sessionTopicsOf } from "../core/native-messages.ts";
 import { stores } from "./stores.ts";
@@ -24,10 +25,19 @@ export async function lessonPlace(chat: Pick<ChatRecord, "course" | "topics" | "
 	const late = new Promise<null>((resolve) => {
 		timer = setTimeout(() => resolve(null), waitMs);
 	});
-	const read = stores.courseRecords
-		.map(workspace)
-		.then((result) => (result.ok ? lessonPlaceOf(result.map, topics) : null))
-		.catch(() => null);
+	// The map Home read, told the lesson in progress (`here`), so opening a
+	// lesson from Home reads the engine's kept map instead of running it again
+	// (round 15, P7). `here` moves only the course's current arc, so a place
+	// whose arc came from it is read from the map without it.
+	const here = lessonTopics(stores.chatStore.listChats(), workspace)[0] ?? null;
+	const placeIn = async (told: string | null): Promise<LessonPlace | null> => {
+		const result = await stores.courseRecords.map(workspace, told);
+		if (!result.ok) return null;
+		const place = lessonPlaceOf(result.map, topics);
+		const fromCurrent = place.topic !== null && !result.map.topics.find((t) => t.handle === place.topic!.handle)?.arc && result.map.current === place.topic.handle;
+		return told !== null && fromCurrent ? placeIn(null) : place;
+	};
+	const read = placeIn(here).catch(() => null);
 	try {
 		return await Promise.race([read, late]);
 	} finally {
