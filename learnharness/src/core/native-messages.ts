@@ -698,6 +698,8 @@ export interface DisputeDetails {
 	/** The answer's tool call: a question's, or a problem's conclude. */
 	answerId: string;
 	observations: string[];
+	/** The try he disputes, on a card of several ("First try"). */
+	row?: string;
 	said?: string;
 	proposed?: MarkResult;
 	/** How he thinks it should count: as his own work, or with help. */

@@ -25,7 +25,7 @@ after(async () => {
 });
 
 describe("Mistakes", () => {
-	it("names every topic whole, gives the arc its number alone, and lets each gap run to three lines", async () => {
+	it("names every topic whole, names no arc, and lets each gap run whole inside the popover (round 16, m18)", async () => {
 		const page = await shell.open("browser", { sidebar: "open", search: "&case=mistakes" });
 		await page.click('[data-slot="course-mistakes"]');
 		await page.waitForSelector('[data-slot="mistake-row"]');
@@ -33,15 +33,16 @@ describe("Mistakes", () => {
 			const popover = document.querySelector('[data-slot="course-mistakes-list"]')!.getBoundingClientRect();
 			return [...document.querySelectorAll('[data-slot="mistake-row"]')].map((row) => {
 				const name = row.querySelector('[data-slot="mistake-topic"]') as HTMLElement | null;
-				const arc = row.querySelector('[data-slot="arc-label"]') as HTMLElement;
 				const words = row.querySelector('[data-slot="mistake-words"]') as HTMLElement;
+				const said = words.getBoundingClientRect();
 				const box = name?.getBoundingClientRect();
 				return {
 					name: name?.textContent ?? null,
 					whole: !!name && name.scrollWidth <= name.clientWidth + 0.5 && name.scrollHeight <= name.clientHeight + 0.5,
 					inside: !!box && box.right <= popover.right + 0.5,
-					arc: arc.getBoundingClientRect().width,
+					arc: row.querySelector('[data-slot="arc-label"]') !== null,
 					clamp: getComputedStyle(words).webkitLineClamp,
+					wordsInside: said.right <= popover.right + 0.5 && said.bottom <= popover.bottom + 0.5,
 				};
 			});
 		});
@@ -53,8 +54,9 @@ describe("Mistakes", () => {
 		);
 		for (const row of rows) {
 			assert.ok(row.whole && row.inside, `${row.name} shows whole inside the popover`);
-			assert.ok(row.arc < 24, `${row.name}: the arc's number alone, not its name (${row.arc}px wide)`);
-			assert.equal(row.clamp, "3", `${row.name}: the gap runs to three lines`);
+			assert.equal(row.arc, false, `${row.name}: no arc number`);
+			assert.equal(row.clamp, "none", `${row.name}: the gap is never cut`);
+			assert.ok(row.wordsInside, `${row.name}: the whole gap sits inside the popover`);
 		}
 	});
 });

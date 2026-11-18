@@ -10,7 +10,8 @@ import { nowOf, unitStatus } from "../components/unit-inbox/units.ts";
 import { searchInbox } from "../components/unit-inbox/unit-sidebar.tsx";
 import { filterSessions } from "../components/sidebar-state.ts";
 import { buildInbox } from "../components/unit-inbox/units.ts";
-import { chat, LINALG, TODAY } from "./fixtures/now-demo.ts";
+import { chat, LINALG, PROB, TODAY, topic } from "./fixtures/now-demo.ts";
+import type { StudyCourse } from "../src/core/index.ts";
 
 const la = { workspace: LINALG.map.workspace, title: LINALG.map.title };
 
@@ -34,10 +35,20 @@ describe("search's sessions", () => {
 });
 
 describe("search's ranking", () => {
-	it("is cmdk's: a title that starts with the query outranks a later word that does", () => {
-		const scattered = chat("chat_s", { title: "Rank practice" });
+	it("matches the starts of a title's words: a title that starts with the query outranks a later word that does", () => {
+		const later = chat("chat_s", { title: "Rank practice" });
 		const start = chat("chat_p", { title: "Probability" });
-		assert.deepEqual(filterSessions([scattered, start], "pr").map((c) => c.id), ["chat_p", "chat_s"]);
-		assert.deepEqual(filterSessions([scattered, start], "rnk").map((c) => c.id), ["chat_s"], "letters in order match, as cmdk's command list does");
+		assert.deepEqual(filterSessions([later, start], "pr").map((c) => c.id), ["chat_p", "chat_s"]);
+		assert.deepEqual(filterSessions([later, start], "rnk"), [], "never scattered letters (round 16, m29)");
+	});
+
+	it("lists only titles that hold the word, and Enter opens the topic named (round 16, m29)", () => {
+		const prob: StudyCourse = { ...PROB, map: { ...PROB.map, topics: [...PROB.map.topics, topic("poisson", "Poisson distribution", "new")] } };
+		const linalg: StudyCourse = { ...LINALG, map: { ...LINALG.map, topics: [...LINALG.map.topics, topic("matmul", "Matrix multiplication as composition", "new")] } };
+		const comp = chat("chat_m", { title: "Matrix multiplication as composition" });
+		const found = searchInbox(buildInbox([prob, linalg], [comp], null), [comp], "Poisson", [prob, linalg]);
+		assert.deepEqual(found.units.map((u) => u.topic.title), ["Poisson distribution"], "Matrix multiplication as composition held P, o, i, s, s, o, n in order, and was listed");
+		assert.deepEqual(found.sessions, []);
+		assert.equal(found.top, found.units[0]!.key, "Enter opens the Poisson topic");
 	});
 });

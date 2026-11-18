@@ -83,19 +83,19 @@ describe("the plan drawn as the course map draws a course", () => {
 describe("the marks on a lesson's steps", () => {
 	it("ring the step the Eigenvalues lesson waits on, saying Your turn over it as the sidebar does, and dot the one asked about before", () => {
 		const marks = stepMarks(EIGEN_PLAN, true);
-		assert.deepEqual(marks.get("compute"), { status: "current", tag: "Your turn" });
-		assert.deepEqual(marks.get("equation"), { status: "visited", tag: null });
-		assert.deepEqual(marks.get("maps"), { status: "upcoming", tag: null });
+		assert.deepEqual(marks.get("compute"), { status: "current", tag: "Your turn", done: false });
+		assert.deepEqual(marks.get("equation"), { status: "visited", tag: null, done: false });
+		assert.deepEqual(marks.get("maps"), { status: "upcoming", tag: null, done: false });
 	});
 
 	it("leave Left off here off a lesson that went through every step", () => {
 		const through: SessionPlan = { ...DET_PLAN, visited: DET_PLAN.tree.nodes.map((node) => node.id).filter((id) => id !== DET_PLAN.current) };
-		assert.deepEqual(stepMarks(through, false).get(DET_PLAN.current!), { status: "current", tag: null });
+		assert.deepEqual(stepMarks(through, false).get(DET_PLAN.current!), { status: "current", tag: null, done: false });
 	});
 
 	it("say where the finished Determinants lesson left off and nothing more", () => {
 		const marks = stepMarks(DET_PLAN, false);
-		assert.deepEqual(marks.get("product"), { status: "current", tag: "Left off here" });
+		assert.deepEqual(marks.get("product"), { status: "current", tag: "Left off here", done: false });
 		assert.deepEqual(
 			[...marks.values()].filter((mark) => mark.status === "visited"),
 			[],

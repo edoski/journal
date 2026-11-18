@@ -1,9 +1,9 @@
-import { TOPIC_LEVELS, namedArc, type ChatListItem, type CourseMap, type CourseMapTopic, type CourseReadiness, type CourseStanding, type NamedArc, type OpenMistake, type ReadinessPart, type StudyCourse, type TopicHandle } from "@/src/core";
+import { TOPIC_LEVELS, namedArc, type ChatListItem, type CourseMap, type CourseMapTopic, type CourseReadiness, type CourseStanding, type MistakeAnswer, type NamedArc, type OpenMistake, type ReadinessPart, type StudyCourse, type TopicHandle } from "@/src/core";
 import { misfitWords } from "@/components/calendar/calendar-facts";
 import { topicPress } from "@/components/unit-inbox/start-unit";
 import type { SessionCreation } from "@/components/start-session";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { finalReviewMissWords, notReadyHeading, notReadyWords, READY_WORDS, shortDay, slipMark, type SlipKey } from "@/components/study-words";
+import { finalReviewMissWords, MARK_WORDS, notReadyHeading, notReadyWords, READY_WORDS, shortDay, slipMark, type SlipKey } from "@/components/study-words";
 import { namesWords } from "@/components/course-page/course-head/head-facts";
 import type { CourseArcSection } from "@/components/course-page/course-model";
 
@@ -80,10 +80,10 @@ export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topi
 }
 
 /** One open mistake as a row: the topic, what went wrong in the tutor's
- *  words (the diagnosis, else the newest answer), its slip's icon, when,
- *  whether it had help, what it was on, the topic's arc, and what
- *  a press does: Resume the session that waits on the topic, else start
- *  one on it, as the sidebar's rows do. */
+ *  words (the diagnosis, else the newest answer under its mark), its slip's
+ *  icon, when, whether it had help, what it was on, and what a press does:
+ *  Resume the session that waits on the topic, else start one on it, as
+ *  the sidebar's rows do. */
 export interface MistakeRow {
 	topic: CourseMapTopic;
 	slip: SlipKey;
@@ -93,7 +93,6 @@ export interface MistakeRow {
 	helped: boolean;
 	/** What it was on, with his answer: the row's hint. */
 	hint: string | null;
-	arc: NamedArc | null;
 	/** The session its press opens: the one the topic's page would. */
 	resume: ChatListItem | null;
 	/** What its press starts when it opens none: the open task continued
@@ -119,14 +118,24 @@ function mistakeDayWords(day: string, today: string): string {
 	return days(day, today) <= 0 ? "Today" : shortDay(day);
 }
 
+/** What went wrong, as a row says it: the tutor's diagnosis, else the
+ *  newest answer's sentence under its mark, since that sentence says what
+ *  he did, not what was wrong (round 16, m17: "Explained why an
+ *  eigenvector stays on its own line under A" read as an achievement under
+ *  "Mistakes to fix"). */
+function mistakeWords(gap: string | null, newest: MistakeAnswer): string {
+	if (gap) return gap;
+	const text = /^\p{Lu}\p{Ll}/u.test(newest.text) ? newest.text[0]!.toLowerCase() + newest.text.slice(1) : newest.text;
+	return `${MARK_WORDS.result[newest.result]}: ${text}`;
+}
+
 /** The open mistakes in the engine's order, newest first, as rows; a
- *  topic the map no longer lists is left out. `arcs` are the arcs the page
- *  shows, whose names the rows wear. A row's press is its topic page's
+ *  topic the map no longer lists is left out. A row's press is its topic page's
  *  action (`topicAction`): the session waiting on the topic, else the open
  *  task continued from the lesson that holds it, else a session on the
  *  topic (round 10, 2 m1: the Eigen row started a fresh session while the
  *  lesson's task waited). */
-export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats: readonly ChatListItem[], arcs: readonly CourseArcSection[] | null): MistakeRow[] {
+export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats: readonly ChatListItem[]): MistakeRow[] {
 	const { map } = course;
 	return standing.mistakes.flatMap((m) => {
 		const topic = map.topics.find((t) => t.handle === m.topic);
@@ -140,11 +149,10 @@ export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats
 			{
 				topic,
 				slip,
-				words: m.gap ?? newest!.text,
+				words: mistakeWords(m.gap, newest!),
 				when: m.latest ? mistakeDayWords(m.latest, map.today) : null,
 				helped: Boolean(newest?.helped),
 				hint: said.length > 0 ? said.join(". ") : null,
-				arc: arcs && topic.arc ? namedArc(arcs.map((s) => s.arc), topic.arc) : null,
 				...pressOf(topic, map, chats),
 				workspace: map.workspace,
 				href: unitHref(map.workspace, topic.handle),

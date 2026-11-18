@@ -8,23 +8,23 @@ Never the app's judgement, and never a guess at which attempt is whose. `core/an
 
 ## The line
 
-The card's foot, under a hairline, 13px muted, icons with a few words:
+Under his answer (`MarkLine`, `lesson/mark-line.md`), 13px muted, icons with a few words:
 
 | Fact | Words |
 |---|---|
 | result | Right, Partly right, Not right (the result in `foreground`) |
 | counted | `markHow`, the rule Earlier reads too, so both say the same: Prediction, not counted (`predicted`); Gave up (`gave_up`); With help (the attempt records help); Not yet confirmed (a right answer the record marks `uncertain`, such as one answered straight after Explain instead); On your own (no help, a guess or a partly right answer included: the result and the confidence beside it say the rest) |
 | confidence he chose | Guessing, Confident (`chosenSure`); a recorded `neutral` is the meter left alone and shows nothing. Once a mark is shown the card's label row drops the confidence he picked: a dispute may have corrected it |
-| disputed | Disputed: and the tutor's ruling, math rendered |
+| disputed | Disputed · the mark stands, or Disputed · the mark changed (`changed`: the ruling changed an attempt's result, how it counted or its confidence). The ruling's words are the tutor's reply under his dispute, never repeated here (round 16, m20: the stamp printed the whole ruling the reply had just said) |
 
-A practice problem with two attempts reads two rows, First try and Then; rows split by topic carry the topic's title. Dispute sits at the right: a quiet 32px button with a flag, its tooltip "Dispute this mark ⌘⇧M", off while a turn runs.
+A practice problem with two attempts reads two rows, First try and Then; rows split by topic carry the topic's title. Dispute sits before the facts: a quiet 32px button with a flag, its tooltip "Dispute this mark ⌘⇧M", off while a turn runs. A card of several rows gives each row its own Dispute, which disputes that row's attempt alone (round 16, m19: one Dispute for First try and Then never said which try a pick would set); ⌘⇧M opens the last row's.
 
 ## The dialog
 
-shadcn Dialog, 448 wide: "Dispute this mark", the current mark and one line, the three marks as a segmented toggle (optional), a field for what's wrong, Cancel and Send to the tutor (needs words or a pick). The field takes focus; ↑ from its start reaches the marks, ← → move between them, ↓ comes back, ⌘↵ sends, Esc closes.
+shadcn Dialog, 448 wide: "Dispute this mark", the current mark ("First try: marked Partly right · On your own" for one row of several) and one line, the three marks as a segmented toggle (optional), a field for what's wrong, Cancel and Send to the tutor (needs words or a pick). The field takes focus; ↑ from its start reaches the marks, ← → move between them, ↓ comes back, ⌘↵ sends, Esc closes.
 
 ## What happens
 
-The dispute is its own input (`dispute`) and its own message to the tutor (`[MARK DISPUTED]`, naming the answer, the attempts that stand, his words and his pick); the transcript shows it as a learner row. The tutor re-judges and records a re-marked attempt that corrects the old one, agreeing or not, with `disputed` and `ruling` (the engine's correction path, `learning/skills/tutor/references/evidence.md`). A question open when he disputed is set aside unanswered, and the tutor asks it again.
+The dispute is its own input (`dispute`) and its own message to the tutor (`[MARK DISPUTED]`, naming the answer, the attempts that stand, or the one try he disputes and its attempt, his words and his pick); the transcript shows it as a learner row, its stamp naming the try ("You disputed the mark · First try · You think: Right"). The tutor re-judges and records a re-marked attempt that corrects the old one, agreeing or not, with `disputed` and `ruling` (the engine's correction path, `learning/skills/tutor/references/evidence.md`). A question open when he disputed is set aside unanswered, and the tutor asks it again.
 
 ⌘⇧M opens the dialog on the newest marked answer.

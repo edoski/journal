@@ -205,6 +205,15 @@ export function leftOffWords(days: number | null, today: string): string {
 	return `Left off ${pastDay(days, today)}`;
 }
 
+/** Where an old lesson's map stopped, when nothing resumes it: "Stopped
+ *  here today", "Stopped here on 6 Nov"; "Left off here" is only for a
+ *  lesson the page resumes (round 16, m22: the 5 and 6 Nov lessons' maps
+ *  said "Left off at A worked example" with no Resume anywhere). */
+export function stoppedHereWords(days: number, today: string): string {
+	const day = pastDay(days, today);
+	return days <= 1 ? `Stopped here ${day}` : `Stopped here on ${day}`;
+}
+
 /** A review the engine has dated ahead, by its day, never a count of
  *  days (round 8: "Back in 2d" where the tutor said Tuesday 10 November):
  *  "Back Tue 10 Nov". */
@@ -651,10 +660,6 @@ export const LESSON_WORDS = {
 	messageKept: "Your unsent message is kept. Press Esc to see it.",
 	doneTonight: "Done for today",
 	leftForTonight: "Left for next time",
-	/** A problem Done for today closed: its unsent work is dropped (Edo's
-	 *  ruling), so the line says what became of the problem, never a
-	 *  "Left for next time" with nothing under it (round 15, 3 m1). */
-	problemSetAside: "Problem set aside for today",
 	skippedProblem: "You skipped this problem.",
 	unreadableCourse: "Couldn't read this course's record",
 	unreadableNotSaved: "What you answer here isn't saved until it can be read again.",
@@ -670,6 +675,10 @@ export const MARK_WORDS = {
 	result: { correct: "Right", partial: "Partly right", incorrect: "Not right" } satisfies Record<MarkResult, string>,
 	sure: { guess: "Guessing", confident: "Confident" } satisfies Record<NonNullable<MarkRow["sure"]>, string>,
 	disputed: "Disputed",
+	/** After the ruling, whose words are the tutor's reply (round 16, m20:
+	 *  the stamp printed the whole ruling the reply had just said). */
+	markStands: "the mark stands",
+	markChanged: "the mark changed",
 	dispute: "Dispute",
 	disputeTitle: "Dispute this mark",
 	disputeLine: "Say what's wrong, or pick the mark or how it should count. The tutor looks at your answer again.",
@@ -683,9 +692,11 @@ export const MARK_WORDS = {
  *  what he picked, the mark and how it should count, "You think: Right,
  *  On your own". One rule for the lesson's row and practice's bubble
  *  (round 8: practice's stamp dropped a help pick). Pure. */
-export function disputeStampWords(dispute: { proposed?: MarkResult; proposedHow?: MarkHow & ("ownWork" | "withHelp") }): string {
+export function disputeStampWords(dispute: { row?: string; proposed?: MarkResult; proposedHow?: MarkHow & ("ownWork" | "withHelp") }): string {
 	const picked = [dispute.proposed && MARK_WORDS.result[dispute.proposed], dispute.proposedHow && MARK_HOW_WORDS[dispute.proposedHow]].filter(Boolean);
-	return picked.length > 0 ? `${MARK_WORDS.youDisputed} · ${MARK_WORDS.youThink}: ${picked.join(", ")}` : MARK_WORDS.youDisputed;
+	// The try he disputed, on a card of several (round 16, m19).
+	const disputed = dispute.row ? `${MARK_WORDS.youDisputed} · ${dispute.row}` : MARK_WORDS.youDisputed;
+	return picked.length > 0 ? `${disputed} · ${MARK_WORDS.youThink}: ${picked.join(", ")}` : disputed;
 }
 
 /** The lesson's mark for a helper he stopped, one sentence per kind;

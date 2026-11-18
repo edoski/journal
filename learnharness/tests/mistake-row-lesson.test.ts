@@ -30,25 +30,25 @@ const STANDING: CourseStanding = {
 describe("a Mistakes row (round 10, 2 m1)", () => {
 	it("continues the open task in the lesson that holds it, closed or not, never a fresh session on the topic", () => {
 		const closed = chat({ id: "lesson", ended: "closed", tasks: [TASK.key], createdAt: "2026-11-08T08:00:00.000Z", updatedAt: "2026-11-08T10:00:00.000Z" });
-		const [row] = mistakeRows(STANDING, course, [closed], null);
+		const [row] = mistakeRows(STANDING, course, [closed]);
 		assert.equal(row?.resume?.id, "lesson", "Continue reopens the lesson, as the topic page's does");
 	});
 
 	it("continues the open task as the topic page does when no session holds it", () => {
-		const [row] = mistakeRows(STANDING, course, [], null);
+		const [row] = mistakeRows(STANDING, course, []);
 		assert.equal(row?.resume, null);
 		assert.deepEqual(row?.creation, { title: TASK.title, course: { workspace: course.map.workspace }, topics: ["eigen"] }, "never \"Continue Continue …\"");
 	});
 
 	it("opens the lesson left for next time that holds the task", () => {
 		const left = chat({ id: "lesson", ended: "left", tasks: [TASK.key], createdAt: "2026-11-08T08:00:00.000Z", updatedAt: "2026-11-08T10:00:00.000Z" });
-		const [row] = mistakeRows(STANDING, course, [left], null);
+		const [row] = mistakeRows(STANDING, course, [left]);
 		assert.equal(row?.resume?.id, "lesson");
 	});
 
 	it("starts the topic page's session on the topic when nothing waits on it", () => {
 		const bare: StudyCourse = { ...course, map: { ...course.map, tasks: [], focus: null, topics: course.map.topics.map((t) => ({ ...t, tasks: [] })) } };
-		const [row] = mistakeRows(STANDING, bare, [], null);
+		const [row] = mistakeRows(STANDING, bare, []);
 		assert.equal(row?.resume, null);
 		assert.equal(row?.creation.title, "Continue Eigenvalues and eigenvectors", "a topic still being learned, as its page's Continue");
 		assert.deepEqual(row?.creation.topics, ["eigen"]);

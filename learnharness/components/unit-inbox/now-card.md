@@ -9,7 +9,7 @@ One of Today's lines as a sidebar card (`unit-inbox.md`, "Today on top"). `now-c
 | card | `RowCard`: 60px, padding 8 × 10, radius 8, no surface; hover `fill-hover`, the open page (the topic or one of its sessions) `fill-selected` with `aria-current` |
 | line 1 | the course's mark (`CourseMark`, 16px) and name (12/400 muted, truncating first), then the status slot |
 | status slot | `data-slot="unit-status-slot"`, right-aligned, up to 60% of the line: `StatusMark` at size `slot` (`status-mark.md`), a 12px icon and the line's `slot` words. Your turn is `link`; every other reason muted. While the tutor writes in the topic: the spinner and Tutor writing, and the card recedes to 70% until its row is hovered or anything in it has keyboard focus (its action included, so it never flickers on the way to the action) |
-| line 2 | the line's one name, the same as Home's line (`NowLine.title`, Home's lesson: "Continue Problem sheet 4: rank and nullity", "Review Law of total probability, Binomial distribution", a session's title), 14/500, full ink, two lines at most (the one row rule, `row-card.md`) |
+| line 2 | the line's one name, the same as Home's line (`NowLine.title`, Home's lesson: "Continue Problem sheet 4: rank and nullity", "Review Law of total probability, Binomial distribution", a session's title), 14/500, full ink, three lines at most (the one row rule, `row-card.md`) |
 | press | a click does what Home's line does, on every card (`cardPress`, which reads the function Home's row reads, `linePress`, `../study-home/agenda-rows/line-target.tsx`, and takes a course's step as Home does, `courseMove`): it opens the session that waits or holds the line's step, else starts the lesson on it (`take`). Never the topic's page (Edo, 17 Nov 2026: the card does what Home's row does; it opened the topic's page and left the lesson behind the action) and never the course page. The card has no other way to the topic's page; the topic stays a click away on Home's and the course page's map, the course page's road, and search |
 | action | `data-slot="row-action"`, over the status slot on hover or keyboard focus (the slot fades): a session line's Resume (play, a link to the session); a course line's Home word, Review, Continue or Start (play), each the lesson's word (`lessonOf`, `pressWord`), so the topic page and the course page say the same; it does what the card's click does (`cardPress`, through the sidebar's one start, `../start/lesson-start.md`) |
 
@@ -30,6 +30,6 @@ A waiting session whose transcript holds no topic of its course's map, or that h
 | keyboard focus | a 2px inset ring; Right moves to the action (`sidebar-tree.ts`), which shows with its own ring, and Left goes back |
 | open page | `fill-selected`, `aria-current="page"` |
 | tutor writing | spinner and Tutor writing in the slot, 70% until its row is hovered or focused |
-| long titles | the course name gives way, whole, and the title stops at two lines, ending in an ellipsis; the slot keeps its words and its right edge |
+| long titles | the course name gives way, whole, and the title stops at three lines, ending in an ellipsis; the slot keeps its words and its right edge |
 
 Sources: T3 Code's sidebar thread row (status label `size-3` at 12px, hover action over it); today.md, "Needs you now" (the line, its reason and its action are Home's).

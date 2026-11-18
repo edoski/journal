@@ -213,4 +213,18 @@ describe("Home's composer (Edo, 18 Nov 2026)", () => {
 		await home.key("Enter", { metaKey: true }, home.field());
 		assert.equal(home.pushed.length, 2, "⌘↵ in the field is the composer's send, never a page");
 	});
+
+	it("Esc in the box hands the keys back to Today's first line, his words kept (round 16, m26)", async () => {
+		const home = await mount();
+		await home.key("w");
+		assert.ok(dom.document.activeElement === home.field(), "the letter went to the composer");
+		await home.type("w");
+		await home.key("Escape", {}, home.field());
+		const first = home.q<HTMLElement>("[data-line]")!;
+		assert.ok(dom.document.activeElement === first, "Esc lands on Today's first line");
+		assert.equal(home.field().value, "w", "his words stay in the box");
+		await home.key("ArrowDown", {}, first);
+		const lines = [...dom.document.querySelectorAll<HTMLElement>("[data-line]")];
+		assert.ok(lines.length < 2 || dom.document.activeElement === lines[1], "↓ walks Today again");
+	});
 });

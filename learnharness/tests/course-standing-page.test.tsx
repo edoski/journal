@@ -167,23 +167,25 @@ const STANDING: CourseStanding = {
 };
 
 describe("the open mistakes", () => {
-	it("words each in the tutor's words, the diagnosis first, with when, help, its arc and its hint", () => {
+	it("words each in the tutor's words, the diagnosis first, else the answer under its mark, with when, help and its hint", () => {
 		const view = viewOf(course(true));
-		const rows = mistakeRows(STANDING, view.course, [], view.arcs);
+		const rows = mistakeRows(STANDING, view.course, []);
 		assert.deepEqual(
-			rows.map((r) => [r.topic.handle, r.slip, r.words, r.when, r.helped, r.arc?.title, r.hint]),
+			rows.map((r) => [r.topic.handle, r.slip, r.words, r.when, r.helped, r.hint]),
 			[
-				["basis", "confident", "Called three vectors in a plane a basis", "6 Nov", false, "Vector spaces", "Sheet 3. You answered a basis"],
-				["rank", "gap", "You count the vectors, not the dimension of their span", "Today", true, "Linear maps", null],
+				// Round 16, m17: the answer's sentence says what he did, so with
+				// no diagnosis its mark leads, never an achievement alone.
+				["basis", "confident", "Not right: called three vectors in a plane a basis", "6 Nov", false, "Sheet 3. You answered a basis"],
+				["rank", "gap", "You count the vectors, not the dimension of their span", "Today", true, null],
 			],
 		);
 	});
 
-	it("without arcs the rows name no arc; a press resumes the session that waits on the topic, else starts one", () => {
+	it("names no arc: its bare number meant nothing alone (round 16, m18); a press resumes the session that waits on the topic, else starts one", () => {
 		const waiting = { id: "c1", title: "Rank", kind: "teach", createdAt: "2026-11-08T09:00:00Z", updatedAt: "2026-11-08T09:00:00Z", messageCount: 2, phase: "teach", pendingQuestion: true, pendingProblem: false, busy: false, course: { workspace: WS, title: "Linear Algebra" }, topics: ["rank"], ownTopics: ["rank"] } as ChatListItem;
-		const rows = mistakeRows(STANDING, course(false), [waiting], null);
-		assert.ok(rows.every((r) => r.arc === null));
+		const rows = mistakeRows(STANDING, viewOf(course(true)).course, [waiting]);
 		const doc = render(<MistakeList rows={rows} />);
+		assert.ok(doc.querySelector("[data-slot=mistake-list] [data-slot=arc-label]") === null, "no arc label on a row");
 		const presses = [...doc.querySelectorAll("[data-slot=mistake-row]")];
 		assert.equal(presses.length, 2);
 		assert.equal(presses[0]!.tagName, "BUTTON");

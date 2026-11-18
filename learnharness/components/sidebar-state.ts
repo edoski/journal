@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { defaultFilter } from "cmdk";
 import type { ChatListItem } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { focusWhereHeTypes } from "@/components/ui/overlay";
@@ -34,14 +33,32 @@ export async function settleSnapshot(
 	setChats((chats) => chats?.map((c) => (c.id === id && c.busy ? { ...c, busy: false } : c)) ?? chats);
 }
 
-/** The items whose title matches the query, best first, by cmdk's own
- *  ranking (a subsequence match where a prefix beats a word start beats
- *  scattered letters). An empty query keeps the list's own order. */
+/** A title's words as search reads them: lowercase letters and digits,
+ *  maths markup set aside. */
+function titleWords(text: string): string[] {
+	return text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+/** How well a title matches the query, by its words: 0 unless every word
+ *  of the query starts a word of the title (round 16, m29: cmdk's
+ *  scattered-letter match listed "Matrix multiplication as composition"
+ *  for "Poisson"); 3 for the title itself, 2 for a title that starts with
+ *  the query, 1 for one that holds it further in. */
+export function titleScore(title: string, query: string): number {
+	const words = titleWords(title);
+	const asked = titleWords(query);
+	if (asked.length === 0 || !asked.every((q) => words.some((w) => w.startsWith(q)))) return 0;
+	const whole = words.join(" ");
+	const said = asked.join(" ");
+	return whole === said ? 3 : whole.startsWith(said) ? 2 : 1;
+}
+
+/** The items whose title matches the query (`titleScore`), best first,
+ *  ties in the list's own order. An empty query keeps the list's order. */
 export function rankByTitle<T>(items: readonly T[], query: string, title: (item: T) => string): T[] {
-	const q = query.trim();
-	if (!q) return [...items];
+	if (!query.trim()) return [...items];
 	return items
-		.map((item) => ({ item, score: defaultFilter(title(item), q) }))
+		.map((item) => ({ item, score: titleScore(title(item), query) }))
 		.filter((r) => r.score > 0)
 		.sort((a, b) => b.score - a.score)
 		.map((r) => r.item);
@@ -210,7 +227,7 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 	// Esc leaves the search
 	// (owner, keyboard wave): blur back to normal, and claim the key so the
 	// window Esc chain (abort) doesn't also fire.
-	const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, shown: readonly ChatListItem[] | null) => {
+	const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, shown: readonly ChatListItem[] | null, top: string | null = null) => {
 		if (e.key === "Escape") {
 			e.stopPropagation();
 			leaveSearch(e.currentTarget, changeQuery, document);
@@ -233,11 +250,13 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 			return;
 		}
 		if (e.key === "Enter") {
-			// The quick-open: the first result shown.
+			// The quick-open: the best match shown, whatever its section, else
+			// the first (round 16, m29: Enter opened the first section's row,
+			// never the topic named exactly).
 			e.preventDefault();
 			setKbdIndex(null);
 			e.currentTarget.blur();
-			rows[0]!.click();
+			(rows.find((row) => row.dataset.sidebarRow === top) ?? rows[0]!).click();
 		}
 	};
 

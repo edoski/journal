@@ -32,6 +32,7 @@ Everything today's composer does stays: Enter sends, ⇧Enter is a newline, ⌘E
 | field focused | the ring at 50% as a 1px outline over the hairline |
 | photo dragged over | the ring outline |
 | control focus-visible | 2px ring, the send offset 2px |
+| opens holding words | the caret after them, wherever focus later lands it (a kept draft, the Ask box he switches into; round 16, m27: a side question went out glued in front of a kept message) |
 
 Sources: T3 Code `apps/web/src/components/chat/ChatComposer.tsx` (body `px-4 pt-4 pb-2`, footer `px-2 pb-2`, controls `gap-0.5`), `ComposerSurface.tsx` (`rounded-2xl`, the `::after` outline), `ComposerPromptEditorTiptap.tsx` (`max-h-52 min-h-[calc(2lh+--spacing(2))] leading-relaxed`), `ComposerPrimaryActions.tsx` (`size-8 rounded-full`); research-ui.md §1.
 

@@ -74,15 +74,19 @@ describe("the cheat sheet groups them in plain words", () => {
 		]);
 	});
 
-	it("Lesson: more sure, less sure, pick a course", () => {
+	it("Lesson: more sure, less sure", () => {
 		const alt = IS_MAC ? "⌥" : "Alt+";
-		const mod = IS_MAC ? "⌘" : "Ctrl+";
 		const lesson = rows("In a lesson");
-		assert.deepEqual(lesson.slice(-3), [
+		assert.deepEqual(lesson.slice(-2), [
 			["More sure", `${alt}↑`],
 			["Less sure", `${alt}↓`],
-			["Pick a course", `${mod}O`],
 		]);
+	});
+
+	it("lists ⌘O under Anywhere, for a new lesson's course, never among the lesson's keys where it does nothing (round 16, m28)", () => {
+		const mod = IS_MAC ? "⌘" : "Ctrl+";
+		assert.ok(rows("Anywhere").some(([label, keys]) => label === "Pick the course for a new lesson" && keys === `${mod}O`));
+		assert.ok(!rows("In a lesson").some(([, keys]) => keys === `${mod}O`));
 	});
 
 	it("files every action somewhere", () => {

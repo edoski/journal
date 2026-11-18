@@ -70,16 +70,17 @@ function useStepCard(steps: readonly StepData[], across: number) {
  * camera and keys, under the topic page's fade. Each step is the course
  * map's card less what a step lacks, its width from the pane, at most
  * four across, every card as tall as the tallest title needs
- * (`useStepCard`). The ringed step carries "Left off here" or "Your
- * turn", the step after it "Next", and every step opens the lesson.
+ * (`useStepCard`). The ringed step carries "Your turn", else `leftOff`
+ * ("Left off here" when the page resumes the lesson, else "Stopped here
+ * on 6 Nov"), the step after it "Next", and every step opens the lesson.
  */
-export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string }) {
+export function LessonMap({ entry, label, leftOff }: { entry: PlannedEntry; label: string; leftOff: string }) {
 	const { plan } = entry;
 	const waits = entry.state === "your-turn";
 	const href = `/chat/${entry.chat.id}`;
 	const ring = ringedStep(plan, waits) as TopicHandle | null;
 	const steps = useMemo<StepData[]>(() => {
-		const marks = hybridMarks(plan, waits);
+		const marks = hybridMarks(plan, waits, leftOff);
 		const { needs } = stepsLayout(plan);
 		const titleOf = new Map(plan.tree.nodes.map((node) => [node.id, mathPlain(node.title)]));
 		// A step the plan repeats is drawn once.
@@ -95,16 +96,17 @@ export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string
 					handle,
 					title: node.title,
 					status: mark.status,
+					done: mark.done,
 					current: mark.status === "current",
 					tag: mark.tag,
-					label: [mathPlain(node.title), mark.tag, `Opens ${label}`].filter(Boolean).join(". "),
+					label: [mathPlain(node.title), mark.tag, mark.done && "Done", `Opens ${label}`].filter(Boolean).join(". "),
 					needs: rests.length ? `Rests on ${rests.join(", ")}` : null,
 					summary: node.summary?.trim() || null,
 					href,
 				},
 			];
 		});
-	}, [plan, waits, href, label]);
+	}, [plan, waits, href, label, leftOff]);
 	const across = useMemo(() => stepsAcross(stepsLayout(plan).layout), [plan]);
 	const { root, measurer, size } = useStepCard(steps, across);
 	const card = size ?? STEP_SIZE;
@@ -123,9 +125,9 @@ export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string
 		() => ({
 			edges: drawing.needs,
 			current: ring,
-			caption: `${label}: ${steps.length} steps, each below the steps it rests on.${current ? ` ${waits ? "Your turn on" : "Left off at"} ${mathPlain(current.title)}.` : ""}`,
+			caption: `${label}: ${steps.length} steps, each below the steps it rests on.${current ? ` ${waits ? `Your turn on ${mathPlain(current.title)}` : `${leftOff}: ${mathPlain(current.title)}`}.` : ""}`,
 		}),
-		[drawing.needs, ring, label, steps.length, current, waits],
+		[drawing.needs, ring, label, steps.length, current, waits, leftOff],
 	);
 	return (
 		<div ref={root} data-slot="topic-lesson-map" className="relative flex min-h-0 flex-1 flex-col" style={VIGNETTE}>

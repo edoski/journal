@@ -74,7 +74,7 @@ async function endExit(node: Element) {
 const MARK: AnswerMark = {
 	rows: [{ id: "o1", topics: ["rank"], label: null, result: "partial", grade: "helped", helped: false, predicted: false, gaveUp: false, uncertain: false, sure: null }],
 	disputed: false,
-	ruling: null,
+	changed: false,
 };
 const COURSE = { workspace: "/study/smm", title: "SMM" };
 
@@ -84,7 +84,7 @@ const DIALOGS: { name: string; testid: string; shows: string; render: (open: boo
 	{ name: "delete lesson", testid: "delete-session-dialog", shows: "Eigenvalues", render: (open, close) => <DeleteSessionDialog chat={open ? { id: "c1", title: "Eigenvalues" } : null} onClose={close} onDeleted={() => {}} /> },
 	{ name: "stop the reply", testid: "abort-turn-dialog", shows: "Stop the tutor's reply?", render: (open, close) => <AbortTurnDialog mode={open ? "turn" : null} onClose={close} onConfirm={() => {}} /> },
 	{ name: "show me", testid: "show-me-dialog", shows: "Show the answer?", render: (open, close) => <ShowMeConfirm what={open ? "question" : null} onClose={close} onConfirm={() => {}} /> },
-	{ name: "dispute", testid: "dispute-dialog", shows: "Dispute this mark", render: (open, close) => <DisputeDialog mark={open ? MARK : null} onClose={close} onSend={() => {}} /> },
+	{ name: "dispute", testid: "dispute-dialog", shows: "Dispute this mark", render: (open, close) => <DisputeDialog rows={open ? MARK.rows : null} onClose={close} onSend={() => {}} /> },
 	{ name: "rename course", testid: "rename-course-dialog", shows: "Rename course", render: (open, close) => <RenameCourseDialog course={open ? COURSE : null} onClose={close} onRenamed={() => {}} /> },
 	{ name: "delete course", testid: "delete-course-dialog", shows: "Delete SMM?", render: (open, close) => <DeleteCourseDialog course={open ? COURSE : null} onClose={close} onDeleted={() => {}} /> },
 	{ name: "new course", testid: "new-course-dialog", shows: "New course", render: (open, close) => <NewCourseDialog roots={open ? ["/study/courses"] : null} onClose={close} onCreated={() => {}} /> },

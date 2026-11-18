@@ -4,8 +4,8 @@
  * (round 8, 2 B1: the line dropped one word per render and React stopped it
  * at 50 nested updates, "Maximum update depth exceeded" in `MathLine`), the
  * topic's name shows whole (round 15, 2 n2: cut to ten letters), and the gap
- * runs to three lines whole, for the box to end (round 9, 2 m2: cut at one
- * line; round 15, 2 n2: at two).
+ * wraps whole (round 9, 2 m2: cut at one line; round 15, 2 n2: at two;
+ * round 16, m18: at three).
  */
 
 import React, { act } from "react";
@@ -81,7 +81,7 @@ describe("Mistakes with a long gap", () => {
 				<AppRouterContext.Provider value={router as never}>
 					<MistakesHead>
 						<div>
-							<MistakesPress rows={mistakeRows(standing, course, [], null)} />
+							<MistakesPress rows={mistakeRows(standing, course, [])} />
 						</div>
 					</MistakesHead>
 				</AppRouterContext.Provider>,
@@ -93,8 +93,8 @@ describe("Mistakes with a long gap", () => {
 		const rows = [...document.querySelectorAll("[data-slot=mistake-row]")];
 		assert.equal(rows.length, 2, "the list opens with both mistakes");
 		const gap = rows[0]!.querySelector("[data-slot=mistake-words]")!;
-		assert.match(gap.getAttribute("class") ?? "", /\bline-clamp-3\b/);
-		assert.ok(gap.textContent!.startsWith("You read a diagonal entry") && gap.textContent!.endsWith("yet is diagonal."), "the whole gap, for the box to end at its third line");
+		assert.doesNotMatch(gap.getAttribute("class") ?? "", /\b(truncate|line-clamp-\d)\b/, "the gap wraps whole (round 16, m18: Rank's ended in … at three lines)");
+		assert.ok(gap.textContent!.startsWith("You read a diagonal entry") && gap.textContent!.endsWith("yet is diagonal."), "the whole gap");
 		const name = rows[0]!.querySelector("[data-slot=mistake-topic]")!;
 		assert.equal(name.textContent, EIGEN_TITLE, "the topic's whole name (round 15, 2 n2: cut to ten letters)");
 		assert.doesNotMatch(name.getAttribute("class") ?? "", /\b(truncate|line-clamp-\d)\b/);

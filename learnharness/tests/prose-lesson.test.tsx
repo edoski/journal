@@ -30,7 +30,7 @@ const answerState = (over: Partial<ProseAnswer> = {}): ProseAnswer => ({
 	setMode: noop,
 	...over,
 });
-const mark = { rows: [{ id: "r1", result: "correct", grade: "unaided", helped: false, sure: "confident", label: null }], disputed: false, ruling: null } as unknown as AnswerMark;
+const mark = { rows: [{ id: "r1", result: "correct", grade: "unaided", helped: false, sure: "confident", label: null }], disputed: false, changed: false } as unknown as AnswerMark;
 const withMarks = (node: React.ReactNode) =>
 	renderToStaticMarkup(<AnswerMarksProvider value={{ marks: { c1: mark }, onDispute: noop, canDispute: true }}>{node}</AnswerMarksProvider>);
 
@@ -94,9 +94,10 @@ describe("the Prose question in the tutor's message", () => {
 		assert.doesNotMatch(html, /Skipped|prose-question-left|by 3|The answer/);
 	});
 
-	it("says a question left by Done for today is left, and never shows its answer", () => {
+	it("keeps a question left by Done for today as asked, and never shows its answer", () => {
 		const html = renderToStaticMarkup(<ProseQuestion tool="explain" toolCallId="c1" input={check} output={dismissedAnswer("explain", check.question, "tonight")} open={false} />);
-		assert.match(html, /Left for next time/);
+		assert.match(html, /stretch\?/);
+		assert.doesNotMatch(html, /Left for next time/, "nothing typed: no bare label (round 16, m16)");
 		assert.doesNotMatch(html, /by 3|The answer/);
 	});
 });
@@ -113,7 +114,7 @@ describe("the Prose problem", () => {
 		assert.match(shown, /data-state="open"/);
 		const solved = withMarks(<ProseConclude toolCallId="c1" input={{ outcome: "solved" }} output={{}} reveal="The rank is 2." />);
 		assert.match(solved, /data-state="closed"/);
-		assert.match(renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "dismissed" }} output={{ reason: "tonight" }} reveal="" />), /Problem set aside for today/);
+		assert.equal(renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "dismissed" }} output={{ reason: "tonight" }} reveal="" />), "", "set aside by Done for today: the close says it (round 16, m15)");
 	});
 
 	it("shows what he asked for as his bubble", () => {

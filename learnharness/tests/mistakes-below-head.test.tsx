@@ -149,7 +149,7 @@ describe("Mistakes opens under the head", () => {
 		assert.ok(top >= facts.top + facts.height, `the popover's top (${top}px) is below the facts row (${facts.top + facts.height}px)`);
 	});
 
-	it("lets each mistake's words run to three lines instead of cutting them at one", async () => {
+	it("lets each mistake's words wrap whole instead of cutting them (round 16, m18)", async () => {
 		await mountHead();
 		await act(async () => {
 			document.querySelector("[data-slot=course-mistakes]")!.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
@@ -158,8 +158,7 @@ describe("Mistakes opens under the head", () => {
 		assert.equal(words.length, 3);
 		for (const line of words) {
 			assert.ok(line, "each row carries its words");
-			assert.match(line.getAttribute("class") ?? "", /\bline-clamp-3\b/, "the words wrap to a third line");
-			assert.doesNotMatch(line.getAttribute("class") ?? "", /\btruncate\b/, "the words are not cut at one line");
+			assert.doesNotMatch(line.getAttribute("class") ?? "", /\b(truncate|line-clamp-\d)\b/, "the words are never cut");
 		}
 		assert.match(words[1]!.textContent ?? "", /result$/, "the whole sentence is there for the second line to show");
 	});

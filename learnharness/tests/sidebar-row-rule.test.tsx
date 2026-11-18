@@ -37,14 +37,14 @@ describe("the sidebar's one row rule", () => {
 		assert.ok(!classes(name).includes("truncate"), "never a cut name, \"Linear Alg…\" (round 10, 1 m8)");
 		assert.ok(["flex-wrap", "overflow-hidden", "h-5"].every((c) => classes(name).includes(c)), "a name too long for the room wraps out of sight whole; the badge still names the course");
 		assert.equal(name?.textContent, unit.course.title, "a screen reader still reads it");
-		assert.ok(classes(doc.querySelector('[data-slot="unit-row-title"]')).includes("line-clamp-2"), "two title lines at most");
+		assert.ok(classes(doc.querySelector('[data-slot="unit-row-title"]')).includes("line-clamp-3"), "three title lines at most (round 16, m25: a combined review's second topic was cut)");
 	});
 
-	it("gives a shelf row's status a line of its own under a title of two lines at most", () => {
+	it("gives a shelf row's status a line of its own under a title of three lines at most", () => {
 		for (const doc of [render(<SessionSlimRow chat={CHATS[0]!} today={TODAY} active={false} onOpen={() => {}} />)]) {
 			const row = doc.querySelector('[data-testid="unit-row"], [data-testid="session-row"]')!;
 			const title = row.querySelector('[data-slot="unit-row-title"]')!;
-			assert.ok(classes(title).includes("line-clamp-2"), "two title lines at most");
+			assert.ok(classes(title).includes("line-clamp-3"), "three title lines at most (round 16, m25: a combined review's second topic was cut)");
 			const statusLine = row.querySelector('[data-slot="unit-status-slot"]')!;
 			assert.ok(statusLine.parentElement === row, "the status is a line of the row");
 			assert.ok(row.lastElementChild === statusLine, "the status is always the row's last line");

@@ -2,10 +2,10 @@
  * An arc is named one way (components/course-map/arc-label.md): its number
  * in study order and its whole name, muted, never a pill and no ring. The
  * same arc reads the same in the map's arc list, the course page's road,
- * the open mistakes, the readiness answer, the exam's run-up and the
- * lesson's roadmap (round 14's finding 5: the mistakes showed a pill with
- * a ring, the roadmap a ringless pill, the readiness answer a ring and a
- * title). Mounted on the real Radix layers, so the popovers open.
+ * the readiness answer, the exam's run-up and the lesson's roadmap (round
+ * 14's finding 5: the mistakes showed a pill with a ring, the roadmap a
+ * ringless pill, the readiness answer a ring and a title). The open
+ * mistakes name no arc (round 16, m18: its bare number meant nothing). Mounted on the real Radix layers, so the popovers open.
  */
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -132,8 +132,8 @@ describe("an arc is named one way", () => {
 		await mount(<SplitList groups={[]} arcs={view.arcs!.filter((s) => s.arc.handle === "maps")} open={{}} onOpenChange={noop} onCheck={noop} marked={null} onPoint={noop} onEnterMap={noop} onWalkKey={noop} arcLine={line} />);
 		const road = reading("maps", "the road");
 
-		await mount(<MistakeList rows={mistakeRows(STANDING, COURSE, [], view.arcs)} />);
-		const mistakes = reading("maps", "the mistakes");
+		await mount(<MistakeList rows={mistakeRows(STANDING, COURSE, [])} />);
+		assert.ok(document.querySelector('[data-slot="arc-label"]') === null, "the mistakes name no arc (round 16, m18)");
 
 		await mount(<ReadyFact view={view} ready={ready} />, '[data-slot="course-ready-fact"]');
 		const answer = reading("maps", "the readiness answer");
@@ -151,10 +151,8 @@ describe("an arc is named one way", () => {
 		const roadmap = reading("maps", "the roadmap");
 
 		assert.deepEqual({ slot: list.slot, number: list.number, text: list.text, pill: list.pill, ring: list.ring }, { slot: "arc-label", number: "2", text: "2Linear maps", pill: false, ring: false });
-		for (const [where, seen] of Object.entries({ road, mistakes, answer, runup, roadmap })) {
-			// The mistakes give the topic the line: the arc's number, its name
-			// kept for a screen reader (round 15, 2 n2).
-			const inner = where === "mistakes" ? list.inner.map((c) => c?.replace(/\btruncate\b/, "sr-only") ?? null) : list.inner;
+		for (const [where, seen] of Object.entries({ road, answer, runup, roadmap })) {
+			const inner = list.inner;
 			assert.deepEqual({ slot: seen.slot, number: seen.number, text: seen.text, inner: seen.inner, pill: seen.pill, ring: seen.ring }, { slot: list.slot, number: list.number, text: list.text, inner, pill: false, ring: false }, `${where} names the arc as the arc list does`);
 			assert.deepEqual(list.classes.filter((c) => !seen.classes.includes(c)), [], `${where} wears the label's own look`);
 		}

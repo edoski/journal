@@ -8,23 +8,19 @@ import { cn } from "@/lib/utils";
  * name, both in the muted ink, never a pill and no ring (Edo, 16 Nov 2026:
  * the pills were "too in the way"). `here` brightens the name; so does the
  * pointer on the press it sits in, when that press is a `group/arc`. A name
- * wider than its room ends in "…"; `named={false}` draws the number alone.
+ * wider than its room ends in "…".
  */
 export function ArcLabel({
 	number,
 	handle,
 	title,
 	here = false,
-	named = true,
 	className,
 }: {
 	number: number;
 	handle: ArcHandle;
 	title: string;
 	here?: boolean;
-	/** False: the number alone, the name kept for a screen reader, where a
-	 *  line's room belongs to what it names (the mistakes' topics). */
-	named?: boolean;
 	className?: string;
 }) {
 	return (
@@ -36,7 +32,7 @@ export function ArcLabel({
 			<span data-slot="arc-number" aria-hidden="true" className="tabular-nums">
 				{number}
 			</span>
-			<span className={cn(named ? "truncate" : "sr-only", here && "text-foreground")}>
+			<span className={cn("truncate", here && "text-foreground")}>
 				<MathText>{title}</MathText>
 			</span>
 		</span>

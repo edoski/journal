@@ -6,7 +6,7 @@ import { lessonWords } from "@/components/unit-inbox/topic-page/steps/steps-fact
 import { TopicHead } from "@/components/unit-inbox/topic-page/topic-head";
 import type { TopicPageProps } from "@/components/unit-inbox/topic-page/topic-page";
 import type { Press, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
-import { isPlanned, mapLessonAtFirst } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
+import { isPlanned, mapLeftOff, mapLessonAtFirst } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { LessonMap } from "@/components/unit-inbox/topic-page/hybrid/lesson-map";
 import { LinkedColumns } from "@/components/linked-columns/linked-columns";
 import { SectionsPane } from "@/components/unit-inbox/topic-page/pickup/sections";
@@ -42,7 +42,9 @@ export interface HybridPaneProps {
  * right, since a lesson's steps run down with little branching, in the
  * app's linked columns. A topic not started, or one a lesson he began has
  * not introduced yet, shows what it builds on there instead. With neither,
- * the history takes the width. At its foot, the course page's composer
+ * the right column stays empty, so the history keeps its width and every
+ * line its date beside it (round 16, m21: Earlier ran about 1,200px wide,
+ * each date at the far edge). At its foot, the course page's composer
  * with the topic chosen. Its starts go through the page's `StartScope`.
  */
 export function HybridTopic({ facts, busy, onAct, onTask }: TopicPageProps) {
@@ -82,17 +84,22 @@ export function HybridTopic({ facts, busy, onAct, onTask }: TopicPageProps) {
 					<StartFailure className="flex min-h-5 items-center text-body" />
 				</TopicHead>
 			</div>
-			{shown ? (
-				<LinkedColumns
-					data-slot="topic-panes"
-					list={side("flex-1")}
-					map={<LessonMap key={shown.chat.id} entry={shown} label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")} />}
-				/>
-			) : starting ? (
-				<LinkedColumns data-slot="topic-panes" list={side("flex-1")} map={<BuildsOnMap map={starting} said={facts.said} topic={facts.topic.handle} lights={tie.lights} />} />
-			) : (
-				side("flex-1")
-			)}
+			<LinkedColumns
+				data-slot="topic-panes"
+				list={side("flex-1")}
+				map={
+					shown ? (
+						<LessonMap
+							key={shown.chat.id}
+							entry={shown}
+							label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")}
+							leftOff={mapLeftOff(shown, facts.action, facts.today)}
+						/>
+					) : starting ? (
+						<BuildsOnMap map={starting} said={facts.said} topic={facts.topic.handle} lights={tie.lights} />
+					) : null
+				}
+			/>
 			<CourseComposer course={facts.course} topic={facts.topic} />
 		</PageFrame>
 	);

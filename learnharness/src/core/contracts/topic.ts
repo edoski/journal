@@ -73,6 +73,9 @@ export interface SessionPlan {
 	 *  or null before any. Where his turn is while the lesson waits on him
 	 *  (round 14, m40). */
 	asked?: string | null;
+	/** Nodes the tutor's `lesson_progress` marked done; absent when none
+	 *  (round 16, m23: his map drew a taught step as one still ahead). */
+	done?: string[];
 }
 
 /** What GET /api/topic answers. `record` is null when the engine could not

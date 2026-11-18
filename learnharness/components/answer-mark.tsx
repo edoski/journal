@@ -21,8 +21,9 @@ import { cn } from "@/lib/utils";
 
 export interface AnswerMarks {
 	marks: Readonly<Record<string, AnswerMark>>;
-	/** Opens the dispute dialog on this answer. */
-	onDispute: (answerId: string) => void;
+	/** Opens the dispute dialog on this answer, on one of its tries when
+	 *  its card has several (`rowId`, the try's attempt). */
+	onDispute: (answerId: string, rowId?: string) => void;
 	/** False while a turn runs: a dispute is a message to the tutor. */
 	canDispute: boolean;
 }
@@ -82,36 +83,26 @@ export function useAnswerMarkActions(): Pick<AnswerMarks, "onDispute" | "canDisp
 	return { onDispute, canDispute };
 }
 
-/** The card's foot: the mark, whether it was disputed, and Dispute. Null
- *  until the engine holds an attempt for the answer. */
-export function AnswerMarkLine({ answerId }: { answerId: string }) {
-	const { marks, onDispute, canDispute } = useContext(AnswerMarksContext);
-	const mark = marks[answerId];
-	if (!mark) return null;
-	return (
-		<div data-testid="answer-mark" className="mt-3 flex items-start gap-3 border-t pt-3 text-body text-muted-foreground">
-			<div className="flex min-w-0 flex-1 flex-col gap-1">
-				{mark.rows.map((row) => (
-					<RowFacts key={row.id} row={row} />
-				))}
-				{mark.disputed && (
-					<span data-testid="mark-disputed" className="flex min-w-0 items-start gap-1.5">
-						<ScaleIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-						<span className="min-w-0">
-							{MARK_WORDS.disputed}
-							{mark.ruling && <span className="text-muted-foreground/80">: <MathText>{mark.ruling}</MathText></span>}
-						</span>
-					</span>
-				)}
-			</div>
-			<Hint label={MARK_WORDS.disputeTitle} action="dispute-mark">
-				<Button variant="quiet" size="row" data-testid="dispute-mark" disabled={!canDispute} onClick={() => onDispute(answerId)} className="-my-1.5 -mr-2 shrink-0">
-					<FlagIcon aria-hidden className="size-3.5" />
-					{MARK_WORDS.dispute}
-				</Button>
-			</Hint>
-		</div>
-	);
+/** What a dispute is on: an answer, and on a card of several tries the
+ *  one he pressed Dispute beside (round 16, m19: "Marked Partly right · On
+ *  your own, Right · With help" never said which try a pick would set). */
+export interface DisputeTarget {
+	answerId: string;
+	rowId?: string;
+}
+
+/** The rows a dispute names: the one try he pressed it on, else every row
+ *  of the answer. */
+export function disputedRows(mark: AnswerMark, target: DisputeTarget): MarkRow[] {
+	const row = target.rowId ? mark.rows.find((r) => r.id === target.rowId) : undefined;
+	return row ? [row] : mark.rows;
+}
+
+/** The dialog's first words: the mark it disputes, and on one try of
+ *  several the try, "First try: marked Partly right · On your own". */
+export function markedWords(rows: readonly MarkRow[]): string {
+	const facts = (row: MarkRow) => `${MARK_WORDS.result[row.result]} · ${MARK_HOW_WORDS[markHow(row)]}`;
+	return rows.length === 1 && rows[0]!.label ? `${rows[0]!.label}: marked ${facts(rows[0]!)}` : `Marked ${rows.map(facts).join(", ")}`;
 }
 
 /** What the dialog sends: his words, the mark he picked, how he thinks it
@@ -125,14 +116,14 @@ const HOW_PICKS: readonly DisputedHow[] = ["ownWork", "withHelp"];
  *  or how he thinks it should count (round 6: help could be argued only
  *  in words). ↑ from the start of the field reaches the choices, ↑ ↓ move
  *  between them and back, ← → within one, ⌘↵ sends. */
-export function DisputeDialog({ mark, ...props }: { mark: AnswerMark | null; onClose: () => void; onSend: (draft: DisputeDraft) => void }) {
-	const { open, shown, opening } = useDialogSubject(mark);
-	return shown && <DisputeForm key={opening} open={open} mark={shown} {...props} />;
+export function DisputeDialog({ rows, ...props }: { rows: readonly MarkRow[] | null; onClose: () => void; onSend: (draft: DisputeDraft) => void }) {
+	const { open, shown, opening } = useDialogSubject(rows);
+	return shown && <DisputeForm key={opening} open={open} rows={shown} {...props} />;
 }
 
 /** One opening of the dispute: its own draft, so the next opening starts
  *  clean. */
-function DisputeForm({ open, mark, onClose, onSend }: { open: boolean; mark: AnswerMark; onClose: () => void; onSend: (draft: DisputeDraft) => void }) {
+function DisputeForm({ open, rows, onClose, onSend }: { open: boolean; rows: readonly MarkRow[]; onClose: () => void; onSend: (draft: DisputeDraft) => void }) {
 	const [said, setSaid] = useState("");
 	const [proposed, setProposed] = useState<MarkResult | "">("");
 	const [proposedHow, setProposedHow] = useState<DisputedHow | "">("");
@@ -144,7 +135,7 @@ function DisputeForm({ open, mark, onClose, onSend }: { open: boolean; mark: Ans
 		if (!ready) return;
 		onSend({ ...(said.trim() ? { said: said.trim() } : {}), ...(proposed ? { proposed } : {}), ...(proposedHow ? { proposedHow } : {}) });
 	};
-	const marked = mark.rows.map((row) => `${MARK_WORDS.result[row.result]} · ${MARK_HOW_WORDS[markHow(row)]}`).join(", ");
+	const marked = markedWords(rows);
 	const focusGroup = (group: HTMLDivElement | null) => (group?.querySelector<HTMLButtonElement>('[data-state="on"]') ?? group?.querySelector<HTMLButtonElement>("[data-pick]"))?.focus();
 	const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
 		const target = e.target as Node;
@@ -171,7 +162,7 @@ function DisputeForm({ open, mark, onClose, onSend }: { open: boolean; mark: Ans
 				<DialogHeader>
 					<DialogTitle>{MARK_WORDS.disputeTitle}</DialogTitle>
 					<DialogDescription>
-						Marked {marked}. {MARK_WORDS.disputeLine}
+						{marked}. {MARK_WORDS.disputeLine}
 					</DialogDescription>
 				</DialogHeader>
 				<ToggleGroup

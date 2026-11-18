@@ -36,6 +36,8 @@ export type TopicData = CardBase & {
 export type StepData = CardBase & {
 	kind: "step";
 	status: PlanNodeStatus;
+	/** The tutor marked it done: a check in the mark's place. */
+	done?: boolean;
 	summary: string | null;
 };
 

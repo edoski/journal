@@ -1,5 +1,7 @@
 import type { SessionPlan } from "@/src/core";
-import { stepMarks, type StepMark } from "@/components/unit-inbox/topic-page/steps/steps-facts";
+import { LEFT_OFF_HERE, stepMarks, type StepMark } from "@/components/unit-inbox/topic-page/steps/steps-facts";
+import { stoppedHereWords } from "@/components/study-words";
+import { daysBetween } from "@/components/unit-inbox/units";
 import { roadmapSteps } from "@/components/lesson/roadmap-facts";
 import type { SessionEntry, TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 
@@ -30,6 +32,16 @@ export function mapLessonAtFirst(sessions: readonly SessionEntry[], action: Topi
 	return (opens ?? planned[0])?.chat.id ?? null;
 }
 
+/** The words over the step a lesson stopped on: "Left off here" when the
+ *  page's action resumes that lesson where it stopped, else the day it
+ *  stopped, "Stopped here on 6 Nov" (round 16, m22: the 5 and 6 Nov
+ *  lessons' maps said "Left off at A worked example" while Now resumed
+ *  nothing of them, or continued a task at part (c), elsewhere). */
+export function mapLeftOff(entry: SessionEntry, action: TopicAction, today: string): string {
+	const resumes = (action.kind === "resume" || action.kind === "open") && action.chat.id === entry.chat.id;
+	return resumes ? LEFT_OFF_HERE : stoppedHereWords(daysBetween(entry.day, today), today);
+}
+
 /** The step after the one the lesson stopped on, as the lesson's ⌘K
  *  panel names it (`roadmapSteps`): the first in teaching order, each
  *  step after everything it rests on, that no question has been about
@@ -48,8 +60,8 @@ export function nextSteps(plan: SessionPlan): Set<string> {
 /** Each step's mark: the steps tab's marks (the step it stopped on, the
  *  steps earlier questions were about), with "Next" over the step after
  *  the one it stopped on (`nextSteps`). */
-export function hybridMarks(plan: SessionPlan, waits: boolean): Map<string, StepMark> {
-	const marks = stepMarks(plan, waits);
+export function hybridMarks(plan: SessionPlan, waits: boolean, leftOff?: string): Map<string, StepMark> {
+	const marks = stepMarks(plan, waits, leftOff);
 	for (const id of nextSteps(plan)) {
 		const mark = marks.get(id);
 		if (mark) marks.set(id, { ...mark, tag: "Next" });

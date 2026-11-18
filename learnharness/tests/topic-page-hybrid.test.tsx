@@ -22,7 +22,8 @@ import type { StudyCourse } from "../src/core/contracts/study.ts";
 import type { SessionPlan } from "../src/core/contracts/topic.ts";
 import { sessionPlanOf, topicRecordOf } from "../src/server/topic.ts";
 import { topicFacts, type TopicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
-import { hybridMarks, mapLessonAtFirst, nextSteps } from "../components/unit-inbox/topic-page/hybrid/hybrid-facts.ts";
+import { hybridMarks, mapLeftOff, mapLessonAtFirst, nextSteps } from "../components/unit-inbox/topic-page/hybrid/hybrid-facts.ts";
+import { stoppedHereWords } from "../components/study-words.ts";
 import { HybridTopic } from "../components/unit-inbox/topic-page/hybrid/hybrid-topic.tsx";
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "topic");
@@ -105,6 +106,19 @@ describe("the hybrid's facts", () => {
 		);
 		assert.equal(hybridMarks(DET_PLAN, false).get(DET_PLAN.current!)!.tag, "Left off here");
 	});
+
+	it("says Left off here only over a lesson the page resumes, else the day it stopped (round 16, m22)", () => {
+		const facts = factsOf(EIGEN, [EIGEN_LESSON, EIGEN_EARLIER], [EIGEN_PLAN, { ...DET_PLAN, id: "chat_eigen_before" }]);
+		const entry = (id: string) => facts.sessions.find((s) => s.chat.id === id)!;
+		assert.equal(mapLeftOff(entry("chat_demo_eigen"), facts.action, facts.today), "Left off here", "Now resumes it");
+		assert.equal(mapLeftOff(entry("chat_eigen_before"), facts.action, facts.today), "Stopped here on 6 Nov", "nothing resumes it");
+		assert.equal(hybridMarks({ ...DET_PLAN, id: "chat_eigen_before" }, false, "Stopped here on 6 Nov").get(DET_PLAN.current!)!.tag, "Stopped here on 6 Nov");
+		const det = factsOf(DET, [DET_LESSON], [DET_PLAN]);
+		assert.equal(det.action.kind, "continue");
+		assert.equal(mapLeftOff(det.sessions[0]!, det.action, det.today), "Stopped here yesterday", "Continue carries on a task elsewhere, never where the plan stopped");
+		assert.equal(stoppedHereWords(0, "2026-11-08"), "Stopped here today");
+		assert.equal(stoppedHereWords(1, "2026-11-08"), "Stopped here yesterday");
+	});
 });
 
 describe("the hybrid page drawn", () => {
@@ -148,9 +162,12 @@ describe("the hybrid page drawn", () => {
 		assert.ok(attempts.every((row) => row.querySelector("a, button") === null));
 	});
 
-	it("gives the history the whole width when no lesson planned, with no map and no toggle", () => {
+	it("keeps the history in its column when no lesson planned, with no map and no toggle (round 16, m21: Earlier ran the page's width, each date at the far edge)", () => {
 		const document = page(factsOf(RANK, RANK_SESSIONS, [], RANK_RECORD));
-		assert.ok(document.querySelector('[data-slot="topic-panes"]') === null);
+		const panes = document.querySelector('[data-slot="topic-panes"]');
+		assert.ok(panes, "the two columns stand without a map");
+		assert.match(panes!.className, /grid-cols-\[minmax\(0,24rem\)_minmax\(0,1fr\)\]/, "the history keeps the list's width");
+		assert.ok(panes!.querySelector('[data-slot="topic-history"]'), "the history is the left column");
 		assert.ok(document.querySelector('[data-slot="topic-lesson-map"]') === null);
 		assert.equal(document.querySelectorAll('[data-slot="topic-map-toggle"]').length, 0);
 		assert.ok(document.querySelector('[data-slot="topic-history"]'));

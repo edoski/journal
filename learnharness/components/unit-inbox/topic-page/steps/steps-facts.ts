@@ -93,7 +93,12 @@ export interface StepMark {
 	/** The words above the ringed step: "Your turn" while the lesson waits on
 	 *  him, else "Left off here" while a step is still ahead. */
 	tag: string | null;
+	/** The tutor marked it done: taught, and he showed he has it. */
+	done: boolean;
 }
+
+/** The ringed step's words on a lesson the page resumes. */
+export const LEFT_OFF_HERE = "Left off here";
 
 /** The step the map rings: while the lesson waits on him, the step his
  *  open question asks about (`asked`), a check back on a step done
@@ -106,18 +111,21 @@ export function ringedStep(plan: SessionPlan, waits: boolean): string | null {
 }
 
 /** Each step's mark: the ringed step (`ringedStep`), steps earlier
- *  questions were about, and the rest. "Your turn" on the ringed step while
- *  the lesson waits on him, as the sidebar says it; else "Left off here",
+ *  questions were about, and the rest; and whether the tutor marked it
+ *  done (round 16, m23: taught steps wore the dot of steps ahead). "Your turn" on the ringed step while
+ *  the lesson waits on him, as the sidebar says it; else `leftOff` ("Left
+ *  off here" for a lesson the page resumes, else "Stopped here on 6 Nov"),
  *  only while the plan has a step still ahead: on a lesson that went
  *  through every step it would say he stopped partway. */
-export function stepMarks(plan: SessionPlan, waits: boolean): Map<string, StepMark> {
+export function stepMarks(plan: SessionPlan, waits: boolean, leftOff = LEFT_OFF_HERE): Map<string, StepMark> {
 	const ring = ringedStep(plan, waits);
 	const visited = new Set(plan.current && plan.current !== ring ? [...plan.visited, plan.current] : plan.visited);
 	const ahead = plan.tree.nodes.some((node) => node.id !== ring && !visited.has(node.id));
+	const done = new Set(plan.done ?? []);
 	return new Map(
 		plan.tree.nodes.map((node): [string, StepMark] => {
-			if (node.id === ring) return [node.id, { status: "current", tag: waits ? "Your turn" : ahead ? "Left off here" : null }];
-			return [node.id, { status: visited.has(node.id) ? "visited" : "upcoming", tag: null }];
+			if (node.id === ring) return [node.id, { status: "current", tag: waits ? "Your turn" : ahead ? leftOff : null, done: done.has(node.id) }];
+			return [node.id, { status: visited.has(node.id) ? "visited" : "upcoming", tag: null, done: done.has(node.id) }];
 		}),
 	);
 }

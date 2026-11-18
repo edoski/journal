@@ -30,9 +30,12 @@ export function courseComposerPlaceholder(course: string, topic?: string): strin
  * (`StartScope`), so the prober routes the opening to teaching or practice
  * as from New lesson, and a start that fails says so in the head, where
  * every start on the page says it. Home draws it with a course control in
- * its toolbar (`control`, `box`; `HomeComposer`).
+ * its toolbar (`control`, `box`; `HomeComposer`). Esc in its field leaves
+ * it, his words kept: to the page's list (`onLeave`), else to nothing
+ * focused, where ↓ enters the list (round 16, m26: once a letter was typed
+ * on Home, ↓ and Enter never reached Today's rows again).
  */
-export function CourseComposer({ course, topic, control, box, onType }: {
+export function CourseComposer({ course, topic, control, box, onType, onLeave }: {
 	course: { workspace: string; title: string };
 	topic?: { handle: string; title: string };
 	/** The toolbar's course control, where the page is no one course. */
@@ -41,6 +44,8 @@ export function CourseComposer({ course, topic, control, box, onType }: {
 	box?: string;
 	/** He typed into it. */
 	onType?: () => void;
+	/** Where Esc in the field takes focus. */
+	onLeave?: () => void;
 }) {
 	const draft = useStartDraft(box ?? (topic ? `topic:${course.workspace}:${topic.handle}` : `course:${course.workspace}`));
 	const lesson = useStartScope();
@@ -48,7 +53,17 @@ export function CourseComposer({ course, topic, control, box, onType }: {
 		if (draft.canSend) lesson.start(lessonCreation(draft.text.trim(), course.workspace, { topics: topic ? [topic.handle] : [] }), { draft });
 	};
 	return (
-		<div data-slot="course-composer" className="mx-auto w-full max-w-[46rem] shrink-0 pt-4">
+		<div
+			data-slot="course-composer"
+			className="mx-auto w-full max-w-[46rem] shrink-0 pt-4"
+			onKeyDown={(e) => {
+				const field = e.target as HTMLElement;
+				if (e.key !== "Escape" || e.defaultPrevented || field.dataset.slot !== "composer-field") return;
+				e.preventDefault();
+				field.blur();
+				onLeave?.();
+			}}
+		>
 			<LessonComposer
 				compact
 				busy={lesson.busy}
@@ -81,7 +96,7 @@ export function CourseComposer({ course, topic, control, box, onType }: {
  * words to another course (Edo, 18 Nov 2026). The course is kept beside
  * the draft, so words back after a reload keep theirs.
  */
-export function HomeComposer({ shown }: { shown: { workspace: string; title: string } }) {
+export function HomeComposer({ shown, onLeave }: { shown: { workspace: string; title: string }; onLeave?: () => void }) {
 	const choice = useCourseChoice({ remember: false });
 	// Read as it mounts, before the box's own restore rewrites what it kept;
 	// Home draws it only once the courses are read, so never on the server.
@@ -114,6 +129,7 @@ export function HomeComposer({ shown }: { shown: { workspace: string; title: str
 			onType={() => {
 				if (!held) setHeld(workspace);
 			}}
+			onLeave={onLeave}
 		/>
-	);;
+	);
 }

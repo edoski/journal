@@ -120,6 +120,17 @@ export function LessonComposer({
 	const empty = !value.trim() && !(photos?.photos.length ?? 0);
 	const collapsed = compact && !focused && empty;
 	const fieldRef = useRef<HTMLTextAreaElement>(null);
+	// A field that opens holding words (a kept draft, the Ask box he switched
+	// into) puts the caret after them, wherever focus later lands it, so his
+	// next words follow them (round 16, m27: the Ask box's caret sat before
+	// "hello? did that go through?", and his side question went out glued in
+	// front of it). A value set while it is open moves the caret itself.
+	const openedWith = useRef(value);
+	useLayoutEffect(() => {
+		const field = fieldRef.current;
+		const words = openedWith.current;
+		if (field && words) field.selectionStart = field.selectionEnd = words.length;
+	}, []);
 	// Turning compact as he reads up a lesson, an empty field lets go of focus, so the composer folds; a key
 	// he types lands back in it (type-to-compose). A field holding words keeps focus and stays open.
 	const wasCompact = useRef(compact);

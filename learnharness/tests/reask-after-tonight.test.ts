@@ -71,8 +71,8 @@ describe("the left question is drawn once when it is asked again (round 14 integ
 		const { ProseQuestion } = await import("../components/lesson/prose/prose-question.tsx");
 		const card = (askedBelow: boolean) =>
 			renderToStaticMarkup(React.createElement(ProseQuestion, { tool: "explain", toolCallId: "c1", input: { type: "check", nodeId: "n", question: "Which inputs does A send to zero?", correctAnswer: "x" }, output: tonight as never, open: false, askedBelow }));
-		assert.match(card(false), /Which inputs does A send to zero\?[\s\S]*Left for next time/);
+		assert.match(card(false), /Which inputs does A send to zero\?/);
 		assert.doesNotMatch(card(true), /Which inputs/);
-		assert.match(card(true), /Left for next time/);
+		assert.doesNotMatch(card(true) + card(false), /Left for next time/, "nothing typed, nothing kept: no bare label (round 16, m16)");
 	});
 });
