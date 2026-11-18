@@ -71,7 +71,8 @@ export type VoiceRule =
 	| "pointer"
 	| "arrival"
 	| "own-words"
-	| "mark-case";
+	| "mark-case"
+	| "not-yet";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -139,6 +140,10 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// as itself (round 15, m17: "My earlier line saying the set was done
 	// was wrong, since one problem is not a set.").
 	{ rule: "own-words", re: /\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b/i },
+	// What he has not done yet is no step for him: it reads as a reproach
+	// (round 16, m13: "You still haven't started Linear maps and their
+	// matrices." closing a lesson under his half answer).
+	{ rule: "not-yet", re: /\byou still (?:haven't|have not)\b|\byou (?:haven't|have not)(?: yet)? (?:started|begun)\b|\byou have yet to (?:start|begin)\b/i },
 	// His card's words, inside a sentence, are plain lowercase words
 	// (round 15, m18: "The mark stands as With help").
 	{ rule: "mark-case", re: /(?<=[a-z0-9,;)]\s+)(?:With help|On your own|Partly right|Not right|Gave up|Not yet confirmed|Prediction, not counted|Guessing|Confident)\b/ },

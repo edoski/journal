@@ -333,8 +333,9 @@ export interface QuestionAnswerData {
 	/** What he had typed in the question's box when Done for today set it
 	 *  aside (reason "tonight"): kept with the lesson, so the line that says
 	 *  it was left shows it and the question asked again opens with it on
-	 *  every way back, in any window (round 15, 3 m1). His only: never in
-	 *  what the tutor reads (`compactAnswerForModel`), never graded. */
+	 *  every way back, in any window (round 15, 3 m1). His only: its words
+	 *  are never in what the tutor reads (`compactAnswerForModel`, which
+	 *  says only that one was kept), never graded. */
 	draft?: LeftDraft;
 	answeredAt: string;
 }
@@ -519,6 +520,13 @@ export const SHOW_ME_TEXT =
 export const LEFT_FOR_TONIGHT_TEXT =
 	"He stopped for today with this question open. Not an answer: no grade, no attempt recorded. Its answer was never shown to him.";
 
+/** What the agent reads beside a question Done for today set aside with
+ *  his half answer in its box: only that it was kept, never its words
+ *  (round 16, m13: with nothing to say so, the close read "You still
+ *  haven't started Linear maps and their matrices" under his half answer). */
+export const LEFT_DRAFT_TEXT =
+	"He had started an answer to it, kept in his box for when he comes back. It is not an attempt: grade nothing. In the close it is his half answer waiting for him there (\"Your half answer to the kernel question waits here for next time.\"), never a topic or question he has not started, and never what it says.";
+
 /** What the agent reads for a question he set aside to ask something
  *  (round 6: the question stays open, so it comes back as it was and the
  *  transcript draws it once). A message asking to be taught instead sets
@@ -540,7 +548,7 @@ export const ASKED_INSTEAD_TEXT =
  */
 export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, unknown> {
 	if (ad.dismissed) {
-		if (ad.reason === "tonight") return { kind: ad.kind, dismissed: true, reason: LEFT_FOR_TONIGHT_TEXT };
+		if (ad.reason === "tonight") return { kind: ad.kind, dismissed: true, reason: LEFT_FOR_TONIGHT_TEXT, ...(ad.draft?.text.trim() ? { draftKept: LEFT_DRAFT_TEXT } : {}) };
 		if (ad.reason === "asked") return { kind: ad.kind, dismissed: true, reason: ASKED_INSTEAD_TEXT };
 		return { kind: ad.kind, dismissed: true };
 	}

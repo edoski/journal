@@ -565,6 +565,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `"You …, whereas …" reads as a formula after the break is already said: ${quoted(b.excerpt)}. Leave it out; say one plain sentence of contrast only when it adds something the break did not, never one that opens on what he did.`;
 		case "hint-question":
 			return `A hint gives him what the question did not, said as a statement: the next move ("Subtract row 1 from row 3 and look at what is left") or a fact the question left out. This one asks him a question instead: ${quoted(b.excerpt)}. Say the move or the fact; his question is asked again after it.`;
+		case "not-yet":
+			return `Never tell him what he has not done yet: ${quoted(b.excerpt)}. Say what he picks up and when: a half answer he left waits for him at its question, and a topic not started is one he starts, on its day when the plan gives one.`;
 		case "hint-back":
 			return `A hint gives him a move or a fact he does not have yet, and this one hands his own idea back for him to check: ${quoted(b.excerpt)}. Say the next move past it ("Subtract row 1 and row 2 from row 3, column by column") or the fact it needs, never what his work or your last message already said.`;
 		case "credit": {
