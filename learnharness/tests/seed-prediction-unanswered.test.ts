@@ -13,7 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 
-const SEED = path.join(process.env.LH_DEMO_SEED ?? path.join(os.homedir(), ".claude", "skills", "logbook", "adapters", "journal", "seed"), "seed-chats.mjs");
+const SEED = path.join(process.env.LH_DEMO_SEED ?? path.join(os.homedir(), ".config", "logbook", "adapters", "journal", "seed"), "seed-chats.mjs");
 
 /** A 2 × 2 pmatrix's entries as a code literal: "[[2, 1], [1, 2]]". */
 function literalOf(tex: string): string | null {

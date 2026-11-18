@@ -59,7 +59,10 @@ in review (replayed from the window start), the daily plan and, near an exam, th
 run-up pace from the Journal schedule. `agenda.py` owns the daily plan: a pure
 projection from today, within the learner's `daily_topics`, of which reviews and
 which new topics each day takes, paced to the exam and assuming each planned
-review succeeds; it stores nothing, so the app and the tutor read the same plan.
+review succeeds. The only thing kept between reads is the plan as each day he
+studies ended (`told.py`, beside the registry, keyed by the history it was made
+from), so a read begins from yesterday's plan instead of replaying every day he
+has studied, and the app and the tutor read the same plan.
 
 `cli.py` is a command table: one small handler per verb with its mutation policy
 declared beside it; `__main__.py` parses, selects the workspace and dispatches.

@@ -539,13 +539,28 @@ def placed(workspace: Workspace, topics: dict[str, Any]) -> dict[str, str]:
     return result
 
 
-def test_a_new_topic_lands_in_the_current_arc_when_its_range_allows(
+def test_a_new_topic_lands_in_its_prerequisites_arc_not_the_current_one(
+    workspace: Workspace,
+) -> None:
+    """Round 16, AIKR: a Prolog topic needing only Prolog topics landed in the
+    arc he was studying, "Uncertainty and probability"."""
+    formed(workspace, path={"arcs": ORDER, "current": "ftc"})
+    assert placed(
+        workspace,
+        {
+            "one-sided": {"title": "One-sided limits", "needs": ["limit"]},
+            "quotient": {"title": "Quotient rule", "needs": ["limit", "derivative"]},
+        },
+    ) == {"one-sided": "limits", "quotient": "derivatives"}
+
+
+def test_a_new_topic_with_no_prerequisite_lands_in_the_current_arc(
     workspace: Workspace,
 ) -> None:
     formed(workspace, path={"arcs": ORDER, "current": "derivative"})
-    assert placed(
-        workspace, {"one-sided": {"title": "One-sided limits", "needs": ["limit"]}}
-    ) == {"one-sided": "derivatives"}
+    assert placed(workspace, {"notation": {"title": "Leibniz notation"}}) == {
+        "notation": "derivatives"
+    }
 
 
 def test_else_at_the_nearer_end_of_its_range(workspace: Workspace) -> None:
@@ -1389,13 +1404,14 @@ def test_after_a_schema_bump_migrate_still_moves_only_6_and_7(
     eight = {**json.loads(workspace.record.read_text()), "schema": 8}
     workspace.record.write_text(storage.encode(eight), encoding="utf-8")
     before = workspace.record.read_bytes()
-    monkeypatch.setattr(schema, "SCHEMA", 8)
-    try:
-        bumped = importlib.reload(migrate)
-        report = bumped.migrate(workspace, to=7)
-    finally:
-        monkeypatch.undo()
-        importlib.reload(migrate)
+    with monkeypatch.context() as patch:
+        patch.setattr(schema, "SCHEMA", 8)
+        try:
+            bumped = importlib.reload(migrate)
+            report = bumped.migrate(workspace, to=7)
+        finally:
+            patch.undo()
+            importlib.reload(migrate)
     assert (
         "this engine moves schema 6 to 7" in report["failed"][str(workspace.directory)]
     )

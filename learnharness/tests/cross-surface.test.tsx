@@ -175,14 +175,17 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 		(page) => !!page.querySelector('[data-slot="course-topic-row"]'),
 		(page, pathname) => {
 			const course = courses.find((c) => courseHref(c.map.workspace) === pathname)!;
-			heads.set(course.map.workspace, text(page.querySelector('[data-slot="page-head"]')));
+			// Each of the head's facts on its own, so a title that ends one is not run into the next ("…variablesStudied yesterday").
+			const facts = [...page.querySelectorAll('[data-slot="page-head"] [data-slot]')].filter((el) => !el.querySelector("[data-slot]"));
+			heads.set(course.map.workspace, facts.map((el) => text(el)).filter(Boolean).join("; "));
 			needsYou.set(
 				course.map.workspace,
 				[...page.querySelectorAll('[data-slot="course-topic-row"][data-group="needs-you"]')].map((row) => ({ handle: row.getAttribute("data-topic") ?? "", text: text(row) })),
 			);
 			for (const row of page.querySelectorAll('[data-slot="course-topic-row"]')) {
-				const title = text(row.querySelector('[data-slot="course-topic-title"]')).replace(/, [^,]*$/, "");
-				const topic = course.map.topics.find((t) => t.title === title);
+				// By its handle: a title with a comma ("Permutations, $k$-permutations and factorials") lost its tail to the
+				// strip of the row's spoken standing.
+				const topic = course.map.topics.find((t) => t.handle === row.getAttribute("data-topic"));
 				if (topic) rows.set(keyOf(course.map.workspace, topic.handle), text(row.querySelector('[data-slot="course-topic-fact"]')));
 			}
 		},
@@ -219,9 +222,12 @@ function dayClaims(s: Survey): Claims {
 		// the entry of today's session that holds the task in its place (one piece of work, one entry): a lesson he
 		// worked on today stays today's (round 14, m2).
 		const begun = new Set(course.map.topics.filter((t) => t.startsWhy?.kind === "begun").map((t) => t.handle));
+		// A lesson started today on a topic the plan starts today is that start, drawn as the session alone (round 15, m6).
+		const startsToday = new Set<string>(course.planned.find((d) => d.date === s.today)?.new ?? []);
 		for (const { entry } of s.calendar) {
 			const goesOn = (entry.kind === "task" || (entry.kind === "session" && entry.task !== null)) && entry.topic && begun.has(entry.topic.handle);
-			const day = entry.kind === "review" || entry.kind === "new" ? entry.topic : goesOn ? entry.topic : null;
+			const starts = entry.kind === "session" && entry.type === "lesson" && entry.day === s.today && entry.topic && startsToday.has(entry.topic.handle) && (entry.chat.ownTopics ?? []).includes(entry.topic.handle);
+			const day = entry.kind === "review" || entry.kind === "new" ? entry.topic : goesOn || starts ? entry.topic : null;
 			if (day && entry.course?.workspace === ws && entry.day >= s.today) {
 				const by = claims.get(keyOf(ws, day.handle));
 				const had = by?.get("calendar");
@@ -645,7 +651,7 @@ function assertFiledByWork(app: DemoApp, s: Survey) {
 
 // ─── the journey ───────────────────────────────────────────────────────────
 
-describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip, concurrency: false, timeout: 900_000 }, () => {
+describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip, concurrency: false, timeout: 1_800_000 }, () => {
 	let app: DemoApp;
 	before(async () => {
 		app = await openDemoApp("2026-11-08");

@@ -119,7 +119,9 @@ export interface TopicFacts {
 	 *  calls weak when that attempt was not right, in the tutor's words. */
 	mistake: string | null;
 	/** Why its next review waits past the day memory asks for it
-	 *  (`waitsWords`); null when nothing holds it back. */
+	 *  (`waitsWords`), the exam first for a topic taught: it leaves it out
+	 *  ("Not on the exam") or its final review has no room for it; null
+	 *  when nothing holds it back. */
 	waits: string | null;
 	/** A topic not started that the engine's plan starts later: the day of
 	 *  its first lesson and, when it waits behind other courses' new
@@ -412,7 +414,9 @@ export function topicFacts({
 		standing: silent ? null : standingOf(topic),
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
 		mistake: mistakeOf(topic, attempts),
-		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam, map.today) : null) ?? waitsWords(topic, map.today),
+		// A topic the exam leaves out stays left out once he starts it: its review says so (the demo world's
+		// Simulation of continuous probabilities, introduced by a probe two days before the exam, read only "Left off today").
+		waits: (topic.level !== "new" ? examWords(topic, map) : null) ?? waitsWords(topic, map.today),
 		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : topic.moved ? movedWords(null, map.today, topic.moved) : startsAfterWords(topic.startsAfter) } : null,
 		firstReview: lessonBegun(topic) ? (read?.firstReview ?? null) : null,
 		startsWhy: topic.level === "new" ? startsReason(topic, map) : null,
