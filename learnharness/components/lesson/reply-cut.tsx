@@ -5,9 +5,12 @@ import { LESSON_WORDS } from "@/components/study-words";
 
 /** The tutor's turn ended with no reply (src/core/turn-cut.ts): one plain
  *  line where the reply would be, saying so when he stopped it himself,
- *  before its first word or after the tutor had written, and Try again, which runs the turn on what he already sent. */
-export function ReplyCut({ cut, onRetry }: { cut: "stopped" | "stopped-mid" | "lost"; onRetry: () => void }) {
-	const words = cut === "stopped-mid" ? LESSON_WORDS.youStoppedMidReply : cut === "stopped" ? LESSON_WORDS.youStoppedReply : LESSON_WORDS.stoppedBeforeReply;
+ *  before its first word or after the tutor had written, that the tutor
+ *  couldn't reply when the turn failed (round 16, m2: a turn refused before
+ *  it began read "The tutor stopped before replying"), and Try again, which
+ *  runs the turn on what he already sent. */
+export function ReplyCut({ cut, onRetry }: { cut: "stopped" | "stopped-mid" | "lost" | "failed"; onRetry: () => void }) {
+	const words = cut === "stopped-mid" ? LESSON_WORDS.youStoppedMidReply : cut === "stopped" ? LESSON_WORDS.youStoppedReply : cut === "failed" ? LESSON_WORDS.couldntReply : LESSON_WORDS.stoppedBeforeReply;
 	return (
 		<div role="status" data-testid="reply-cut" className="flex flex-wrap items-center gap-1 text-body">
 			<span className="mr-2 min-w-0 text-muted-foreground">{words}</span>

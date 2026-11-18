@@ -635,6 +635,7 @@ export const LESSON_WORDS = {
 	newReply: "New reply",
 	skippedQuestion: "Skipped",
 	stoppedBeforeReply: "The tutor stopped before replying.",
+	couldntReply: "The tutor couldn't reply.",
 	youStoppedReply: "You stopped the tutor before it replied.",
 	youStoppedMidReply: "You stopped the tutor mid-reply.",
 	tryAgain: "Try again",

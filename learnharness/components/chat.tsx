@@ -737,7 +737,7 @@ export function Chat({
 		setMessageHidden(dockKey !== null && textRef.current.trim() !== "");
 		// `dock` is derived from the render that changed dockKey.
 	}, [chatId, dockKey, applyText, carryScope]);
-	const { unconnected, status: modelStatus, read: statusRead } = useModelSetup(busy);
+	const { unconnected, status: modelStatus, read: statusRead, refresh: refreshStatus } = useModelSetup(busy);
 	const [setupOpen, setSetupOpen] = useState(false);
 	/** The explicitly-sent draft (composer send) until the server accepts
 	 *  it (sent-draft.ts): the
@@ -862,6 +862,17 @@ export function Chat({
 	// Retry alone: the pill above the box is the one sign-in (round 15, M2:
 	// the line stayed, and its Sign in crashed the page once Claude was back).
 	const refusalSinceRef = useRef<number | null>(null);
+	// The line asks Claude again as it appears, and each time he comes back
+	// to the window, where he signs in elsewhere (round 16, m2: with Claude
+	// back, nothing read the status again, and the line stood 30 s and more).
+	const signedOutLine = isSignedOutLine(error?.message);
+	useEffect(() => {
+		if (!signedOutLine) return;
+		const ask = () => refreshStatus(true);
+		ask();
+		window.addEventListener("focus", ask);
+		return () => window.removeEventListener("focus", ask);
+	}, [signedOutLine, refreshStatus]);
 	useEffect(() => {
 		const watch = refusalWatch(refusalSinceRef.current, isSignedOutLine(error?.message), modelStatus?.connected, statusRead);
 		refusalSinceRef.current = watch.since;
@@ -1875,13 +1886,13 @@ export function Chat({
 							{thinking && <ActivityLine testId="thinking-placeholder" label={compacting ? COMPACTING_LINE : (streamingToolActivity(messages) ?? idleLine)} />}
 							{replyCut && !courseGone && !gone && <ReplyCut cut={replyCut} onRetry={() => void send({ type: "continue" })} />}
 							{/* A failed turn whose cause is gone (signed in again): Retry alone. */}
-							{!error && retryable && !claudeLimit && !courseGone && !gone && <ReplyCut cut="lost" onRetry={retryFailedTurn} />}
+							{!error && retryable && !claudeLimit && !courseGone && !gone && <ReplyCut cut="failed" onRetry={retryFailedTurn} />}
 							{openingError && <p role="alert" className="text-body text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && (
-								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} kept={refusedWords} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")}>
+								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} kept={refusedWords} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
 							)}

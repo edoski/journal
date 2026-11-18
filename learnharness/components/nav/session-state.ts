@@ -110,11 +110,12 @@ export function continueHref(chat: ChatListItem): string {
 }
 
 /** What a paused session says (round 8): his own stop in his words, a
- *  turn that failed as one that couldn't reply (round 14, 4 minor 6: a
- *  signed-out refusal read "Reply cut off"), a turn a restart cut as cut
+ *  turn that failed by what to do, Try again, as its line says (round 14,
+ *  4 minor 6: a signed-out refusal read "Reply cut off"; round 16, m3:
+ *  "Couldn't reply" named nothing to do), a turn a restart cut as cut
  *  off. Each short enough to sit beside the course's name on a sidebar
  *  card (round 15, 4 minor 9: "You stopped the tutor" pushed "Linear
  *  Algebra" off its line). */
 export function pausedWords(chat: Pick<ChatListItem, "stopped" | "failed">): string {
-	return chat.stopped ? "Stopped by you" : chat.failed ? "Couldn't reply" : "Reply cut off";
+	return chat.stopped ? "Stopped by you" : chat.failed ? "Try again" : "Reply cut off";
 }
