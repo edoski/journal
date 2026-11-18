@@ -7,6 +7,7 @@ import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MathText } from "@/components/ui/math-text";
 import { useModelSetup, SignInPill } from "@/components/setup-cta";
 import { useStickToBottomContext, type StickToBottomContext } from "use-stick-to-bottom";
 import {
@@ -1689,7 +1690,8 @@ export function Chat({
 										}}
 										className="lh-no-drag -mx-1.5 block h-auto min-w-4 shrink cursor-text truncate px-1.5 text-left text-headline text-inherit hover:text-inherit"
 									>
-										{titleText}
+										{/* Its maths typeset, as every title (round 17, m5: "$\binom{n}{j}$" in the head). */}
+										<MathText>{titleText}</MathText>
 									</Button>
 								</Hint>
 							)

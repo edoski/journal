@@ -1235,6 +1235,44 @@ export function sessionPlanTopicOf(messages: readonly LhMessage[]): string | nul
 	return null;
 }
 
+/** The topic not started that the session's answers started before any
+ *  plan: the first save that went through whose receipt moved a topic up
+ *  from "new" (its `levels`), as a probe's first answer on the topic he
+ *  asked to start does (round 17, M5). Null when a plan came first, or no
+ *  save started one. Pure. */
+export function firstStartedTopicOf(messages: readonly LhMessage[]): string | null {
+	const clean = cleanToolCallIds(messages);
+	for (const m of messages) {
+		if (m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === "plan_init" && clean.has(b.id))) return null;
+		if (m.role !== "toolResult" || m.isError || m.toolName !== "course_save") continue;
+		let receipt: unknown;
+		try { receipt = JSON.parse(resultText(m)); } catch { continue; }
+		const levels = (receipt as { levels?: unknown } | null)?.levels;
+		const started = Object.entries(typeof levels === "object" && levels !== null ? levels : {}).find(([, change]) => (change as { from?: unknown } | null)?.from === "new");
+		if (started) return started[0];
+	}
+	return null;
+}
+
+/** When the session's saved answers on each topic came: the time of the
+ *  newest message whose save went through with an answer on it, by topic.
+ *  Pure. */
+export function savedAnswerTimesOf(messages: readonly LhMessage[]): Map<string, number> {
+	const clean = cleanToolCallIds(messages);
+	const at = new Map<string, number>();
+	for (const m of messages) {
+		if (m.role !== "assistant" || typeof m.timestamp !== "number") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const changes = saveChanges(block.arguments as Record<string, unknown>);
+			for (const o of Array.isArray(changes?.observations) ? changes.observations : []) {
+				for (const t of strings((o as { topics?: unknown } | null)?.topics)) at.set(t, Math.max(at.get(t) ?? 0, m.timestamp));
+			}
+		}
+	}
+	return at;
+}
+
 /** The topics the session's saved answers were on: each observation's
  *  `topics` in the saves that went through, in order. Pure. */
 export function savedAnswerTopicsOf(messages: readonly LhMessage[]): string[] {

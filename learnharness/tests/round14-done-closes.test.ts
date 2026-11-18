@@ -106,7 +106,12 @@ describe("Done for today with a question open (round 14, M1)", () => {
 		assert.equal(pendingQuestionOf(saved), null, "nothing is asked under the closing words");
 		assert.equal(continuesTask(summary(chat.id)), false, "the left question waits for him, so Continue opens the chat at it and takes up no task");
 
+		const leftAt = "2026-11-09T18:00:00.000Z";
+		fs.writeFileSync(path.join(scratch, "data", "chats", `${chat.id}.json`), JSON.stringify({ ...chatStore.getChat(chat.id)!, updatedAt: leftAt }));
 		assert.equal(reposeLeftQuestions(chat.id), true, "when he opens the session again, the left question is asked again");
+		// Round 17, M6 (1 M4): viewing a session he left is not study; it
+		// keeps the day he left it, so nothing says "Studied today".
+		assert.equal(chatStore.getChat(chat.id)!.updatedAt, leftAt, "opening it keeps the day he left it");
 		const resumed = chatStore.getChat(chat.id)!.messages;
 		const open = pendingQuestionOf(resumed);
 		assert.deepEqual(open?.input, CHECK, "its own call, word for word, so Hint, Show me and his confidence serve it");

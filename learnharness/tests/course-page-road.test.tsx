@@ -124,21 +124,17 @@ const text = (el: Element | null | undefined) => el?.textContent ?? "";
 describe("the course head", () => {
 	const view = viewOf(course());
 
-	it("says where he stands for the exam as one fact, never a pill per arc", () => {
+	it("never says where he stands as a pill per arc", () => {
 		for (const standing of [NOT_READY, SOME_READY]) {
 			const head = render(<CourseHead {...columns(view, standing)} />);
 			assert.ok(head.querySelector('[data-slot="arc-pill"]') === null, "no arc pill in the head");
-			assert.equal(head.querySelectorAll('[data-slot="course-ready-fact"]').length, 1, "one readiness fact");
-			assert.equal(text(head.querySelector('[data-slot="course-ready-fact"]')), READY_FACT_WORDS.notYet);
 		}
 	});
 
-	it("with all of it still fitting, is the fact alone: no press that opens a list of arcs not ready (round 16, m6)", () => {
+	it("with all of it still fitting, says no bare Not ready, which opens nothing he can act on (round 16, m6; round 17, m7)", () => {
 		const head = render(<CourseHead {...columns(view, SOME_READY)} />);
-		const fact = head.querySelector('[data-slot="course-ready-fact"]')!;
-		assert.equal(fact.tagName, "SPAN", "not a press");
-		assert.equal(fact.getAttribute("aria-haspopup"), null, "opens nothing");
-		assert.doesNotMatch(text(head.querySelector('[data-slot="page-head"]')), /Not ready yet in/);
+		assert.ok(head.querySelector('[data-slot="course-ready-fact"]') === null, "no readiness line without a reason");
+		assert.doesNotMatch(text(head.querySelector('[data-slot="page-head"]')), new RegExp(`${READY_FACT_WORDS.notYet}|Not ready yet in`));
 	});
 
 	it("takes one line's room under the title", () => {
@@ -187,10 +183,10 @@ describe("the road", () => {
 		assert.equal(examStop(viewOf(course({ exam: null })).course.map, view.arcs!), null, "no exam, no stop");
 	});
 
-	it("says when a not-started arc's first topic starts, and nothing for one under way", () => {
+	it("says when a not-started arc's first topic starts, and for one under way when its next starts (round 17, m9)", () => {
 		const view = viewOf(course());
 		assert.equal(arcStarts(view.arcs!.find((s) => s.arc.handle === "eigen")!, view.course.map.today), "Starts 20 Nov");
-		assert.equal(arcStarts(view.arcs!.find((s) => s.arc.handle === "maps")!, view.course.map.today), null);
+		assert.equal(arcStarts(view.arcs!.find((s) => s.arc.handle === "maps")!, view.course.map.today), "Planned 12 Nov");
 	});
 
 	it("is the course's one list of arcs, drawn as the map's arc list draws its rows, so the map beside it lists none", () => {

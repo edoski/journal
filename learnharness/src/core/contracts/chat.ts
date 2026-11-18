@@ -542,6 +542,10 @@ export interface ChatSummary {
 	 *  every day he worked in it, a lesson begun one day and left the next
 	 *  included (round 16, m8). */
 	studiedDays?: readonly string[];
+	/** The local day, YYYY-MM-DD, of its newest saved answer on each topic:
+	 *  a review he left today keeps Home's line for the topics it did not
+	 *  answer today (round 17, M4). Absent with no saved answer. */
+	answeredOn?: Readonly<Record<string, string>>;
 }
 
 /** The sidebar's session row: a summary + live liveness. The chats list

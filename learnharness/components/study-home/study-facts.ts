@@ -223,7 +223,8 @@ const lastDay = (chat: ChatListItem) => localDay(new Date(chat.updatedAt));
  *      ago, most recent first;
  *   5. the lines with nothing for today (`laterOnly`).
  * A step a session he ended today works on has no line, nor does a task a
- * waiting session holds, since that session has its own line.
+ * waiting session holds, since that session has its own line; today's
+ * review leaves only with the topics he answered today (round 17, M4).
  * A review left for next time has no line of its own: it waits for its
  * topics' next review day, when the review's line opens it (`courseMove`),
  * and its topic page keeps it meanwhile. A session he ended with Done for
@@ -297,7 +298,16 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 			// (round 13, 1 n3: "Start Geometric" sat above "Continue Poisson distribution lesson").
 			const goesOn = step.kind === "task" && step.topics.some((h) => course.newToday.includes(h));
 			const rows = planned(step) || goesOn ? plan : tasks;
-			if (own(ended, step)) continue;
+			// A review leaves Today only for the topics he answered today: one he left today, or that settled after
+			// the read, keeps the line of the topics it did not answer, which opens it (round 17, M4: "your
+			// Inclusion-exclusion principle review is still due today", and Home had no line for it).
+			if (step.kind === "review" && step.on === undefined) {
+				const review = step;
+				const answered = new Set(ended.filter((c) => c.course?.workspace === course.map.workspace).flatMap((c) => Object.entries(c.answeredOn ?? {}).flatMap(([h, d]) => (d >= today ? [h] : []))));
+				const kept = review.topics.flatMap((h, i) => (answered.has(h) ? [] : [{ handle: h, title: review.titles[i]! }]));
+				if (kept.length === 0) continue;
+				step = { ...review, topics: kept.map((t) => t.handle), titles: kept.map((t) => t.title) };
+			} else if (own(ended, step)) continue;
 			const active = own(waiting, step);
 			if (active) {
 				if (planned(step) && !placed.has(active)) {

@@ -10,6 +10,7 @@
 import { subscribe } from "../core/events.ts";
 import type { ChatStore, CourseRecords } from "../core/ports.ts";
 import { firstTurnTopics, onFirstTurn } from "../core/session-naming.ts";
+import { lessonTakenUp } from "../core/session-opening.ts";
 
 export interface SessionNamingDeps {
 	chatStore: ChatStore;
@@ -33,9 +34,27 @@ export async function nameFromFirstTurn(deps: SessionNamingDeps, chatId: string)
 	return true;
 }
 
+/** Name a session after the lesson it took up (`lessonTakenUp`) once a
+ *  turn of it settles, as its first plan names it: a review whose probe
+ *  started the topic he asked for is "Expectation and linearity lesson"
+ *  from that answer on, though no plan came yet (round 17, M5). The store
+ *  keeps a name he gave it. Returns whether it took one up. */
+export async function nameTakenUpLesson(deps: SessionNamingDeps, chatId: string): Promise<boolean> {
+	const record = deps.chatStore.getChat(chatId);
+	const taken = record?.course && !record.renamed ? lessonTakenUp(record) : null;
+	if (!record?.course || !taken) return false;
+	const mapped = await deps.courseRecords.map(record.course.workspace);
+	const title = mapped.ok ? mapped.map.topics.find((t) => t.handle === taken)?.title : undefined;
+	if (!title) return false;
+	deps.chatStore.takeUpLesson(chatId, `${title} lesson`);
+	return true;
+}
+
 /** Subscribe to settled turns. Returns the unsubscribe. */
 export function onSessionNaming(deps: SessionNamingDeps): () => void {
 	return subscribe((event) => {
-		if (event.type === "turn-settled") void nameFromFirstTurn(deps, event.chatId).catch(() => {});
+		if (event.type !== "turn-settled") return;
+		void nameFromFirstTurn(deps, event.chatId).catch(() => {});
+		void nameTakenUpLesson(deps, event.chatId).catch(() => {});
 	});
 }

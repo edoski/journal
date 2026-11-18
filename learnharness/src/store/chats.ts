@@ -17,7 +17,7 @@ import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, Sessi
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
-import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, opensTurn, savedAnswerTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, isQuestionRepose, opensTurn, savedAnswerTimesOf, savedAnswerTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
 import { leftQuestionRepose, sessionEndOf } from "../core/session-end.ts";
 import { lessonTakenUp, openedAsReview } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
@@ -178,24 +178,35 @@ function endedBy(ended: SessionEnd, updatedAt: string, waits: boolean): SessionE
 }
 
 /** When his input in a session came: its newest, and every local day it
- *  came on (`ChatSummary.studiedAt`, `studiedDays`). */
-function inputTimes(messages: readonly LhMessage[]): { studiedAt?: string; studiedDays: string[] } {
+ *  came on (`ChatSummary.studiedAt`, `studiedDays`), and the day of its
+ *  newest saved answer on each topic (`answeredOn`). */
+function inputTimes(messages: readonly LhMessage[]): { studiedAt?: string; studiedDays: string[]; answeredOn?: Record<string, string> } {
 	const at = messages.flatMap((m) => (opensTurn(m) && typeof m.timestamp === "number" ? [m.timestamp] : []));
 	const day = (ms: number) => {
 		const d = new Date(ms);
 		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 	};
-	return { ...(at.length > 0 ? { studiedAt: new Date(Math.max(...at)).toISOString() } : {}), studiedDays: [...new Set(at.map(day))].sort() };
+	const answered = [...savedAnswerTimesOf(messages)];
+	return {
+		...(at.length > 0 ? { studiedAt: new Date(Math.max(...at)).toISOString() } : {}),
+		studiedDays: [...new Set(at.map(day))].sort(),
+		...(answered.length > 0 ? { answeredOn: Object.fromEntries(answered.map(([topic, ms]) => [topic, day(ms)])) } : {}),
+	};
 }
 
 /** Persist the full native message list (the record IS the agent state —
  *  Wave B: replay is state.messages = record.messages). SILENT by the
- *  events law — see the SILENCE LAW comment at createChat. */
+ *  events law — see the SILENCE LAW comment at createChat. updatedAt moves
+ *  only with a message the save adds; the app asking his left question
+ *  again as he opens the session is not study, so it keeps the day he left
+ *  it (round 17, M6: a view re-stamped a 9 Nov session "Studied today"). */
 function saveMessages(id: string, messages: LhMessage[]): void {
 	const record = getChat(id);
 	if (!record) throw new Error(`Chat not found: ${id}`);
+	const had = new Set(record.messages.map((m) => m.id));
+	const added = messages.some((m) => !had.has(m.id) && !isQuestionRepose(m));
 	record.messages = messages;
-	record.updatedAt = studyNow().toISOString();
+	if (added) record.updatedAt = studyNow().toISOString();
 	writeChat(record);
 }
 

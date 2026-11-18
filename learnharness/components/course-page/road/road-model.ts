@@ -1,6 +1,6 @@
 import type { ArcHandle, CourseMap } from "@/src/core";
 import type { CourseArcSection } from "@/components/course-page/course-model";
-import { ARC_EXAM_WORDS, arcStartsWords } from "@/components/study-words";
+import { ARC_EXAM_WORDS, ARC_NOT_PLANNED, arcPlannedWords, arcStartsWords } from "@/components/study-words";
 
 /**
  * Where the exam sits on the road (spec: road.md): after the last arc
@@ -28,11 +28,15 @@ export function examStop(map: Pick<CourseMap, "exam" | "topics">, sections: read
 }
 
 /** What an arc's line ends in on the road, when it says something: its
- *  first new topic's day while none is started, "Starts 15 Nov". Pure. */
+ *  first new topic's day while none is started, "Starts 15 Nov", or "Not
+ *  planned yet" while the plan has no day for any; an arc under way with a
+ *  topic still to start, the day the plan starts the next, "Planned 10
+ *  Dec" (round 17, m9: arc 7, one topic done, alone had no day). Pure. */
 export function arcStarts(section: CourseArcSection, today: string): string | null {
-	if (section.arc.state !== "new") return null;
-	const days = section.topics.flatMap((t) => (t.topic.starts && t.topic.excluded === undefined ? [t.topic.starts] : [])).sort();
+	if (section.arc.state !== "new" && section.arc.state !== "learning") return null;
+	const days = section.topics.flatMap((t) => (t.topic.starts && t.topic.excluded === undefined && t.topic.introduced == null ? [t.topic.starts] : [])).sort();
 	const first = days.find((d) => d >= today) ?? null;
-	return first ? arcStartsWords(first) : null;
+	if (section.arc.state === "learning") return first ? arcPlannedWords(first) : null;
+	return first ? arcStartsWords(first) : ARC_NOT_PLANNED;
 }
 

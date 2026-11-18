@@ -263,13 +263,15 @@ describe("the header's facts and next lesson", () => {
 		assert.deepEqual(next.lesson.open, { kind: "session", href: "/chat/c1" });
 	});
 
-	it("still takes up the course's next step once he ended today's lesson on it with Done for today, which Home leaves off Today", () => {
-		const left = chat("c1", { title: "Review Span", topics: [h("span")], ended: "left", updatedAt: "2026-11-08T12:00:00.000Z" });
+	it("still takes up the course's next step once he ended today's review on it with Done for today, its answer saved, which Home leaves off Today", () => {
+		const left = chat("c1", { title: "Review Span", topics: [h("span")], ended: "left", updatedAt: "2026-11-08T12:00:00.000Z", answeredOn: { span: "2026-11-08" } });
 		const next = courseNext(course({ tasks: [], focus: null }), [left]);
 		assert.equal(next.lesson.action, "Review");
 		assert.equal(next.lesson.title, "Review Span");
 		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
 		assert.equal(courseNext(course(), [left]).lesson.title, `Continue ${course().map.tasks[0]!.title}`, "with an open task, the line Home still has for the course");
+		// Round 17, M4: left with no answer on Span today, the review is still today's, on Home and here.
+		assert.equal(courseNext(course(), [{ ...left, answeredOn: undefined }]).lesson.title, "Review Span");
 	});
 
 	it("starts a lesson in a course with nothing to review, no task and no current topic", () => {

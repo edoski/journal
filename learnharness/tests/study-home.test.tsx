@@ -373,7 +373,8 @@ describe("what a line of Today reads", () => {
 		assert.deepEqual(short(todayRows([LINALG], [waiting], TODAY).find((r) => r.kind === "session")!), ["reply", "Your turn"]);
 		assert.deepEqual(short(rowOf(LINALG)), ["review", "Due 23 Oct"]);
 		assert.deepEqual(short(rowOf(ANALYSIS)), ["review", "Due 7 Nov"]);
-		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Not right last time: Sequences"]);
+		// A row of one topic names it already: the lapse alone (round 17, m12).
+		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Not right last time"]);
 		assert.deepEqual(short(rowOf({ ...LINALG, due: [] })), ["task", "Left off 5 Nov"], "when the task was left, never the tutor's step");
 		assert.deepEqual(short(rowOf(PROB)), ["next", "Next up"]);
 	});

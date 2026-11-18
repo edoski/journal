@@ -10,7 +10,7 @@
  */
 
 import type { TopicReview } from "./contracts/course-map.ts";
-import { sessionPlanTopicOf, type LhMessage } from "./native-messages.ts";
+import { firstStartedTopicOf, sessionPlanTopicOf, type LhMessage } from "./native-messages.ts";
 
 /** The opening a review is started with: "Review " and the titles. */
 const REVIEW_OPENING = /^Review\s+\S/;
@@ -71,13 +71,17 @@ function reviewOpening(record: { title?: string; topics?: readonly string[]; mes
 }
 
 /** The topic whose lesson a session opened on topics took up: its first
- *  plan teaches a topic it was not opened on, so from that plan on it is
- *  that topic's lesson, no longer the review or lesson it opened as (round
- *  16, M4: "Review Binomial distribution", asked for Poisson, taught a
- *  Poisson lesson that stayed filed under the review, with no task and no
- *  Resume on Poisson's page). Null otherwise. Pure. */
+ *  plan teaches a topic it was not opened on, or before any plan, a probe's
+ *  answer started a topic it was not opened on (`firstStartedTopicOf`), so
+ *  from then on it is that topic's lesson, no longer the review or lesson
+ *  it opened as (round 16, M4: "Review Binomial distribution", asked for
+ *  Poisson, taught a Poisson lesson that stayed filed under the review,
+ *  with no task and no Resume on Poisson's page; round 17, M5: the same
+ *  while still in its probe, since the probe is the first lesson's start).
+ *  Null otherwise. Pure. */
 export function lessonTakenUp(record: { topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): string | null {
-	return planTakesUp(record, sessionPlanTopicOf(record.messages as readonly LhMessage[]));
+	const messages = record.messages as readonly LhMessage[];
+	return planTakesUp(record, sessionPlanTopicOf(messages) ?? firstStartedTopicOf(messages));
 }
 
 /** The topic a session opened on topics takes up as its lesson when its

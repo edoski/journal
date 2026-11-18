@@ -159,3 +159,37 @@ describe("the plan outranks a session he only opened (round 10, 1 m2)", () => {
 		assert.ok(shown.some((r) => lessonTitle(r) === "Start Inner products and orthogonality"), "the plan's new topic is a full line, never an Also today chip");
 	});
 });
+
+/**
+ * Round 17, M4 (3 N2, 1 m4): he closed a four-topic review with Done for
+ * today after answering two of its topics. The close and the calendar said
+ * the rest was still due today, and Home dropped the whole review, since a
+ * session he ended today had no line. A review leaves Home only for the
+ * topics he answered today; the rest keeps its line, which opens the review
+ * that holds it.
+ */
+describe("a review left today keeps its line for the topics it did not answer (round 17, M4)", () => {
+	const course = linalg({ due: ["eigen", "linear-maps"], eigen: "due" });
+	const left = chat({ id: "both-review", title: "Linear Algebra review", ended: "left", review: true, topics: ["eigen", "linear-maps"], ownTopics: ["eigen", "linear-maps"], updatedAt: `${TODAY}T11:00:00.000Z`, answeredOn: { eigen: TODAY } });
+
+	it("lists the unanswered topic's review, which opens the session he left", () => {
+		const rows = todayRows([course], openSessions([left]), TODAY);
+		assert.deepEqual(rows.map(lessonTitle), ["Review Linear maps and their matrices", "Start Inner products and orthogonality"]);
+		const review = rows[0]!;
+		assert.equal(review.kind, "course");
+		const move = review.kind === "course" ? courseMove(course, [left], review.step) : null;
+		assert.deepEqual(move?.kind === "open" && move.chat.id, "both-review", "the press picks the review up where he left it");
+	});
+
+	it("still drops a topic answered today, also from a session that settled after the read", () => {
+		const all = { ...left, answeredOn: { eigen: TODAY, "linear-maps": TODAY } };
+		assert.deepEqual(todayRows([course], openSessions([all]), TODAY).map(lessonTitle), ["Start Inner products and orthogonality"]);
+		const settled = { ...left, ended: "closed" as const };
+		assert.deepEqual(todayRows([course], [], TODAY, [settled]).map(lessonTitle), ["Review Linear maps and their matrices", "Start Inner products and orthogonality"]);
+	});
+
+	it("keeps a topic answered on an earlier day in the same session", () => {
+		const older = { ...left, answeredOn: { eigen: "2026-11-08" } };
+		assert.deepEqual(todayRows([course], openSessions([older]), TODAY).map(lessonTitle), ["Review Eigenvalues and eigenvectors, Linear maps and their matrices", "Start Inner products and orthogonality"]);
+	});
+});

@@ -164,13 +164,16 @@ export function keepWhole(word: readonly MathPiece[]): boolean {
  * lesson. A formula and the letters touching it, or a lone symbol and its
  * hyphenated word, wrap as one word (`keepWhole`). A label with neither
  * renders as plain text. The caller's element keeps its own truncation: a
- * formula is inline, so an ellipsis still cuts the line.
+ * formula is inline, so an ellipsis still cuts the line. Its words are one
+ * run of text, as a plain label's are, so a flex parent (a press, a menu
+ * item) wraps them as words, never as columns of pieces (round 17, M3:
+ * "Review Permutations, | k-permutations | and factorials today").
  */
 export function MathText({ children }: { children: string }) {
 	const words = useMemo(() => mathWords(mathPieces(children)), [children]);
 	if (!words.some((word) => Array.isArray(word) && keepWhole(word))) return <>{children}</>;
 	return (
-		<>
+		<span data-slot="math-run">
 			{words.map((word, index) => {
 				if (!Array.isArray(word)) return <Fragment key={index}>{word.kind === "text" ? word.text : null}</Fragment>;
 				const parts = word.map((piece, at) =>
@@ -188,6 +191,6 @@ export function MathText({ children }: { children: string }) {
 					<Fragment key={index}>{parts}</Fragment>
 				);
 			})}
-		</>
+		</span>
 	);
 }

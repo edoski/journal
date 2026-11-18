@@ -139,7 +139,8 @@ export function shownArcs(map: Pick<CourseMap, "arcs">): readonly CourseMapArc[]
 /** One arc as the course page lists it (spec: course-page.md, "Arcs"). */
 export interface CourseArcSection {
 	arc: CourseMapArc;
-	/** Its topics in path order, each as the groups' rows say it. */
+	/** Its topics in study order (started first, then by planned start), each
+	 *  as the groups' rows say it. */
 	topics: readonly CourseTopic[];
 	/** One of its topics is one Home's Today takes up: the line says
 	 *  "Needs you" in place of where the arc stands. */
@@ -172,8 +173,16 @@ export function courseArcs(course: StudyCourse, chats: readonly ChatListItem[] =
 	const here = currentArc(map);
 	const covers = new Map(arcs.map((arc) => [arc.handle, examCovers(map.exam, arc, map.topics)]));
 	const leavesSomeOut = [...covers.values()].some((c) => c === "part" || c === "none");
+	// In the order he studies them: those started first, in path order, then those to start by the day the plan
+	// starts them, those it has no day for last (round 17, m8: arc 8 listed Eigenvalues, studied first, last).
+	// The map keeps its own order.
+	const NEVER = "9999-12-31";
+	const studyOrder = (a: CourseTopic, b: CourseTopic) => {
+		const started = (row: CourseTopic) => (row.topic.introduced != null ? 0 : 1);
+		return started(a) - started(b) || (started(a) === 1 ? (a.topic.starts ?? NEVER).localeCompare(b.topic.starts ?? NEVER) : 0);
+	};
 	return arcs.map((arc) => {
-		const topics = rows.filter((row) => row.topic.arc === arc.handle);
+		const topics = rows.filter((row) => row.topic.arc === arc.handle).sort(studyOrder);
 		const cover = covers.get(arc.handle);
 		return {
 			arc,
