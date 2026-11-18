@@ -75,7 +75,8 @@ export type VoiceRule =
 	| "not-yet"
 	| "due-reviews"
 	| "undisputed"
-	| "verdict-words";
+	| "verdict-words"
+	| "begun";
 
 export interface VoiceBreak {
 	rule: VoiceRule;

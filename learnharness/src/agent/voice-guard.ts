@@ -278,6 +278,11 @@ const HIS_MARK_WORDS = /\b(?:mark(?:s|ed)?|dispute|re-?mark|card)\b/i;
 /** A reply that says how his answer was judged. */
 const VERDICT_SAID = /\b(?:right|correct|wrong|incorrect)\b/i;
 
+/** Words that start the lesson he is closing (round 17, m19: "…waits
+ *  for you in Linear maps and their matrices, which you start tomorrow"
+ *  closing a lesson he began that morning). */
+const STARTS_IT = /\b(?:which|that) you (?:start|begin)\b|\byou (?:start|begin) (?:it|this(?: lesson)?|the lesson)\b/i;
+
 /** Words that tell him reviews are due: "your Binomial distribution
  *  review is still due today", "due today: your Kernel review". */
 const DUE_REVIEWS = /\breviews?\b[^.?!]{0,40}?\b(?:still )?(?:over)?due\b|\b(?:over)?due (?:today|now)\b[^.?!]{0,60}?\breviews?\b/i;
@@ -654,6 +659,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `He disputed no mark, so say nothing of one, nor of how to dispute it: ${quoted(b.excerpt)}. Leave it out; every mark he has not disputed stands as recorded.`;
 		case "verdict-words":
 			return `His answer's save failed, so his card shows no mark, and this reply never says how his answer was judged: ${quoted(b.excerpt)}. Open on the verdict in words ("Right, …", "Not right: …", "Partly right: …"), then the rest.`;
+		case "begun":
+			return `This lesson began today, so at its close it continues, never starts: ${quoted(b.excerpt)}. Say it continues on its day ("which you continue tomorrow, Monday 9 November").`;
 		case "review-lesson":
 			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
@@ -1378,6 +1385,8 @@ export class VoiceGuard {
 		const markTalk = !this.input.ruling && !HIS_MARK_WORDS.test(this.input.words ?? "") ? sentences(text).find((s) => MARK_TALK.test(s)) : undefined;
 		if (markTalk) out.push({ rule: "undisputed", excerpt: markTalk.trim() });
 		if (this.verdictOwed && !VERDICT_SAID.test(text)) out.push({ rule: "verdict-words", excerpt: first });
+		const startsBegun = kind === "close" && !this.review && this.earlier.length > this.told.length ? sentences(text).find((s) => STARTS_IT.test(s)) : undefined;
+		if (startsBegun) out.push({ rule: "begun", excerpt: startsBegun.trim() });
 		const dueSaid = this.opening && kind !== "close" && !asksPlan ? DUE_REVIEWS.exec(text) : null;
 		if (dueSaid) out.push({ rule: "due-reviews", excerpt: sentences(text).find((s) => DUE_REVIEWS.test(s))?.trim() ?? dueSaid[0] });
 		const asLesson = this.review ? SESSION_AS_LESSON.exec(text) : null;
