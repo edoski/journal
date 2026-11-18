@@ -559,3 +559,28 @@ def test_a_start_whose_need_comes_only_on_the_eve_is_not_ready(
     assert plan["does_not_fit"] == ["variance"]
     assert plan["reasons"]["variance"] == "not_ready"
     assert plan["reasons"]["conditional"] == "full"
+
+
+GUESS = json.loads(
+    (Path(__file__).parent / "golden" / "exam-eve-guess.json").read_text()
+)
+
+
+def test_a_right_guess_on_the_eve_keeps_the_starts_that_need_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 16, 1 M1: on 17 Nov, two days before the Probability exam, a
+    right Random variables answer marked Guessing (o23) moved Expectation's
+    start that day to 29 Nov and Poisson's next day to 26 Nov. A right
+    answer never lowers what a start stands on, so both keep their days."""
+    world = {"checkpoints": {"eve": GUESS}, "steady": GUESS}
+    plan = World(tmp_path, "eve", monkeypatch, capsys, world).plan("2026-11-17")
+    starts = {
+        topic: day["date"]
+        for day in plan["probability"]["plan"]["days"]
+        for topic in day["new"]
+    }
+    assert starts["expectation"] == "2026-11-17", starts
+    assert starts["poisson"] == "2026-11-18", starts
