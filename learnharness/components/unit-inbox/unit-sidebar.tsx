@@ -5,7 +5,7 @@ import Link from "next/link";
 import { CalendarDaysIcon, HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
 import { KEYBOARD_ACTIONS, type ChatListItem, type CourseMapArc, type StudyCourse } from "@/src/core";
 import { useSidebar } from "@/components/sidebar";
-import { filterSessions, opensSearchResult, rankByTitle, useSessionsSidebar } from "@/components/sidebar-state";
+import { filterSessions, opensSearchResult, rankByTitle, titleScore, useSessionsSidebar } from "@/components/sidebar-state";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
 import { ActivitySection, toBlobs, useActivity } from "@/components/activity-dock";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
@@ -38,8 +38,10 @@ export interface FoundArc {
 	arc: CourseMapArc;
 }
 
-/** Every course, arc, topic and session whose title matches the query,
- *  best first, sessions newest first; courses and arcs only when the app has a course page to
+/** Every course, arc, topic and session whose title matches the query
+ *  (`titleScore`), best first, sessions newest first, and `top`, the row
+ *  Enter opens: the best match of all, the first shown on a tie (its
+ *  `data-sidebar-row`); courses and arcs only when the app has a course page to
  *  open, an arc read from the course's map (`map.arcs`). Topics are
  *  every topic on the courses' maps in the inbox's scope, those not
  *  started included (a unit built for each, `unitFor`): the inbox lists
@@ -50,9 +52,9 @@ export function searchInbox(
 	chats: readonly ChatListItem[],
 	query: string,
 	courses: readonly StudyCourse[] = [],
-): { courses: StudyCourse[]; arcs: FoundArc[]; units: Unit[]; sessions: ChatListItem[] } {
+): { courses: StudyCourse[]; arcs: FoundArc[]; units: Unit[]; sessions: ChatListItem[]; top: string | null } {
 	const best = <T,>(items: readonly T[], title: (item: T) => string): T[] => rankByTitle(items, query, title);
-	return {
+	const found = {
 		courses: best(courses, (c) => c.map.title),
 		arcs: best(
 			courses.flatMap((course) => (course.map.arcs ?? []).map((arc) => ({ course, arc }))),
@@ -62,6 +64,18 @@ export function searchInbox(
 		// Sessions are history: newest first, as everywhere they are listed.
 		sessions: filterSessions([...chats], query).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
 	};
+	// In the order the rows are drawn, each with its row's name and title.
+	const shown: Array<[string, string]> = [
+		...found.courses.map((c): [string, string] => [`course:${c.map.workspace}`, c.map.title]),
+		...found.arcs.map(({ course, arc }): [string, string] => [`arc:${course.map.workspace}#${arc.handle}`, arc.title]),
+		...found.units.map((u): [string, string] => [u.key, u.topic.title]),
+		...found.sessions.map((c): [string, string] => [`chat:${c.id}`, c.title]),
+	];
+	const top = shown.reduce<[string, number] | null>((at, [key, title]) => {
+		const score = titleScore(title, query);
+		return at && at[1] >= score ? at : [key, score];
+	}, null);
+	return { ...found, top: top?.[0] ?? null };
 }
 
 /** The inbox's units, then a unit for every other topic on the maps of
@@ -233,7 +247,7 @@ export function UnitSidebar() {
 												focusFirstRow();
 												return;
 											}
-											s.onSearchKeyDown(e, found?.sessions ?? null);
+											s.onSearchKeyDown(e, found?.sessions ?? null, found?.top ?? null);
 										}}
 										placeholder="Search"
 										aria-label={SEARCH_LABEL}
