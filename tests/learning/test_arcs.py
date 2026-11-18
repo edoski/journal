@@ -539,13 +539,28 @@ def placed(workspace: Workspace, topics: dict[str, Any]) -> dict[str, str]:
     return result
 
 
-def test_a_new_topic_lands_in_the_current_arc_when_its_range_allows(
+def test_a_new_topic_lands_in_its_prerequisites_arc_not_the_current_one(
+    workspace: Workspace,
+) -> None:
+    """Round 16, AIKR: a Prolog topic needing only Prolog topics landed in the
+    arc he was studying, "Uncertainty and probability"."""
+    formed(workspace, path={"arcs": ORDER, "current": "ftc"})
+    assert placed(
+        workspace,
+        {
+            "one-sided": {"title": "One-sided limits", "needs": ["limit"]},
+            "quotient": {"title": "Quotient rule", "needs": ["limit", "derivative"]},
+        },
+    ) == {"one-sided": "limits", "quotient": "derivatives"}
+
+
+def test_a_new_topic_with_no_prerequisite_lands_in_the_current_arc(
     workspace: Workspace,
 ) -> None:
     formed(workspace, path={"arcs": ORDER, "current": "derivative"})
-    assert placed(
-        workspace, {"one-sided": {"title": "One-sided limits", "needs": ["limit"]}}
-    ) == {"one-sided": "derivatives"}
+    assert placed(workspace, {"notation": {"title": "Leibniz notation"}}) == {
+        "notation": "derivatives"
+    }
 
 
 def test_else_at_the_nearer_end_of_its_range(workspace: Workspace) -> None:
