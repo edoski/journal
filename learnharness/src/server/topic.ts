@@ -156,27 +156,32 @@ export function firstReviewOf(plan: unknown, handle: string): string | null {
 	return plannedOf(plan, { topics: [{ handle } as never] }).find((day) => day.reviews.includes(handle as never))?.date ?? null;
 }
 
-/** Every topic of a course as the engine shows it, in one read kept until a
- *  record changes; null when the course's map cannot be read or has no
- *  topics. Showing a topic replays the course's plan, and a topic's item is
- *  the same whatever else is shown beside it, so one read serves every topic
- *  page of the course where each topic ran its own (round 15, P7). */
+/** Every topic and open task of a course as the engine shows them, in one
+ *  read kept until a record changes; null when the course's map cannot be
+ *  read or has no topics. Showing a topic replays the course's plan, and an
+ *  item is the same whatever else is shown beside it, so one read serves
+ *  every topic page of the course where each topic ran its own (round 15, P7). */
 export async function topicsShown(workspace: string): Promise<CourseResult | null> {
 	const map = await homeMap(workspace);
 	if (!map.ok || map.map.topics.length === 0) return null;
-	return stores.courseRecords.run(workspace, { verb: "show", handles: map.map.topics.map((t) => t.handle) });
+	return stores.courseRecords.run(workspace, { verb: "show", handles: [...map.map.topics.map((t) => t.handle), ...map.map.tasks.map((t) => t.key)] });
 }
 
-/** The topic and the tasks that hold it, as one `show` prints them: the topic
- *  from the course's kept read of every topic (`topicsShown`), the tasks
+/** The topic and the tasks that hold it, as one `show` of them prints them:
+ *  from the course's kept read (`topicsShown`), the tasks it does not hold
  *  (no plan to replay) read beside it; one `show` of them all where that read
  *  does not hold the topic. */
 async function shownFor(workspace: string, handle: string, taskKeys: readonly string[]): Promise<CourseResult> {
 	const alone = () => stores.courseRecords.run(workspace, { verb: "show", handles: [handle, ...taskKeys] });
-	const [every, tasks] = await Promise.all([topicsShown(workspace), taskKeys.length > 0 ? stores.courseRecords.run(workspace, { verb: "show", handles: [...taskKeys] }) : null]);
+	const every = await topicsShown(workspace);
 	const topics = every?.ok ? record(every.json) : null;
-	if (!topics || !record(topics.items)?.[handle] || (tasks && !tasks.ok)) return alone();
-	const held = tasks?.ok ? (record(tasks.json) ?? {}) : {};
+	const items = record(topics?.items);
+	if (!topics || !items?.[handle]) return alone();
+	const missing = taskKeys.filter((key) => !items[key]);
+	if (missing.length === 0) return { ok: true, json: topics };
+	const tasks = await stores.courseRecords.run(workspace, { verb: "show", handles: missing });
+	if (!tasks.ok) return alone();
+	const held = record(tasks.json) ?? {};
 	const merged = (key: string) => ({ ...record(topics[key]), ...record(held[key]) });
 	return { ok: true, json: { ...topics, items: merged("items"), evidence: merged("evidence"), sources: merged("sources") } };
 }

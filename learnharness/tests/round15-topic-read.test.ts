@@ -27,11 +27,11 @@ type CourseMap = import("../src/core/contracts/course-map.ts").CourseMap;
 
 const W = "/s/algebra";
 
-function world() {
+function world(tasks: { key: string }[] = []) {
 	const shows: string[][] = [];
 	const records: CourseRecords = {
 		list: async () => ({ available: true, courses: [{ workspace: W, title: "Algebra", due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null }], unreadable: [] }),
-		map: async (workspace) => ({ ok: true, map: { workspace, title: "Algebra", today: "2026-11-14", revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [{ handle: "rank" }, { handle: "kernel" }], edges: [] } as unknown as CourseMap }),
+		map: async (workspace) => ({ ok: true, map: { workspace, title: "Algebra", today: "2026-11-14", revision: 1, exam: null, current: null, focus: null, tasks, topics: [{ handle: "rank" }, { handle: "kernel" }], edges: [] } as unknown as CourseMap }),
 		run: async (_workspace, verb) => {
 			if (verb.verb !== "show" || verb.handles === "all") return { ok: false, kind: "io", message: "unused" };
 			shows.push([...verb.handles]);
@@ -74,14 +74,21 @@ describe("a topic page reads its course's topics once (round 15, P7)", () => {
 		assert.deepEqual(shows(), [["rank", "kernel"]]);
 	});
 
-	it("takes the topic from the course's read and the tasks that hold it from their own, and shows a topic the map does not list alone", async () => {
+	it("takes the topic from the course's read, a task that read does not hold from its own, and shows a topic the map does not list alone", async () => {
 		const shows = world();
 		const held = await topicRead(W, "rank", ["sheet-4"], []);
 		assert.ok(held.body.ok);
 		assert.deepEqual(held.body.record?.tasks, [{ key: "sheet-4", updated: "2026-11-10" }]);
 		assert.deepEqual(held.body.record?.attempts.map((a) => a.text), ["On rank"]);
-		assert.deepEqual(shows.map((s) => s.join(" ")).sort(), ["rank kernel", "sheet-4"], "the course's show, and the tasks' beside it");
+		assert.deepEqual(shows.map((s) => s.join(" ")), ["rank kernel", "sheet-4"], "the course's show, then a task it does not hold");
 		await topicRead(W, "limits", [], []);
 		assert.deepEqual(shows.at(-1), ["limits"]);
+	});
+
+	it("an open task the course's map lists comes in the course's one read", async () => {
+		const shows = world([{ key: "sheet-4" }]);
+		const held = await topicRead(W, "rank", ["sheet-4"], []);
+		assert.deepEqual(held.body.ok && held.body.record?.tasks, [{ key: "sheet-4", updated: "2026-11-10" }]);
+		assert.deepEqual(shows, [["rank", "kernel", "sheet-4"]]);
 	});
 });
