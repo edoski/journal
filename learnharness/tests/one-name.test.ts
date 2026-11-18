@@ -11,7 +11,9 @@ import { COURSE, LA, LEFT, TODAY, chat, map, topic } from "./fixtures/round8-hom
 
 describe("one piece of work, one name (1 D9)", () => {
 	it("names a lesson opened on a topic after the topic, never the verb that opened it; a review keeps its words", () => {
-		assert.equal(openingTitle("Start Linear maps and their matrices", ["linmaps"]), "Linear maps and their matrices");
+		assert.equal(openingTitle("Start Linear maps and their matrices", ["linmaps"]), "Linear maps and their matrices lesson", "named as its task will be, from its first turn (round 16, m4)");
+		assert.equal(openingTitle("Invertible matrices", ["invertibility"]), "Invertible matrices lesson");
+		assert.equal(openingTitle("Vector spaces check", ["vectors"], false), "Vector spaces check", "an arc's check or a practice round keeps its words");
 		assert.equal(openingTitle("Continue Problem sheet 4: rank and nullity", ["rank"]), "Problem sheet 4: rank and nullity");
 		assert.equal(openingTitle("Review Binomial distribution", ["binomial"]), "Review Binomial distribution");
 		assert.equal(openingTitle("Start with the basics", []), "Start with the basics", "a typed opening keeps its words");

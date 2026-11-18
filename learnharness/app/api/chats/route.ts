@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 	// (Ask the tutor), which shows as his message (round 13, 1 n8). It is
 	// opened on no topic: it belongs to those its work is on (round 16, M3).
 	const named = name !== null;
-	const chat = createChat(titleFromPrompt(name ?? (openingTitle(title, topics) || "Untitled session")), course, named ? [] : topics, arcCheck, named);
+	const chat = createChat(titleFromPrompt(name ?? (openingTitle(title, topics, !practice && !arcCheck) || "Untitled session")), course, named ? [] : topics, arcCheck, named);
 	const opening: LhMessage[] = practice ? [newSessionModeMessage("practice") as LhMessage] : [];
 	if (resumed) {
 		// The lesson's plan carries over as this session's plan map, so the

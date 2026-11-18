@@ -325,7 +325,7 @@ describe("Today", () => {
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
 			// The course's badge leads each line with its two letters (the Visual system, shipped 17 Nov 2026).
-			["LALinear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "RAReal AnalysisReview SequencesDue since 7 Nov", "LALinear AlgebraEigen lessonYour turn", "PProbabilityContinue Bayes' ruleNot right last time", "LALinear AlgebraContinue Problem sheet 4Left off 5 Nov"],
+			["LALinear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "RAReal AnalysisReview SequencesDue since 7 Nov", "LALinear AlgebraContinue Eigen lessonYour turn", "PProbabilityContinue Bayes' ruleNot right last time", "LALinear AlgebraContinue Problem sheet 4Left off 5 Nov"],
 		);
 		assert.equal(lines[2]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
@@ -426,7 +426,7 @@ describe("what a line of Today reads", () => {
 		assert.deepEqual(lines, [
 			"LALinear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct",
 			"RAReal AnalysisReview SequencesDue since 7 Nov",
-			"LALinear AlgebraEigen lessonYour turn",
+			"LALinear AlgebraContinue Eigen lessonYour turn",
 			"PProbabilityContinue Bayes' ruleNot right last time",
 			"LALinear AlgebraContinue Problem sheet 4Left off 5 Nov",
 		]);

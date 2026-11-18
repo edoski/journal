@@ -687,7 +687,8 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		const id = opened!.slice(6);
 		await app.navigate(opened!);
 		invertible = { id, call: app.pose(id, "Which inputs does $A$ send to zero?") };
-		const title = app.record(id).title;
+		// Home's line and its card name the lesson after its verb (round 16, m4).
+		const title = `Continue ${app.record(id).title}`;
 		await app.settle(() => app.sidebarCards().some((c) => c.title === title), 20_000);
 		// Back on Home while the engine's course reads are slow (round 13: 6.5 s and more under load).
 		const problems: string[] = [];
@@ -779,7 +780,7 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 });
 		// Eigen's review is due today, and the Eigen lesson left yesterday is open on it, so the review is that lesson's
 		// line, where his answers count as it (round 15, m6).
-		const line = app.homeLines().find((l) => l.course === "Linear Algebra" && (l.title.startsWith("Review ") || l.title.startsWith("Eigenvalues and eigenvectors")));
+		const line = app.homeLines().find((l) => l.course === "Linear Algebra" && (l.title.startsWith("Review ") || l.title.startsWith("Continue Eigenvalues and eigenvectors")));
 		assert.ok(line, `Home offers a Linear Algebra review: ${app.homeLines().map((l) => l.title).join(" | ")}`);
 		assert.ok(app.homeLines().filter((l) => /Eigenvalues and eigenvectors/.test(l.title)).length === 1, `one line for Eigen: ${app.homeLines().map((l) => `${l.title} · ${l.status}`).join(" | ")}`);
 		const opened = await app.press(line.el);

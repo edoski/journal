@@ -230,7 +230,8 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 					// edge endpoints, self-loops, cycles → PlanTreeError).
 					const next = createTree(parsed.plan.nodes, parsed.plan.edges);
 					// Every problem at once, so one rewrite fixes them all.
-					const lesson = { topic: goal?.topic, titles: [goal?.title, record.title].filter((t): t is string => typeof t === "string") };
+					// A lesson is named "<topic> lesson" (`openingTitle`): a step named after its topic is the lesson too.
+					const lesson = { topic: goal?.topic, titles: [goal?.title, record.title, record.title?.replace(/\s+lesson$/i, "")].filter((t): t is string => typeof t === "string") };
 					const taught = record.tree ? derivePlanStatusesLh(record.tree, record.messages) : null;
 					const problems = [planMapTooBig(next), planTitlesGiveAway(next), planStepIsTheTopic(next, lesson), planDropsSteps(record.tree, next, (taught?.visited.size ?? 0) > 0 || taught?.current != null, taught?.done ?? new Set())].filter((p): p is string => p !== null);
 					if (problems.length > 0) return { ok: false, error: problems.join("\n") };

@@ -42,6 +42,6 @@ describe("one session, one name (round 15, m5)", () => {
 		const course = LINALG as StudyCourse;
 		const lesson = (ended: "left" | "mid-lesson") => chat("lm", { title: "Linear maps and their matrices lesson", ended, pendingQuestion: ended === "mid-lesson", course: { workspace: course.map.workspace, title: course.map.title } });
 		assert.equal(lessonTitle({ kind: "session", chat: lesson("left"), course }), lessonTitle({ kind: "session", chat: lesson("mid-lesson"), course }));
-		assert.equal(lessonTitle({ kind: "session", chat: lesson("left"), course }), "Linear maps and their matrices lesson");
+		assert.equal(lessonTitle({ kind: "session", chat: lesson("left"), course }), "Continue Linear maps and their matrices lesson", "after its verb, as every line (round 16, m4)");
 	});
 });

@@ -46,7 +46,7 @@ describe("todayTop", () => {
 		);
 		assert.deepEqual(
 			top.map((i) => (i.kind === "topic" ? i.unit.topic.title : i.line.title)),
-			["Random variables and distributions", "Linear independence", "Convergent sequences", "Chain rule", "Eigenvalues lesson"],
+			["Random variables and distributions", "Linear independence", "Convergent sequences", "Chain rule", "Continue Eigenvalues lesson"],
 			"each course's review first, then the lesson he is in today, the other sessions waiting on him folded after it (round 10, 1 m2; round 11, 3 n5)",
 		);
 		assert.ok(top.length <= 5);
@@ -300,7 +300,7 @@ describe("TodayList", () => {
 		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
-			["Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence", "Review Convergent sequences, Cauchy sequences", "Review Chain rule, Riemann sums, Improper integrals", "Eigenvalues lesson"],
+			["Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence", "Review Convergent sequences, Cauchy sequences", "Review Chain rule, Riemann sums, Improper integrals", "Continue Eigenvalues lesson"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),

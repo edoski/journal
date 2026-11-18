@@ -30,7 +30,7 @@ describe("a promised review on Home (1 D3)", () => {
 		const rows = todayRows([COURSE], openSessions([LEFT, review]), TODAY);
 		assert.deepEqual(rows.map(lessonTitle), ["Review Eigenvalues and eigenvectors"], "the review session is the review's line");
 		const done = { ...COURSE, due: [], map: map({ topics: [topic("eigen", "Eigenvalues and eigenvectors", { review: { kind: "scheduled", date: "2026-11-19" } })] }) };
-		assert.deepEqual(needsYouNow([done], [LEFT], TODAY).rows.map(lessonTitle), ["Eigenvalues and eigenvectors"]);
+		assert.deepEqual(needsYouNow([done], [LEFT], TODAY).rows.map(lessonTitle), ["Continue Eigenvalues and eigenvectors"]);
 	});
 
 	it("tells a review session from a lesson by its opening", () => {

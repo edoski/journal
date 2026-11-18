@@ -106,11 +106,19 @@ export function reviewRecord(record: { title: string; topics?: readonly string[]
 }
 
 /** The name a session opened on topics takes from its opening: a review
- *  keeps "Review A, B"; a lesson drops the verb that opened it ("Start
- *  Poisson distribution" is named "Poisson distribution"); anything else,
- *  or a session opened on no topic, keeps its words. */
-export function openingTitle(opening: string, topics: readonly string[]): string {
-	return topics.length > 0 ? opening.replace(LESSON_VERB, "") : opening;
+ *  keeps "Review A, B"; work continued drops its verb ("Continue Problem
+ *  sheet 4" is named "Problem sheet 4"); a lesson started is named as its
+ *  task will be, from its first turn ("Start Poisson distribution" and
+ *  "Poisson distribution" are "Poisson distribution lesson"; round 16, m4:
+ *  "Invertible matrices" while live, "Invertible matrices lesson" after
+ *  its close). Anything else (a practice round, an arc's check), or a
+ *  session opened on no topic, keeps its words. */
+export function openingTitle(opening: string, topics: readonly string[], lesson = true): string {
+	if (topics.length === 0 || REVIEW_OPENING.test(opening)) return opening;
+	if (/^Continue\s/.test(opening)) return opening.replace(LESSON_VERB, "");
+	if (!lesson) return opening;
+	const named = opening.replace(LESSON_VERB, "").trim();
+	return /\blesson$/i.test(named) ? named : `${named} lesson`;
 }
 
 /** Whether memory asks for the topic's review by `today`, the engine's
