@@ -48,6 +48,11 @@ export interface CourseToolContext {
 	 *  here keeps no task (round 9, 2 m4: a review turned into teaching saved
 	 *  "Re-learn checking independence"). */
 	review?: boolean;
+	/** The topics this session teaches as its lesson when a save runs
+	 *  (session-opening.ts `lessonTopicsOf`): an answer on none of them is
+	 *  saved `aside`, so a check in a side question never starts its topic
+	 *  (round 17, m3). Absent or empty: no answer is aside. */
+	lessonTopics?: () => readonly string[];
 	/** The steps of this session's lesson plan as they stand when a save
 	 *  runs (the plan may be written in the same turn). Absent: none. */
 	planSteps?: () => readonly { id: string; title: string }[];
@@ -73,6 +78,20 @@ function planStepAsTopic(ctx: CourseToolContext, patch: Record<string, unknown> 
 	});
 	if (made.length === 0) return null;
 	return `topics: ${made.map(([h]) => h).join(", ")} ${made.length > 1 ? "are steps" : "is a step"} of this lesson's plan, not ${made.length > 1 ? "course topics" : "a course topic"}. A step lives on the lesson's map; what he did on it is saved to the lesson's own topic. Leave ${made.length > 1 ? "them" : "it"} out of topics and send the rest.`;
+}
+
+/** Each answer on none of the lesson's topics marked `aside`: a check in a
+ *  side question is kept, and counts once its topic has an answer of its
+ *  own, but never starts it or takes its first lesson away (round 17, m3:
+ *  one Guessing answer on Similar matrices in the Linear maps lesson left
+ *  it "Right, but a guess" with no Start, and moved Diagonalization). */
+function asideOf(ctx: CourseToolContext, observations: readonly unknown[]): unknown[] {
+	const lesson = ctx.lessonTopics?.() ?? [];
+	if (lesson.length === 0) return [...observations];
+	return observations.map((o) => {
+		if (!isObject(o) || (o.kind ?? "attempt") !== "attempt" || "corrects" in o || !Array.isArray(o.topics) || o.topics.length === 0) return o;
+		return o.topics.some((t) => lesson.includes(t as string)) ? o : { ...o, aside: true };
+	});
 }
 
 /** Why a review's save is refused: it keeps a task. A task removed (null)
@@ -307,7 +326,7 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 		const question = named.questions[i];
 		return question ? answers.get(question)?.seenBefore === true : problem?.seen === true;
 	});
-	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: { ...patch, observations: ruled.observations } });
+	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: { ...patch, observations: asideOf(ctx, ruled.observations) } });
 	if (result.ok) for (const key of problem ? [problem.id] : named.questions) if (key) saved.add(key);
 	// A problem's attempts are kept under its conclude, so its card shows while
 	// the turn still runs (round 15, 2 D2: First try / Then came only after a

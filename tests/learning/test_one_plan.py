@@ -820,3 +820,61 @@ def test_a_moved_day_s_reason_fits_the_way_it_moved(
             else:
                 assert "ready" not in move, (name, topic["topic"], move)
     assert moves, "the day moves something"
+
+
+def test_a_check_in_a_side_question_keeps_its_topic_s_first_lesson(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 17, m3 (4 minor 4): in the Linear maps lesson he asked why
+    similar matrices have the same eigenvalues and answered the tutor's check
+    at Guessing. Similar matrices, never started, then read "Right, but a
+    guess" with no Start, and Diagonalization moved "since Similar matrices
+    is not solid yet". An answer given inside another topic's lesson
+    (``aside``) is kept, and counts once the topic has its own answer: it
+    never starts the topic or removes its first lesson."""
+    seeded = World(tmp_path, "seed", monkeypatch, capsys, R17)
+
+    def plan() -> tuple[dict[str, str], str]:
+        found = seeded.plan("2026-11-08")["linear-algebra"]
+        starts = {t: d["date"] for d in found["plan"]["days"] for t in d["new"]}
+        level = next(
+            t["level"]
+            for t in seeded.run("linear-algebra", "map", day="2026-11-08")["topics"]
+            if t["topic"] == "similarity"
+        )
+        return starts, level
+
+    def save(*answers: dict[str, Any]) -> None:
+        monkeypatch.setenv("LEARNING_TODAY", "2026-11-08")
+        monkeypatch.setattr(
+            sys, "stdin", io.StringIO(json.dumps({"observations": list(answers)}))
+        )
+        assert main(["--workspace", str(seeded.roots["linear-algebra"]), "save"]) == 0
+        capsys.readouterr()
+
+    before, level = plan()
+    assert level == "new" and "similarity" in before and "diagonalization" in before
+    check = {
+        "topics": ["similarity"],
+        "text": "Told why similar matrices share their eigenvalues",
+        "response": "det(P^-1AP - tI) = det(A - tI)",
+        "result": "correct",
+        "help": "none",
+        "sure": "guess",
+    }
+    save({**check, "aside": True})
+    after, level = plan()
+    assert level == "new", "the side check started no topic"
+    assert after["similarity"] == before["similarity"], "its first lesson keeps its day"
+    assert after["diagonalization"] == before["diagonalization"]
+    record = json.loads(
+        (seeded.roots["linear-algebra"] / ".study" / "course.json").read_text()
+    )
+    kept = [o for o in record["observations"].values() if o.get("aside")]
+    assert [o["topics"] for o in kept] == [["similarity"]], "kept in his history"
+    save(
+        {**check, "text": "Showed similar matrices share a trace", "sure": "confident"}
+    )
+    assert plan()[1] != "new", "once he answers it on its own, the topic is started"

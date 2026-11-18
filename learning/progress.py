@@ -28,7 +28,7 @@ from itertools import groupby
 from typing import Any
 
 from learning import arc_rules, memo, preferences
-from learning.schema import PatchResult, counts, number, unaided
+from learning.schema import PatchResult, counts, counts_aside, number, unaided
 
 LADDER = (3, 7, 16, 35, 75, 160)
 INTERVALS = {"missed": 1, "helped": 2}
@@ -285,14 +285,26 @@ def positions(observations: dict[str, Any]) -> dict[str, int]:
 
 
 def _histories(observations: dict[str, Any]) -> dict[str, _History]:
+    """Each topic's effective attempts. An answer given inside another
+    topic's lesson (``aside``) counts once the topic has an answer of its
+    own that counts; until then it stays in the history only, so a check in
+    a side question never starts a topic or takes its first lesson away
+    (round 17, m3: one answer on Similar matrices in the Linear maps lesson
+    made it "Right, but a guess" with no Start, and moved Diagonalization)."""
     histories: dict[str, _History] = defaultdict(_History)
     place = positions(observations)
+    aside: dict[str, list[Attempt]] = defaultdict(list)
     for key, item in effective(observations).items():
         for topic in item["topics"]:
             history = histories[topic]
             history.latest = max(history.latest, item["date"])
             if counts(item):
                 history.attempts.append((key, item))
+            elif counts_aside(item):
+                aside[topic].append((key, item))
+    for topic, items in aside.items():
+        if histories[topic].attempts:
+            histories[topic].attempts.extend(items)
     for history in histories.values():
         history.attempts.sort(
             key=lambda pair: (pair[1]["date"], place[pair[0]], number(pair[0]))

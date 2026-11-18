@@ -10,7 +10,7 @@
  */
 
 import type { TopicReview } from "./contracts/course-map.ts";
-import { firstStartedTopicOf, sessionPlanTopicOf, type LhMessage } from "./native-messages.ts";
+import { firstStartedTopicOf, sessionPlanTopicOf, sessionTaskTopicsOf, type LhMessage } from "./native-messages.ts";
 
 /** The opening a review is started with: "Review " and the titles. */
 const REVIEW_OPENING = /^Review\s+\S/;
@@ -107,6 +107,19 @@ export function isReviewSession(chat: { title: string; review?: boolean; ownTopi
  *  tools and the digest read a review the same way. */
 export function reviewRecord(record: { title: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): boolean {
 	return lessonTakenUp(record) === null && (openedAsReview(record) || isReviewSession(record));
+}
+
+/** The topics a session teaches as its lesson: the topics a session not a
+ *  review was opened on, the topic its plan teaches and the topics of the
+ *  task it took up. None for a review, which asks across its topics and may
+ *  start one he asks for (round 17, M5), nor for a session opened on no
+ *  topic before its plan. An answer on none of them was given inside
+ *  another topic's lesson (round 17, m3). Pure. */
+export function lessonTopicsOf(record: { title: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): string[] {
+	if (reviewRecord(record)) return [];
+	const messages = record.messages as readonly LhMessage[];
+	const planned = sessionPlanTopicOf(messages);
+	return [...new Set([...(record.topics ?? []), ...(planned ? [planned] : []), ...sessionTaskTopicsOf(messages)])];
 }
 
 /** The name a session opened on topics takes from its opening: a review

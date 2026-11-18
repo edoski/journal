@@ -166,6 +166,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "shown": _FLAG,
         "gave_up": _FLAG,
         "predicted": _FLAG,
+        "aside": _FLAG,
         "date": _DAY,
         "task": _HANDLE,
         "refs": _REFS,
@@ -334,6 +335,7 @@ class Observation(TypedDict, total=False):
     shown: bool
     gave_up: bool
     predicted: bool
+    aside: bool
     date: str
     task: str
     refs: list[Reference]
@@ -857,8 +859,21 @@ def counts(observation: dict[str, Any]) -> bool:
     except a prediction made before its step was taught (``predicted``).
     Before the teaching a wrong guess is expected, so it says nothing about
     what is held, and a right one is not yet recall of what was taught; it
-    stays in the history as what happened."""
-    return observation["kind"] in SCHEDULING_KINDS and not observation.get("predicted")
+    stays in the history as what happened. An answer given inside another
+    topic's lesson (``aside``) is no start either: it moves nothing, and
+    counts for its topic's level only once the topic has an answer that
+    counts (``progress``)."""
+    return (
+        observation["kind"] in SCHEDULING_KINDS
+        and not observation.get("predicted")
+        and not observation.get("aside")
+    )
+
+
+def counts_aside(observation: dict[str, Any]) -> bool:
+    """An answer that would count but was given inside another topic's
+    lesson (``aside``)."""
+    return bool(observation.get("aside")) and counts({**observation, "aside": False})
 
 
 def _predictions_alone(
@@ -1040,6 +1055,11 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
                 f"{path}.predicted marks a prediction made in a session before "
                 "its step was taught; an exam is never one"
             )
+        if "aside" in observation:
+            raise ValueError(
+                f"{path}.aside marks an answer given inside another topic's "
+                "lesson; an exam is never one"
+            )
     else:
         given = [
             name
@@ -1052,6 +1072,7 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
                 "shown",
                 "gave_up",
                 "predicted",
+                "aside",
             )
             if name in observation
         ]
