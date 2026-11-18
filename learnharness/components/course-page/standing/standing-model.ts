@@ -80,10 +80,10 @@ export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topi
 }
 
 /** One open mistake as a row: the topic, what went wrong in the tutor's
- *  words (the diagnosis, else the newest answer), its slip's icon, when,
- *  whether it had help, what it was on, the topic's arc, and what
- *  a press does: Resume the session that waits on the topic, else start
- *  one on it, as the sidebar's rows do. */
+ *  words (the diagnosis, else the newest answer), its slip's
+ *  icon, when, whether it had help, what it was on, and what a press does:
+ *  Resume the session that waits on the topic, else start one on it, as
+ *  the sidebar's rows do. */
 export interface MistakeRow {
 	topic: CourseMapTopic;
 	slip: SlipKey;
@@ -93,7 +93,6 @@ export interface MistakeRow {
 	helped: boolean;
 	/** What it was on, with his answer: the row's hint. */
 	hint: string | null;
-	arc: NamedArc | null;
 	/** The session its press opens: the one the topic's page would. */
 	resume: ChatListItem | null;
 	/** What its press starts when it opens none: the open task continued
@@ -120,13 +119,12 @@ function mistakeDayWords(day: string, today: string): string {
 }
 
 /** The open mistakes in the engine's order, newest first, as rows; a
- *  topic the map no longer lists is left out. `arcs` are the arcs the page
- *  shows, whose names the rows wear. A row's press is its topic page's
+ *  topic the map no longer lists is left out. A row's press is its topic page's
  *  action (`topicAction`): the session waiting on the topic, else the open
  *  task continued from the lesson that holds it, else a session on the
  *  topic (round 10, 2 m1: the Eigen row started a fresh session while the
  *  lesson's task waited). */
-export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats: readonly ChatListItem[], arcs: readonly CourseArcSection[] | null): MistakeRow[] {
+export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats: readonly ChatListItem[]): MistakeRow[] {
 	const { map } = course;
 	return standing.mistakes.flatMap((m) => {
 		const topic = map.topics.find((t) => t.handle === m.topic);
@@ -144,7 +142,6 @@ export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats
 				when: m.latest ? mistakeDayWords(m.latest, map.today) : null,
 				helped: Boolean(newest?.helped),
 				hint: said.length > 0 ? said.join(". ") : null,
-				arc: arcs && topic.arc ? namedArc(arcs.map((s) => s.arc), topic.arc) : null,
 				...pressOf(topic, map, chats),
 				workspace: map.workspace,
 				href: unitHref(map.workspace, topic.handle),

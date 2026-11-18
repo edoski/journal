@@ -24,7 +24,7 @@ const h = (handle: string) => handle as TopicHandle;
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const topic = (handle: string, title: string, over: Partial<CourseMapTopic> = {}): CourseMapTopic => ({ handle: h(handle), title, level: "new", introduced: null, review: null, weak: false, signals: QUIET, tasks: [], ...over });
 
-const mistake = (handle: string, title: string, arc: [number, string, string], words: string, when: string): MistakeRow =>
+const mistake = (handle: string, title: string, words: string, when: string): MistakeRow =>
 	({
 		topic: topic(handle, title),
 		slip: "confident",
@@ -32,7 +32,6 @@ const mistake = (handle: string, title: string, arc: [number, string, string], w
 		when,
 		helped: false,
 		hint: null,
-		arc: { number: arc[0], handle: arc[1], title: arc[2] },
 		resume: null,
 		creation: {},
 		workspace: "/study/la",
@@ -40,10 +39,10 @@ const mistake = (handle: string, title: string, arc: [number, string, string], w
 	}) as unknown as MistakeRow;
 
 export const MISTAKES: MistakeRow[] = [
-	mistake("rank", "Rank and the column space", [4, "systems", "Linear systems and rank"], "You count nonzero entries instead of pivots, and mix up the number of rows with the number of columns when you subtract the rank from the dimension.", "Today"),
-	mistake("eigen", "Eigenvalues and eigenvectors", [6, "diagonal", "Diagonalization by change of basis"], "Explained why an eigenvector stays on its own line under A by its length, not its direction, and took a repeated eigenvalue to rule out a diagonal form.", "Today"),
-	mistake("matmul", "Matrix multiplication", [3, "maps", "Linear maps and matrices"], "Multiplied a 2 × 3 by a 3 × 2 matrix and gave a 3 × 3 result, reading the inner sizes as the outer ones.", "5 Nov"),
-	mistake("elimination", "Gaussian elimination", [4, "systems", "Linear systems and rank"], "Reached for Cramer's rule on a 4 × 4 system and stalled on the determinants instead of eliminating the first column.", "5 Nov"),
+	mistake("rank", "Rank and the column space", "You count nonzero entries instead of pivots, and mix up the number of rows with the number of columns when you subtract the rank from the dimension.", "Today"),
+	mistake("eigen", "Eigenvalues and eigenvectors", "Explained why an eigenvector stays on its own line under A by its length, not its direction, and took a repeated eigenvalue to rule out a diagonal form.", "Today"),
+	mistake("matmul", "Matrix multiplication", "Multiplied a 2 × 3 by a 3 × 2 matrix and gave a 3 × 3 result, reading the inner sizes as the outer ones.", "5 Nov"),
+	mistake("elimination", "Gaussian elimination", "Reached for Cramer's rule on a 4 × 4 system and stalled on the determinants instead of eliminating the first column.", "5 Nov"),
 ];
 
 const course: StudyCourse = {

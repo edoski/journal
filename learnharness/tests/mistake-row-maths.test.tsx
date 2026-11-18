@@ -27,7 +27,6 @@ const row: MistakeRow = {
 	when: "Today",
 	helped: false,
 	hint: null,
-	arc: null,
 	resume: null,
 	workspace: "/study/linalg",
 	creation: { title: eigen.title, course: { workspace: "/study/linalg" }, topics: ["eigen"] },

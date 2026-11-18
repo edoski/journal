@@ -24,7 +24,7 @@ const ICON: Record<ExamReady["kind"], typeof CircleCheckIcon> = { ready: CircleC
 export function useHeadStanding(view: CourseView, standing: CourseStanding | null) {
 	const { course, arcs, chats } = view;
 	const ready = useMemo(() => (standing?.readiness ? examReady(standing.readiness, course.map, arcs, standing.mistakes) : null), [standing, course.map, arcs]);
-	const mistakes = useMemo(() => (standing ? mistakeRows(standing, course, chats, arcs) : []), [standing, course, chats, arcs]);
+	const mistakes = useMemo(() => (standing ? mistakeRows(standing, course, chats) : []), [standing, course, chats]);
 	return { ready, mistakes };
 }
 
