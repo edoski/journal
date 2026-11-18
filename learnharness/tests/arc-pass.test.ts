@@ -911,6 +911,22 @@ describe("the grouping pass (real engine, scripted model)", { skip: realEngineMi
 		assert.match(purposeAnswerProblems({ false: [], names: [{ arc: "Sorting", why: "x" }] }, quiz)!, /"Sorting" is no arc name/);
 	});
 
+	it("an arc whose topics, read without its name and line, answer two questions sends the cut back, even when its line is true of every topic", () => {
+		const cut: ArcSubmit = { basis: "chapters", arcs: [arc("limits", "Limits", ["limits", "continuity"]), arc("calculus", "Calculus beyond limits", ["derivative", "chain", "riemann"])] };
+		const quiz = purposeQuiz(cut, view(CALC), arcPassChanges(cut, view(CALC))!);
+		const [riemann] = quiz.arcs[1]!.topics.filter((t) => t.handle === "riemann");
+		const answer = { false: [], splits: [{ arc: "Calculus beyond limits", question: "How fast does a function change?", apart: [riemann!.id], other: "How much does a function accumulate?" }] };
+		assert.equal(purposeAnswerProblems(answer, quiz), null);
+		const refusal = purposeProblems(answer, quiz)!;
+		assert.match(refusal, /- "Calculus beyond limits" holds two ideas: its topics serve "How fast does a function change\?", but "[^"]+" \(riemann\) serve "How much does a function accumulate\?" instead\./);
+		assert.match(refusal, /by rising above them, is still two \(rule 3\)/);
+		assert.doesNotMatch(refusal, /Write each such line again|Name each such arc/, "no line or name was faulted");
+		const all = quiz.arcs[1]!.topics.map((t) => t.id);
+		assert.match(purposeAnswerProblems({ false: [], splits: [{ ...answer.splits[0]!, apart: all }] }, quiz)!, /some of them and not all/);
+		assert.match(purposeAnswerProblems({ false: [], splits: [{ ...answer.splits[0]!, apart: [quiz.arcs[0]!.topics[0]!.id] }] }, quiz)!, /is no topic of "Calculus beyond limits"/);
+		assert.match(purposeAnswerProblems({ false: [], splits: [{ ...answer.splits[0]!, other: " " }] }, quiz)!, /give "Calculus beyond limits" both questions/);
+	});
+
 	it("a blind reader sorts the titles into the arc names alone; two topics that read as another arc send the cut back, naming them", async () => {
 		const dir = course("sorted");
 		const model = scriptedModel(EDGES, [CUT, CUT], undefined, { Continuity: "Derivatives", "Chain rule": "Integrals" });

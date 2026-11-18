@@ -187,6 +187,17 @@ const purposeSchema = Type.Object({
 			description: "Each arc name that fails to name the one idea its topics serve; leave out or send an empty list when none does.",
 		}),
 	),
+	splits: Type.Optional(
+		Type.Array(
+			Type.Object({
+				arc: Type.String({ description: "The arc's name, exactly as listed." }),
+				question: Type.String({ description: "The focus question most of its topics serve." }),
+				apart: Type.Array(Type.String({ description: "A topic's id: t1, t2, …" }), { description: "The topics that serve the other question instead." }),
+				other: Type.String({ description: "The question the topics apart serve." }),
+			}),
+			{ description: "Each arc whose topics answer no one focus question; leave out or send an empty list when every arc's do." },
+		),
+	),
 });
 
 const arcSchema = Type.Object({
@@ -294,6 +305,7 @@ export const PURPOSE_INSTRUCTIONS = `You read a course's arcs the way a student 
   - it promises an idea none of its topics teaches, as a chapter title can when the course keeps only part of the chapter; or
   - read cold, it hides the idea the arc is built on: a student would not expect the topics most of the others build on, while the heading of the unit it cites names them ("Shortest paths" for an arc whose unit is "Graph search" and whose first topics are breadth-first and depth-first search).
   A name taken from a unit's heading, one that shares a word with a topic's title, and two phrases joined by "and" that the material treats together are fine.
+- Then read the arc's topics alone, as if its name and line were covered, and write the focus question a chapter on just them would answer: the one question every topic helps answer. Under splits, list the arc only when no one such question holds them all: some of its topics answer a question unrelated to the others', so that a question covering both must join the two with "and", or be so broad that it would hold the topics of the course's other arcs too. A tool and the topics that use it, or a method and its cases, answer one question.
 A line that is broad but true, plain and concrete is fine. Answer with one ${PURPOSE_TOOL} call.`;
 
 function purposePrompt(quiz: PurposeQuiz): string {
@@ -819,12 +831,13 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			const purposeRead = await runSubmitAgent<PurposeAnswer>({
 				role: "teacher",
 				toolName: PURPOSE_TOOL,
-				toolDescription: "Submit the topics a purpose line is false of, and the names that are lists.",
+				toolDescription: "Submit the topics a purpose line is false of, the names that are lists, and the arcs that answer two questions.",
 				parameters: purposeSchema,
 				fill: (input: Json) => ({
 					false: (input.false as PurposeAnswer["false"] | undefined) ?? [],
 					lines: (input.lines as PurposeAnswer["lines"] | undefined) ?? [],
 					names: (input.names as PurposeAnswer["names"] | undefined) ?? [],
+					splits: (input.splits as PurposeAnswer["splits"] | undefined) ?? [],
 				}),
 				validate: (answer) => purposeAnswerProblems(answer, purposes),
 				systemPrompt: PURPOSE_INSTRUCTIONS,

@@ -1060,6 +1060,10 @@ export interface PurposeAnswer {
 	false: { topic: string; why: string }[];
 	lines?: { arc: string; why: string }[];
 	names?: { arc: string; why: string }[];
+	/** Arcs whose topics, read without their name and line, answer no one
+	 *  focus question: the question most serve, the topics apart, and the
+	 *  question those serve instead (rule 3). */
+	splits?: { arc: string; question: string; apart: string[]; other: string }[];
 }
 
 /** The quiz for a formation. Pure. */
@@ -1084,6 +1088,16 @@ export function purposeAnswerProblems(answer: PurposeAnswer, quiz: PurposeQuiz):
 		...answer.false.flatMap((f) => [...(ids.has(f.topic) ? [] : [`"${f.topic}" is no topic id.`]), ...(f.why?.trim() ? [] : [`say why the purpose line is false of "${f.topic}".`])]),
 		...(answer.lines ?? []).flatMap((l) => [...(names.has(l.arc) ? [] : [`"${l.arc}" is no arc name; use the names exactly as listed.`]), ...(l.why?.trim() ? [] : [`say what is wrong with the purpose line of "${l.arc}".`])]),
 		...(answer.names ?? []).flatMap((n) => [...(names.has(n.arc) ? [] : [`"${n.arc}" is no arc name; use the names exactly as listed.`]), ...(n.why?.trim() ? [] : [`say what fails in the name "${n.arc}".`])]),
+		...(answer.splits ?? []).flatMap((x) => {
+			const arc = quiz.arcs.find((a) => a.title === x.arc);
+			if (!arc) return [`"${x.arc}" is no arc name; use the names exactly as listed.`];
+			const own = new Set(arc.topics.map((t) => t.id));
+			return [
+				...(x.question?.trim() && x.other?.trim() ? [] : [`give "${x.arc}" both questions: the one most of its topics serve, and the one its topics apart serve.`]),
+				...(x.apart.length > 0 && x.apart.length < arc.topics.length ? [] : [`list under apart the topics of "${x.arc}" that serve the other question, some of them and not all.`]),
+				...x.apart.filter((t) => !own.has(t)).map((t) => `"${t}" is no topic of "${x.arc}".`),
+			];
+		}),
 	];
 	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
 }
@@ -1098,13 +1112,20 @@ export function purposeProblems(answer: PurposeAnswer, quiz: PurposeQuiz): strin
 	});
 	for (const l of answer.lines ?? []) if (quiz.arcs.some((a) => a.title === l.arc)) lines.push(`- "${l.arc}": ${l.why.trim()}`);
 	const named = (answer.names ?? []).filter((n) => quiz.arcs.some((a) => a.title === n.arc)).map((n) => `- "${n.arc}": the name does not name the arc's one idea: ${n.why.trim()}`);
-	if (lines.length === 0 && named.length === 0) return null;
+	const split = (answer.splits ?? []).flatMap((x) => {
+		const arc = quiz.arcs.find((a) => a.title === x.arc);
+		const apart = arc?.topics.filter((t) => x.apart.includes(t.id)) ?? [];
+		return arc && apart.length > 0 ? [`- "${arc.title}" holds two ideas: its topics serve "${x.question.trim()}", but ${apart.map((t) => `"${t.title}" (${t.handle})`).join(", ")} serve "${x.other.trim()}" instead.`] : [];
+	});
+	if (lines.length === 0 && named.length === 0 && split.length === 0) return null;
 	return [
-		"A fresh reader read each arc's name and purpose line against its topics (rule 8) and found these faults:",
+		"A fresh reader read each arc's name and purpose line against its topics (rule 8), and its topics alone for their one focus question (rule 3), and found these faults:",
 		...lines,
 		...named,
+		...split,
 		...(lines.length > 0 ? ["Write each such line again: one sentence on the one thing the arc lets the learner do, at the level of the arc's question, true of every topic in it, promising only what its topics teach, in words its topic titles use."] : []),
 		...(named.length > 0 ? ["Name each such arc for the one idea all its topics serve, in the material's words, by its unit's own title when that fits every topic; when no one idea holds them, the arc holds several: cut it (rule 3)."] : []),
+		...(split.length > 0 ? ["A focus question that covers both by joining them, or by rising above them, is still two (rule 3). Move the topics apart to the arc whose question they serve, or give them an arc of their own, as rule 2 allows; then write each arc's question, name and purpose line for its one idea."] : []),
 	].join("\n");
 }
 
