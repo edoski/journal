@@ -3,7 +3,9 @@
  * asks him to find (round 13, 1 n10): the seeded Eigen lesson's code
  * sample ran `np.linalg.eig` on the very matrix the prediction then asked
  * about and printed its eigenvalues, `[3. 1.]`, above the question. The
- * seed is the Logbook adapter's; the check skips where it is not installed.
+ * seed is the Logbook adapter's, or another one named by `LH_DEMO_SEED`
+ * (as `helpers/demo-app.tsx` reads it); the check skips where it is not
+ * installed.
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -11,7 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 
-const SEED = path.join(os.homedir(), ".claude", "skills", "logbook", "adapters", "journal", "seed", "seed-chats.mjs");
+const SEED = path.join(process.env.LH_DEMO_SEED ?? path.join(os.homedir(), ".claude", "skills", "logbook", "adapters", "journal", "seed"), "seed-chats.mjs");
 
 /** A 2 × 2 pmatrix's entries as a code literal: "[[2, 1], [1, 2]]". */
 function literalOf(tex: string): string | null {
