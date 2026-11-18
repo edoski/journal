@@ -52,8 +52,7 @@ describe("the practice transcript", () => {
 		assert.match(skipped, /You skipped this problem/);
 		assert.doesNotMatch(skipped, /Model solution/);
 		const left = renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "dismissed" }} output={{ outcome: "dismissed", problemCallId: "p1", reason: "tonight" }} reveal="" />);
-		assert.match(left, /Problem set aside for today/);
-		assert.doesNotMatch(left, /Left for next time/, "never a Left for next time with nothing under it: his unsent work is dropped (round 15, 3 m1)");
+		assert.equal(left, "", "set aside by Done for today: no marker above the close that says it (round 16, m15), and never an empty Left for next time (round 15, 3 m1)");
 	});
 
 	it("his work is his bubble, its words shown as sent", () => {

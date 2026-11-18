@@ -101,7 +101,7 @@ import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
 import { ProseAnswerProvider, useProseAnswer } from "@/components/lesson/prose/prose-answer";
 import { ProseQuestion } from "@/components/lesson/prose/prose-question";
-import { askedAfterHint, askedAgain, leftAskedBelow, leftOpenOf, reaskedFrom } from "@/components/lesson/prose/prose-question-data";
+import { askedAfterHint, askedAgain, leftAskedBelow, leftOpenOf, reaskedFrom, spokenAbove } from "@/components/lesson/prose/prose-question-data";
 import { DisputeBubble, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 import { focusWhereHeTypes } from "@/components/ui/overlay";
@@ -1117,6 +1117,7 @@ export function Chat({
 	const reasked = useMemo(() => askedAgain(messages), [messages]);
 	const reaskedAfterHint = useMemo(() => askedAfterHint(messages), [messages]);
 	const leftBelow = useMemo(() => leftAskedBelow(messages), [messages]);
+	const spoken = useMemo(() => spokenAbove(messages), [messages]);
 	const openingAt = useMemo(() => appOpeningAt(messages, appOpening), [messages, appOpening]);
 	const steps = useMemo(() => {
 		if (!planTree) return [];
@@ -1821,6 +1822,7 @@ export function Chat({
 																repeat={reasked.has(part.toolCallId!)}
 																afterHint={reaskedAfterHint.has(part.toolCallId!)}
 																askedBelow={leftBelow.has(part.toolCallId!)}
+																spoken={spoken.has(part.toolCallId!)}
 															/>
 														);
 													}

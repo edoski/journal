@@ -265,6 +265,38 @@ export function leftAskedBelow(messages: ReadonlyArray<{ parts: readonly Questio
 	return out;
 }
 
+/** The question calls whose words already end the tutor's text just above
+ *  them in the same message: the reply asked it in its own words, so the
+ *  question draws only its "Your turn" mark (round 16, m15: after "Yes" in
+ *  the Ask flow the question printed twice, word for word). */
+export function spokenAbove(messages: ReadonlyArray<{ parts: ReadonlyArray<QuestionPart & { text?: string }> }>): ReadonlySet<string> {
+	const out = new Set<string>();
+	for (const message of messages) {
+		let said = "";
+		for (const part of message.parts) {
+			if (part.type === "text") {
+				said = wordsKey(part.text ?? "");
+				continue;
+			}
+			if (asked(part) && part.toolCallId) {
+				const question = (part.input as { question?: unknown } | undefined)?.question;
+				const key = typeof question === "string" ? wordsKey(question) : "";
+				if (key && said.endsWith(key)) out.add(part.toolCallId);
+			}
+			// Only what the reader sees between them breaks the tie: a
+			// tool's card or another question.
+			if (part.type.startsWith("tool-")) said = "";
+		}
+	}
+	return out;
+}
+
+/** Words as the reader compares them: letters and digits only, so markup,
+ *  maths delimiters and spacing never tell two copies apart. */
+function wordsKey(text: string): string {
+	return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
 /** The re-asks (`askedAgain`) that follow a hint: the hint may itself end
  *  in a question, so their mark names the question he pressed Hint on,
  *  never "the question above" (round 12, 3 D11). */

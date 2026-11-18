@@ -70,9 +70,7 @@ describe("Left for next time", () => {
 		assert.match(card(false), /Is F invertible\? Say why\./, "the question stays as asked");
 	});
 
-	it("a practice problem Done for today closed says it was set aside, never an empty Left for next time", () => {
-		const html = renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "dismissed" }} output={{ reason: "tonight" }} reveal="" />);
-		assert.match(html, /Problem set aside for today/);
-		assert.doesNotMatch(html, /Left for next time/);
+	it("a practice problem Done for today closed draws no line of its own: the Done for today line and the close say it (round 16, m15)", () => {
+		assert.equal(renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "dismissed" }} output={{ reason: "tonight" }} reveal="" />), "");
 	});
 });

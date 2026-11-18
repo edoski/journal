@@ -53,10 +53,13 @@ export function ProseConclude({ toolCallId, input, output, reveal }: {
 }) {
 	const { outcome, solutionReveal } = (input ?? {}) as { outcome?: unknown; solutionReveal?: unknown };
 	if (outcome === "dismissed") {
-		const tonight = (output as { reason?: unknown } | undefined)?.reason === "tonight";
+		// Done for today set it aside: the Done for today line under it and
+		// the close say so, so no marker of its own (round 16, m15: "Problem
+		// set aside for today" sat above "The problem … is set aside.").
+		if ((output as { reason?: unknown } | undefined)?.reason === "tonight") return null;
 		return (
 			<p data-testid="prose-conclude" className="my-1 text-body text-muted-foreground">
-				{tonight ? LESSON_WORDS.problemSetAside : LESSON_WORDS.skippedProblem}
+				{LESSON_WORDS.skippedProblem}
 			</p>
 		);
 	}

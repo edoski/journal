@@ -39,7 +39,7 @@ export function YourTurn({ above = false, afterHint = false }: { above?: boolean
  *  its reply is the one guarded voice he reads (round 8: the unguarded
  *  card stated a false fact, opened above a stop marker before any reply,
  *  and named the same thing as practice's "Model solution"). */
-export function ProseQuestion({ tool, toolCallId, input, output, photos, open, stepAnchor, repeat = false, afterHint = false, askedBelow = false }: {
+export function ProseQuestion({ tool, toolCallId, input, output, photos, open, stepAnchor, repeat = false, afterHint = false, askedBelow = false, spoken = false }: {
 	tool: string;
 	toolCallId: string;
 	input: unknown;
@@ -59,12 +59,14 @@ export function ProseQuestion({ tool, toolCallId, input, output, photos, open, s
 	/** Set aside with Done for today and asked again further down
 	 *  (`leftAskedBelow`): its words are drawn there. */
 	askedBelow?: boolean;
+	/** The tutor's text just above ends with its words (`spokenAbove`). */
+	spoken?: boolean;
 }) {
 	const spec = proseQuestionSpec(tool, toolCallId, input);
 	if (!spec) return null;
-	if (open) return <OpenQuestion spec={spec} stepAnchor={stepAnchor} repeat={repeat} afterHint={afterHint} />;
+	if (open) return <OpenQuestion spec={spec} stepAnchor={stepAnchor} repeat={repeat} afterHint={afterHint} spoken={spoken} />;
 	if (!output) return null;
-	return <AnsweredQuestion spec={spec} toolCallId={toolCallId} input={input} output={output} photos={photos} stepAnchor={stepAnchor} repeat={repeat} askedBelow={askedBelow} />;
+	return <AnsweredQuestion spec={spec} toolCallId={toolCallId} input={input} output={output} photos={photos} stepAnchor={stepAnchor} repeat={repeat || spoken} askedBelow={askedBelow} />;
 }
 
 /** The question's words: the question, and "Select all that apply" for a
@@ -79,13 +81,13 @@ export function QuestionWords({ spec, compact = false }: { spec: ProseQuestionSp
 	);
 }
 
-function OpenQuestion({ spec, stepAnchor, repeat, afterHint }: { spec: ProseQuestionSpec; stepAnchor?: string; repeat: boolean; afterHint: boolean }) {
+function OpenQuestion({ spec, stepAnchor, repeat, afterHint, spoken }: { spec: ProseQuestionSpec; stepAnchor?: string; repeat: boolean; afterHint: boolean; spoken: boolean }) {
 	const answer = useProseAnswerContext();
 	const selected = answer?.selection.selected ?? new Set<number>();
 	return (
 		<div data-testid="prose-question" data-slot="prose-question" data-open="" data-repeat={repeat ? "" : undefined} data-step-anchor={stepAnchor} className="mt-2">
-			<YourTurn above={repeat && spec.mode === "text"} afterHint={afterHint} />
-			{!repeat && <QuestionWords spec={spec} />}
+			<YourTurn above={repeat && !spoken && spec.mode === "text"} afterHint={afterHint} />
+			{!repeat && !spoken && <QuestionWords spec={spec} />}
 			{spec.mode !== "text" && (
 				<ChoiceRows
 					options={spec.data.options}
