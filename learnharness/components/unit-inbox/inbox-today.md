@@ -27,7 +27,7 @@ No header, no count and no total on top: cards leave as the day's plan empties, 
 | 1100×700 | the same | the same | none |
 | 1512×982 | the same | the same | none |
 
-The demo's cards: Linear Algebra, Your turn, Eigenvalues and eigenvectors (the lesson); Linear Algebra, Your turn, Rank practice; Probability, Due since 5 Nov, Review Random variables and distributions; Real Analysis, Due since 5 Nov, Review Convergent sequences; Calculus I, Not right last time, Review Chain rule. Home's Today shows the same five lines in that order with the same reasons.
+The demo's cards: Linear Algebra, Your turn, Eigenvalues and eigenvectors (the lesson); Linear Algebra, Your turn, Rank practice; Probability, Due 5 Nov, Review Random variables and distributions; Real Analysis, Due 5 Nov, Review Convergent sequences; Calculus I, Not right last time, Review Chain rule. Home's Today shows the same five lines in that order with the same reasons.
 
 The card is `NowCard` (`now-card.md`); Sessions, the skeleton and the notes are `SessionsShelf`, `NowSkeleton` and `SidebarNote` (`now-shelves.md`).
 

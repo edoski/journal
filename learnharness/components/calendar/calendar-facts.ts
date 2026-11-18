@@ -218,7 +218,7 @@ const PLANNED_TODAY = "Planned today";
 
 /** An entry's words beside its icon: its look's, except a review due
  *  today, which says how late as Home's rows and the sidebar do ("Due
- *  today", "Due since 5 Nov"), so one review never reads "Due since 5 Nov" on Home
+ *  today", "Due 5 Nov"), so one review never reads "Due 5 Nov" on Home
  *  and "Overdue" here (round 5). Pure. */
 export function lookWords(entry: CalendarEntry, today: string): string {
 	const review = entry.kind === "review" && entry.day === today ? entry.topic.review : null;

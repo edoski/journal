@@ -24,14 +24,14 @@ The split page draws `TopicMap` (`../course-map/topic-map/topic-map.md`) directl
 
 ## The groups
 
-`courseGroups(course, chats, courses)` sorts every topic once, always into the same four groups in this order, an empty one included. It reads what the sidebar says for each topic (`sidebarSays`, `../unit-inbox/sidebar-says.ts`, over `../unit-inbox/now-inbox.ts` and `../unit-inbox/today/today-top.ts`), the same source the map's cards read, so a topic sits in the group the sidebar puts it in and ends in the words the sidebar says for it (Edo's brief, 14 Nov 2026: one fact per topic across surfaces; round 4 found Kernel under Learning in the sidebar and Needs you here, and Basis and dimension "Left off 6 Nov" there and "Due since 29 Oct" here).
+`courseGroups(course, chats, courses)` sorts every topic once, always into the same four groups in this order, an empty one included. It reads what the sidebar says for each topic (`sidebarSays`, `../unit-inbox/sidebar-says.ts`, over `../unit-inbox/now-inbox.ts` and `../unit-inbox/today/today-top.ts`), the same source the map's cards read, so a topic sits in the group the sidebar puts it in and ends in the words the sidebar says for it (Edo's brief, 14 Nov 2026: one fact per topic across surfaces; round 4 found Kernel under Learning in the sidebar and Needs you here, and Basis and dimension "Left off 6 Nov" there and "Due 29 Oct" here).
 
 | Group | Holds | Order | Row's fact |
 |---|---|---|---|
-| Needs you | what Home's Today takes up in this course: the sidebar's top (`todayTop` over every course, each line's claimed topics, `claimedKeys`) | Today's | Today's reason for it, as the sidebar's card says it (`slotWords`): "Your turn", "Due since 1 Nov", "Left off 6 Nov", "Planned today" |
+| Needs you | what Home's Today takes up in this course: the sidebar's top (`todayTop` over every course, each line's claimed topics, `claimedKeys`) | Today's | Today's reason for it, as the sidebar's card says it (`slotWords`): "Your turn", "Due 1 Nov", "Left off 6 Nov", "Planned today" |
 | Learning | taught and not solid, or solid but weak (`restTopics`' working and learning) | the tutor writing first, then a turn that waits, then the latest studied | its fact (`shelfStatus`): a slip ("Sure, but wrong"), a review in today's plan, where an open task was left, when it comes back, else how long since he studied it |
 | Not started | what the sidebar leaves out | the order the plan starts them (the engine's `starts`, the day each first lesson is planned), so it reads as the plan does; those the plan has no day for last, in the engine's path order (round 4: the list ran Poisson, Geometric, Expectation while the plan starts Expectation first) | nothing, except "You are here" on the current topic |
-| On your own | solid and not weak (`restTopics`' known), the topics Home's pie counts | the due ones first, then the soonest back | its fact: "Due since 5 Nov", "Left off 6 Nov", "Back in 5d", "Due since 21 Oct" |
+| On your own | solid and not weak (`restTopics`' known), the topics Home's pie counts | the due ones first, then the soonest back | its fact: "Due 5 Nov", "Left off 6 Nov", "Back in 5d", "Due 21 Oct" |
 
 The current topic says "You are here" in place of when it comes back or when he last studied it, never in place of a reason that needs him. Which reason a topic says when it has several is the app's one order (`../study-words.md`, "Which one a topic says"): unfinished work before a review the plan dates later.
 

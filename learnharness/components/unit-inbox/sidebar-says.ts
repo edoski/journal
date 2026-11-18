@@ -24,7 +24,7 @@ export type TopicFact =
 	| { kind: "task"; words: string }
 	/** Today's plan starts it: "Planned today", "Next up". */
 	| { kind: "next"; words: string }
-	/** When its next review comes: "Back in 5d", "Due since 21 Oct". */
+	/** When its next review comes: "Back in 5d", "Due 21 Oct". */
 	| { kind: "back"; words: string }
 	/** When he last studied it: "3d ago". */
 	| { kind: "studied"; words: string }

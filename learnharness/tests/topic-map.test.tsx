@@ -383,7 +383,7 @@ describe("topic map drawing", () => {
 		assert.equal(document.querySelectorAll('[data-slot="course-map-node"] [data-slot="topic-glyph"]').length, 16);
 		assert.deepEqual(
 			[...document.querySelectorAll('[data-slot="topic-need"] [data-slot="status-words"]')].map((line) => line.textContent),
-			["Due since 29 Oct", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Sure, but wrong"],
+			["Due 29 Oct", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Sure, but wrong"],
 		);
 		assert.ok(node("determinant").querySelector('[data-slot="topic-need"]') === null);
 		assert.equal(node("determinant").querySelector('[data-slot="topic-standing"]')!.textContent, "Right with help");

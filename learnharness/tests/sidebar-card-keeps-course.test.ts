@@ -6,7 +6,9 @@
  * session status is now short enough to sit beside each course's name.
  * Round 16, m4's remainder: "Left off yesterday" left "Linear Algebra" no
  * room, so a card left off yesterday names its day, "Left off 17 Nov".
- * Each status wears its icon, as in the sidebar.
+ * Each status wears its icon, as in the sidebar. Its last remainder, a
+ * due review's "Due since 13 Nov", left the two longer names no room; Edo
+ * shortened it to "Due 13 Nov" (18 Nov 2026).
  * Measured in a real Chrome at the sidebar's default width.
  */
 import assert from "node:assert/strict";
@@ -35,8 +37,6 @@ describe("a sidebar card at the sidebar's default width", () => {
 		await page.close();
 		assert.equal(cards.length, 36);
 		const dropped = cards.filter((c) => !c.shown).map((c) => `${c.name} · ${c.status}`);
-		// Open for Edo (fix round 16): a due review's words, with their icon,
-		// leave the two longer names no room; their words are his to change.
-		assert.deepEqual(dropped, ["Linear Algebra · , Due since 13 Nov", "Real Analysis · , Due since 13 Nov"], "no other card drops its course's name");
+		assert.deepEqual(dropped, [], "no card drops its course's name");
 	});
 });

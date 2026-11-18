@@ -309,7 +309,7 @@ describe("TodayList", () => {
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
-			["Due since 5 Nov", "Due since 4 Nov", "Due since 1 Nov", "Not right last time", "Your turn"],
+			["Due 5 Nov", "Due 4 Nov", "Due 1 Nov", "Not right last time", "Your turn"],
 		);
 		assert.deepEqual(
 			[...doc.querySelectorAll('[data-slot="unit-section-header"]')].map((h) => h.textContent),

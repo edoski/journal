@@ -53,7 +53,7 @@ One mark, one ink and one phrase per state, on Home's Today rows, the topic map'
 | being learned | a quarter, a half, three quarters | muted | Taught, not tried · Tried, not right yet · Right with help, and the other `RIGHT_WORDS` |
 | on his own | full | muted | On your own |
 | slipping | the pie, a quarter short of full, on a topic he could do on his own whose newest counted answer is not right (`slipsNow`) | `warning` | Slipping (`SLIPPING_WORDS`), and the slip beside it, each with its own icon (`SLIP_ICON`): Check on your own, Mistake to fix, Not right last time, Check again another day, Sure, but wrong, Mixed up with … |
-| review due | History (`FACT_ICON.review`, `components/unit-inbox/status-mark.md`) | muted | Due today · Due since 5 Nov |
+| review due | History (`FACT_ICON.review`, `components/unit-inbox/status-mark.md`) | muted | Due today · Due 5 Nov |
 
 Words come from `study-words.ts` and `topic-standing.ts` (`standingOf`, `slipBeside`) only.
 

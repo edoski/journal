@@ -171,8 +171,8 @@ export const MARK_HOW_WORDS: Record<MarkHow, string> = {
 
 /*
  * A time in the past is named by its day, never counted (round 9, 2 m5:
- * "Due since 5 Nov", "Left off 6 Nov" and "Studied 4 Nov" made him count
- * back): "today", "yesterday", else the day, "3 Nov", as "Due since 3 Nov"
+ * "Due 5 Nov", "Left off 6 Nov" and "Studied 4 Nov" made him count
+ * back): "today", "yesterday", else the day, "3 Nov", as "Due 3 Nov"
  * and "Back Tue 10 Nov" already said. `today` is the engine's study day.
  */
 
@@ -190,11 +190,17 @@ function pastDay(days: number, today: string): string {
 	return shortDay(dayBefore(today, days));
 }
 
-/** A review come due: "Due today", else since the day it fell due, "Due
- *  since 3 Nov". */
+/** A review come due: "Due today", else the day it fell due, "Due 3 Nov",
+ *  never "Due since", which with its icon left a sidebar card no room for
+ *  its course's name (round 16, Edo's ruling of 18 Nov 2026). */
 export function overdueWords(overdue: number, today: string): string {
 	if (overdue <= 0) return "Due today";
-	return `Due since ${shortDay(dayBefore(today, overdue))}`;
+	return dueWords(dayBefore(today, overdue));
+}
+
+/** A review due since a day already past: "Due 3 Nov". */
+function dueWords(day: string): string {
+	return `Due ${shortDay(day)}`;
 }
 
 /** Where unfinished work holding a topic was left, by when, never by the
@@ -277,23 +283,23 @@ export function heldExamWords(review: CourseMapTopic["review"]): string | null {
 /** A day that moved, from when: one he was told ("Moved from 10 Nov after
  *  your Probability study today", round 7: a told day moved in silence),
  *  else a review the plan holds past a day memory asked for that has
- *  passed, "Due since 1 Oct"; null otherwise. Memory's day still ahead was
+ *  passed, "Due 1 Oct"; null otherwise. Memory's day still ahead was
  *  never a day he was told, so nothing moved "from" it (round 8: "Moved
  *  from 11 Nov" named a day he never heard). */
 export function movedWords(review: CourseMapTopic["review"], today: string, told?: TopicMoved): string | null {
 	if (told) return `Moved from ${shortDay(told.from)}${movedWhy(told, today, shortDay)}`;
 	if (review?.kind !== "scheduled" || !review.held) return null;
-	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : null;
+	return review.held.since < today ? dueWords(review.held.since) : null;
 }
 
-/** A review that is due: "Due today", "Due since 5 Nov"; one the plan holds
+/** A review that is due: "Due today", "Due 5 Nov"; one the plan holds
  *  past a day memory asked for already says since when, so a review weeks
- *  late never reads as spacing, and the day the plan brings it back, "Due
- *  since 1 Oct, back 3 Dec" (round 8: Calculus' rows gave no return day);
+ *  late never reads as spacing, and the day the plan brings it back, "Due 1
+ *  Oct, back 3 Dec" (round 8: Calculus' rows gave no return day);
  *  any other dated review "Back in 5d". `today` is the engine's day. */
 export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
 	if (review.kind === "due") return overdueWords(review.overdue, today);
-	if (review.held && review.held.since < today) return `Due since ${shortDay(review.held.since)}, back ${shortDay(review.date)}`;
+	if (review.held && review.held.since < today) return `${dueWords(review.held.since)}, back ${shortDay(review.date)}`;
 	return returnWords(review.date);
 }
 

@@ -325,7 +325,7 @@ describe("Today", () => {
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
 			// The course's badge leads each line with its two letters (the Visual system, shipped 17 Nov 2026).
-			["LALinear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "RAReal AnalysisReview SequencesDue since 7 Nov", "LALinear AlgebraContinue Eigen lessonYour turn", "PProbabilityContinue Bayes' ruleNot right last time", "LALinear AlgebraContinue Problem sheet 4Left off 5 Nov"],
+			["LALinear AlgebraReview Linear independence, Rank, SpanDue 23 Oct", "RAReal AnalysisReview SequencesDue 7 Nov", "LALinear AlgebraContinue Eigen lessonYour turn", "PProbabilityContinue Bayes' ruleNot right last time", "LALinear AlgebraContinue Problem sheet 4Left off 5 Nov"],
 		);
 		assert.equal(lines[2]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
@@ -371,8 +371,8 @@ describe("what a line of Today reads", () => {
 			return why && [why.kind, why.short];
 		};
 		assert.deepEqual(short(todayRows([LINALG], [waiting], TODAY).find((r) => r.kind === "session")!), ["reply", "Your turn"]);
-		assert.deepEqual(short(rowOf(LINALG)), ["review", "Due since 23 Oct"]);
-		assert.deepEqual(short(rowOf(ANALYSIS)), ["review", "Due since 7 Nov"]);
+		assert.deepEqual(short(rowOf(LINALG)), ["review", "Due 23 Oct"]);
+		assert.deepEqual(short(rowOf(ANALYSIS)), ["review", "Due 7 Nov"]);
 		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Not right last time: Sequences"]);
 		assert.deepEqual(short(rowOf({ ...LINALG, due: [] })), ["task", "Left off 5 Nov"], "when the task was left, never the tutor's step");
 		assert.deepEqual(short(rowOf(PROB)), ["next", "Next up"]);
@@ -424,8 +424,8 @@ describe("what a line of Today reads", () => {
 		const doc = render(<HybridRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
 		assert.deepEqual(lines, [
-			"LALinear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct",
-			"RAReal AnalysisReview SequencesDue since 7 Nov",
+			"LALinear AlgebraReview Linear independence, Rank, SpanDue 23 Oct",
+			"RAReal AnalysisReview SequencesDue 7 Nov",
 			"LALinear AlgebraContinue Eigen lessonYour turn",
 			"PProbabilityContinue Bayes' ruleNot right last time",
 			"LALinear AlgebraContinue Problem sheet 4Left off 5 Nov",

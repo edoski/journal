@@ -49,7 +49,7 @@ export type RowStatus = { kind: "standing"; facts: RowStanding } | { kind: "why"
  * Mistake to fix · Your turn" on one row; round 12, 1 m3 and 2 n2: Home
  * said "Mistake to fix" where the sidebar said "Your turn" for one
  * session, "Check again another day" beside "Due today" for one review):
- * why the row is on Today ("Your turn", "Tutor writing", "Due since 6
+ * why the row is on Today ("Your turn", "Tutor writing", "Due 6
  * Nov", "Not right last time: Chain rule", "Left off 6 Nov", "Planned
  * today"), since that is what its press opens on, except a plain "Next
  * up", which says only that the row is on Today; else the slip he would

@@ -1,6 +1,6 @@
 # Status mark
 
-One fact about a topic or a session as an icon and a few words ("Your turn", "Tutor writing", "Due since 6 Nov", "At part (c)", a slip, where he stands), drawn by one component from one icon table everywhere it shows (audit 17 Nov 2026, finding 3: seven components and five icon tables drew it, so the tutor writing was a pen on Home and a spinner elsewhere, an open task a clipboard on the calendar, a new topic an open book there, and Your turn muted on a map card). `status-mark.tsx` (`StatusMark`, `FactIcon`) over `fact-icon.ts` (`FACT_ICON`, `Fact`, `factInk`, `reasonMark`). `tests/one-fact-one-look.test.tsx` holds every surface to it.
+One fact about a topic or a session as an icon and a few words ("Your turn", "Tutor writing", "Due 6 Nov", "At part (c)", a slip, where he stands), drawn by one component from one icon table everywhere it shows (audit 17 Nov 2026, finding 3: seven components and five icon tables drew it, so the tutor writing was a pen on Home and a spinner elsewhere, an open task a clipboard on the calendar, a new topic an open book there, and Your turn muted on a map card). `status-mark.tsx` (`StatusMark`, `FactIcon`) over `fact-icon.ts` (`FACT_ICON`, `Fact`, `factInk`, `reasonMark`). `tests/one-fact-one-look.test.tsx` holds every surface to it.
 
 ## The table (`FACT_ICON`)
 

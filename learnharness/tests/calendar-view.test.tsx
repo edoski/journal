@@ -2,7 +2,7 @@
  * The calendar page as Edo sees it, mounted on FullCalendar's day grid in
  * a DOM: an empty week says so, a busy week shows each entry's course
  * mark, title and type, an exam names how far off it is, an overdue
- * review says how late, as Home does ("Due since 29 Oct"), and a review's panel starts the topic page's
+ * review says how late, as Home does ("Due 29 Oct"), and a review's panel starts the topic page's
  * session or opens the topic.
  */
 import React, { act } from "react";
@@ -134,7 +134,7 @@ describe("the calendar page", () => {
 		const drills = { ...lesson, id: "chat_drills", title: "Span drills", kind: "practice" as const, phase: "probe" as const, pendingQuestion: false, updatedAt: "2026-11-04T18:00:00" };
 		await mount([linalg(null)], [lesson, drills]);
 		assert.ok(document.querySelector("[data-slot=calendar-quiet]") === null);
-		assert.deepEqual(text("[data-slot=calendar-entry]"), ["Span drillsLAPractice", "Eigenvalues and eigenvectorsLAYour turn", "SpanLADue since 29 Oct"]);
+		assert.deepEqual(text("[data-slot=calendar-entry]"), ["Span drillsLAPractice", "Eigenvalues and eigenvectorsLAYour turn", "SpanLADue 29 Oct"]);
 		assert.deepEqual(text("[data-slot=calendar-day-head][data-today]"), ["Sun8Study 9:00 to 12:30"]);
 		assert.ok(document.querySelector('[data-slot=calendar-entry][data-look=lesson] svg[aria-label="Lesson"]'), "the waiting lesson's icon names its look");
 	});
@@ -199,7 +199,7 @@ describe("the calendar page", () => {
 		const detail = document.querySelector("[data-slot=calendar-entry-detail]");
 		assert.ok(detail, "its panel opens");
 		// The engine dates a due review on today and counts its days overdue (round 4: it read today's date).
-		assert.match(detail.textContent ?? "", /SpanDue since 29 OctWas due Thursday 29 October/);
+		assert.match(detail.textContent ?? "", /SpanDue 29 OctWas due Thursday 29 October/);
 		assert.equal(detail.querySelector("a")?.getAttribute("href"), "/unit/L3N0dWR5L2xpbmFsZw/span");
 		await press(detail.querySelector("[data-slot=calendar-entry-start]")!);
 		assert.deepEqual(started, [["Review Span", "/study/linalg", { topics: ["span"] }]]);

@@ -7,7 +7,7 @@ import { RowCard } from "@/components/unit-inbox/row-card";
 import { StatusMark } from "@/components/unit-inbox/status-mark";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { pausedWords } from "@/components/nav/session-state";
-import { TUTOR_WRITING, leftOffWords } from "@/components/study-words";
+import { TUTOR_WRITING, leftOffWords, overdueWords } from "@/components/study-words";
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
 export const COURSES = ["Linear Algebra", "Real Analysis", "Probability", "Calculus I"];
@@ -20,7 +20,7 @@ export const STATUSES: { kind: string; words: string }[] = [
 	{ kind: "working", words: TUTOR_WRITING },
 	{ kind: "task", words: leftOffWords(8, "2026-11-18") },
 	{ kind: "task", words: leftOffWords(1, "2026-11-18") },
-	{ kind: "review", words: "Due since 13 Nov" },
+	{ kind: "review", words: overdueWords(5, "2026-11-18") },
 	{ kind: "next", words: "Planned today" },
 ];
 

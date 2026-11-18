@@ -200,8 +200,8 @@ export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
 }
 
 /** Why the review waits past the day memory asked for it, after from
- *  when (`movedWords`): "Due since 1 Oct, waits for your Probability exam",
- *  "Due since 1 Oct"; an exam is the only why it names (`heldExamWords`). */
+ *  when (`movedWords`): "Due 1 Oct, waits for your Probability exam",
+ *  "Due 1 Oct"; an exam is the only why it names (`heldExamWords`). */
 /** What the exam ahead means for the topic: it leaves it out, or its plan
  *  has no room to start or review it; null otherwise. */
 const examWords = (topic: CourseMapTopic, map: CourseMap) => leftOutWords(topic, map.exam) ?? examGapTopicWords(topic, map.exam, map.today);
@@ -278,8 +278,8 @@ export { agoWords, studiedDaysWords as studiedWords };
 /**
  * What the head says beside the pie, in the app's words (study-words.ts),
  * each drawn as an icon and a few words: why the engine calls the topic
- * weak (the sidebar keeps it as the row's reason), then its review, due ("Due since 5 Nov"), held past memory's day ("Due
- * since 1 Oct") or dated ("Back in 5d"), as the map, Home and the sidebar
+ * weak (the sidebar keeps it as the row's reason), then its review, due ("Due 5 Nov"), held past memory's day ("Due
+ * 1 Oct") or dated ("Back in 5d"), as the map, Home and the sidebar
  * say it (`reviewWords`). `today` is the engine's study day.
  */
 export function headMarks(topic: CourseMapTopic, titleOf: (handle: string) => string, today: string): HeadMark[] {

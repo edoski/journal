@@ -123,7 +123,7 @@ describe("Now", () => {
 			[
 				["resume", "Eigenvalues and eigenvectors", "Your turn", "Resume", "chat_demo_eigen"],
 				["open", "Eigenvalues and eigenvectors", "Tutor writing", "Resume", "chat_demo_eigen"],
-				["review", "Due since 6 Nov", null, "Review", null],
+				["review", "Due 6 Nov", null, "Review", null],
 				["continue", "Problem sheet 4", "Part (c)", "Continue", null],
 				["start", "First lesson", null, "Start", null],
 				["continue", "Determinants as volume scaling", "Left off 7 Nov", "Continue", "chat_demo_det"],
@@ -335,9 +335,9 @@ describe("the sections drawn", () => {
 
 	it("says why the scheduled review waits when something holds it, and only then", () => {
 		const held = factsOf({ ...VECTORS, review: { kind: "scheduled", date: "2026-12-03", held: { exam: "Probability", since: "2026-10-01" } } });
-		assert.deepEqual(pickupSections(held).scheduled, { kind: "review", day: "Thu 3 Dec", waits: "Due since 1 Oct, waits for your Probability exam" });
+		assert.deepEqual(pickupSections(held).scheduled, { kind: "review", day: "Thu 3 Dec", waits: "Due 1 Oct, waits for your Probability exam" });
 		const line = page(held).querySelector('[data-slot="pickup-scheduled"]')!;
-		assert.equal(line.querySelector('[data-slot="pickup-scheduled-waits"]')!.textContent, "Due since 1 Oct, waits for your Probability exam");
+		assert.equal(line.querySelector('[data-slot="pickup-scheduled-waits"]')!.textContent, "Due 1 Oct, waits for your Probability exam");
 		assert.ok(page(factsOf(VECTORS)).querySelector('[data-slot="pickup-scheduled-waits"]') === null);
 	});
 

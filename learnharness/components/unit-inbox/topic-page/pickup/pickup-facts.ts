@@ -102,7 +102,7 @@ export function plannedWords(facts: TopicFacts): string | null {
  *  phrase on every topic page (round 15, m9: "Nothing due" on one page,
  *  "Nothing today" on another): Scheduled gives the plan's day, and for a
  *  review memory asked for already that the plan holds for a later day the
- *  head says since when ("Due since 10 Nov, back 20 Nov"), so Now never
+ *  head says since when ("Due 10 Nov, back 20 Nov"), so Now never
  *  says "Due today" beside "Review Mon 9 Nov" (round 12, 1 m1 and 2 n1). */
 export const NOTHING_DUE = "Nothing due today";
 

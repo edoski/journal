@@ -45,7 +45,7 @@ describe("a sidebar card's status at the card's edge (m35)", () => {
 	it("cuts every kind of status the same way, never at the card's edge", () => {
 		for (const status of [
 			{ kind: "task", words: "Left off yesterday" },
-			{ kind: "review", words: "Due since 8 Nov" },
+			{ kind: "review", words: "Due 8 Nov" },
 			{ kind: "none", words: "Not started" },
 			{ kind: "studied", words: "3d ago" },
 			{ kind: "working" },

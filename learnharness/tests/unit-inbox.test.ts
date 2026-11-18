@@ -160,8 +160,8 @@ describe("unitStatus", () => {
 		assert.deepEqual(unitStatus(by("kernel"), inbox.today), { kind: "slip", words: "Mistake to fix", slip: "gap" });
 		assert.deepEqual(unitStatus(by("elimination"), inbox.today), { kind: "slip", words: "Mixed up with cramer", slip: "mixed" }, "the method named by its title, as the map says it");
 		assert.deepEqual(unitStatus(by("matmul"), inbox.today), { kind: "slip", words: "Check again another day", slip: "repaired" });
-		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review", words: "Due since 6 Nov" });
-		assert.deepEqual(unitStatus(by("basis"), inbox.today), { kind: "review", words: "Due since 30 Oct" });
+		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review", words: "Due 6 Nov" });
+		assert.deepEqual(unitStatus(by("basis"), inbox.today), { kind: "review", words: "Due 30 Oct" });
 		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "task", words: "Left off 6 Nov" });
 		assert.deepEqual(unitStatus(by("cramer"), inbox.today), { kind: "back", words: "Back Mon 9 Nov" });
 		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "back", words: "Back Mon 30 Nov" });

@@ -188,7 +188,7 @@ export function daysBetween(from: string, to: string): number {
  *     first;
  *   - the engine calls the topic weak ("Not right last time", "Mistake to
  *     fix", "Mixed up with Rank", "Sure, but wrong");
- *   - a solid topic's review is due ("Due today", "Due since 5 Nov");
+ *   - a solid topic's review is due ("Due today", "Due 5 Nov");
  *   - an open task holds it, and when he left off ("Left off 6 Nov");
  *   - when its next review comes ("Back in 5d");
  *   - else when he last studied it ("Today", "6 Nov").
@@ -263,7 +263,7 @@ export function unitStatus(unit: Unit, today: string, asked = false): UnitStatus
 	// latest about it (round 14, m33: Rank read "Left off 6 Nov", the sheet's day, after his Rank practice today).
 	const studied = unit.sessions.find((c) => ownsTopic(c, topic.handle))?.updatedAt;
 	if (unit.task && !(studied && unit.task.updated && dayOf(studied) > unit.task.updated)) return { kind: "task", words: taskWords(unit.task, today) };
-	// A review held past memory's day is due already ("Due since 6 Nov"):
+	// A review held past memory's day is due already ("Due 6 Nov"):
 	// a fact that needs him, which the map's card shows, never a date ahead.
 	if (topic.review?.kind === "scheduled") return { kind: topic.review.held && topic.review.held.since < today ? "review" : "back", words: reviewWords(topic.review, today) };
 	const at = unit.sessions[0]?.updatedAt ?? topic.introduced;

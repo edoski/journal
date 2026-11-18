@@ -123,7 +123,7 @@ export function openingTitle(opening: string, topics: readonly string[], lesson 
 
 /** Whether memory asks for the topic's review by `today`, the engine's
  *  study day: the plan has it today (`due`), or holds it past the day
- *  memory asked for it ("Due since 6 Nov, back 11 Nov"). */
+ *  memory asked for it ("Due 6 Nov, back 11 Nov"). */
 export function reviewAsked(review: TopicReview | null | undefined, today: string): boolean {
 	return review?.kind === "due" || (review?.kind === "scheduled" && review.held !== undefined && review.held.since <= today);
 }

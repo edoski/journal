@@ -122,7 +122,7 @@ describe("why a slip needs him", () => {
 
 describe("why a review needs him", () => {
 	it("says since which day a review is due, never a count of days (round 9, 2 m5)", () => {
-		assert.deepEqual([0, 1, 5, 40].map((days) => overdueWords(days, "2026-11-08")), ["Due today", "Due since 7 Nov", "Due since 3 Nov", "Due since 29 Sept"]);
+		assert.deepEqual([0, 1, 5, 40].map((days) => overdueWords(days, "2026-11-08")), ["Due today", "Due 7 Nov", "Due 3 Nov", "Due 29 Sept"]);
 	});
 
 	it("says the day work was left and the day he studied, never a count of days (round 9, 2 m5)", () => {
@@ -166,10 +166,10 @@ describe("why a review waits", () => {
 		assert.equal(heldWords(null), null);
 	});
 	it("says since when a held review was due, so weeks late never reads as 'Back in 25d'", () => {
-		assert.equal(reviewWords(late, "2026-11-08"), "Due since 1 Oct, back 3 Dec", "with the day the plan brings it back (round 8: Calculus gave none)");
+		assert.equal(reviewWords(late, "2026-11-08"), "Due 1 Oct, back 3 Dec", "with the day the plan brings it back (round 8: Calculus gave none)");
 		assert.equal(reviewWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), "Back Thu 3 Dec");
 		assert.equal(reviewWords({ ...behind, held: { exam: "Probability", since: "2026-11-13" } }, "2026-11-08"), "Back Fri 20 Nov", "memory's day is still ahead");
-		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "Due since 5 Nov");
+		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "Due 5 Nov");
 	});
 	it("says from which told day a review moved and what of his study moved it, ahead of memory's day", () => {
 		const told = { from: "2026-11-10", by: "study" as const, courses: ["Probability"], day: "today" as const };
@@ -191,7 +191,7 @@ describe("why a review waits", () => {
 	});
 	it("says since when a held review was due once memory's day has passed, and names no day he was never told", () => {
 		assert.equal(movedWords(behind, "2026-11-08"), null, "memory's day is still ahead: no 'Moved from' a day he never heard (round 8)");
-		assert.equal(movedWords(late, "2026-11-08"), "Due since 1 Oct");
+		assert.equal(movedWords(late, "2026-11-08"), "Due 1 Oct");
 		assert.equal(movedWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), null);
 		assert.equal(movedWords({ kind: "due", date: "2026-11-08", overdue: 0 }, "2026-11-08"), null);
 	});

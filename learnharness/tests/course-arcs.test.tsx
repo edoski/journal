@@ -190,7 +190,7 @@ describe("Now, under the course head", () => {
 	it("picks up what Home's Today puts first for the course, even when that is a slip in another arc than where he is", () => {
 		const line = pickUpLine(ARCS)!;
 		assert.equal(line.title, "Review Linear independence");
-		assert.equal(line.why?.short, "Due since 4 Nov");
+		assert.equal(line.why?.short, "Due 4 Nov");
 		assert.equal((line.lead ?? line.topics[0])?.arc, "spaces", "You are here is in Linear systems");
 		const waiting = pickUpLine(ARCS, CHATS)!;
 		assert.equal(waiting.title, "Review Linear independence", "today's review comes before a session waiting on him, as on Today (round 10, 1 m2)");
