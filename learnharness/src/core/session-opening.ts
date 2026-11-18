@@ -10,6 +10,7 @@
  */
 
 import type { TopicReview } from "./contracts/course-map.ts";
+import { sessionPlanTopicOf, type LhMessage } from "./native-messages.ts";
 
 /** The opening a review is started with: "Review " and the titles. */
 const REVIEW_OPENING = /^Review\s+\S/;
@@ -59,9 +60,32 @@ export function openedByApp(record: { appOpening?: true; title: string; topics?:
  *  the starting review showed twice on the sidebar, as Home's review line
  *  and as its session, "Tutor writing" on both). */
 export function openedAsReview(record: { title?: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): boolean {
+	return reviewOpening(record) && lessonTakenUp(record) === null;
+}
+
+/** Opened on topics with a review's words, whatever it did after. */
+function reviewOpening(record: { title?: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): boolean {
 	if ((record.topics ?? []).length === 0) return false;
 	const opening = openingText(record.messages);
 	return opening === null ? REVIEW_OPENING.test(record.title ?? "") : /^Review\b/.test(opening.trim());
+}
+
+/** The topic whose lesson a session opened on topics took up: its first
+ *  plan teaches a topic it was not opened on, so from that plan on it is
+ *  that topic's lesson, no longer the review or lesson it opened as (round
+ *  16, M4: "Review Binomial distribution", asked for Poisson, taught a
+ *  Poisson lesson that stayed filed under the review, with no task and no
+ *  Resume on Poisson's page). Null otherwise. Pure. */
+export function lessonTakenUp(record: { topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): string | null {
+	return planTakesUp(record, sessionPlanTopicOf(record.messages as readonly LhMessage[]));
+}
+
+/** The topic a session opened on topics takes up as its lesson when its
+ *  first plan teaches `taught` (`lessonTakenUp`), for the plan being
+ *  written. Pure. */
+export function planTakesUp(record: { topics?: readonly string[] }, taught: string | null | undefined): string | null {
+	const opened = record.topics ?? [];
+	return taught && opened.length > 0 && !opened.includes(taught) ? taught : null;
 }
 
 /** Whether a session is a review of course topics: the session list says so
@@ -78,7 +102,7 @@ export function isReviewSession(chat: { title: string; review?: boolean; ownTopi
  *  words, or a summary made elsewhere named as one. The brief, the course
  *  tools and the digest read a review the same way. */
 export function reviewRecord(record: { title: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): boolean {
-	return openedAsReview(record) || isReviewSession(record);
+	return lessonTakenUp(record) === null && (openedAsReview(record) || isReviewSession(record));
 }
 
 /** The name a session opened on topics takes from its opening: a review

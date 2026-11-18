@@ -37,7 +37,7 @@ async function startFrom(body: unknown) {
 
 describe("Ask the tutor's opening is his question (1 n8)", () => {
 	it("draws as his message, while a press on a topic stays the app's opening", async () => {
-		const ask = await startFrom(examGapAskCreation(PROB, ["Variance", "Expectation"], ["variance", "expectation"]));
+		const ask = await startFrom(examGapAskCreation(PROB, ["Variance", "Expectation"]));
 		assert.equal(openedByApp(ask), false, "his question shows");
 		const press = await startFrom(topicCreation(PROB, { title: "Variance", handle: "variance" as never, review: null }, "2026-11-17"));
 		assert.equal(openedByApp(press), true, "Start Variance stays the app's words");

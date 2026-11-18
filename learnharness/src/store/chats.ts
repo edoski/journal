@@ -17,9 +17,9 @@ import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, Sessi
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
-import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, savedAnswerTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
 import { leftQuestionRepose, sessionEndOf } from "../core/session-end.ts";
-import { openedAsReview } from "../core/session-opening.ts";
+import { lessonTakenUp, openedAsReview } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
 import { stoppedByHim } from "../core/turn-cut.ts";
 import { failedResponseAtEnd } from "../core/input-events.ts";
@@ -33,7 +33,7 @@ function chatFile(id: string): string {
 }
 
 /** THE SILENCE LAW (push S6, 2026-10-02): chats-changed announces ONLY
- *  list-SHAPE mutations — createChat, renameChat, nameSession, deleteChat (below,
+ *  list-SHAPE mutations — createChat, renameChat, nameSession, takeUpLesson, deleteChat (below,
  *  each emits post-write). The content writers (saveMessages,
  *  appendTurnUsage, saveDigestLedger, saveTree) are
  *  DELIBERATELY SILENT: saveMessages fires per turn-persist and would
@@ -42,7 +42,7 @@ function chatFile(id: string): string {
  *  turn-started / turn-settled, or for a turn-less write (a dismissal,
  *  compaction) by record-changed, which the sidebar refetches on. Silence
  *  here is law, not oversight. */
-function createChat(title: string, course?: CourseLink, topics: readonly string[] = [], arcCheck?: string, asked = false): ChatRecord {
+function createChat(title: string, course?: CourseLink, topics: readonly string[] = [], arcCheck?: string, named = false): ChatRecord {
 	const now = studyNow().toISOString();
 	const record: ChatRecord = {
 		id: `chat_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
@@ -51,7 +51,8 @@ function createChat(title: string, course?: CourseLink, topics: readonly string[
 		updatedAt: now,
 		messages: [],
 		...(course ? { course: { workspace: course.workspace, title: course.title } } : {}),
-		...(topics.length > 0 ? { topics: [...topics], ...(asked ? {} : { appOpening: true as const }) } : {}),
+		...(topics.length > 0 ? { topics: [...topics], appOpening: true as const } : {}),
+		...(named ? { named: true as const } : {}),
 		...(arcCheck ? { arcCheck } : {}),
 	};
 	fs.mkdirSync(PATHS.chats, { recursive: true });
@@ -102,12 +103,16 @@ function listChats(): ChatSummary[] {
 				// zero-back-compat wipe makes these "corrupt") must not blank the
 				// whole sidebar — same isolation getChat's per-file catch gives.
 				try {
-					// Its own topics: the ones it was started on or named after, else
-					// for practice its first problem's.
+					// Its own topics follow what it did: the task it took up (round 15,
+					// m4), else the lesson its plan took up (round 16, M4), else the ones
+					// it was started on or named after, else for practice its first
+					// problem's; one named with no topic (Ask the tutor) the topics its
+					// saved answers were on, never the words of his question (round 16,
+					// M3); a lesson none, until its plan names one (round 7).
 					const kind = sessionModeOf(messages, summary.kind);
-					// A session that took up a task belongs to the task's topics (round 15, m4).
 					const tasked = sessionTaskTopicsOf(messages);
-					const own = tasked.length > 0 ? tasked : summary.topics?.length ? summary.topics : kind === "practice" ? firstProblemTopicsOf(messages) : [];
+					const taken = lessonTakenUp({ ...summary, messages });
+					const own = tasked.length > 0 ? tasked : taken ? [taken] : summary.topics?.length ? summary.topics : kind === "practice" ? firstProblemTopicsOf(messages) : summary.named ? savedAnswerTopicsOf(messages) : [];
 					return {
 						// turns stay out of the list payload (list =
 						// summaries; usage aggregates ride the full record, the picker
@@ -134,7 +139,7 @@ function listChats(): ChatSummary[] {
 						// waiting"); only practice poses, and a handoff to teaching
 						// is refused while one is active.
 						pendingProblem: activeProblemOf(messages) !== null,
-						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages)])],
+						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages), ...own])],
 						ownTopics: own,
 						ended: sessionEndOf(messages, tree, summary.kind, own),
 						...(stoppedByHim(messages) ? { stopped: true as const } : {}),
@@ -244,6 +249,16 @@ function nameSession(id: string, goal: SessionGoal): void {
 	emit("chats-changed", { named: { id, title: record.title } });
 }
 
+/** Name a session after the lesson it took up (the port's rule). */
+function takeUpLesson(id: string, title: string): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	if (record.renamed || !title.trim() || record.title === title.trim()) return;
+	record.title = title.trim();
+	writeChat(record);
+	emit("chats-changed", { named: { id, title: record.title } });
+}
+
 /** Delete the session record file entirely (session-deletion wave 6,
  *  owner 2026-09-22). False when the id is unknown — the route turns that
  *  into a 404. The session's jobs are the caller's choreography
@@ -290,6 +305,7 @@ export const chatStore: ChatStore = {
 	linkCourse,
 	renameChat,
 	nameSession,
+	takeUpLesson,
 	deleteChat,
 	appendTurnUsage,
 	saveDigestLedger,

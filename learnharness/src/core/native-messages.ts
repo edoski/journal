@@ -1206,6 +1206,34 @@ export function sessionTaskTopicsOf(messages: readonly LhMessage[]): string[] {
 	return topics;
 }
 
+/** The course topic the session's first plan teaches: the `topic` of the
+ *  goal its first `plan_init` that went through gave; null when it gave
+ *  none. Pure. */
+export function sessionPlanTopicOf(messages: readonly LhMessage[]): string | null {
+	const clean = cleanToolCallIds(messages);
+	for (const m of messages) {
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "plan_init" || !clean.has(block.id)) continue;
+			const topic = ((block.arguments as { goal?: { topic?: unknown } } | null)?.goal ?? null)?.topic;
+			return typeof topic === "string" && topic.trim() ? topic.trim() : null;
+		}
+	}
+	return null;
+}
+
+/** The topics the session's saved answers were on: each observation's
+ *  `topics` in the saves that went through, in order. Pure. */
+export function savedAnswerTopicsOf(messages: readonly LhMessage[]): string[] {
+	const topics = new Set<string>();
+	for (const changes of sessionSavesOf(messages)) {
+		for (const o of Array.isArray(changes.observations) ? changes.observations : []) {
+			for (const t of strings((o as { topics?: unknown } | null)?.topics)) topics.add(t);
+		}
+	}
+	return [...topics];
+}
+
 /** The conclusion's reveal (owner round, 2026-10-05): the hero of a
  *  conclude card is the modelSolution committed at POSE time — the newest
  *  cleanly-posed problem BEFORE this conclude call. The reveal is never

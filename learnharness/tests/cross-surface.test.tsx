@@ -28,7 +28,11 @@
  * 8. a lesson he left with Done for today reads "Left off today" on every
  *    surface and leaves Today, however the close's record ends, and its
  *    page holds the left question once, posed again with Hint, Show me and
- *    his confidence as before (round 14, M1: 1 M1, 2 D2, 3 M1, 4 minor 5).
+ *    his confidence as before (round 14, M1: 1 M1, 2 D2, 3 M1, 4 minor 5);
+ * 9. a topic's page resumes a session only when the session's own record
+ *    did work on the topic: a press opened it there, it saved an answer or
+ *    a task on it, or its plan teaches it, never because his question named
+ *    the topic (round 16, M3: 1 M2; M4: 3 N1).
  *
  * It seeds its own copy of the world each run (about a minute) and reads
  * the real engine, so it runs where the seed and the engine are installed.
@@ -597,6 +601,47 @@ async function assertFinishedLesson(app: DemoApp, s: Survey, id: string) {
 	assert.ok(problems.length === 0, `${s.label}: ${chat.title}, finished:\n  ${problems.join("\n  ")}`);
 }
 
+// ─── 9. a session is filed by what it did ──────────────────────────────────
+
+/** The topics session `id`'s own record did work on, read from the record, not from the app's session
+ *  list: those a press opened it on or it was named after, each answer, task and problem its calls that went
+ *  through gave a topic, and the topic its plan teaches. */
+function workedOn(app: DemoApp, id: string): Set<string> {
+	const record = app.record(id) as { appOpening?: true; named?: true; topics?: readonly string[]; messages: Array<{ role: string; content?: unknown; toolCallId?: string; isError?: boolean }> };
+	const done = new Set<string>(record.appOpening || record.named ? (record.topics ?? []) : []);
+	const failed = new Set(record.messages.filter((m) => m.role === "toolResult" && m.isError).map((m) => m.toolCallId));
+	const list = (v: unknown) => (Array.isArray(v) ? v.filter((t): t is string => typeof t === "string") : []);
+	for (const m of record.messages) {
+		if (m.role !== "assistant" || !Array.isArray(m.content)) continue;
+		for (const block of m.content as Array<{ type: string; id?: string; name?: string; arguments?: Record<string, unknown> }>) {
+			if (block.type !== "toolCall" || failed.has(block.id)) continue;
+			const args = block.arguments ?? {};
+			if (block.name === "plan_init") {
+				const topic = (args.goal as { topic?: unknown } | undefined)?.topic;
+				if (typeof topic === "string") done.add(topic);
+			}
+			if (block.name === "problem") for (const t of list(args.topics)) done.add(t);
+			if (block.name !== "course_save") continue;
+			const raw = args.changes;
+			const changes = (typeof raw === "string" ? JSON.parse(raw) : raw) as { observations?: Array<{ topics?: unknown }>; tasks?: Record<string, { topics?: unknown } | null> } | undefined;
+			for (const o of changes?.observations ?? []) for (const t of list(o.topics)) done.add(t);
+			for (const task of Object.values(changes?.tasks ?? {})) for (const t of list(task?.topics)) done.add(t);
+		}
+	}
+	return done;
+}
+
+function assertFiledByWork(app: DemoApp, s: Survey) {
+	const problems: string[] = [];
+	for (const [key, page] of s.pages) {
+		const id = page.opens?.startsWith("/chat/") ? page.opens.slice(6).split("?")[0]! : null;
+		if (!id || page.press === "Review") continue;
+		const handle = key.split("#")[1]!;
+		if (!workedOn(app, id).has(handle)) problems.push(`${handle}: its page's Now "${page.now} · ${page.press} · ${page.note}" resumes "${app.record(id).title}", which did no work on it (${[...workedOn(app, id)].join(", ") || "none"})`);
+	}
+	assert.ok(problems.length === 0, `${s.label}: a session filed under a topic it never worked on:\n  ${problems.join("\n  ")}`);
+}
+
 // ─── the journey ───────────────────────────────────────────────────────────
 
 describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip, concurrency: false, timeout: 900_000 }, () => {
@@ -610,7 +655,7 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 	async function holds(label: string, also: (s: Survey) => Promise<void> | void = () => {}) {
 		const s = await survey(app, label);
 		const failures: string[] = [];
-		for (const check of [() => assertOneDay(s), () => assertOneStatus(s), () => assertExamWarnings(s), () => assertNeedsYouOnToday(s), () => assertOneStatusEverywhere(s), () => also(s), () => assertContinueOpensTask(app, s)]) {
+		for (const check of [() => assertOneDay(s), () => assertOneStatus(s), () => assertExamWarnings(s), () => assertNeedsYouOnToday(s), () => assertOneStatusEverywhere(s), () => also(s), () => assertContinueOpensTask(app, s), () => assertFiledByWork(app, s)]) {
 			try {
 				await check();
 			} catch (err) {
@@ -813,5 +858,57 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 	it("Tue 17 Nov, two days before the Probability exam", async () => {
 		app.day("2026-11-17");
 		await holds("Tue 17 Nov", (s) => (finishedLesson ? assertFinishedLesson(app, s, finishedLesson) : assert.fail("the Tue 10 step finished the Linear maps lesson")));
+	});
+
+	it("Tue 17 Nov, Ask the tutor from the Probability head, two review answers, then Done for today (round 16, M3: 1 M2)", async () => {
+		const { examGapAskCreation } = await import("../components/unit-inbox/start-unit.ts");
+		const { courses } = (await (await fetch("/api/calendar")).json()) as { courses: CalendarCourse[] };
+		const course = courses.find((c) => c.map.title === "Probability")!.map;
+		// His question names topics never started, as the head's gaps are (lens 1: Geometric, Poisson, Variance).
+		const gaps = course.topics.filter((t) => t.level === "new" && !app.chats().some((c) => (c.topics ?? []).includes(t.handle))).slice(0, 3);
+		assert.ok(gaps.length > 0, "Probability has topics not started");
+		const creation = examGapAskCreation(course.workspace, gaps.map((t) => t.title));
+		const res = await fetch("/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(creation) });
+		const { id } = (await res.json()) as { id: string };
+		app.say(id, creation.title);
+		const due = course.topics.filter((t) => t.review?.kind === "due").map((t) => t.handle);
+		assert.ok(due.length > 0, "a Probability review is due on the exam eve");
+		await app.save(id, { observations: due.map((topic, i) => ({ topics: [topic], text: `Exam-eve review question ${i + 1}`, result: "correct", help: "none", sure: "confident" })) });
+		app.pose(id, "What is $P(\\max = 5)$ for three rolls of a die?");
+		app.doneForToday(id, "The question you left open will still be waiting.");
+		await holds("Tue 17 Nov, after the Ask session", (s) => {
+			for (const gap of gaps) {
+				const row = s.rows.get(keyOf(course.workspace, gap.handle)) ?? "";
+				assert.ok(!/Left off/.test(row), `${gap.title}'s course row reads "${row}", though the Ask session did no work on it`);
+			}
+		});
+	});
+
+	it("Tue 17 Nov, a review that takes up a lesson on another topic, left for next time (round 16, M4: 3 N1)", async () => {
+		// A review opened on a taught topic, as Home, its page or a sidebar card opens it; his first message names
+		// a topic not started (lens 3: "Poisson" sent into "Review Binomial distribution").
+		const { courses } = (await (await fetch("/api/calendar")).json()) as { courses: CalendarCourse[] };
+		const course = courses.find((c) => c.map.title === "Probability")!.map;
+		const taught = course.topics.find((t) => t.level !== "new")!;
+		const res = await fetch("/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: `Review ${taught.title}`, course: { workspace: course.workspace }, topics: [taught.handle] }) });
+		const { id } = (await res.json()) as { id: string };
+		const reviewed = app.record(id).topics ?? [];
+		const other = course.topics.find((t) => t.level === "new" && !app.chats().some((c) => (c.topics ?? []).includes(t.handle)))!;
+		assert.ok(other, "Probability has a topic no session touched");
+		app.say(id, other.title);
+		await app.save(id, { observations: reviewed.map((topic, i) => ({ topics: [topic], text: `Review question ${i + 1}`, result: "correct", help: "none", sure: "confident" })) });
+		// The probe's answer on the topic he asked for, which starts it (lens 3: two Poisson probe answers).
+		await app.save(id, { observations: [{ topics: [other.handle], text: `Probe question on ${other.title}`, result: "partial", help: "none", sure: "guess" }] });
+		await app.plan(id, "graph TD\n  first[Where the counts come from] --> second[Putting the pieces together]", { title: other.title, topic: other.handle });
+		const left = app.pose(id, "Which count comes first?");
+		app.leave(id);
+		app.closes(id, "We'll stop here for today.", left);
+		const listed = app.chats().find((c) => c.id === id)!;
+		assert.equal(listed.title, `${other.title} lesson`, "the session is named after the lesson it took up");
+		assert.ok(!listed.review, "it is no longer the review it opened as");
+		await holds("Tue 17 Nov, after the review that took up a lesson", (s) => {
+			const page = s.pages.get(keyOf(course.workspace, other.handle));
+			assert.ok(page?.opens?.split("?")[0] === `/chat/${id}`, `${other.title}'s page resumes its lesson: "${page?.now} · ${page?.press} · ${page?.note}" opens ${page?.opens}`);
+		});
 	});
 });

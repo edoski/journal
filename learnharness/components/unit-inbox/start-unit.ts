@@ -36,11 +36,14 @@ export function topicPress(topic: CourseMapTopic, map: CourseMap, chats: readonl
 export const EXAM_GAP_NAME = "Fitting the exam's topics in";
 
 /** The session Ask the tutor opens from such a head: his question as its
- *  opening, linked to the topics it names, under a short name of its own,
- *  never the question (round 11, 1 N14: the breadcrumb read "My exam plan
- *  has no room for Geometric distribution, Expectation and…"). Pure. */
-export function examGapAskCreation(workspace: string, titles: readonly string[], topics: readonly string[]): SessionCreation {
-	return { title: examGapAsk(titles), name: EXAM_GAP_NAME, course: { workspace }, topics: [...topics] };
+ *  opening, under a short name of its own, never the question (round 11,
+ *  1 N14: the breadcrumb read "My exam plan has no room for Geometric
+ *  distribution, Expectation and…"). It is opened on no topic: the topics
+ *  his question names are words, and the session belongs to those its
+ *  work is on (round 16, M3: filed under Geometric, Poisson and Variance,
+ *  it made each read "Left off today"). Pure. */
+export function examGapAskCreation(workspace: string, titles: readonly string[]): SessionCreation {
+	return { title: examGapAsk(titles), name: EXAM_GAP_NAME, course: { workspace } };
 }
 
 /** The session a Check it press creates (spec: course-page.md, "Arcs"):

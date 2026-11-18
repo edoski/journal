@@ -284,6 +284,15 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 				if (kept.length === 0) continue;
 				step = { ...review, topics: kept.map((t) => t.handle), titles: kept.map((t) => t.title) };
 			}
+			// A start of several topics drops one whose lesson a session of his took up today, as the calendar
+			// draws it (round 16, M4: "Start Expectation and linearity, Geometric distribution" beside the Geometric
+			// lesson a review took up).
+			if (step.kind === "topic" && step.topics.length > 1) {
+				const start = step;
+				const taken = new Set([...waiting, ...leftovers, ...ended].filter((c) => c.course?.workspace === course.map.workspace && c.kind !== "practice" && !isReviewSession(c)).flatMap((c) => c.ownTopics ?? []));
+				const kept = course.map.topics.filter((t) => start.topics.includes(t.handle) && !taken.has(t.handle));
+				if (kept.length > 0 && kept.length < start.topics.length) step = { ...start, title: titleList(kept.map((t) => t.title)), topics: kept.map((t) => t.handle) };
+			}
 			// A task that holds a lesson the plan goes on with today is the plan's, ahead of its new starts
 			// (round 13, 1 n3: "Start Geometric" sat above "Continue Poisson distribution lesson").
 			const goesOn = step.kind === "task" && step.topics.some((h) => course.newToday.includes(h));

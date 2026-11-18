@@ -182,6 +182,7 @@ export async function openDemoApp(day = "2026-11-08") {
 	const { inputAppends, tonightAppends } = await import("../../src/core/input-events.ts");
 	const { danglingQuestionOf } = await import("../../src/core/native-messages.ts");
 	const { newQuestionRepose } = await import("../../src/core/native-messages.ts");
+	const { planTools } = await import("../../src/agent/tools/plan.ts");
 
 	// Every fetch the pages make, answered by the route that answers it in the app. A read can be held
 	// (`hold`) to stand for a slow engine read.
@@ -548,6 +549,20 @@ export async function openDemoApp(day = "2026-11-08") {
 				{ id: `msg_n6_${++n}`, role: "toolResult", toolCallId: call, toolName: "course_save", content: [{ type: "text", text: receipt }], details: receipt, isError: false, timestamp: stamp() },
 			);
 			return result.json as Record<string, unknown>;
+		},
+		/** The tutor's first `plan_init` in session `id`, run through the real tool (its tree and the name it
+		 *  gives the session), then the call and its receipt in the session's record. */
+		async plan(id: string, mermaid: string, goal: { title: string; topic?: string }) {
+			const chat = record(id);
+			const course = chat.course ? { course: chat.course, records: stores.courseRecords, arcs: false } : undefined;
+			const call = `toolu_n6_${++n}`;
+			const result = await planTools({ chatId: id, chatStore: stores.chatStore, course: course as never }).plan_init!.execute(call, { mermaid, goal } as never);
+			const receipt = (result as { content?: unknown }).content ?? [{ type: "text", text: "{}" }];
+			append(
+				id,
+				assistant([{ type: "toolCall", id: call, name: "plan_init", arguments: { mermaid, goal } }], "toolUse"),
+				{ id: `msg_n6_${++n}`, role: "toolResult", toolCallId: call, toolName: "plan_init", content: receipt, details: {}, isError: false, timestamp: stamp() },
+			);
 		},
 		/** The tutor poses a question in session `id` and waits on him; returns the call, its tool and arguments. */
 		pose(id: string, question: string) {

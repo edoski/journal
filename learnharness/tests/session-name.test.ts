@@ -23,7 +23,7 @@ after(() => fs.rmSync(TMP_DATA, { recursive: true, force: true }));
 
 describe("a session's own name (1 N14)", () => {
 	it("Ask the tutor about the exam opens with his question and names the session plainly", async () => {
-		const creation = examGapAskCreation(WS, ["Geometric distribution", "Expectation and linearity"], ["geometric", "expectation"]);
+		const creation = examGapAskCreation(WS, ["Geometric distribution", "Expectation and linearity"]);
 		assert.match(creation.title, /^My exam plan has no room for Geometric distribution and Expectation and linearity\./, "the opening stays his question");
 		const res = await POST(new Request("http://test/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(creation) }));
 		const { title } = (await res.json()) as { title: string };
