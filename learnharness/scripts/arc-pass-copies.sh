@@ -9,7 +9,10 @@
 # one course --apply may later give its arcs, with his approval.
 #
 #   OUT=<empty folder> ACCOUNT=<Claude account label> PY=<python with the engine's packages> \
-#     [COURSES="calculus linear-algebra probability real-analysis" | COURSES="SMM AIKR"] bash scripts/arc-pass-copies.sh
+#     [COURSES="calculus linear-algebra probability real-analysis" | COURSES="SMM AIKR"] [CUT_ON=stored] bash scripts/arc-pass-copies.sh
+#
+# CUT_ON=stored cuts a real copy on its stored edges only, so a proposed edge cannot reorder the material
+# (scripts/arc-pass.ts --cut-on).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -68,7 +71,7 @@ done
 pids=()
 for name in $COURSES; do
 	if [ -n "$(real_of "$name")" ]; then
-		args=(--workspace "$OUT/real/courses/$name" --engine-home "$OUT/real/home" --edges propose --original "$(real_of "$name")")
+		args=(--workspace "$OUT/real/courses/$name" --engine-home "$OUT/real/home" --edges propose --cut-on "${CUT_ON:-proposed}" --original "$(real_of "$name")")
 	else
 		args=(--workspace "$OUT/demo/courses/$name" --engine-home "$OUT/demo/home" --engine-vault "$OUT/demo/vault" --edges apply)
 	fi
