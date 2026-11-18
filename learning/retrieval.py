@@ -1307,9 +1307,13 @@ def moved(
     in ``courses`` made a topic it waited on not ready, named in ``waits_on``
     when they left one it needs or a competing method not solid (round 14,
     m3: Poisson moved because Random variables slipped, and the tutor said
-    "today's day was full"); ``answered``, his own answer today on the topic
+    "today's day was full"), with ``another_day`` when each was right on
+    his own today and waits only for a check on another day; a day his
+    study brought forward names in ``ready`` the topics it waited on that
+    his answers today made solid; ``answered``, his own answer today on the topic
     set a day other than the one ahead he was told (a review done on its
-    day is done, not moved). A day that moved for none of these has no
+    day is done, not moved). A day the night brought forward moved for
+    nothing he left, so it is not listed. A day that moved for none of these has no
     cause in his study, so it is not listed as moved: a told day that moves
     otherwise is a fault the tests catch, never a reason to give him.
     The days he was told are the plan as the last day he studied ended,
@@ -1349,6 +1353,7 @@ def moved(
                 continue
             if before < today == day:
                 continue  # a day gone by, and it is today's: due, not moved
+            earlier = day < before
             if morning == before:
                 courses = sorted(
                     str(course.get("title") or Path(key_).name)
@@ -1360,12 +1365,34 @@ def moved(
                     "courses": courses,
                     "day": "today",
                 }
-                if waits := [
+                linked = (*progress.needs(record, key), *partners[key])
+                if earlier:
+                    # Brought forward: what of his study today made it
+                    # ready sooner, never a reason for a delay (round 17,
+                    # 2 m3).
+                    if ready := [
+                        other
+                        for other in linked
+                        if other in mine and agenda.solid(levels[other])
+                    ]:
+                        why["ready"] = ready
+                elif waits := [
                     other
-                    for other in (*progress.needs(record, key), *partners[key])
+                    for other in linked
                     if other in mine and not agenda.solid(levels[other])
                 ]:
                     why["waits_on"] = waits
+                    # Right on his own today, not yet on another day: what
+                    # it waits for is that check, not a mistake (round 17,
+                    # 1 M1: "not solid yet" beside "Right on your own").
+                    if all(levels[other].get("right") == "unaided" for other in waits):
+                        why["another_day"] = True
+            elif earlier:
+                # A day that came forward when the plan was made again, or
+                # took the room a day left: nothing he left moved it, so it
+                # has no cause to name (round 17, 1 m1: "moved from Sunday 15
+                # November because yesterday's plan was not finished").
+                continue
             elif replayed.afresh:
                 why = {
                     "by": "missed" if replayed.missed else "left",
@@ -1420,9 +1447,14 @@ def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:
         topic: {
             "title": title(topic),
             "starts": planned.starts[topic].isoformat(),
-            "moved": {**move, "waits_on": [title(key) for key in move["waits_on"]]}
-            if "waits_on" in move
-            else move,
+            "moved": {
+                **move,
+                **{
+                    field: [title(key) for key in move[field]]
+                    for field in ("waits_on", "ready")
+                    if field in move
+                },
+            },
             **({"past_exam": True} if past_exam(topic) else {}),
         }
         for topic, move in moves.items()

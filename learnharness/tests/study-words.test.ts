@@ -180,6 +180,14 @@ describe("why a review waits", () => {
 		assert.equal(movedWords(behind, "2026-11-08", { ...told, day: "yesterday" }), "Moved from 10 Nov after your Probability study yesterday", "round 9: today's work moves only what it touched, so the rest moves the next morning and says so");
 		assert.equal(movedWords(null, "2026-11-09", { ...told, waitsOn: ["Random variables and distributions"] }), "Moved from 10 Nov, since Random variables and distributions is not solid yet", "round 14, m3: the topic that slipped, never \"today's day was full\"");
 		assert.equal(movedWords(null, "2026-11-09", { ...told, waitsOn: ["Bases", "Rank"] }), "Moved from 10 Nov, since Bases and Rank are not solid yet");
+		// Round 17, 1 M1: "since Random variables is not solid yet" beside Random
+		// variables' own "Right on your own, check another day".
+		const checked = movedWords(null, "2026-11-08", { ...told, from: "2026-11-08", waitsOn: ["Random variables and distributions"], anotherDay: true });
+		assert.equal(checked, "Moved from 8 Nov, since Random variables and distributions needs its check on another day");
+		assert.doesNotMatch(checked ?? "", /not solid/);
+		assert.equal(movedWords(null, "2026-11-08", { ...told, waitsOn: ["Bases", "Rank"], anotherDay: true }), "Moved from 10 Nov, since Bases and Rank need their checks on another day");
+		// Round 17, 2 m3: a day brought forward says why it came, never a delay.
+		assert.equal(movedWords(null, "2026-11-08", { ...told, ready: ["Random variables and distributions"] }), "Moved from 10 Nov, now that Random variables and distributions is solid");
 		assert.equal(movedWords(behind, "2026-11-09", { from: "2026-11-12", by: "answered" }), "Moved from 12 Nov after your answer today", "round 14, m3: Rank, told Thu 12, moved by more practice, says so");
 	});
 	it("names the last day he studied when the cause is days ago, never a 'yesterday' a week back", () => {

@@ -330,7 +330,8 @@ describe("when a topic comes up", () => {
 		const variance = examOf(topic("variance", { starts: "2026-12-13", startsAfter: ["Linear Algebra"], startsWhy: { kind: "after", needs: [h("expectation")], partners: [] } }));
 		assert.equal(variance.startsWhy?.words, "Not before the exam, what it needs won’t be solid in time");
 		assert.equal(variance.starts?.waits, null, "the exam is why, not another course");
-		assert.equal(examOf(topic("poisson", { starts: "2026-11-18", startsWhy: { kind: "next" } })).startsWhy?.words, "No room in the final review, it starts too close to the exam");
+		// Round 17, 3 m4: "No room in the final review…" beside "Planned Wed 18 Nov" read as a contradiction.
+		assert.equal(examOf(topic("poisson", { starts: "2026-11-18", startsWhy: { kind: "next" } })).startsWhy?.words, "Too close to the exam for a review before it");
 		const bayes = topic("bayes", { level: "independent", introduced: "2026-10-01", review: { kind: "scheduled", date: "2026-12-15", held: { exam: null, since: "2026-11-11" } } });
 		assert.equal(examOf(bayes).waits, "No room in the final review at your pace");
 	});

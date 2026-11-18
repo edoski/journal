@@ -786,3 +786,37 @@ def test_a_day_his_answers_left_without_a_start_keeps_his_pace_and_the_exam(
     assert "variance" not in lost(evening)
     assert lost(morning) == lost(evening)
     assert morning["capacity"]["new_per_day"] == evening["capacity"]["new_per_day"]
+
+
+@pytest.mark.parametrize(
+    ("checkpoint", "day"),
+    [("seed", "2026-11-08"), ("d9-end", "2026-11-09"), ("d9-end", "2026-11-10")],
+)
+def test_a_moved_day_s_reason_fits_the_way_it_moved(
+    checkpoint: str,
+    day: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 17, 1 m1 and 2 m3: "you start Expectation and linearity, moved
+    from Sunday 15 November because yesterday's plan was not finished" came
+    forward, and Diagonalization read "Moved from 27 Nov, yesterday's plan was
+    not finished" on 26 Nov. A day that came forward names no delay: what he
+    left or missed moves a day later, a topic it waits on slipping moves it
+    later, and only his study today brings one forward."""
+    world = World(tmp_path, checkpoint, monkeypatch, capsys, R17)
+    moves = 0
+    for name, shown in world.maps(day).items():
+        for topic in shown["topics"]:
+            move = topic.get("moved")
+            if not move:
+                continue
+            moves += 1
+            now = topic.get("starts") or topic.get("review")
+            if move["from"] > now:
+                assert move["by"] in ("study", "answered"), (name, topic["topic"], move)
+                assert "waits_on" not in move, (name, topic["topic"], move)
+            else:
+                assert "ready" not in move, (name, topic["topic"], move)
+    assert moves, "the day moves something"
