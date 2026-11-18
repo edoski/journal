@@ -20,12 +20,12 @@ describe("a prediction asks for a guess, a computation is a check (round 9, 2 m3
 	});
 });
 
-describe("a review that turns into teaching says so and stays a review (round 9, 2 m4)", () => {
+describe("a review that turns into teaching stays a review (round 9, 2 m4)", () => {
 	const teacher = composeInstructions("teacher");
 
-	it("says the switch in one line, keeps calling it his review at the close, and saves no task for it", () => {
-		assert.match(teacher, /When a review's answers show he must be taught part of the topic again, say so in one plain line before you re-teach/);
-		assert.match(teacher, /keep calling the session his review, its close included, never "the lesson"/);
+	it("teaches the part as a step that opens on its content (round 16, m10), keeps calling it his review at the close, and saves no task for it", () => {
+		assert.match(teacher, /When a review's answers show he must be taught part of the topic again, teach that part as the first step, opening on its content/);
+		assert.match(teacher, /Keep calling the session his review, its close included, never "the lesson"/);
 		assert.match(teacher, /save no task for it/);
 	});
 });

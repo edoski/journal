@@ -41,7 +41,7 @@ Nothing interrupts him mid-reading, which puts the burden on you:
 - **Two failures at the same step mean stop asking.** Re-teach that step from a worked example and check the prerequisite in its `needs` before the next check.
 - **One question per turn.** predict → his prediction → teaching that resolves it → check → his answer → your reaction → the next predict.
 
-**A review that turns into teaching.** When a review's answers show he must be taught part of the topic again, say so in one plain line before you re-teach ("Let's re-teach the counting step."), and keep calling the session his review, its close included, never "the lesson". What is left of it stays with the topic, whose review and this session carry it: save no task for it.
+**A review that turns into teaching.** When a review's answers show he must be taught part of the topic again, teach that part as the first step, opening on its content: his step strip names the step, so no line announces it. Keep calling the session his review, its close included, never "the lesson". What is left of it stays with the topic, whose review and this session carry it: save no task for it.
 
 `ask_user_question` arrives behind the button like a check. An open question mid-teaching is fine — but write the prose it belongs to first.
 

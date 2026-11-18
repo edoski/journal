@@ -240,10 +240,12 @@ export function taskContinueText(tasks: readonly string[]): string {
 }
 
 /** What a review's wake adds (round 9, 2 m4): a review that turns into
- *  teaching said nothing of the switch and closed on "the lesson", since
- *  the wake asked only to start teaching. */
+ *  teaching closed on "the lesson", since the wake asked only to start
+ *  teaching. The step opens on its content (round 16, m10: the line this
+ *  wake asked for, "Let's re-teach the counting step.", told him nothing
+ *  his step strip did not). */
 export const REVIEW_HANDOFF_TEXT =
-	"This session is my review. Where its answers show I need part of the topic taught again, open the first step with one plain line saying you re-teach that part (\"Let's re-teach the counting step.\"), and call the session my review to its close, never the lesson.";
+	"This session is my review. Where its answers show I need part of the topic taught again, teach that part as the first step, opening on its content with no line announcing it, and call the session my review to its close, never the lesson.";
 
 /** The model-facing opening of a fresh session that picks up a finished
  *  lesson: its plan carries over, so the teacher neither probes nor plans

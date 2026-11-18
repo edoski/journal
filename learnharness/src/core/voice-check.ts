@@ -93,6 +93,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// A handoff between teaching and practice needs no words of its own
 	// (round 12, 3 D4: "Switching to an explanation of when three vectors
 	// form a basis of ℝ³.").
+	// A step announced instead of taught (round 16, m10: "Let's re-teach
+	// the counting step." opening a review's first teaching step).
+	{ rule: "narration", re: /(?:^|[.!?]\s+|\n)(?:let'?s|let us|we(?:'ll| will)|I(?:'ll| will))(?: now| first)? (?:re-?teach|teach|go (?:back )?over|revisit|recap|review|redo|work through|cover|fix|repair)\b/i },
 	{ rule: "narration", re: /(?:^|[.!?]\s+|\n)(?:(?:let'?s|now,?|ok(?:ay)?,?) (?:switch|move|turn|go|head)|(?:now,? )?(?:switching|moving|turning|going|heading)|back)(?: (?:back|over|on|now))?(?: (?:to|into))? (?:(?:an?|the|some|your|more) )?(?:explanation|explaining|teaching|practice|practising|practicing|problems?|exercises?|lesson|review)\b/i },
 	// A confident miss's contrast as a formula, closing every such reply
 	// after the break was said (round 14, m15: "You held that extra freedom
