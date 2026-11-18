@@ -167,13 +167,15 @@ const STANDING: CourseStanding = {
 };
 
 describe("the open mistakes", () => {
-	it("words each in the tutor's words, the diagnosis first, with when, help and its hint", () => {
+	it("words each in the tutor's words, the diagnosis first, else the answer under its mark, with when, help and its hint", () => {
 		const view = viewOf(course(true));
 		const rows = mistakeRows(STANDING, view.course, []);
 		assert.deepEqual(
 			rows.map((r) => [r.topic.handle, r.slip, r.words, r.when, r.helped, r.hint]),
 			[
-				["basis", "confident", "Called three vectors in a plane a basis", "6 Nov", false, "Sheet 3. You answered a basis"],
+				// Round 16, m17: the answer's sentence says what he did, so with
+				// no diagnosis its mark leads, never an achievement alone.
+				["basis", "confident", "Not right: called three vectors in a plane a basis", "6 Nov", false, "Sheet 3. You answered a basis"],
 				["rank", "gap", "You count the vectors, not the dimension of their span", "Today", true, null],
 			],
 		);
