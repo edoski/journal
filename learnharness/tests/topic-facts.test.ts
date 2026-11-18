@@ -26,6 +26,7 @@ import {
 	headMarks,
 	localDay,
 } from "../components/unit-inbox/topic-page/topic-facts.ts";
+import { pickupSections } from "../components/unit-inbox/topic-page/pickup/pickup-facts.ts";
 
 const TODAY = "2026-11-08";
 const WORKSPACE = "/study/linalg";
@@ -332,6 +333,16 @@ describe("when a topic comes up", () => {
 		assert.equal(examOf(topic("poisson", { starts: "2026-11-18", startsWhy: { kind: "next" } })).startsWhy?.words, "No room in the final review, it starts too close to the exam");
 		const bayes = topic("bayes", { level: "independent", introduced: "2026-10-01", review: { kind: "scheduled", date: "2026-12-15", held: { exam: null, since: "2026-11-11" } } });
 		assert.equal(examOf(bayes).waits, "No room in the final review at your pace");
+	});
+
+	it("still says the exam leaves out a topic he started, beside the lesson he left (demo world, 17 Nov: Simulation of continuous probabilities read only Left off today)", () => {
+		const exam = { date: "2026-11-19", daysLeft: 2, finalReview: "2026-11-17", leavesOut: [h("simulation")] };
+		const simulation = topic("simulation", { title: "Simulation of continuous probabilities", level: "assisted", introduced: "2026-11-17", review: { kind: "scheduled", date: "2026-11-25", held: { exam: null, since: "2026-11-18" } } });
+		const lesson = chat({ title: "Simulation of continuous probabilities lesson", topics: ["simulation"], ended: "left", updatedAt: "2026-11-17T10:00:00.000Z" });
+		const facts = topicFacts({ course: { ...COURSE, map: { ...COURSE.map, today: "2026-11-17", exam, topics: [...COURSE.map.topics, simulation] } }, topic: simulation, chats: [lesson], read: null });
+		const { now, scheduled } = pickupSections(facts);
+		assert.deepEqual([now.kind, now.note], ["resume", "Left off today"], "Now resumes the lesson he left");
+		assert.deepEqual(scheduled, { kind: "review", day: "Wed 25 Nov", waits: "Not on the exam" });
 	});
 
 	it("never says a topic has no review before the exam beside a review day before it (round 9, 2 M1: Binomial read Review Wed 11 Nov, No review before the exam)", () => {
