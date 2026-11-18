@@ -36,8 +36,9 @@ function Mark({ entry }: { entry: CalendarEntry }) {
 	return entry.course ? <CourseMark title={entry.course.title} /> : <CircleDashedIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />;
 }
 
-/** The entry's face. A week gives the title the column's width, on two
- *  lines at most, over its course mark and its look in an icon and a word
+/** The entry's face. A week gives the title the column's width, on three
+ *  lines at most (round 16, m25: "Review Random variables and
+ *  distributions,…" lost its second topic with the column's room below), over its course mark and its look in an icon and a word
  *  (an exam also says how far off it is); a session that waits says Your
  *  turn in the word's place, its icon naming the look. A month keeps the mark and the look's icon beside the title,
  *  still on two lines at most, so the topic reads. */
@@ -59,7 +60,7 @@ function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; 
 	}
 	return (
 		<>
-			<span data-slot="calendar-entry-title" className="line-clamp-2 min-w-0 text-foreground">
+			<span data-slot="calendar-entry-title" className="line-clamp-3 min-w-0 text-foreground">
 				<LineText>{entry.title}</LineText>
 			</span>
 			<span className="flex min-w-0 items-center gap-1.5 text-callout text-muted-foreground">

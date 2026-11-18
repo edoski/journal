@@ -43,13 +43,15 @@ export const SLOT_WORDS = "min-w-0 truncate";
 export const ROW_FRAME = "flex flex-col px-2.5 py-2";
 
 /** Every row's title: T3 Code's thread title, 14px on a 20px line,
- *  wrapping onto a second line and cut only past it. `loud` is a row
+ *  wrapping onto a second and third line and cut only past them (round
+ *  16, m25: "Review Random variables and distributions, Binomial…" cut a
+ *  combined review's second topic with room below). `loud` is a row
  *  that needs him or is open (a card, the open row, a session waiting on
  *  him): 500 in full ink. Otherwise it is T3 Code's quiet row, 400 at 75%
  *  ink until the row is hovered or has keyboard focus. */
 export const rowTitle = (loud: boolean) =>
 	cn(
-		"line-clamp-2 min-w-0 text-pretty",
+		"line-clamp-3 min-w-0 text-pretty",
 		loud
 			? "text-sidebar-title text-foreground"
 			: "text-sidebar-title-quiet text-foreground/75 group-hover/sidebar-row:text-foreground group-has-[:focus-visible]/sidebar-row:text-foreground",
