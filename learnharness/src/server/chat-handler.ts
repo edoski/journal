@@ -1,4 +1,4 @@
-import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
+import type { Usage } from "@earendil-works/pi-ai";
 import { COURSE_DELETED, courseDeleted } from "./courses.ts";
 import {
 	createPracticeAgent,
@@ -35,11 +35,8 @@ import { beginTurn, endTurn, isTurnRunning } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn } from "./turn-runs.ts";
 import { askPrestart, claimPrestart, prestart } from "./prestart.ts";
-import { claimEarlyPlan, endEarlyPlan, startEarlyPlan } from "./early-plan.ts";
-import { EARLY_PLAN_SAVED_TEXT, EARLY_PLAN_TEXT } from "../core/contracts.ts";
-import { sdkInputBlocks } from "../core/sdk-session.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
-import { activeProblemOf, answeredQuestionsOf, danglingQuestionOf, hasProbeDone, hasUnresolvedQuestion, HIS_MESSAGE, newHandoffMessage, sessionTasksOf, recordedBySaves, respondingAgentOf, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
+import { activeProblemOf, answeredQuestionsOf, danglingQuestionOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
 import { remarkableOf } from "../core/answer-marks.ts";
 import { reviewRecord } from "../core/session-opening.ts";
 import { compactionInstructions, planTreeToText } from "../core/compaction.ts";
@@ -228,7 +225,7 @@ function turnAgent(
 	merged: LhMessage[],
 	engine: SdkEngine,
 	courseArcs: Awaited<ReturnType<typeof fetchCourseArcs>>,
-	{ onUsage, claim, claimEarly, kind, buildAgent }: { onUsage?: (usage: Usage) => void; claim?: AgentBuildOptions["claim"]; claimEarly?: AgentBuildOptions["claimEarly"]; kind?: AgentKind; buildAgent?: TurnAgentFactory } = {},
+	{ onUsage, claim, buildAgent }: { onUsage?: (usage: Usage) => void; claim?: AgentBuildOptions["claim"]; buildAgent?: TurnAgentFactory } = {},
 ): TeachingAgent {
 	// AGENT CONSTRUCTION BRANCH (docs/probe-teach-split.md §2): the transcript
 	// is the seam. Its mode picks practice or teaching; in teaching a
@@ -236,7 +233,7 @@ function turnAgent(
 	// else the PROBER (quiz/ask + probe_done). All three share this whole
 	// composition (write-ahead persist, liveness, steers, usage) — only the
 	// agent differs.
-	const agentKind = kind ?? respondingAgentOf(agentMessages, record.kind);
+	const agentKind = respondingAgentOf(agentMessages, record.kind);
 	const teaching = agentKind === "teacher";
 	// Tests inject a factory: the agent is stateless per turn, so each
 	// request builds a fresh one off the record — the factory mirrors that
@@ -261,7 +258,6 @@ function turnAgent(
 		messages: asAgentMessages(agentMessages),
 		onUsage,
 		claim,
-		claimEarly,
 		// The lesson's Claude Code session: the model's memory of it.
 		session: record.session,
 		sessionStore: sessionStoreFor(chatId),
@@ -325,37 +321,6 @@ function turnAgent(
 					},
 					agentOpts,
 				);
-}
-
-/**
- * Plan while the assessment is written (early-plan.ts): the moment the
- * probe starts writing `probe_done`, the teacher starts on a fork of the
- * probe's session, before the reply being written, reading what the
- * handoff reads, with the probe's save of his last answer and the words
- * he read after it in place of the reply. A session that carries on with
- * an open task plans from the assessment itself, so it waits for it.
- */
-function planWhileAssessing(chatId: string, prober: TeachingAgent, engine: SdkEngine, courseArcs: Awaited<ReturnType<typeof fetchCourseArcs>>, buildAgent?: TurnAgentFactory): void {
-	const stop = prober.subscribe((event) => {
-		if (event.type !== "message_update" || event.assistantMessageEvent.type !== "toolcall_start") return;
-		const reply = event.message as AssistantMessage;
-		const block = reply.content[event.assistantMessageEvent.contentIndex];
-		if (block?.type !== "toolCall" || block.name !== "probe_done") return;
-		stop();
-		const record = stores.chatStore.getChat(chatId);
-		const fork = prober.replyStart();
-		if (!record || !fork || hasProbeDone(record.messages) || sessionTasksOf(record.messages).length > 0) return;
-		const said = [...record.messages, reply as LhMessage];
-		const handoff = withProbeFeedback(newHandoffMessage(chatId, reviewRecord(record)) as LhMessage, said);
-		const saves = reply.content.flatMap((b) => (b.type === "toolCall" && b.name === "course_save" ? [JSON.stringify(b.arguments)] : []));
-		const blocks = [
-			...(saves.length ? [{ type: "text" as const, text: `${EARLY_PLAN_SAVED_TEXT} ${saves.join(" ")}` }] : []),
-			{ type: "text" as const, text: EARLY_PLAN_TEXT },
-			...sdkInputBlocks([handoff]),
-		];
-		const teacher = turnAgent(chatId, record, [...record.messages, handoff], [...record.messages, handoff], engine, courseArcs, { kind: "teacher", buildAgent });
-		startEarlyPlan(chatId, teacher.startEarly(fork, blocks));
-	});
 }
 
 /** A lesson waits on his answer: a question he has not answered, or a
@@ -604,12 +569,7 @@ export async function handleChatInput(
 	const modelId = `${engine.model.provider}:${engine.model.id}`;
 	// The turn takes the process started for it while he thought, when
 	// that process has every option this turn starts one with.
-	// The probe's handoff takes the plan started while the assessment was
-	// written (early-plan.ts); any other turn of the lesson ends it.
-	const probeHandoff = input.type === "steers" && input.steers.some((s) => s.role === "custom" && s.customType === "probe-handoff");
-	if (!probeHandoff) endEarlyPlan(chatId);
-	const constructed = turnAgent(chatId, record, agentMessages, merged, engine, courseArcs, { onUsage: collectUsage, claim: (key) => claimPrestart(chatId, key), ...(probeHandoff ? { claimEarly: (key: string) => claimEarlyPlan(chatId, key) } : {}), buildAgent });
-	if (respondingAgentOf(agentMessages, record.kind) === "prober") planWhileAssessing(chatId, constructed, engine, courseArcs, buildAgent);
+	const constructed = turnAgent(chatId, record, agentMessages, merged, engine, courseArcs, { onUsage: collectUsage, claim: (key) => claimPrestart(chatId, key), buildAgent });
 
 	// A test-injected agent gets no usage collector (tests assert the
 	// transcript, not the money channel); when it's ours, usage flows through
@@ -668,8 +628,6 @@ export async function handleChatInput(
 				// Wave B: append only messages past the temporary agent prefix.
 				// Retry's saved record still includes its earlier failed attempts.
 				const stamped = persistTurn(stores.chatStore, chatId, persistBaseCount, turnMessages, isAborted);
-				// A probe that did not conclude hands nothing off: its early plan ends.
-				if (respondingAgentOf(stores.chatStore.getChat(chatId)?.messages ?? stamped, record.kind) === "prober") endEarlyPlan(chatId);
 				// The record's map to the session moves to what the turn left there.
 				const sessionEnd = constructed.sessionEnd();
 				if (sessionEnd) stores.chatStore.saveSession(chatId, nextChatSession(record.session, sessionEnd, stores.chatStore.getChat(chatId)?.messages ?? stamped));

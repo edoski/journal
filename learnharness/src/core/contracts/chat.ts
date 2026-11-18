@@ -201,14 +201,6 @@ export const HANDOFF_TEXT =
 	`each of ${SENTENCE_WORDS} words or fewer, since a longer one counts as two, ` +
 	"then its question, never waiting for plan_init's result; I'll interrupt if I want something else.";
 
-/** The teacher's plan, begun while the probe still writes its assessment
- *  (src/server/early-plan.ts): what the probe saved of his last answer,
- *  and that the plan comes from his answers above. */
-export const EARLY_PLAN_SAVED_TEXT = "The probe saved my last answer:";
-export const EARLY_PLAN_TEXT =
-	"The probe has ended. Its written assessment of me is still being written, so plan from my answers above: " +
-	"where each one shows my edge, what I hold and where it runs out.";
-
 /** What the wake says of the probe's last answer, read from the record
  *  once the probe's turn has landed (round 15, m13: the first step opened
  *  "Your answer took the limit of the base alone…" under the feedback
