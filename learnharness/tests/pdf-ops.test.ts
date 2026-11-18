@@ -137,7 +137,16 @@ describe("pdf-ops — the pdfjs text layer", () => {
 // read still running in another document then never settles, and the process exits mid-await (18 Nov 2026, a
 // 1,127-page textbook measured beside an 80-page deck by the arc pass).
 describe("pdf-ops — a teardown never lands while another document is being read", () => {
-	it("a short PDF read beside a long one is torn down only once the long one is read", async () => {
+	it("a short PDF read beside a long one is torn down only once the long one is read", () => shortBesideLong(readPdf));
+
+	// Next bundles pdf-ops into every route and into instrumentation, while pdfjs is one server-external module.
+	it("so it holds when the long read runs in another bundled copy of pdf-ops", async () => {
+		const copy = (await import(new URL("../src/agent/subagents/pdf-ops.ts?copy=route", import.meta.url).href)) as typeof import("../src/agent/subagents/pdf-ops.ts");
+		assert.notEqual(copy.readPdf, readPdf, "the copy is its own module instance");
+		await shortBesideLong(copy.readPdf);
+	});
+
+	async function shortBesideLong(readLong: typeof readPdf): Promise<void> {
 		const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
 		const first = pdfjs.getDocument({ data: tinyPdf([{ runs: [{ text: "x", x: 72, y: 700 }] }]), verbosity: 0 });
 		await first.promise;
@@ -152,7 +161,7 @@ describe("pdf-ops — a teardown never lands while another document is being rea
 		try {
 			let finish!: () => void;
 			const held = new Promise<void>((resolve) => (finish = resolve));
-			const long = readPdf(tinyPdf([{ runs: [{ text: "Long one", x: 72, y: 700 }] }]), async (doc) => {
+			const long = readLong(tinyPdf([{ runs: [{ text: "Long one", x: 72, y: 700 }] }]), async (doc) => {
 				await held;
 				const page = await doc.getPage(1);
 				return (await page.getTextContent()).items.length;
@@ -166,5 +175,5 @@ describe("pdf-ops — a teardown never lands while another document is being rea
 		} finally {
 			proto.destroy = destroy;
 		}
-	});
+	}
 });

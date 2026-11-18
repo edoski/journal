@@ -64,9 +64,14 @@ export function standardFontsDir(): string {
  * (18 Nov 2026: a 1,127-page textbook measured beside an 80-page deck). So
  * documents read side by side, a teardown waits until none is reading, and
  * once one is due no new document opens until it is done, so documents never
- * pile up waiting for a quiet moment.
+ * pile up waiting for a quiet moment. The gate lives on globalThis: pdfjs is
+ * one server-external module, while Next bundles this file into every route
+ * and into instrumentation, so a gate per copy would let one copy's teardown
+ * run under another copy's read.
  */
-const gate = { reading: 0, ending: [] as PDFDocumentLoadingTask[], due: null as Promise<void> | null, done: () => {} };
+interface PdfGate { reading: number; ending: PDFDocumentLoadingTask[]; due: Promise<void> | null; done: () => void }
+type PdfGateGlobal = { __lhPdfGate?: PdfGate };
+const gate: PdfGate = ((globalThis as typeof globalThis & PdfGateGlobal).__lhPdfGate ??= { reading: 0, ending: [], due: null, done: () => {} });
 
 async function tearDown(): Promise<void> {
 	while (gate.ending.length > 0) await gate.ending.shift()!.destroy().catch(() => {});
