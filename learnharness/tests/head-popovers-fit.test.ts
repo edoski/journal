@@ -89,3 +89,55 @@ describe("the readiness answer's ways in", () => {
 		assert.deepEqual(m.over, [], "no press runs past the popover's edge");
 	});
 });
+
+/**
+ * Round 17, M3 (1 M3, 1 m6 in part; 2 m1): on the 17 Nov Probability page,
+ * nine topics with no room ran the head off the window, "Properties of
+ * probability: P(A∪B)=P(A)+P(B)−P(A∩B)" was drawn under its "Back Tue 17
+ * Nov", and the readiness answer's pick split into three columns around
+ * "k-permutations". The head wraps inside its column, a formula in a row's
+ * title breaks at its own break points before the fact, and a press's
+ * words with maths are one run of text.
+ */
+describe("the exam eve at the new world's size (round 17, M3)", () => {
+	it("keeps the head inside its column, a maths title clear of its fact, and the pick's words one run", async () => {
+		const page = await shell.open("browser", { sidebar: "open", search: "&case=eve" });
+		await page.waitForSelector('[data-slot="course-topic-row"]');
+		const before = await page.evaluate(() => {
+			const drawnRight = (el: Element) => {
+				const range = document.createRange();
+				range.selectNodeContents(el);
+				return Math.max(...[...range.getClientRects()].map((r) => r.right));
+			};
+			const head = document.querySelector('[data-slot="page-head"]')!.getBoundingClientRect();
+			const chip = document.querySelector('[data-slot="course-topic-fact"]')!.getBoundingClientRect();
+			return { headRight: head.right, factRight: drawnRight(document.querySelector('[data-slot="course-ready-fact"]')!), window: innerWidth, titleRight: drawnRight(document.querySelector('[data-slot="course-topic-title"]')!), chipLeft: chip.left };
+		});
+		assert.ok(before.factRight <= before.headRight + 0.5 && before.factRight <= before.window, `the readiness line's words stay inside the head (${before.factRight} against ${before.headRight}, window ${before.window})`);
+		assert.ok(before.titleRight <= before.chipLeft, `the maths title ends before its fact (${before.titleRight} against ${before.chipLeft})`);
+		await page.click('[data-slot="course-ready-fact"]');
+		await page.waitForSelector('[data-slot="exam-gaps-pick"]');
+		const pick = await page.evaluate(() => {
+			const press = document.querySelector('[data-slot="exam-gaps-pick"]')!;
+			// Each piece of its words in reading order: a run of words outside a formula, rect by rect, and each
+			// formula whole. Pieces in columns read back up a line; one run of words never does.
+			const pieces: DOMRect[] = [];
+			const walk = (node: Node) => {
+				if (node instanceof Element && node.classList.contains("katex")) pieces.push(node.getBoundingClientRect());
+				else if (node.nodeType === Node.TEXT_NODE) {
+					const range = document.createRange();
+					range.selectNodeContents(node);
+					pieces.push(...[...range.getClientRects()].filter((r) => r.width > 0));
+				} else node.childNodes.forEach(walk);
+			};
+			walk(press);
+			const centres = pieces.map((r) => r.top + r.height / 2);
+			const lines = [...centres].sort((a, b) => a - b).reduce<number[]>((at, c) => (at.length && c - at[at.length - 1]! < 8 ? at : [...at, c]), []);
+			const lineOf = (c: number) => lines.findLastIndex((l) => c >= l - 0.5);
+			return { words: press.textContent, order: centres.map(lineOf) };
+		});
+		await page.close();
+		assert.match(pick.words ?? "", /^Review Permutations, .*-permutations and factorials today$/);
+		assert.ok(pick.order.every((line, i) => i === 0 || line >= pick.order[i - 1]!), `the pick's words read in order, line by line, never in columns: ${pick.order.join(" ")}`);
+	});
+});

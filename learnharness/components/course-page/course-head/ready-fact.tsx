@@ -66,8 +66,10 @@ export function ReadyFact({ view, ready }: { view: CourseView; ready: ExamReady 
 	}
 	return (
 		<Popover>
-			<PopoverTrigger data-slot="course-ready-fact" data-kind={ready.kind} className={cn(PRESS, ready.kind === "short" && "text-warning hover:text-warning data-[state=open]:text-warning")}>
-				<Icon aria-hidden className={MARK} />
+			{/* What won't fit wraps inside the head's column, its mark on the first line (round 17, M3: nine topics ran
+			    the line off the window on the exam eve). */}
+			<PopoverTrigger data-slot="course-ready-fact" data-kind={ready.kind} className={cn(PRESS, ready.kind === "short" && "h-auto min-h-5 items-start whitespace-normal text-left text-warning hover:text-warning data-[state=open]:text-warning")}>
+				<Icon aria-hidden className={cn(MARK, ready.kind === "short" && "mt-0.5")} />
 				{ready.kind === "short" ? <MathText>{ready.words}</MathText> : READY_FACT_WORDS[ready.kind]}
 			</PopoverTrigger>
 			<PopoverContent data-slot="course-ready-detail" align="start" collisionPadding={12} className="flex flex-col gap-3">

@@ -15,7 +15,10 @@ import { PageFrame, PageHead } from "@/components/page-frame/page-frame";
 import { MistakesHead, MistakesPress } from "@/components/course-page/standing/mistakes-press";
 import { ReadyFact } from "@/components/course-page/course-head/ready-fact";
 import type { MistakeRow } from "@/components/course-page/standing/standing-model";
-import type { CourseView } from "@/components/course-page/course-model";
+import { StudiedFact } from "@/components/course-page/course-head/head-parts";
+import { CourseTopicRow } from "@/components/course-page/course-topic-row";
+import { misfitWords } from "@/components/calendar/calendar-facts";
+import type { CourseTopic, CourseView } from "@/components/course-page/course-model";
 import type { CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
@@ -70,6 +73,33 @@ const course: StudyCourse = {
 };
 const view = { course, chats: [] } as unknown as CourseView;
 
+/** Probability on Tue 17 Nov, two days before its exam (round 17, M3: 1 `75`, `76`; 2 `14a`): nine topics with no
+ *  room, a review whose title holds maths as the readiness answer's pick, and an arc row titled with a formula. */
+const LOST = ["Geometric distribution", "Negative binomial distribution", "Poisson distribution", "Hypergeometric distribution", "Expectation of sums and products", "Conditional expectation", "Martingales", "Variance", "Variance of sums"];
+const eve: StudyCourse = {
+	...course,
+	map: {
+		...course.map,
+		exam: { ...course.map.exam!, doesNotFit: LOST.map((_, i) => h(`lost-${i}`)) },
+		current: h("perms"),
+		topics: [
+			topic("perms", "Permutations, $k$-permutations and factorials", { level: "assisted", introduced: "2026-11-02", review: { kind: "due", date: "2026-11-09", overdue: 8 } as CourseMapTopic["review"] }),
+			...LOST.map((title, i) => topic(`lost-${i}`, title)),
+		],
+	},
+	due: [h("perms")],
+};
+const eveView = { course: eve, chats: [] } as unknown as CourseView;
+const PROPERTIES: CourseTopic = {
+	topic: topic("properties", "Properties of probability: $P(A\\cup B)=P(A)+P(B)-P(A\\cap B)$", { level: "assisted", introduced: "2026-10-20" }),
+	group: "learning",
+	standing: { fill: 2, slipping: false, words: "Right with help", short: "Right with help" } as unknown as CourseTopic["standing"],
+	current: false,
+	fact: { kind: "back", words: "Back Tue 17 Nov" },
+	factWords: "Back Tue 17 Nov",
+	href: "/unit/probability/properties",
+};
+
 const which = new URLSearchParams(location.search).get("case");
 createRoot(document.getElementById("root")!).render(
 	<AppRouterContext.Provider value={router as never}>
@@ -81,14 +111,34 @@ createRoot(document.getElementById("root")!).render(
 							<AppShell>
 								<WindowPage>
 									<PageFrame>
-										<MistakesHead>
-											<PageHead
-												compact
-												title={which === "gaps" ? "Probability" : "Linear Algebra"}
-												actions={which === "mistakes" ? <MistakesPress rows={MISTAKES} /> : undefined}
-												standing={which === "gaps" ? <ReadyFact view={view} ready={{ kind: "short", words: "No room before the exam to start Geometric distribution and Variance" }} /> : undefined}
-											/>
-										</MistakesHead>
+										{which === "eve" ? (
+											<>
+												<MistakesHead>
+													<PageHead
+														compact
+														title="Probability"
+														standing={
+															<>
+																<ReadyFact view={eveView} ready={{ kind: "short", words: misfitWords(LOST)! }} />
+																<StudiedFact words="Studied 10 Nov" session={null} />
+															</>
+														}
+													/>
+												</MistakesHead>
+												<ul data-slot="eve-arc" className="w-[380px]">
+													<CourseTopicRow row={PROPERTIES} />
+												</ul>
+											</>
+										) : (
+											<MistakesHead>
+												<PageHead
+													compact
+													title={which === "gaps" ? "Probability" : "Linear Algebra"}
+													actions={which === "mistakes" ? <MistakesPress rows={MISTAKES} /> : undefined}
+													standing={which === "gaps" ? <ReadyFact view={view} ready={{ kind: "short", words: "No room before the exam to start Geometric distribution and Variance" }} /> : undefined}
+												/>
+											</MistakesHead>
+										)}
 									</PageFrame>
 								</WindowPage>
 							</AppShell>

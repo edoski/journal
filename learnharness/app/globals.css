@@ -344,8 +344,11 @@ body {
    some of his formulas: there a formula wider than the row breaks after a
    top-level relation or operator, KaTeX's own break points, each part whole,
    rather than run past the column and be clipped (round 14, m37: "P(X≥2) =
-   1 − P(X=0) − P(X=1) ≈ 0.756" read "≈ 0.7"). One that fits stays on one line. */
+   1 − P(X=0) − P(X=1) ≈ 0.756" read "≈ 0.7"), and in a course page row's
+   title, which wraps before its fact (round 17, M3: "P(A∪B)=P(A)+P(B)−P(A∩B)"
+   ran under "Back Tue 17 Nov"). One that fits stays on one line. */
 [data-slot="topic-attempt-text"] .katex { white-space: normal; }
+[data-slot="course-topic-title"] .katex { white-space: normal; }
 
 /* The pieces between a bracket and its close stay on one line wherever a
    formula may wrap (math-text.tsx, `holdBrackets`): "P(X =" | "0)" broke
