@@ -63,3 +63,24 @@ describe("a new check posed after an Ask (round 17, M7)", () => {
 		assert.ok(!answeredQuestionsOf(record).has(SR), "the SR check was set aside, not answered");
 	});
 });
+
+/** Both halves of M7 on the one record: P3's Ask guard and this page. */
+describe("the Ask guard and the page agree on a new check after an Ask (round 17, M7)", () => {
+	it("the guard holds the new check once, lets it through when the tutor insists, and the page then shows it and files his answer under it", async () => {
+		const { VoiceGuard } = await import("../src/agent/voice-guard.ts");
+		// The turn that answers his Ask: built from the record up to his message.
+		const guard = new VoiceGuard(record.slice(0, 5), undefined, false, true);
+		const calls = (i: number) => record[i]!.content as Array<{ type: string; id: string }>;
+		const call = calls(7).find((b) => b.id === UVW) as never;
+		const held = (c: { id: string }) => (guard as unknown as { decisions: Map<string, unknown> }).decisions.get(c.id) ?? null;
+		guard.screen(calls(5)[0] as never);
+		guard.screen(call);
+		assert.ok(held(call) !== null, "the first new check after the Ask is held: the open one comes back word for word");
+		const again = { ...(call as object), id: `${UVW}-again` } as never;
+		guard.screen(again);
+		assert.equal(held(again), null, "the hold is once a turn, so the new check goes through when the tutor sends it again");
+		const waiting = projectView(record.slice(0, -1));
+		assert.ok(!askedAgain(waiting).has(UVW), "the page draws it in its own words");
+		assert.equal(answeredQuestionsOf(record).get(UVW)?.seenBefore, false, "and files his answer under it, with no help");
+	});
+});
