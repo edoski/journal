@@ -46,6 +46,7 @@ import {
 	sortMisses,
 	sortProblems,
 	standingMisses,
+	withoutWithdrawn,
 	sortQuiz,
 	withProposed,
 	addCandidates,
@@ -328,6 +329,24 @@ describe("the cut's shape rules", () => {
 
 	it("takes a cut that homes every topic once in at least two arcs", () => {
 		assert.equal(arcPassProblems(good, view(CALC)), null);
+	});
+
+	it("withdraws only a need this pass added or proposed, with a reason, and the cut then need not hold it", () => {
+		const added = view({ ...CALC, limits: topic("Limits", ["chain"]) }, { added: { limits: ["chain"] } });
+		const withdrawn: ArcSubmit = { ...good, withdraw: [{ topic: "limits", need: "chain", reason: "only one example uses it" }] };
+		assert.equal(arcPassProblems(withdrawn, added), null);
+		assert.deepEqual(withoutWithdrawn(added, withdrawn).topics.limits!.needs, []);
+		assert.match(arcPassProblems({ ...good, withdraw: [{ topic: "chain", need: "derivative", reason: "r" }] }, view(CALC))!, /"chain" needs "derivative", which this pass did not add/);
+		assert.match(arcPassProblems({ ...good, withdraw: [{ topic: "limits", need: "chain", reason: " " }] }, added)!, /gives no reason/);
+		const proposed = view({ ...CALC, limits: topic("Limits", ["chain"]) }, { proposed: { limits: ["chain"] } });
+		assert.match(arcPassProblems(good, proposed)!, /"limits" \(in "limits-continuity"\) needs "chain"/);
+		assert.equal(arcPassProblems(withdrawn, proposed), null, "a withdrawn proposal no longer binds the cut");
+		const changes = arcPassChanges(withdrawn, added, { edgesEntry: 0 })!.changes as { topics: Record<string, { needs?: string[] }>; arc_change: Record<string, unknown> };
+		assert.deepEqual(changes.topics.limits!.needs, [], "the withdrawn add is dropped in the formation's save");
+		assert.equal("needs" in changes.topics.chain!, false);
+		assert.deepEqual(changes.arc_change.edges, [{ topic: "limits", need: "chain", change: "drop", reason: "withdrawn by the cut: only one example uses it" }]);
+		assert.equal("edges_entry" in changes.arc_change, false, "the formation refers to its own edges event");
+		assert.equal("needs" in (arcPassChanges(withdrawn, proposed)!.changes as { topics: Record<string, object> }).topics.limits!, false, "a withdrawn proposal changes no stored need");
 	});
 
 	it("R1: every topic, left-out ones too, in exactly one arc", () => {
@@ -751,6 +770,24 @@ describe("the grouping pass (real engine, scripted model)", { skip: realEngineMi
 		assert.deepEqual(result.status === "formed" && result.edges.diffs.map((d) => `${d.change} ${d.topic}<-${d.need}`), ["add chain<-continuity"]);
 		assert.equal(model.readers, 2 * Object.keys(CALC).length, "two fresh readers per topic");
 		assert.equal(model.kinds, 1, "one kind check for the course");
+	});
+
+	it("the cut sees the needs the edge step just added, and one it withdraws is dropped in the formation's save, logged as an edges event", async () => {
+		const dir = course("withdrawn");
+		const withdraw: ArcSubmit = { ...CUT, withdraw: [{ topic: "continuity", need: "derivative", reason: "only one exercise differentiates; continuity is worked by limits" }] };
+		const model = scriptedModel(EDGES, [withdraw], undefined, {}, { continuity: [{ need: "derivative", step: "Exercise 9 differentiates a continuous function" }] }, [], [], {}, { "continuity<-derivative": "method" });
+		const result = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "apply" });
+		assert.equal(result.status, "formed", JSON.stringify(result));
+		assert.ok([...model.prompts].some((p) => /- continuity: Continuity \(needs limits; added needs derivative/.test(p)), "the cut's prompt lists the add apart");
+		const r = record(dir);
+		assert.deepEqual(r.topics.continuity.needs, ["limits"]);
+		assert.equal(r.topics.continuity.arc, "limits-continuity", "the cut holds without the withdrawn need, which sits in a later arc");
+		const formed = r.arc_log.at(-1);
+		assert.equal(formed.kind, "formed");
+		const drop = r.arc_log.find((e: { kind: string; edges?: { change: string }[] }) => e.kind === "edges" && e.edges?.some((d) => d.change === "drop" && JSON.stringify(d).includes("withdrawn by the cut")));
+		assert.ok(drop, JSON.stringify(r.arc_log));
+		assert.equal(formed.edges_entry, r.arc_log.indexOf(drop));
+		assert.deepEqual(result.status === "formed" && result.edges.withdrawn.map((d) => `${d.topic}<-${d.need}`), ["continuity<-derivative"]);
 	});
 
 	it("proposes only the uses the kind check sorts into a kind that makes a prerequisite, and lists the rest as refused", async () => {

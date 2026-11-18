@@ -12,8 +12,9 @@
  *    proposed, as per-topic diffs against the record as it is at save time,
  *    so a need a tutor added meanwhile stays.
  * 2. The cut. A second agent groups the settled graph into arcs from the
- *    material's units. Its answer has no field for `needs`, and the merge
- *    never sends one: an edge it doubts is kept as a note.
+ *    material's units. Its answer has no field for `needs`: a stored edge it
+ *    doubts is kept as a note, and only an edge step 1 added or proposed can
+ *    it withdraw, with the prerequisite test's reason.
  *
  * The merge forms the arcs in one save and never removes, merges or renames a
  * topic: it only gives untitled topics a title and drops a shared leading
@@ -630,6 +631,10 @@ export interface ArcSubmit {
 	leavesOut?: string[];
 	/** Edges it thinks false: recorded, never applied. */
 	doubts?: { topic: string; need: string; reason: string }[];
+	/** Needs this pass's edge step added or proposed that fail the
+	 *  prerequisite test, with the reason: dropped, so the cut need not hold
+	 *  them. Never a stored need. */
+	withdraw?: { topic: string; need: string; reason: string }[];
 	/** Why the course gets no arcs (R6), instead of arcs. */
 	none?: string;
 	/** Where the cut comes from, and why it departs from the material where it does: the formation's reason. */
@@ -645,6 +650,26 @@ export interface ArcPassView extends MapCourseView {
 	/** Needs the edge step proposes and the record does not hold yet, by
 	 *  topic: also in the topic's `needs`, so the cut holds them. */
 	proposed?: Readonly<Record<string, readonly string[]>>;
+	/** Needs this pass's edge step added and saved, by topic: in the topic's
+	 *  `needs`, and the cut may withdraw them. */
+	added?: Readonly<Record<string, readonly string[]>>;
+}
+
+/** The edges a cut may withdraw: the ones this pass added or proposes. */
+function withdrawable(view: Pick<ArcPassView, "proposed" | "added">): Set<string> {
+	return new Set([view.added, view.proposed].flatMap((by) => Object.entries(by ?? {}).flatMap(([t, needs]) => needs.map((n) => edgeKey(t, n)))));
+}
+
+/** The view without the edges the answer withdraws: out of each topic's
+ *  needs and of `proposed` and `added`. Pure. */
+export function withoutWithdrawn<V extends ArcPassView>(view: V, submit: Pick<ArcSubmit, "withdraw">): V {
+	const can = withdrawable(view);
+	const out = new Set((submit.withdraw ?? []).map((w) => edgeKey(w.topic, w.need)).filter((k) => can.has(k)));
+	if (out.size === 0) return view;
+	const keep = (t: string) => (n: string) => !out.has(edgeKey(t, n));
+	const less = (by: V["proposed"]) => (by ? Object.fromEntries(Object.entries(by).map(([t, needs]) => [t, needs.filter(keep(t))])) : by);
+	const topics = Object.fromEntries(Object.entries(view.topics).map(([k, t]) => [k, { ...t, needs: t.needs.filter(keep(k)) }]));
+	return { ...view, topics, ...(view.proposed ? { proposed: less(view.proposed) } : {}), ...(view.added ? { added: less(view.added) } : {}) };
 }
 
 /** The view, from the record and the topics he has studied. */
@@ -660,8 +685,14 @@ const unitOf = (r: MapRef) => (r.locator ? `${r.source} ${r.locator.trim().toLow
 /** What is wrong with a cut, for the agent to fix; null when it can go to
  *  the engine's dry run. The engine holds every structural rule; these are
  *  the shape rules only the app can name. Pure. */
-export function arcPassProblems(submit: ArcSubmit, view: ArcPassView): string | null {
+export function arcPassProblems(submit: ArcSubmit, given: ArcPassView): string | null {
 	const problems: string[] = [];
+	const can = withdrawable(given);
+	for (const w of submit.withdraw ?? []) {
+		if (!can.has(edgeKey(w.topic, w.need))) problems.push(`withdraw names "${w.topic}" needs "${w.need}", which this pass did not add: withdraw only an added or proposed need; a stored one you think false goes under doubts.`);
+		else if (!w.reason?.trim()) problems.push(`withdraw gives no reason for "${w.topic}" needs "${w.need}": say why an exercise on it can be worked without it.`);
+	}
+	const view = withoutWithdrawn(given, submit);
 	const topics = Object.keys(view.topics);
 	if (submit.none?.trim()) {
 		if (submit.arcs.length > 0) problems.push("none says the course gets no arcs, yet arcs lists some: send one or the other.");
@@ -823,15 +854,20 @@ export interface Formation {
  *   the answer lists them (the material's, read by the agent), moved only
  *   so a prerequisite in the same arc comes first: a hint the engine's own
  *   order agrees with.
- * - Titles only for topics that have none, and the label strip. No `needs`,
- *   ever: an edge the cut doubts goes in its note.
+ * - Titles only for topics that have none, and the label strip. `needs`
+ *   only less an edge this pass added that the cut withdraws, logged as
+ *   this save's edges event; a stored edge the cut doubts goes in its note.
  * - `exam.arcs` and `exam.leaves_out` when the answer states the scope and
  *   the course has an exam date.
  * - `arc_change`: the basis, `edges_entry` naming the log's edges event the
- *   cut ran on, and `asked` when his words are given.
+ *   cut ran on (or this save's own, when it withdraws an edge), and `asked`
+ *   when his words are given.
  */
-export function arcPassChanges(submit: ArcSubmit, view: ArcPassView, extra: { edgesEntry?: number; asked?: string; reason?: string } = {}): Formation | null {
+export function arcPassChanges(submit: ArcSubmit, given: ArcPassView, extra: { edgesEntry?: number; asked?: string; reason?: string } = {}): Formation | null {
 	if (submit.none?.trim()) return null;
+	const view = withoutWithdrawn(given, submit);
+	const added = new Set(Object.entries(given.added ?? {}).flatMap(([t, needs]) => needs.map((n) => edgeKey(t, n))));
+	const dropped = (submit.withdraw ?? []).filter((w) => added.has(edgeKey(w.topic, w.need)) && w.topic in view.topics);
 	const exists = (t: string) => t in view.topics;
 	const arcs = submit.arcs.map((a) => ({ ...a, topics: a.topics.filter(exists) }));
 	const gone = [...new Set(submit.arcs.flatMap((a) => a.topics.filter((t) => !exists(t))))];
@@ -844,7 +880,7 @@ export function arcPassChanges(submit: ArcSubmit, view: ArcPassView, extra: { ed
 	for (const a of arcs) {
 		for (const t of a.topics) {
 			const title = stripped[t] ?? titles.get(t);
-			topics[t] = { ...(title ? { title } : {}), arc: a.handle };
+			topics[t] = { ...(title ? { title } : {}), ...(dropped.some((w) => w.topic === t) ? { needs: view.topics[t]!.needs } : {}), arc: a.handle };
 		}
 	}
 	const index = new Map(view.order.map((t, i) => [t, i]));
@@ -874,7 +910,16 @@ export function arcPassChanges(submit: ArcSubmit, view: ArcPassView, extra: { ed
 		topics,
 		path: { arcs: handles, order, basis: pathBasis(view.basis, arcs) },
 		...(Object.keys(exam).length > 0 ? { exam } : {}),
-		arc_change: { reason, ...(extra.edgesEntry !== undefined ? { edges_entry: extra.edgesEntry } : {}), ...(extra.asked ? { asked: extra.asked } : {}) },
+		arc_change: {
+			reason,
+			// A withdrawn added need is dropped in this save, logged as its own edges event, which the formation then refers to.
+			...(dropped.length > 0
+				? { edges: dropped.map((w) => ({ topic: w.topic, need: w.need, change: "drop", reason: `withdrawn by the cut: ${w.reason.trim()}` })) }
+				: extra.edgesEntry !== undefined
+					? { edges_entry: extra.edgesEntry }
+					: {}),
+			...(extra.asked ? { asked: extra.asked } : {}),
+		},
 	};
 	return { changes, stripped, gone, placedByEngine: Object.keys(view.topics).filter((t) => !placed.has(t)) };
 }
