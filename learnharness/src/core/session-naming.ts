@@ -1,4 +1,4 @@
-import { opensTurn, type LhMessage } from "./native-messages.ts";
+import { opensTurn, sessionTaskTitleOf, type LhMessage } from "./native-messages.ts";
 
 /**
  * The course topics a session's first turn looked at, in the order it
@@ -54,4 +54,14 @@ function parse(text: string): unknown {
 export function onFirstTurn(messages: readonly LhMessage[]): boolean {
 	const reply = messages.findIndex((m) => m.role === "assistant" && m.stopReason !== "aborted" && m.stopReason !== "error");
 	return reply < 0 || !messages.slice(reply + 1).some(opensTurn);
+}
+
+/** A session's one name on every surface, the chat's head included: the
+ *  title its saves gave the task it took up (`sessionTaskTitleOf`), else
+ *  the name it was created or named with; a name he gave it himself always
+ *  (round 15, m5: "Problem sheet 4" in Sessions and on the calendar,
+ *  "Problem sheet 4: rank and nullity" on Home; "Invertible matrices lesson"
+ *  on the live card, "Invertible matrices" elsewhere). Pure. */
+export function sessionTitleOf(record: { title: string; renamed?: true; messages: readonly LhMessage[] }): string {
+	return record.renamed ? record.title : (sessionTaskTitleOf(record.messages) ?? record.title);
 }

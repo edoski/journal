@@ -79,7 +79,9 @@ def week(reviews: float, new: float) -> Capacity:
 def plan(
     records: dict[str, dict[str, Any]], day: date, days: int, rates: Capacity
 ) -> agenda.Plan:
-    return agenda.plan(read(records, day), day, days, rates)
+    """The plan its rules make from these records (``agenda.afresh``): the
+    days a replay holds are ``test_agenda``'s."""
+    return agenda.afresh(read(records, day), day, days, rates)
 
 
 def starts(result: agenda.Plan, name: str = "c") -> list[str]:

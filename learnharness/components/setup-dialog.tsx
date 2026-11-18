@@ -13,7 +13,7 @@
  * settings kit (components/settings/settings.md) inside the shared Dialog.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CLAUDE_MODEL } from "@/src/core";
 import { useModelStatus } from "@/components/model-status";
 import { signedInCloseFocus } from "@/components/setup-dialog-focus";
@@ -29,36 +29,53 @@ interface SetupDialogProps {
 	onClose: () => void;
 }
 
-export function SetupDialog(props: SetupDialogProps) {
-	return props.open ? <OpenSetupDialog {...props} /> : null;
-}
-
-function OpenSetupDialog({ onClose }: SetupDialogProps) {
-	const { status } = useModelStatus();
-	const connected = status?.connected === true;
+export function SetupDialog({ open, onClose }: SetupDialogProps) {
+	const { status, read, refresh } = useModelStatus();
+	// Opening re-checks the sign-in, and only a reading taken since then
+	// closes the dialog (round 10, 4 minor 1: a stale "connected" closed it
+	// as it opened, so Sign in did nothing).
+	const [openedAt, setOpenedAt] = useState<number | null>(null);
+	const readRef = useRef(read);
+	readRef.current = read;
+	useEffect(() => {
+		setOpenedAt(open ? readRef.current : null);
+		if (open) refresh(true);
+	}, [open, refresh]);
+	const connected = status?.connected === true && openedAt !== null && read > openedAt;
 	const signedInRef = useRef(false);
 	signedInRef.current = connected;
+	// The caller's close, read at call time: an inline one is new on each
+	// render, and the close fires once per open (round 15, M2: an effect
+	// keyed on it re-ran on every render of the lesson).
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
+	const closedRef = useRef(false);
 	useEffect(() => {
-		if (connected) onClose();
-	}, [connected, onClose]);
+		if (!open) {
+			closedRef.current = false;
+			return;
+		}
+		if (!connected || closedRef.current) return;
+		closedRef.current = true;
+		onCloseRef.current();
+	}, [open, connected]);
 
 	// THE ONE-ESC LAW (owner, keyboard round 2026-10-06): claim Esc at the
 	// document level so the window chain (abort) never also fires.
 	useEffect(() => {
+		if (!open) return;
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key !== "Escape") return;
 			e.preventDefault();
 			e.stopPropagation();
-			onClose();
+			onCloseRef.current();
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
-	}, [onClose]);
-
-	if (connected) return null;
+	}, [open]);
 
 	return (
-		<Dialog open onOpenChange={(open) => !open && onClose()}>
+		<Dialog open={open && !connected} onOpenChange={(next) => !next && onClose()}>
 			<DialogContent data-testid="setup-dialog" className="max-h-[85vh] max-w-xl gap-6 overflow-y-auto" onCloseAutoFocus={(e) => signedInCloseFocus(signedInRef.current)(e)}>
 				<DialogHeader>
 					<DialogTitle>Sign in to Claude</DialogTitle>
@@ -68,7 +85,7 @@ function OpenSetupDialog({ onClose }: SetupDialogProps) {
 					<DialogClose aria-label="Close setup" data-testid="setup-close" />
 				</Hint>
 				<div className="flex flex-col gap-6" data-testid="setup-stage-keys">
-					<SettingsGroup label="Claude">
+					<SettingsGroup>
 						<ClaudeConnectionRow />
 					</SettingsGroup>
 				</div>

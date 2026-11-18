@@ -2,14 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { NowCard } from "@/components/unit-inbox/now-card";
-import { restShelves } from "@/components/unit-inbox/now-inbox";
+import { restSessions, saidOnTop } from "@/components/unit-inbox/now-inbox";
 import type { NowListProps } from "@/components/unit-inbox/now-list-props";
-import { NowShelves } from "@/components/unit-inbox/now-shelves";
+import { SessionsShelf } from "@/components/unit-inbox/now-shelves";
 import { SidebarNote } from "@/components/unit-inbox/sidebar-note";
 import { claimedKeys, steadyTop, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
-import { courseHref } from "@/components/unit-inbox/unit-href";
 import { isUnitOpen } from "@/components/unit-inbox/unit-row";
-import { UnreadableCard } from "@/components/unit-inbox/unreadable-card";
+import { UnreadableNote } from "@/components/unit-inbox/unreadable-note";
 
 /** The list's one quiet note under the cards, or none: the courses could
  *  not be read, there are none, or nothing has a card. */
@@ -23,8 +22,9 @@ function noteOf({ unavailable, courses, unreadable }: Pick<NowListProps, "unavai
  * The sidebar's list (spec: ../inbox-today.md): its top
  * is exactly Home's Today, one card per line in Today's order with Today's
  * reason, each drawn as the topic its line leads with (a waiting session on
- * no topic as itself, a course line on no topic as its course), then a card for each course whose record can't be
- * read; everything else folds onto the shelves at the foot.
+ * no topic as itself, a course line on no topic as its course), then a
+ * quiet note for each course whose record can't be read; then one folded
+ * Sessions list, every session newest first.
  * No header and no totals on top: cards leave as the day's plan empties,
  * and a card stays in its place, at 70% with Working, while the tutor
  * writes in its session.
@@ -40,10 +40,14 @@ export function TodayList(props: NowListProps) {
 		top = steadyTop(drawn.top, fresh, inbox, chats);
 		setDrawn({ fresh, top });
 	}
-	const shelves = useMemo(() => restShelves(inbox, new Set(top.flatMap(claimedKeys))), [inbox, top]);
+	const sessions = useMemo(() => restSessions(chats, inbox.scope ?? null, new Set(top.flatMap(claimedKeys))), [chats, inbox.scope, top]);
+	const said = useMemo(() => saidOnTop(top), [top]);
 	const isOpen = (item: NowItem) => {
 		if (item.kind === "topic") return isUnitOpen(item.unit, pathname);
-		return pathname === (item.kind === "course" ? courseHref(item.workspace) : `/chat/${item.chat.id}`);
+		if (item.kind === "session") return pathname === `/chat/${item.chat.id}`;
+		// A course card takes up its task (`cardPress`), never the course page, so it is open in a session holding that task (round 10, 2: it stayed selected on the course page).
+		const { step } = item.line.row.kind === "course" ? item.line.row : { step: null };
+		return step?.kind === "task" && chats.some((c) => pathname === `/chat/${c.id}` && (c.tasks ?? []).includes(step.key));
 	};
 	const note = noteOf(props, top.length + unreadable.length);
 	return (
@@ -52,10 +56,10 @@ export function TodayList(props: NowListProps) {
 				<NowCard key={item.line.key} line={item.line} unit={item.kind === "topic" ? item.unit : null} active={isOpen(item)} chats={chats} />
 			))}
 			{unreadable.map((course) => (
-				<UnreadableCard key={course.workspace} course={course} active={pathname === courseHref(course.workspace)} />
+				<UnreadableNote key={course.workspace} course={course} />
 			))}
 			{note && <SidebarNote>{note}</SidebarNote>}
-			<NowShelves shelves={shelves} {...props} />
+			<SessionsShelf sessions={sessions} said={said} {...props} />
 		</>
 	);
 }

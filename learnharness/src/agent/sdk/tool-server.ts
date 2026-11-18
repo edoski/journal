@@ -32,14 +32,17 @@ const TOOL_USE_ID = "claudecode/toolUseId";
  * schemas are served as the JSON Schema TypeBox already is, and every tool
  * is always loaded, never deferred behind tool search. A call that ends the
  * turn returns `claude/endTurn`: Claude Code finishes the batch and makes no
- * further model call.
+ * further model call. `tools` are the schemas Claude Code is given; each
+ * call runs on the turn `bound` names, which a process started before its
+ * turn waits for (prestart.ts): the same tools, built for that turn.
  */
-export function sdkToolServer(tools: readonly AgentTool<any>[], hooks: ToolRunHooks): McpSdkServerConfigWithInstance {
+export function sdkToolServer(tools: readonly AgentTool<any>[], bound: () => Promise<{ tools: readonly AgentTool<any>[]; hooks: ToolRunHooks }>): McpSdkServerConfigWithInstance {
 	const server = new Server({ name: SDK_TOOL_SERVER, version: "1" }, { capabilities: { tools: {} } });
 	server.setRequestHandler(ListToolsRequestSchema, async () => ({
 		tools: tools.map((tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.parameters as { type: "object" }, _meta: { "anthropic/alwaysLoad": true } })),
 	}));
 	server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
+		const { tools, hooks } = await bound();
 		const meta = request.params._meta as Record<string, unknown> | undefined;
 		const toolUseId = typeof meta?.[TOOL_USE_ID] === "string" ? meta[TOOL_USE_ID] as string : `call_${randomUUID()}`;
 		const streamed = hooks.callFor(toolUseId);

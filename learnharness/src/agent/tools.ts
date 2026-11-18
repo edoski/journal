@@ -17,10 +17,6 @@ import { planTools, type PlanToolContext } from "./tools/plan.ts";
 import { probeDoneTool, type ProbeDoneContext } from "./tools/probe.ts";
 import { nameSessionTool } from "./tools/name-session.ts";
 import { withPracticeHandoff } from "./tools/handoff.ts";
-import { readTool } from "./tools/read.ts";
-import { lsTool } from "./tools/ls.ts";
-import { findTool } from "./tools/find.ts";
-import { grepTool } from "./tools/grep.ts";
 import { healToolRecord } from "./tools/heal.ts";
 
 export { jobTools };
@@ -168,7 +164,23 @@ export interface ProberToolContext extends ProbeDoneContext {
 	jobStore: JobStore;
 	/** Fire the background runner for a freshly created job. */
 	spawn: (job: JobRecord, input: ResearchInput | DemoInput | VisualInput | PdfInput) => void;
+	/** The session saves to a course record, whose goal every lesson in it
+	 *  serves: the probe asks no goal question. */
+	course?: boolean;
 }
+
+/** In a course, a lesson's goal is the topic it is on, for the course's own
+ *  goal, however he named the topic (round 16, m11: a Poisson lesson asked
+ *  for in a Binomial review's chat got "What do you want from Poisson?
+ *  Select all that apply", whose three overlapping picks changed nothing). */
+const COURSE_GOAL_SET =
+	"A lesson in a course already has its goal: the topic it is on, for the course's own goal, whether the session opened on it or his words named it. Ask him nothing about it; start bracketing with `recall`.";
+
+/** The prober's ask in a course session: the goal question is refused. */
+const courseAskTool: AgentTool<typeof askInputSchema> = {
+	...askUserQuestionTool,
+	execute: async () => invalidInputResult("ask_user_question", [COURSE_GOAL_SET]),
+};
 
 /** The prober's tool set: recall (no nodeId) + ask + the learner-fs
  *  set + probe_done + the two phase-omnipresent job dispatch tools. Every
@@ -186,14 +198,7 @@ export function createProberTools(ctx: ProberToolContext): Record<string, AgentT
 	// the standard argument heal over the WHOLE registry — every tool,
 	// not just the one the latest wobble incident landed on.
 	return withPracticeHandoff(healToolRecord({
-		ask_user_question: askUserQuestionTool,
-		// The learner-filesystem set (sources v1): the prober inspects and
-		// LOCATES learner-referenced files while assessing the edge.
-		// Read-only by construction.
-		read: readTool,
-		ls: lsTool,
-		find: findTool,
-		grep: grepTool,
+		ask_user_question: ctx.course ? courseAskTool : askUserQuestionTool,
 		// Job dispatch in the probe phase (owner ruling, 2026-09-20):
 		// research + pdf are available in every phase — the prober can
 		// verify facts or read learner PDFs while assessing. demo/visual
@@ -247,13 +252,6 @@ export function createTeacherTools(ctx: TeacherToolContext): Record<string, Agen
 	// healToolRecord — same standard as the prober's registry (above).
 	const tools = healToolRecord({
 		ask_user_question: askUserQuestionTool,
-		// The learner-filesystem set (sources v1): the teacher locates and
-		// reads learner-referenced files on its own terms — nothing
-		// auto-injects. Read-only by construction (fs-shared.ts).
-		read: readTool,
-		ls: lsTool,
-		find: findTool,
-		grep: grepTool,
 		...planTools(ctx),
 		...jobTools({ chatId: ctx.chatId, jobStore: ctx.jobStore, spawn: ctx.spawn }),
 		explain: teachExplainToolFor(ctx),

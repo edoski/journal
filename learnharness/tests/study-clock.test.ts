@@ -37,8 +37,9 @@ describe("the study clock", () => {
 
 	it("stamps a session's activity on the study day, so Studied today names the lesson just finished", () => {
 		const chat = chatStore.createChat("Eigenvalues and eigenvectors");
-		chatStore.saveMessages(chat.id, [{ role: "user", content: "go", timestamp: Date.now() } as never]);
-		const item = { ...chatStore.listChats().find((c) => c.id === chat.id)!, busy: false, compacting: false };
+		// His opening and an answer in words after it: a session he studied in (round 10, 1 m2).
+		chatStore.saveMessages(chat.id, [{ role: "user", content: "go", timestamp: Date.now() } as never, { role: "user", content: "λ = 2 and 5", timestamp: Date.now() } as never]);
+		const item = { ...chatStore.listChats().find((c) => c.id === chat.id)!, busy: false };
 		assert.equal(localDay(new Date(item.updatedAt)), "2026-11-08");
 		assert.deepEqual(doneToday([item], new Date(2026, 10, 8, 10, 30)), ["Eigenvalues and eigenvectors"]);
 	});

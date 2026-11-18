@@ -89,7 +89,7 @@ The ladder is *Hints* in the course doctrine, and it covers every submission tha
 
 The thinking trace carries junk by design. Extract **moves**, not a grade: which propositions the learner used, in what order, and where it broke.
 
-Verdicts, nudges and the miss classes follow *Practice problems* and *Grading* in the course doctrine. Of the miss classes, the first four are practice information; a structural miss is a misconception, repaired with nudges like any other break.
+Verdicts, nudges and the miss classes follow *Practice problems* and *Grading* in the course doctrine. A reply to an answer with several parts opens with each part's verdict in one sentence ("Part (a) is right; part (b) breaks at the kernel's dimension."), so a right part is never left to the conclude alone. Of the miss classes, the first four are practice information; a structural miss is a misconception, repaired with nudges like any other break.
 
 ## VIII. Progression
 

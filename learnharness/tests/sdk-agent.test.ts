@@ -81,7 +81,7 @@ describe("when a lesson turn ends", () => {
 		const { fake } = scripted([fauxAssistantMessage([fauxText("Let me check."), fauxToolCall("lookup", {}, { id: "l1" })], { stopReason: "toolUse" }), fauxAssistantMessage("Done.")]);
 		const agent = agentOn(fake.engine, [user("teach me")]);
 		const events: string[] = [];
-		agent.subscribe((event: AgentEvent) => {
+		agent.subscribe((event) => {
 			if (event.type === "message_end") events.push(`end:${(event.message as { role: string }).role}`);
 			if (event.type === "tool_execution_start" || event.type === "tool_execution_end") events.push(event.type);
 		});
@@ -314,5 +314,30 @@ describe("refusing to bill an API key", () => {
 		assert.equal(replies.length, 1, "nothing Claude Code streamed reached the record");
 		assert.equal(replies[0]!.stopReason, "error");
 		assert.equal(replies[0]!.errorMessage, CLAUDE_API_KEY_REFUSAL);
+	});
+});
+
+/** Round 12, 4 minor 3: Claude Code ended a turn with its own error
+ *  ("Autocompact is thrashing…") while the plan had 47% left, and the
+ *  lesson told him to check `claude` in a terminal and his plan. */
+describe("a turn Claude Code ends with its own error", () => {
+	it("says Claude Code stopped with an error, never blaming his plan or sending him to a terminal", async () => {
+		const { fake } = scripted([]);
+		const engine: SdkEngine = {
+			...fake.engine,
+			query: () => {
+				const iterator = (async function* () {
+					yield { type: "system", subtype: "init", session_id: "s1", apiKeySource: "none", mcp_servers: [{ name: "lh", status: "connected" }], uuid: "i1" } as unknown as SDKMessage;
+					yield { type: "result", subtype: "error_during_execution", is_error: true, errors: ["Autocompact is thrashing: the context refilled to the limit within 3 turns of the previous compact, 3 times in a row"], session_id: "s1", uuid: "r1" } as unknown as SDKMessage;
+				})();
+				return { [Symbol.asyncIterator]: () => iterator, interrupt: async () => undefined, close: () => void iterator.return(undefined) };
+			},
+		};
+		const agent = agentOn(engine, [user("they need two different eigenvalues, I think")]);
+		await agent.continue();
+		const failed = agent.state.messages.at(-1) as AssistantMessage;
+		assert.equal(failed.stopReason, "error");
+		assert.match(failed.errorMessage ?? "", /^Claude Code stopped with an error before it finished\. Retry\./);
+		assert.doesNotMatch(failed.errorMessage ?? "", /terminal|plan|usage/i);
 	});
 });

@@ -1,9 +1,10 @@
-import { isReviewSession, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
+import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
-import { distanceWords, heldWords, leftOutWords, movedWords, overdueWords, startsAfterWords } from "@/components/study-words";
+import { dayAndNearWords, distanceWords, heldExamWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
-import { courseMove, nextStepOf, titleList, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
+import { courseMove, nextStepOf, titleList, todaySteps, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
+import { nowLine } from "@/components/study-home/needs-you";
 
 /**
  * What the calendar draws (spec: calendar.md): the engine's dates and the
@@ -33,7 +34,7 @@ export type CalendarEntry =
 			road: readonly RoadWeek[];
 			finalReview: string | null;
 			doesNotFit: readonly string[];
-			unreviewed: readonly string[];
+			unreviewed: readonly ExamGapTopic[];
 			allStarted: boolean;
 			next: NextMove | null;
 	  }
@@ -52,7 +53,21 @@ export type CalendarEntry =
 			action: TopicAction;
 	  }
 	| { kind: "new"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; waits: string | null; action: TopicAction }
-	| { kind: "task"; id: string; day: string; title: string; course: CourseRef; task: CourseMapTask; topic: CourseMapTopic | null; opening: string }
+	| {
+			kind: "task";
+			id: string;
+			day: string;
+			title: string;
+			course: CourseRef;
+			task: CourseMapTask;
+			topic: CourseMapTopic | null;
+			/** Continue, as Home's line for the task takes it (`courseMove`):
+			 *  the session that holds it, else a new one (round 13, N6: it
+			 *  started a new session beside the one Home and the sidebar open). */
+			move: CourseMove;
+			/** Home's one status for this work (`openWorkStatus`), or null. */
+			status: string | null;
+	  }
 	| {
 			kind: "session";
 			id: string;
@@ -64,9 +79,12 @@ export type CalendarEntry =
 			waits: boolean;
 			topic: CourseMapTopic | null;
 			/** The open task this session of today left (`holdsTask`): one
-			 *  piece of work, so one entry, Unfinished, under the session's
-			 *  name. */
+			 *  piece of work, so one entry under the session's name, saying
+			 *  Home's status for it (`status`). */
 			task: CourseMapTask | null;
+			/** Home's one status for the session's open work
+			 *  (`openWorkStatus`), or null. */
+			status: string | null;
 	  };
 
 /** The next step toward an exam: the course's step as Home's line takes it
@@ -77,6 +95,10 @@ export type CalendarEntry =
 export interface NextMove {
 	verb: "Review" | "Continue" | "Start";
 	what: string;
+	/** The later day the plan holds it on, when nothing is left for today:
+	 *  the panel names that day and offers no button, so it never invites
+	 *  tomorrow's review today (round 10: 1 m9). */
+	on: string | null;
 	move: CourseMove;
 }
 
@@ -108,12 +130,12 @@ function weekOf(day: string): string {
 }
 
 /** The road to an exam: the daily plan's new topics before it, a line per
- *  week. Pure. */
-export function roadOf(planned: readonly PlannedDay[], exam: string, titleOf: (handle: TopicHandle) => string): RoadWeek[] {
+ *  week, a week split at the final review's start (`roadLines`). Pure. */
+export function roadOf(planned: readonly PlannedDay[], exam: string, titleOf: (handle: TopicHandle) => string, finalReview: string | null = null): RoadWeek[] {
 	const weeks: { key: string; from: string; to: string; titles: string[] }[] = [];
 	for (const day of planned) {
 		if (day.new.length === 0 || day.date >= exam) continue;
-		const key = weekOf(day.date);
+		const key = `${weekOf(day.date)}${finalReview !== null && day.date >= finalReview ? ":final" : ""}`;
 		const last = weeks.at(-1);
 		if (last?.key === key) {
 			last.to = day.date;
@@ -121,6 +143,22 @@ export function roadOf(planned: readonly PlannedDay[], exam: string, titleOf: (h
 		} else weeks.push({ key, from: day.date, to: day.date, titles: day.new.map(titleOf) });
 	}
 	return weeks.map(({ from, to, titles }) => ({ from, to, titles }));
+}
+
+/** One line of the road to an exam: a week of new topics, or the final
+ *  review's start. */
+export type RoadLine = { kind: "week"; week: RoadWeek } | { kind: "final"; day: string };
+
+/** The road's lines by date: the final review before the first week that
+ *  starts on or after its day (`roadOf` splits a week at it), so a start
+ *  inside it never reads above it (round 9: "17 Nov Variance" above "Final
+ *  review from 13 Nov", "18 Nov Poisson" above "Final review now"). Pure. */
+export function roadLines(road: readonly RoadWeek[], finalReview: string | null): RoadLine[] {
+	const weeks = road.map((week): RoadLine => ({ kind: "week", week }));
+	if (finalReview === null) return weeks;
+	const at = road.findIndex((week) => week.from >= finalReview);
+	const index = at < 0 ? weeks.length : at;
+	return [...weeks.slice(0, index), { kind: "final", day: finalReview }, ...weeks.slice(index)];
 }
 
 /** The day memory asked for a review: the engine dates a due review on
@@ -175,13 +213,42 @@ export function moreWords(hidden: readonly CalendarEntry[]): string {
 	return things.length > 0 ? `Also ${listWords(things)}` : "More";
 }
 
+/** A new topic's plan status on the day the plan starts it. */
+const PLANNED_TODAY = "Planned today";
+
 /** An entry's words beside its icon: its look's, except a review due
  *  today, which says how late as Home's rows and the sidebar do ("Due
- *  today", "2d overdue"), so one review never reads "2d overdue" on Home
+ *  today", "Due 5 Nov"), so one review never reads "Due 5 Nov" on Home
  *  and "Overdue" here (round 5). Pure. */
 export function lookWords(entry: CalendarEntry, today: string): string {
 	const review = entry.kind === "review" && entry.day === today ? entry.topic.review : null;
-	return review?.kind === "due" ? overdueWords(review.overdue) : LOOKS[lookOf(entry)].words;
+	if (review?.kind === "due") return overdueWords(review.overdue, today);
+	// Open work says Home's status for it ("Left off today", "Your turn"), never a word of its own (round 12, 2 n2), and so
+	// does a lesson or practice left for next time, never its kind (round 13, 2 n4: "Eigenvalues and eigenvectors · Practice");
+	// a review stays Review (round 9, 2 m4).
+	if ((entry.kind === "task" || entry.kind === "session") && entry.status && (lookOf(entry) === "task" || lookOf(entry) === "lesson" || lookOf(entry) === "practice")) return entry.status;
+	// Today's new topic says its plan status, as Home, the sidebar and the course page's Now do (round 15, m1).
+	if (lookOf(entry) === "new" && entry.day === today) return PLANNED_TODAY;
+	return LOOKS[lookOf(entry)].words;
+}
+
+/** Home's one status for open work (`nowLine`, the function Home's rows
+ *  and the sidebar's cards share): an unfinished session holding it is
+ *  that session's line ("Your turn", "Left off today"), else the course's
+ *  step for the task ("Left off 6 Nov"). Null when neither says anything,
+ *  and the entry reads Unfinished (round 12, 2 n2: Problem sheet 4 read
+ *  "Left off today" on Home and in the sidebar, "Unfinished" here). Pure. */
+function openWorkStatus(course: CalendarCourse | undefined, chat: ChatListItem | null, task: CourseMapTask | null): string | null {
+	const session = chat && sessionState(chat) !== "finished" ? nowLine({ kind: "session", chat, course: course ?? null }).slot : null;
+	if (session || !course || !task) return session;
+	const step = todaySteps(course).find((s) => s.kind === "task" && s.key === task.key);
+	return step ? nowLine({ kind: "course", course, step }).slot : null;
+}
+
+/** Continue on an open task: Home's move for the course's step on it. Pure. */
+function taskMove(course: CalendarCourse, chats: readonly ChatListItem[], task: CourseMapTask): CourseMove {
+	const step = todaySteps(course).find((s) => s.kind === "task" && s.key === task.key);
+	return courseMove(course, chats, step ?? { kind: "task", key: task.key, title: task.title, updated: task.updated, topics: [] });
 }
 
 export function lookOf(entry: CalendarEntry): EntryLook {
@@ -191,11 +258,14 @@ export function lookOf(entry: CalendarEntry): EntryLook {
 		case "review":
 			return entry.overdue ? "overdue" : "review";
 		case "new":
-			return "new";
+			// A lesson he began goes on: it is no new topic (round 12, 1 D3).
+			return entry.topic.startsWhy?.kind === "begun" ? "lesson" : "new";
 		case "task":
 			return "task";
 		case "session":
-			return entry.task ? "task" : entry.type;
+			// A review that turned into teaching is still the review (round 9,
+			// 2 m4: it read Unfinished).
+			return entry.task && entry.type !== "review" ? "task" : entry.type;
 	}
 }
 
@@ -295,11 +365,15 @@ export function calendarEntries({
 		const course = { workspace: map.workspace, title: map.title };
 		const titleOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 		if (map.exam) {
-			const road = roadOf(planned, map.exam.date, titleOf);
+			const road = roadOf(planned, map.exam.date, titleOf, finalReview);
 			const allStarted = map.topics.length > 0 && road.length === 0 && doesNotFit.length === 0;
 			const step = nextStepOf(studied);
-			const next = map.exam.date > today && step.kind !== "none" ? { ...nextParts(step), move: courseMove(studied, chats) } : null;
-			const unreviewed = (map.exam.unreviewed ?? []).map(titleOf);
+			const next = map.exam.date > today && step.kind !== "none" ? { ...nextParts(step), on: (step.kind === "review" || step.kind === "topic") && step.on ? step.on : null, move: courseMove(studied, chats) } : null;
+			const reasons = map.exam.reasons ?? {};
+			const unreviewed = (map.exam.unreviewed ?? []).map((h): ExamGapTopic => {
+				const reason = reasons[h];
+				return reason ? { title: titleOf(h), reason } : { title: titleOf(h) };
+			});
 			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, road, finalReview, doesNotFit: doesNotFit.map(titleOf), unreviewed, allStarted, next });
 		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, chats) });
@@ -307,7 +381,7 @@ export function calendarEntries({
 			const held = topic.review?.kind === "scheduled" && topic.review.date === day && topic.review.held ? topic.review : null;
 			const told = topic.review?.date === day ? topic.moved : undefined;
 			const since = held || told ? movedWords(held, today, told) : null;
-			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held && !told ? heldWords(held) : null, ...facts(topic) });
+			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held && !told ? heldExamWords(held) : null, ...facts(topic) });
 		};
 		const fresh = (topic: CourseMapTopic, day: string) =>
 			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? (leftOutWords(topic, map.exam) ?? (topic.moved ? movedWords(null, today, topic.moved) : startsAfterWords(topic.startsAfter))) : null, ...facts(topic) });
@@ -324,13 +398,17 @@ export function calendarEntries({
 			}
 			for (const handle of day.new) {
 				const topic = topicOf(handle);
-				if (topic) fresh(topic, day.date);
+				// A lesson he began goes on today under its open task's own entry, and a lesson started on it today is its
+				// start, under the session's entry: one piece of work, one entry (round 15, m6: "Linear maps · Your turn"
+				// beside "Linear maps · New topic" on Sun 8).
+				const started = day.date === today && ofToday(map.workspace).some((chat) => chat.kind !== "practice" && !isReviewSession(chat) && (chat.ownTopics ?? []).includes(handle));
+				if (topic && !(day.date === today && lessonBegun(topic)) && !started) fresh(topic, day.date);
 			}
 		}
 		const reviewing = new Set<string>((due ?? []).filter((handle) => topicOf(handle)));
 		reviewedToday.set(map.workspace, reviewing);
 		for (const task of map.tasks) {
-			const holders = map.topics.filter((t) => t.tasks.includes(task.key));
+			const holders = taskTopics(task, map);
 			if (inReview(holders.map((t) => t.handle), reviewing)) continue;
 			const lesson = ofToday(map.workspace).find((chat) => !heldBy.has(chat.id) && !inReview(sessionTopics(chat, courses), reviewing) && holdsTask(chat, task, holders.map((t) => t.handle)));
 			if (lesson) {
@@ -342,7 +420,10 @@ export function calendarEntries({
 			// and eigenvectors" on Home, "Eigenvalues lesson: eigenspaces and
 			// diagonalising" here).
 			const holder = chats.find((chat) => chat.course?.workspace === map.workspace && !chat.courseDeleted && sessionState(chat) !== "finished" && holdsTask(chat, task, holders.map((t) => t.handle)));
-			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: holder?.title ?? task.title, course, task, topic: holders[0] ?? null, opening: `Continue ${task.title}` });
+			// A review he left for next time rides with its topics' next review,
+			// which opens it, never an Unfinished row of its own (round 10, 1 m7).
+			if (holder && isReviewSession(holder) && sessionState(holder) === "left") continue;
+			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: holder?.title ?? task.title, course, task, topic: holders[0] ?? null, move: taskMove(studied, chats, task), status: openWorkStatus(studied, holder ?? null, task) });
 		}
 	}
 	for (const chat of chats) {
@@ -352,6 +433,7 @@ export function calendarEntries({
 		if (day === today && workspace && inReview(sessionTopics(chat, courses), reviewedToday.get(workspace))) continue;
 		const listed = courses.find((c) => c.map.workspace === workspace);
 		const course = workspace ? { workspace, title: listed?.map.title ?? chat.course!.title } : null;
+		const held = heldBy.get(chat.id) ?? null;
 		entries.push({
 			kind: "session",
 			id: `session:${chat.id}`,
@@ -362,8 +444,14 @@ export function calendarEntries({
 			type: sessionType(chat),
 			waits: sessionState(chat) === "your-turn",
 			topic: sessionTopic(chat, courses),
-			task: heldBy.get(chat.id) ?? null,
+			task: held,
+			status: held || sessionState(chat) === "left" ? openWorkStatus(listed, chat, held) : null,
 		});
+		// Every earlier day he worked in it shows it too, as what he did that day (round 16, m8: the Linear maps lesson
+		// begun on 9 Nov showed only on 10 Nov, the day he left it).
+		for (const earlier of (chat.studiedDays ?? []).filter((d) => d < day)) {
+			entries.push({ kind: "session", id: `session:${chat.id}@${earlier}`, day: earlier, title: chat.title, course, chat, type: sessionType(chat), waits: false, topic: sessionTopic(chat, courses), task: null, status: null });
+		}
 	}
 	return entries.sort((a, b) => a.day.localeCompare(b.day) || rankOf(a) - rankOf(b));
 }
@@ -402,7 +490,7 @@ export function longDayWords(day: string): string {
 
 /** How far a day is from the engine's, in the app's one form
  *  (`study-words.ts`). */
-export { distanceWords };
+export { dayAndNearWords, distanceWords };
 
 const SHORT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 const short = (day: string) => SHORT.format(new Date(`${day}T00:00:00Z`));
@@ -424,11 +512,6 @@ export function finalReviewWords(day: string | null, today: string): string | nu
 /** "A, B and C". */
 function listWords(items: readonly string[]): string {
 	return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
-}
-
-/** The taught topics the final review has no room for, named. */
-export function unreviewedWords(titles: readonly string[]): string | null {
-	return titles.length > 0 ? `No room in it for ${listWords(titles)}` : null;
 }
 
 /** The topics the plan has no room to start before the exam, named. */

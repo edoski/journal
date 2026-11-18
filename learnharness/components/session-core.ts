@@ -20,7 +20,6 @@ import {
 	pendingQuestionOf,
 	failedResponseAtEnd,
 	isQuestionTool,
-	measuredContextTokens,
 	newAnswerResult,
 	newNextMessage,
 	newProblemDismissedMarker,
@@ -91,6 +90,16 @@ async function turnInFlight(model: SessionModel): Promise<boolean | null> {
 }
 
 export const STREAM_DROPPED = LESSON_WORDS.connectionDropped;
+
+/** The failure a session shows. `dropped` keeps a reply the connection cut
+ *  owed while a later send fails for its own reason (round 10, 4 major 1). */
+export type SessionError = { message: string; repeat?: number; dropped?: true };
+
+/** Whether the reply the connection cut is still owed: the drop's own line,
+ *  or a later failure that kept it. */
+export function droppedError(error: SessionError | null | undefined): boolean {
+	return error?.message === STREAM_DROPPED || error?.dropped === true;
+}
 
 /** Mark transport failures without confusing JSON/application bugs with drops. */
 class StreamReadError extends Error {
@@ -191,15 +200,18 @@ export interface SessionState {
 	nativeMessages: LhMessage[];
 	/** Server-read history only; optimistic bubbles are not delivery proof. */
 	hasConfirmedConversation: boolean;
-	/** Completed conversation usage; null after compaction or before first usage. */
-	contextTokens: number | null;
 	status: SessionStatus;
-	error: { message: string } | null;
+	/** `repeat` counts the failures just before it that failed the same
+	 *  way, so a press that fails again still shows (round 9). */
+	error: SessionError | null;
 	/** Steers sent but not yet drained (composer steering, 2026-10-03):
 	 *  the queued indicator's truth. An entry dies when its id lands in
 	 *  the messages (the drain's verbatim events upsert the real card) —
 	 *  visibleQueuedSteers is the pure fold. */
 	steerQueue: SteerQueueItem[];
+	/** Claude Code is compacting inside the running turn: the working line
+	 *  names that wait (core/compaction.ts `CompactionEvent`). */
+	compacting: boolean;
 }
 
 /** One queued composer steer: the client-minted id (the upsert key) + text. */
@@ -238,6 +250,7 @@ export class SessionModel {
 	fetch: typeof globalThis.fetch;
 	/** Steers sent but not yet drained (the queued indicator's truth). */
 	private steerQueueValue: SteerQueueItem[] = [];
+	private compactingValue = false;
 	private readonly waitMaxMs: number;
 	private turnSettled?: TurnSettledWaiter;
 	private onReattachSettled?: () => void;
@@ -260,17 +273,28 @@ export class SessionModel {
 	private streamingMessageId: string | null = null;
 	private statusValue: SessionStatus = "ready";
 	/** Request/loop failures are transient; provider failures derive from messages. */
-	private errorValue: { message: string } | null = null;
+	private errorValue: SessionError | null = null;
+	/** The failure the send under way tries again after, and how many
+	 *  times it had already repeated: failing the same way again is a
+	 *  repeat (round 9: a second Enter while the app was down changed
+	 *  nothing on screen). */
+	private retrying: { message: string; repeat: number } | null = null;
 	/** Dismissing a banner must not authorize an automatic replacement turn. */
 	private automaticContinuationBlocked = false;
 	/** A completed failure from THIS consume, not the previous attempt's record. */
 	private liveFailureId: string | null = null;
+	/** The failed turn whose cause is gone (`outlivedFailure`): its line
+	 *  goes, and Retry stays. */
+	private outlivedFailureId: string | null = null;
 	// The single live consume (POST response or reattach stream): a newer
 	// consume cancels the older — one reader at a time.
 	private consumeAbort: AbortController | null = null;
 	/** Retain the latest request across stop(): an opening POST still owns
 	 * its refusal after view detachment, but never after a newer request. */
 	private latestRequest: AbortController | null = null;
+	/** His send whose POST is on its way: resolves with whether the app
+	 *  took it, the turn it starts then live (steer's early window). */
+	private taking: Promise<boolean> | null = null;
 	/** Synchronous ready check for the gate (send/read mount logic). */
 	readyRef = true;
 
@@ -311,7 +335,7 @@ export class SessionModel {
 		// trying again, hide the old banner from the first Thinking frame,
 		// but show a new completed failure from this consume immediately.
 		const providerError =
-			latest !== undefined &&
+			latest !== undefined && latest.id !== this.outlivedFailureId &&
 			!this.incompleteUsageIds.has(latest.id) && (!live || latest.id === this.liveFailureId)
 				? { message: latest.errorMessage ?? "An error occurred." }
 				: null;
@@ -319,10 +343,10 @@ export class SessionModel {
 			messages: projectView(messages, live),
 			nativeMessages: messages,
 			hasConfirmedConversation: this.base.some(m => m.role === "user" || m.role === "assistant"),
-			contextTokens: measuredContextTokens(messages, this.incompleteUsageIds),
 			status: this.statusValue,
 			error: this.errorValue ?? providerError,
 			steerQueue: this.steerQueueValue,
+			compacting: live !== undefined && this.compactingValue,
 		};
 	}
 
@@ -343,8 +367,15 @@ export class SessionModel {
 		this.onChange?.();
 	}
 
-	private setError(message: string | null): void {
-		this.errorValue = message === null ? null : { message };
+	private setError(message: string | null, dropped = false): void {
+		// A failure while a reply the connection cut is still owed keeps it
+		// owed, so the app's return still heals it (round 15, M8: a steer
+		// sent while the app was down replaced the drop, and the lesson
+		// never resumed).
+		dropped ||= message !== null && this.statusValue === "error" && droppedError(this.errorValue);
+		const repeat = message !== null && this.retrying?.message === message ? this.retrying.repeat + 1 : 0;
+		this.errorValue = message === null ? null : { message, ...(repeat > 0 ? { repeat } : {}), ...(dropped ? { dropped: true as const } : {}) };
+		if (message !== null) this.retrying = null;
 		if (message !== null) this.automaticContinuationBlocked = true;
 		this.onChange?.();
 	}
@@ -395,12 +426,19 @@ export class SessionModel {
 			this.setError(String(event.errorText ?? "An error occurred."));
 			return false;
 		}
+		if (event.type === "compaction") {
+			this.mutate(() => {
+				this.compactingValue = event.active === true;
+			});
+			return false;
+		}
 		const agent = event as unknown as AgentEvent;
 		switch (agent.type) {
 			case "agent_start":
 				// Positive evidence of a new/replayed server-owned turn. Any
 				// later failure in that replay blocks continuation again.
 				this.automaticContinuationBlocked = false;
+				this.compactingValue = false;
 				if (this.errorValue !== null) this.setError(null);
 				return false;
 			case "message_start":
@@ -683,6 +721,10 @@ export class SessionModel {
 		const controller = new AbortController();
 		this.consumeAbort = controller;
 		this.latestRequest = controller;
+		this.retrying = recovering && this.errorValue ? { message: this.errorValue.message, repeat: this.errorValue.repeat ?? 0 } : null;
+		// A send that fails after the connection cut a reply leaves that
+		// reply owed: the app's return still recovers it.
+		const afterDrop = recovering && droppedError(this.errorValue);
 		this.setError(null);
 		this.setStatus("submitted");
 		if (recovering && input.type === "answer") {
@@ -709,7 +751,7 @@ export class SessionModel {
 				}
 			} catch (err) {
 				if (this.consumeAbort !== controller || controller.signal.aborted) return false;
-				this.setError((err as Error).message);
+				this.setError((err as Error).message, afterDrop);
 				this.setStatus("error");
 				return false;
 			}
@@ -734,8 +776,10 @@ export class SessionModel {
 		} else if (input.type === "tonight") {
 			// Done for tonight: the withheld questions, a dropped problem and
 			// the line land at once. A dropped problem's synthesized conclude
-			// pair waits for the record.
-			for (const m of tonightAppends({ messages: [...this.base, ...this.tail] })) {
+			// pair waits for the record. The reply still streaming is the one
+			// the server stops, so it answered nothing (workAwaitingGradeOf).
+			const streaming = this.streamingMessageId;
+			for (const m of tonightAppends({ messages: [...this.base, ...this.tail].filter((m) => m.id !== streaming) })) {
 				if (m.role === "custom" || (m.role === "toolResult" && isQuestionTool(m.toolName))) optimistic.push({ ...m, id: localId() });
 			}
 		} else if (input.type === "dispute") {
@@ -755,6 +799,10 @@ export class SessionModel {
 			this.tail = [...this.tail, ...optimistic];
 		});
 		let accepted = false;
+		let taken: (ok: boolean) => void = () => {};
+		const taking = new Promise<boolean>((resolve) => (taken = resolve));
+		this.taking = taking;
+		void taking.then(() => { if (this.taking === taking) this.taking = null; });
 		try {
 			// SUBMITS ARE NOT ABORTABLE BY VIEW TEARDOWN (owner, 2026-10-10 —
 			// the dead-session-start postmortem): the POST must NOT ride
@@ -771,6 +819,7 @@ export class SessionModel {
 			const res = await this.postInputEvent(input);
 			if (res.status === 409 && input.type === "continue") {
 				await res.body?.cancel().catch(() => {});
+				taken(true); // the running turn is the reply it asked for
 				if (this.consumeAbort !== controller) return false;
 				await this.resumeStream(true);
 				return false;
@@ -792,6 +841,7 @@ export class SessionModel {
 				throw new Error(message);
 			}
 			accepted = true;
+			taken(true);
 			// Opening-message handover ends at acceptance, not stream completion.
 			onAccepted?.();
 			// CONNECTION DIET B (owner, 2026-10-10 — parallel-session freeze
@@ -830,12 +880,15 @@ export class SessionModel {
 					for (const id of ids) this.unconfirmedAnswers.delete(id);
 				});
 			}
-			this.setError((err as Error).message);
+			this.setError((err as Error).message, afterDrop && !accepted);
 			this.setStatus("error");
 			// true means we observed this POST's acknowledgment. false does
 			// NOT prove non-delivery: a network failure may hide acceptance.
 			// Opening-message callers restore a draft, never automatically retry.
 			return accepted;
+		} finally {
+			// Refused: settled only now, so a waiting steer finds its refusal shown.
+			taken(accepted);
 		}
 	}
 
@@ -847,11 +900,17 @@ export class SessionModel {
 	 *  steer route, which hands it to the live agent's steering queue.
 	 *  When pi drains it at the next response boundary, the verbatim
 	 *  message events upsert the real card (the client-minted id is the
-	 *  key) and the indicator's fold drops the line. A 409 means the turn
-	 *  settled mid-send (the race): fall back to the plain text send —
-	 *  the entry is dropped and send() pushes its own optimistic card.
+	 *  key) and the indicator's fold drops the line. A 409 while his own
+	 *  send is still being taken means its turn is not live yet (the
+	 *  server reads the course brief first): the steer waits for that send
+	 *  and goes again, and a refused send gives the words back under its
+	 *  refusal (round 12, 4 major 1: the words sat in the box, unsaid, while
+	 *  the reply ignored them). Otherwise a 409 means the turn settled
+	 *  mid-send (the race): fall back to the plain text send — the entry is
+	 *  dropped and send() pushes its own optimistic card. `onAccepted`
+	 *  fires once the app took it, either way.
 	 */
-	async steer(text: string, photos?: Photo[]): Promise<boolean> {
+	async steer(text: string, photos?: Photo[], onAccepted?: () => void): Promise<boolean> {
 		const t = text.trim();
 		if (!t && !photos?.length) return false;
 		const id = `steer_${localId()}`;
@@ -861,16 +920,29 @@ export class SessionModel {
 			this.steerQueueValue = this.steerQueueValue.filter((s) => s.id !== id);
 			this.onChange?.();
 		};
+		const sending = this.taking;
+		const post = () => this.fetch(`/api/chats/${this.chatId}/steer`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ input: { type: "steer", id, text: t, ...(photos?.length ? { photos } : {}) } }),
+		});
 		try {
-			const res = await this.fetch(`/api/chats/${this.chatId}/steer`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ input: { type: "steer", id, text: t, ...(photos?.length ? { photos } : {}) } }),
-			});
-			if (res.ok) return true; // parked or delivered — the stream lands the card
+			let res = await post();
+			if (res.status === 409 && sending) {
+				await res.body?.cancel().catch(() => {});
+				if (!(await sending)) {
+					dropSteer();
+					return false;
+				}
+				res = await post();
+			}
+			if (res.ok) {
+				onAccepted?.();
+				return true; // parked or delivered — the stream lands the card
+			}
 			if (res.status === 409) {
 				dropSteer();
-				return await this.send({ type: "text", text: t, ...(photos?.length ? { photos } : {}) }); // the settle race: plain send
+				return await this.send({ type: "text", text: t, ...(photos?.length ? { photos } : {}) }, onAccepted); // the settle race: plain send
 			}
 			dropSteer();
 			this.setError((await res.text()) || `The steer failed (${res.status}).`);
@@ -950,6 +1022,20 @@ export class SessionModel {
 		this.setStatus("ready");
 	}
 
+	/** His stop of the running reply: the view reads it as stopped at once,
+	 *  as the record will once the server's abort settles, so the lesson's
+	 *  stop line shows on his press, not 2 to 3 s later (round 14, 4
+	 *  minor 10). The settle's sync replaces this with the record. */
+	stopReply(): void {
+		const streaming = this.streamingMessageId;
+		this.mutate(() => {
+			const idx = streaming === null ? -1 : this.tail.findIndex((m) => m.id === streaming);
+			const stopped = { role: "assistant", content: [], stopReason: "aborted", timestamp: Date.now() } as unknown as LhMessage;
+			this.tail = idx === -1 ? [...this.tail, { ...stopped, id: localId() } as LhMessage] : this.tail.with(idx, { ...this.tail[idx]!, stopReason: "aborted" } as LhMessage);
+		});
+		this.stop();
+	}
+
 	/** Submission snapshots outlive the dock, not the session mount. */
 	questionDraft(questionKey: string): QuestionDraft | undefined {
 		return this.questionDrafts.get(questionKey);
@@ -967,6 +1053,27 @@ export class SessionModel {
 		for (const [id, key] of this.unconfirmedAnswers) {
 			if (key !== pendingKey) this.unconfirmedAnswers.delete(id);
 		}
+	}
+
+	/** The page a lesson mounts from can be old: Back restores it from the
+	 *  router's cache as first rendered, maybe before the lesson had a word
+	 *  (round 9: an empty "New session" page after Done for today). Once per
+	 *  mount the lesson reads the record and takes it if it moved, unless
+	 *  something happened here meanwhile; a turn running now is attached. */
+	async refreshFromRecord(): Promise<void> {
+		const base = this.base;
+		let record: { messages?: LhMessage[]; turnInFlight?: boolean; turnError?: string };
+		try {
+			const res = await this.fetch(`/api/chats/${encodeURIComponent(this.chatId)}`);
+			if (!res.ok) return;
+			record = await res.json();
+		} catch {
+			return;
+		}
+		if (!Array.isArray(record.messages) || this.base !== base || this.tail.length > 0 || this.statusValue !== "ready") return;
+		const ids = (messages: readonly LhMessage[]) => messages.map((m) => m.id).join("\n");
+		if (ids(record.messages) !== ids(base)) this.setMessages(record.messages, record.turnError);
+		if (record.turnInFlight === true) await this.resumeStream(false);
 	}
 
 	/** Full snapshot swap (the idle settle sync — server canon). */
@@ -1013,15 +1120,30 @@ export class SessionModel {
 	/** The mount/sync continuation fold (native-messages.ts). */
 	static needsContinuation = needsContinuation;
 
+	/** Clears a failure this view holds. Nothing to clear changes nothing,
+	 *  so a caller that clears on each render never loops (round 15, M2:
+	 *  React #185 on the signed-out line). */
 	clearError(): void {
+		if (this.errorValue === null) return;
 		this.setError(null);
+	}
+
+	/** The failed turn at the record's end outlived its cause (Claude is
+	 *  signed in again): its line goes, and the turn stays failed, so Retry
+	 *  still runs it again (round 15, M2). */
+	outlivedFailure(): void {
+		const latest = failedResponseAtEnd([...this.base, ...this.tail]);
+		if (!latest || latest.id === this.outlivedFailureId) return;
+		this.mutate(() => {
+			this.outlivedFailureId = latest.id;
+		});
 	}
 
 	/** The app came back after a restart cut the turn this view was reading.
 	 *  A dropped connection is no failure of the tutor's, so the record alone
 	 *  decides what is owed next, as when the lesson opens. */
 	recoverDroppedStream(): void {
-		if (this.statusValue !== "error" || this.errorValue?.message !== STREAM_DROPPED) return;
+		if (this.statusValue !== "error" || !droppedError(this.errorValue)) return;
 		this.automaticContinuationBlocked = false;
 		this.setError(null);
 		this.setStatus("ready");

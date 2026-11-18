@@ -14,7 +14,8 @@
  *   They never fill another question's answer.
  */
 
-import { keepWords, keptWords } from "@/components/lesson/kept-drafts";
+import { joinAsTyped, keepWords, keptWords } from "@/components/lesson/kept-drafts";
+import { LESSON_WORDS } from "@/components/study-words";
 
 /** What he has typed in the open dock, keyed by the question or problem. */
 export interface LiveDraft {
@@ -35,9 +36,30 @@ export type Overtaken = { to: "carry"; words: string; why: LeftOpen } | { to: "b
  *  `leftOpen` says why `before`'s question left, when it is still open. Pure. */
 export function overtakenDraft(before: string | null, after: string | null, draft: LiveDraft | null, leftOpen: LeftOpen | null): Overtaken | null {
 	if (before === null || before === after || draft === null || draft.key !== before) return null;
-	const words = draft.text.trim();
-	if (words === "") return null;
+	// As he typed them, trailing space too (round 10, 4 minor 5).
+	const words = draft.text;
+	if (words.trim() === "") return null;
 	return leftOpen ? { to: "carry", words, why: leftOpen } : { to: "box", words };
+}
+
+/** Words he typed in the dock after this window sent from it, when the
+ *  dock moves on, or null: they go to the message box as typed (round 11,
+ *  4 major 1: words typed in a problem's box while the tutor replied to
+ *  his work were erased when the problem closed). Pure. */
+export function typedAfterSend(before: string | null, after: string | null, draft: LiveDraft | null): string | null {
+	if (before === null || before === after || draft === null || draft.key !== before) return null;
+	return draft.text.trim() === "" ? null : draft.text;
+}
+
+/** The line under the transcript about where his words are: another
+ *  window's doing (`overtaken`), given whether a question or problem now
+ *  holds the box; else, while one holds it, words of his waiting in the
+ *  message box behind it (`hidden`, round 11, 4 minor 2). Pure. */
+export function boxLine(overtaken: "answered" | LeftOpen | null, open: boolean, hidden: boolean): string | null {
+	if (overtaken === "answered") return open ? LESSON_WORDS.answeredElsewhereOpen : LESSON_WORDS.answeredElsewhere;
+	if (overtaken === "hint" && !open) return LESSON_WORDS.hintElsewhere;
+	if (overtaken === "asked" && !open) return LESSON_WORDS.askedElsewhere;
+	return open && hidden ? LESSON_WORDS.messageKept : null;
 }
 
 const rescueScope = (chatId: string) => `${chatId}:rescued`;
@@ -58,7 +80,7 @@ export function forgetRescue(chatId: string): void {
  *  then they are another question's answer, never this one's. */
 export function holdsRescue(chatId: string, box: string): boolean {
 	const rescued = keptWords(rescueScope(chatId))?.text;
-	return !!rescued && box.trim().endsWith(rescued);
+	return !!rescued && box.trimEnd().endsWith(rescued.trimEnd());
 }
 
 /** Whether the box holds the rescued words and nothing else of his. */
@@ -72,7 +94,7 @@ function onlyRescue(chatId: string, box: string): boolean {
  *  merged into one block). Pure but for reading the kept rescue. */
 export function rescuedBox(chatId: string, box: string, words: string): string {
 	if (!box.trim() || onlyRescue(chatId, box)) return words;
-	return `${box.trim()}\n\n${words}`;
+	return joinAsTyped([box, words]);
 }
 
 /** A rescue dies with its own question (round 8: it stayed in the box

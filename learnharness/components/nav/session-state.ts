@@ -12,7 +12,8 @@ import type { ChatListItem } from "@/src/core";
  *     owes the next word and picks the turn back up when it is opened;
  *   - left: he pressed Done for today on work still open (a question or
  *     problem it set aside, plan steps still to teach, a review not yet
- *     done), so it waits for next time;
+ *     done), so it waits for next time, even with the question the app
+ *     posed again for him there (round 12, 3 n10): he said he is done;
  *   - finished: the tutor ended the lesson (a sign-off such as "Good place
  *     to stop" included), the practice round or the answer.
  */
@@ -20,8 +21,8 @@ export type SessionState = "working" | "your-turn" | "paused" | "left" | "finish
 
 export function sessionState(chat: ChatListItem): SessionState {
 	if (chat.busy) return "working";
-	if (chat.pendingQuestion || chat.pendingProblem || chat.ended === "mid-lesson") return "your-turn";
 	if (chat.ended === "left") return "left";
+	if (chat.pendingQuestion || chat.pendingProblem || chat.ended === "mid-lesson") return "your-turn";
 	return chat.ended === "cut" ? "paused" : "finished";
 }
 
@@ -47,13 +48,36 @@ const CONTINUE: Record<SessionState, (chat: ChatListItem, finished: typeof FINIS
 
 const PICK_UP_ORDER: readonly SessionState[] = ["your-turn", "working", "paused", "left"];
 
-/** The session to pick up among some: one that waits on the learner, else
- *  one the tutor writes in, else one the tutor stopped in, else one left
- *  for next time; the first in the order given (newest first) within
- *  each. */
-export function resumableSession(sessions: readonly ChatListItem[]): ChatListItem | null {
+/** The sessions still current among some: each but one a later session of
+ *  its kind started after he last touched it, which moved past it (round
+ *  9, 2 m7: a preview whose turn failed on 6 Nov stayed Diagonalization's
+ *  Now over the lesson he left on 8 Nov), and one whose reply was cut
+ *  before he said anything in it once he has started another session in
+ *  its course (`course`, any sessions: those of its course are read), as
+ *  that study moved past it (round 10, 2 m4: the same preview, with no
+ *  later session on its own topic). A session holding an open task is
+ *  moved past only by a later session on that task, since the task is its
+ *  work, not the topic's (round 13, 2 M1: the morning's Kernel review
+ *  moved past Problem sheet 4, so after its close Learning had no Kernel).
+ *  A turn running now stays. Pure. */
+export function currentSessions(sessions: readonly ChatListItem[], course: readonly ChatListItem[] = []): ChatListItem[] {
+	const sameWork = (of: ChatListItem, chat: ChatListItem) => chat.kind === of.kind && (!of.tasks?.length || (chat.tasks ?? []).some((key) => of.tasks!.includes(key)));
+	// Only another session moves past one: a seeded session can carry a start later than his clock (round 11, 1 N5).
+	const started = (of: ChatListItem) => sessions.reduce((last, chat) => (chat.id !== of.id && sameWork(of, chat) && chat.createdAt > last ? chat.createdAt : last), "");
+	const movedOn = (chat: ChatListItem) =>
+		chat.untouched === true && chat.ended === "cut" && course.some((other) => other.id !== chat.id && other.course?.workspace === chat.course?.workspace && other.createdAt > chat.updatedAt);
+	return sessions.filter((chat) => chat.busy || (chat.updatedAt >= started(chat) && !movedOn(chat)));
+}
+
+/** The session to pick up among some: of the current ones
+ *  (`currentSessions`, against the sessions of their `course`), one that
+ *  waits on the learner, else one the tutor writes in, else one the tutor
+ *  stopped in, else one left for next time; the first in the order given
+ *  (newest first) within each. */
+export function resumableSession(sessions: readonly ChatListItem[], course: readonly ChatListItem[] = []): ChatListItem | null {
+	const current = currentSessions(sessions, course);
 	for (const state of PICK_UP_ORDER) {
-		const found = sessions.find((chat) => sessionState(chat) === state);
+		const found = current.find((chat) => sessionState(chat) === state);
 		if (found) return found;
 	}
 	return null;
@@ -68,8 +92,30 @@ export function continueMove(sessions: readonly ChatListItem[], finished: typeof
 	return chat ? CONTINUE[sessionState(chat)](chat, finished) : null;
 }
 
+/** Whether Continue on a session takes up the task it holds with a turn:
+ *  it holds an open task and nothing in it waits on him or runs, so the
+ *  tutor carries on at the task's step as it opens (round 13, 2 M1:
+ *  Continue Problem sheet 4 opened the sheet's finished chat with an empty
+ *  box). Opening it to read it, from the calendar or Earlier, asks for
+ *  nothing. */
+export function continuesTask(chat: ChatListItem): boolean {
+	return (chat.tasks?.length ?? 0) > 0 && !chat.busy && !chat.pendingQuestion && !chat.pendingProblem && chat.ended !== "cut" && chat.ended !== "mid-lesson";
+}
+
+/** Where Continue on a session goes: its chat, asked to take up its task
+ *  when `continuesTask`. Every Continue, Resume and line that picks a
+ *  session up links here. */
+export function continueHref(chat: ChatListItem): string {
+	return continuesTask(chat) ? `/chat/${chat.id}?continue=task` : `/chat/${chat.id}`;
+}
+
 /** What a paused session says (round 8): his own stop in his words, a
- *  turn a restart cut as cut off. */
-export function pausedWords(chat: Pick<ChatListItem, "stopped">): string {
-	return chat.stopped ? "You stopped the tutor" : "Reply cut off";
+ *  turn that failed by what to do, Try again, as its line says (round 14,
+ *  4 minor 6: a signed-out refusal read "Reply cut off"; round 16, m3:
+ *  "Couldn't reply" named nothing to do), a turn a restart cut as cut
+ *  off. Each short enough to sit beside the course's name on a sidebar
+ *  card (round 15, 4 minor 9: "You stopped the tutor" pushed "Linear
+ *  Algebra" off its line). */
+export function pausedWords(chat: Pick<ChatListItem, "stopped" | "failed">): string {
+	return chat.stopped ? "Stopped by you" : chat.failed ? "Try again" : "Reply cut off";
 }

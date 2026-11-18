@@ -7,13 +7,17 @@
  * transcript leaves the server.
  */
 
-import { markLinks } from "../core/answer-marks.ts";
+import { markLinks, savedOf } from "../core/answer-marks.ts";
 import type { ChatRecord } from "../core/contracts/chat.ts";
 import { chosenSure } from "../core/contracts/marks.ts";
-import { derivePlanStatusesLh } from "../core/contracts/plan.ts";
+import { derivePlanStatusesLh, lhToolCalls } from "../core/contracts/plan.ts";
+import { POSITION_QUESTION_TOOLS } from "../core/question-core.ts";
 import type { SessionPlan, TopicAttempt, TopicReadResponse, TopicRecord, TopicRef } from "../core/contracts/topic.ts";
+import { planDays, plannedOf } from "./calendar.ts";
+import type { CourseResult } from "../core/contracts/course.ts";
 import { listCourses } from "./courses.ts";
 import { stores } from "./stores.ts";
+import { homeMap } from "./study.ts";
 
 /** The most sessions one read names. */
 export const TOPIC_READ_SESSIONS = 20;
@@ -77,10 +81,14 @@ function refsOf(topic: Record<string, unknown>, sources: Record<string, unknown>
 }
 
 /** Which session saved each observation, from the sessions' transcripts:
- *  every attempt their answers' marks link (`markLinks`). Pure. */
+ *  every attempt their answers' marks link (`markLinks`), and every one
+ *  their own saves' receipts name (`savedOf`), so an answer saved with
+ *  no card to mark, as a seeded session's or one given in words, still sits
+ *  under its session's line in Earlier (round 14, m30). Pure. */
 export function savedBy(chats: readonly ChatRecord[]): Map<string, string> {
 	const saved = new Map<string, string>();
 	for (const chat of chats) for (const ids of Object.values(markLinks(chat))) for (const id of ids) saved.set(id, chat.id);
+	for (const chat of chats) for (const id of savedOf(chat.messages, chat.answerSaves)) if (!saved.has(id)) saved.set(id, chat.id);
 	return saved;
 }
 
@@ -111,12 +119,25 @@ export function topicRecordOf(show: unknown, handle: string, taskKeys: readonly 
 	};
 }
 
+/** The step the newest step-tagged question asks about, whatever the
+ *  strip's position does with it (a check back on a step done moves
+ *  nothing there); null before any. Pure. */
+export function askedStep(tree: NonNullable<ChatRecord["tree"]>, messages: ChatRecord["messages"]): string | null {
+	const ids = new Set(tree.nodes.map((node) => node.id));
+	const tagged = lhToolCalls(messages).flatMap((call) => {
+		const nodeId = POSITION_QUESTION_TOOLS.includes(call.name) ? (call.input as { nodeId?: unknown } | undefined)?.nodeId : undefined;
+		return typeof nodeId === "string" && ids.has(nodeId) ? [nodeId] : [];
+	});
+	return tagged.at(-1) ?? null;
+}
+
 /** A stored session's plan and where its transcript puts him on it, or
  *  null when its tutor authored none. Pure. */
 export function sessionPlanOf(chat: ChatRecord): SessionPlan | null {
 	const { tree } = chat;
 	if (!tree || tree.nodes.length === 0) return null;
-	const { current, visited } = derivePlanStatusesLh(tree, chat.messages);
+	const { current, visited, done } = derivePlanStatusesLh(tree, chat.messages);
+	const asked = askedStep(tree, chat.messages);
 	return {
 		id: chat.id,
 		tree: {
@@ -125,34 +146,82 @@ export function sessionPlanOf(chat: ChatRecord): SessionPlan | null {
 		},
 		current,
 		visited: [...visited],
+		...(asked !== current ? { asked } : {}),
+		...(done.size > 0 ? { done: [...done] } : {}),
 	};
+}
+
+/** The first day of `plan`'s daily plan that reviews the topic, from
+ *  today on; null when it reviews it on none. Pure. */
+export function firstReviewOf(plan: unknown, handle: string): string | null {
+	return plannedOf(plan, { topics: [{ handle } as never] }).find((day) => day.reviews.includes(handle as never))?.date ?? null;
+}
+
+/** Every topic and open task of a course as the engine shows them, in one
+ *  read kept until a record changes; null when the course's map cannot be
+ *  read or has no topics. Showing a topic replays the course's plan, and an
+ *  item is the same whatever else is shown beside it, so one read serves
+ *  every topic page of the course where each topic ran its own (round 15, P7). */
+export async function topicsShown(workspace: string): Promise<CourseResult | null> {
+	const map = await homeMap(workspace);
+	if (!map.ok || map.map.topics.length === 0) return null;
+	return stores.courseRecords.run(workspace, { verb: "show", handles: [...map.map.topics.map((t) => t.handle), ...map.map.tasks.map((t) => t.key)] });
+}
+
+/** The topic and the tasks that hold it, as one `show` of them prints them:
+ *  from the course's kept read (`topicsShown`), the tasks it does not hold
+ *  (no plan to replay) read beside it; one `show` of them all where that read
+ *  does not hold the topic. */
+async function shownFor(workspace: string, handle: string, taskKeys: readonly string[]): Promise<CourseResult> {
+	const alone = () => stores.courseRecords.run(workspace, { verb: "show", handles: [handle, ...taskKeys] });
+	const every = await topicsShown(workspace);
+	const topics = every?.ok ? record(every.json) : null;
+	const items = record(topics?.items);
+	if (!topics || !items?.[handle]) return alone();
+	const missing = taskKeys.filter((key) => !items[key]);
+	if (missing.length === 0) return { ok: true, json: topics };
+	const tasks = await stores.courseRecords.run(workspace, { verb: "show", handles: missing });
+	if (!tasks.ok) return alone();
+	const held = record(tasks.json) ?? {};
+	const merged = (key: string) => ({ ...record(topics[key]), ...record(held[key]) });
+	return { ok: true, json: { ...topics, items: merged("items"), evidence: merged("evidence"), sources: merged("sources") } };
 }
 
 /**
  * GET /api/topic's answer: the topic's record and the plans of the named
- * sessions that belong to the course. Only a course the engine lists is
- * read, as for the course map. An engine failure answers with no record
- * and the plans, since the page can still say where a lesson stands.
+ * sessions that belong to the course, and for a lesson he began (`begun`)
+ * the day the engine's daily plan first reviews the topic, read over the
+ * calendar's days (round 14, m36: the begun Poisson page said "Lesson
+ * continues · Today" and nothing of the review the plan puts after it).
+ * Only a course the engine lists is read, as for the course map. An
+ * engine failure answers with no record and the plans, since the page can
+ * still say where a lesson stands.
  */
 export async function topicRead(
 	workspace: string,
 	handle: string,
 	taskKeys: readonly string[],
 	sessionIds: readonly string[],
+	begun = false,
 ): Promise<{ status: 200 | 400 | 404; body: TopicReadResponse }> {
 	const bad = (error: string) => ({ status: 400 as const, body: { ok: false as const, code: "bad_request" as const, error } });
 	if (!handle) return bad("A topic is required");
 	if (sessionIds.length > TOPIC_READ_SESSIONS) return bad(`At most ${TOPIC_READ_SESSIONS} sessions`);
 	if (!sessionIds.every((id) => SESSION_ID.test(id))) return bad("A session id is not valid");
 	const listing = await listCourses();
-	if (!listing.available || !listing.courses.some((c) => c.workspace === workspace)) {
+	const course = listing.available ? listing.courses.find((c) => c.workspace === workspace) : undefined;
+	if (!course) {
 		return { status: 404, body: { ok: false, code: "unknown_course", error: "No registered course has this folder" } };
 	}
-	const shown = await stores.courseRecords.run(workspace, { verb: "show", handles: [handle, ...taskKeys] });
+	const [shown, plan] = await Promise.all([
+		shownFor(workspace, handle, taskKeys),
+		begun ? stores.courseRecords.run(workspace, { verb: "plan", days: planDays(course) }) : null,
+	]);
 	const chats = sessionIds.flatMap((id) => {
 		const chat = stores.chatStore.getChat(id);
 		return chat && chat.course?.workspace === workspace ? [chat] : [];
 	});
 	const plans = chats.flatMap((chat) => sessionPlanOf(chat) ?? []);
-	return { status: 200, body: { ok: true, record: shown.ok ? topicRecordOf(shown.json, handle, taskKeys, savedBy(chats)) : null, plans } };
+	const record = shown.ok ? topicRecordOf(shown.json, handle, taskKeys, savedBy(chats)) : null;
+	return { status: 200, body: { ok: true, record, plans, ...(plan ? { firstReview: plan.ok ? firstReviewOf(plan.json, handle) : null } : {}) } };
 }

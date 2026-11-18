@@ -35,6 +35,12 @@ class Workspace:
         return self.root / "course.json"
 
     @property
+    def forgotten(self) -> Path:
+        """The records of the course deleted here (``records.forget``), one per
+        deletion: the history of his study in it."""
+        return self.root / "forgotten"
+
+    @property
     def notes(self) -> Path:
         """Standalone study notes, beside the material so Obsidian shows them."""
         return self.directory / "study-notes"

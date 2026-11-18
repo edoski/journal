@@ -12,7 +12,7 @@ import { escAbortTarget } from "../components/chat.tsx";
  * pure) is the defense. Priority = stacking order.
  */
 describe("escAbortTarget (the layered-Esc ruling)", () => {
-	const none = { abortAsk: false, mermaidFocus: false, planOpen: false, setupOpen: false, pending: false, problem: false, busy: false };
+	const none = { abortAsk: false, mermaidFocus: false, planOpen: false, setupOpen: false, pending: false, problem: false, askToggle: false, busy: false };
 
 	it("no overlays: the 2026-10-02 chain stands (question before turn)", () => {
 		assert.equal(escAbortTarget({ ...none, pending: true }), "question");
@@ -48,5 +48,13 @@ describe("escAbortTarget (the layered-Esc ruling)", () => {
 
 	it("stacking order among overlays: mermaid paints above plan (later in DOM)", () => {
 		assert.equal(escAbortTarget({ ...none, mermaidFocus: true, planOpen: true, pending: true }), "mermaid");
+	});
+
+	it("while the tutor replies, Esc in the answer box asks to stop it; Ask takes Esc only when idle (round 9, 4 #1)", () => {
+		for (const open of ["pending", "problem"] as const) {
+			assert.equal(escAbortTarget({ ...none, [open]: true, askToggle: true, busy: true }), "turn", `${open} open mid-reply: the stop dialog`);
+			assert.equal(escAbortTarget({ ...none, [open]: true, askToggle: true }), "ask", `${open} open and idle: switch to Ask`);
+		}
+		assert.equal(escAbortTarget({ ...none, planOpen: true, problem: true, askToggle: true, busy: true }), "plan", "an open popup still claims Esc first");
 	});
 });

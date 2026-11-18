@@ -14,7 +14,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { needsYouNow } from "../components/study-home/needs-you.ts";
-import { NowCard, nowActionOf } from "../components/unit-inbox/now-card.tsx";
+import { NowCard, cardPress } from "../components/unit-inbox/now-card.tsx";
 import { topicUnit } from "../components/unit-inbox/now-inbox.ts";
 import { buildInbox } from "../components/unit-inbox/units.ts";
 import type { StudyCourse } from "../src/core/index.ts";
@@ -27,7 +27,14 @@ const render = (node: React.ReactNode) =>
 
 describe("NowCard", () => {
 	const inbox = buildInbox(COURSES, CHATS, null);
-	const { lines } = needsYouNow(COURSES, CHATS, TODAY);
+	/** The demo's two waiting sessions, then its first two course lines:
+	 *  Today lists the sessions after the plan, folded (round 10, 1 m2), and
+	 *  a card draws the same either way. */
+	const lines = (() => {
+		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
+		const all = [...lines, ...also];
+		return [...all.filter((l) => l.row.kind === "session"), ...all.filter((l) => l.row.kind === "course").slice(0, 2)];
+	})();
 
 	it("draws each line on its lead topic, under Home's name for it, with Today's reason and the line's action", () => {
 		const doc = render(
@@ -40,18 +47,19 @@ describe("NowCard", () => {
 		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
-			["Eigenvalues lesson", "Rank practice", "Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence"],
+			["Continue Eigenvalues lesson", "Continue Rank practice", "Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
-			["Your turn", "Your turn", "3d overdue", "4d overdue"],
+			["Your turn", "Your turn", "Due 5 Nov", "Due 4 Nov"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="row-action"]')?.getAttribute("aria-label")),
-			["Resume: Eigenvalues lesson", "Resume: Rank practice", "Review: Review Random variables and distributions, Law of total probability, Bayes' rule", "Review: Review Linear independence"],
+			["Resume: Continue Eigenvalues lesson", "Resume: Continue Rank practice", "Review: Review Random variables and distributions, Law of total probability, Bayes' rule", "Review: Review Linear independence"],
 		);
 		assert.equal(cards[0]!.querySelector('[data-slot="row-action"]')?.getAttribute("href"), "/chat/chat_eigen");
-		assert.equal(cards[2]!.querySelector('[data-testid="unit-row"]')?.getAttribute("href")?.startsWith("/unit/"), true);
+		assert.equal(cards[0]!.querySelector('[data-testid="unit-row"]')?.getAttribute("href"), "/chat/chat_eigen", "a click resumes the session, as Home's line does, not the topic's page");
+		assert.equal(cards[2]!.querySelector('[data-testid="unit-row"]')?.tagName, "BUTTON", "a click starts the review, as Home's line does");
 	});
 
 	it("draws a waiting session on no topic as its own card, opening the session, with no action", () => {
@@ -62,7 +70,7 @@ describe("NowCard", () => {
 		assert.equal(link.getAttribute("data-sidebar-row"), "chat:chat_eigen");
 		assert.equal(link.getAttribute("aria-current"), "page");
 		assert.match(link.textContent ?? "", /No course.*Your turn.*Eigenvalues lesson/);
-		assert.equal(doc.querySelector('[data-slot="row-action"]'), null);
+		assert.ok(doc.querySelector('[data-slot="row-action"]') === null);
 	});
 
 	it("draws a course line with no topic to lead with as its course's card, under Home's name, taking up the work as Home's line does, with Home's action", () => {
@@ -84,9 +92,12 @@ describe("NowCard", () => {
 		assert.equal(doc.querySelector('[data-slot="row-action"]')?.textContent, "Continue");
 	});
 
-	it("takes Home's word for a course line's action", () => {
+	it("takes up a course line's own step, as Home's line does", () => {
+		const press = cardPress(lines[2]!, CHATS);
+		assert.ok("move" in press && press.move.kind === "start");
+		assert.equal(press.workspace, "/s/prob");
 		const row = lines[2]!.row;
-		assert.deepEqual(nowActionOf(lines[2]!), { label: "Review", workspace: "/s/prob", step: row.kind === "course" ? row.step : null }, "the line's own step, so it starts that lesson");
-		assert.deepEqual(nowActionOf(lines[0]!), { label: "Resume", href: "/chat/chat_eigen" });
+		assert.deepEqual(press.move.topics, row.kind === "course" && row.step.kind !== "none" ? row.step.topics : null, "the line's own step, so it starts that lesson");
+		assert.deepEqual(cardPress(lines[0]!, CHATS), { href: "/chat/chat_eigen" });
 	});
 });

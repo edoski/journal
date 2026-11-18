@@ -12,7 +12,7 @@ import { FIGURE_ON_DARK } from "@/components/artifacts/figure-on-dark";
 import { DemoErrorChip, INITIAL_DEMO_BRIDGE_STATE, reduceDemoBridgeState, type DemoBridgeState } from "@/components/artifacts/demo-card";
 import { SvgImage } from "@/components/artifacts/svg-image";
 import { svgNaturalWidth } from "@/components/artifacts/visual-card";
-import type { DemoResult, VisualResult } from "@/src/core";
+import { DEMO_BASE_STYLE, DEMO_DARK_STYLE, type DemoResult, type VisualResult } from "@/src/core";
 
 /**
  * A tutor's figure or demo in the flow of his reply (spec: inline-figure.md):
@@ -22,7 +22,7 @@ import type { DemoResult, VisualResult } from "@/src/core";
  */
 
 /** The app's tokens a demo may use, handed to it as `:root` variables. */
-const THEME_TOKENS = ["--foreground", "--muted-foreground", "--card", "--muted", "--border", "--primary", "--primary-foreground", "--accent", "--ring", "--danger", "--success", "--warning", "--font-sans", "--radius"] as const;
+const THEME_TOKENS = ["--foreground", "--muted-foreground", "--card", "--muted", "--border", "--input", "--primary", "--primary-foreground", "--secondary", "--secondary-foreground", "--accent", "--ring", "--danger", "--success", "--warning", "--font-sans", "--lh-font-sans", "--radius"] as const;
 
 /** The `:root` block for a demo: the app's resolved tokens, a transparent
  *  page in the lesson's text colour and face, and dark form controls. Pure:
@@ -32,7 +32,7 @@ export function demoThemeStyle(read: (token: string) => string): string {
 		.filter(([, value]) => value)
 		.map(([token, value]) => `${token}:${value};`)
 		.join("");
-	return `<style data-lh-theme>:root{color-scheme:dark;--background:transparent;${vars}}html,body{margin:0;background:transparent;color:var(--foreground);font-family:var(--font-sans,system-ui);font-size:16px;line-height:1.6}</style>`;
+	return `<style data-lh-theme>:root{color-scheme:dark;--background:transparent;${vars}}html,body{margin:0;background:transparent;color:var(--foreground);font-family:var(--lh-font-sans,var(--font-sans,system-ui));font-size:16px;line-height:1.6}</style>`;
 }
 
 /** Tells the lesson the demo's height, any error, and whether it painted its
@@ -41,21 +41,23 @@ export function demoThemeStyle(read: (token: string) => string): string {
 export const INLINE_BRIDGE_SCRIPT = `<script>(function(){
 var send=function(m){try{parent.postMessage(m,"*")}catch(e){}};
 var light=function(){var els=[document.body,document.documentElement];for(var i=0;i<els.length;i++){var el=els[i];if(!el)continue;var c=getComputedStyle(el).backgroundColor;var m=c&&c.match(/[\\d.]+/g);if(!m||m.length<3)continue;if(m.length>3&&+m[3]===0)continue;return (0.2126*m[0]+0.7152*m[1]+0.0722*m[2])/255>0.5}return false};
-var post=function(){var b=document.body;var h=b?Math.max(b.scrollHeight,b.getBoundingClientRect().height):document.documentElement.scrollHeight;if(b){var cs=getComputedStyle(b);h+=(parseFloat(cs.marginTop)||0)+(parseFloat(cs.marginBottom)||0)}send({type:"demo-resize",height:Math.ceil(h)});send({type:"demo-page",light:light()})};
+var post=function(){var b=document.body;var h=b?Math.max(b.scrollHeight,b.getBoundingClientRect().height):document.documentElement.scrollHeight;if(b){var cs=getComputedStyle(b);h+=(parseFloat(cs.marginTop)||0)+(parseFloat(cs.marginBottom)||0)}var l=light();if(l)document.documentElement.setAttribute("data-lh-light","");else document.documentElement.removeAttribute("data-lh-light");send({type:"demo-resize",height:Math.ceil(h)});send({type:"demo-page",light:l})};
 if(typeof ResizeObserver!=="undefined"){new ResizeObserver(post).observe(document.documentElement)}
 window.addEventListener("resize",post);window.addEventListener("load",post);
 window.addEventListener("error",function(e){send({type:"demo-error",message:e.message||String(e)})});
 setTimeout(post,50);setTimeout(post,400);
 })();</script>`;
 
-/** The demo's document: the theme first, so the demo's own styles win, and
- *  the bridge last. Pure. */
+/** The demo's document: the theme and the controls' base first (the light
+ *  base the builder tested it on, and shadcn's dark variants over it on his
+ *  dark page), so the demo's own styles win, and the bridge last. Pure. */
 export function buildInlineSrcDoc(html: string, theme: string): string {
+	const head = `${theme}${html.includes("data-demo-base") ? "" : DEMO_BASE_STYLE}${DEMO_DARK_STYLE}`;
 	const themed = /<head[^>]*>/i.test(html)
-		? html.replace(/<head[^>]*>/i, (head) => `${head}${theme}`)
+		? html.replace(/<head[^>]*>/i, (open) => `${open}${head}`)
 		: /<html[^>]*>/i.test(html)
-			? html.replace(/<html[^>]*>/i, (open) => `${open}<head>${theme}</head>`)
-			: `${theme}${html}`;
+			? html.replace(/<html[^>]*>/i, (open) => `${open}<head>${head}</head>`)
+			: `${head}${html}`;
 	return /<\/body>/i.test(themed) ? themed.replace(/<\/body>/i, `${INLINE_BRIDGE_SCRIPT}</body>`) : `${themed}${INLINE_BRIDGE_SCRIPT}`;
 }
 

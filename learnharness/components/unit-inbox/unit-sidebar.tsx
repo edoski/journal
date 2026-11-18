@@ -3,9 +3,9 @@
 import { useId, useMemo, useRef } from "react";
 import Link from "next/link";
 import { CalendarDaysIcon, HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
-import { fuzzyScore, KEYBOARD_ACTIONS, type ChatListItem, type CourseMapArc, type StudyCourse } from "@/src/core";
+import { KEYBOARD_ACTIONS, type ChatListItem, type CourseMapArc, type StudyCourse } from "@/src/core";
 import { useSidebar } from "@/components/sidebar";
-import { filterSessions, useSessionsSidebar } from "@/components/sidebar-state";
+import { filterSessions, opensSearchResult, rankByTitle, titleScore, useSessionsSidebar } from "@/components/sidebar-state";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
 import { ActivitySection, toBlobs, useActivity } from "@/components/activity-dock";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
@@ -25,10 +25,11 @@ import { isUnitOpen, TopicCard } from "@/components/unit-inbox/unit-row";
 import { TodayList } from "@/components/unit-inbox/today/today-list";
 import { useUnitInbox } from "@/components/unit-inbox/use-unit-inbox";
 import { sessionsNow, sessionTwins, unitKey, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import { StartFailure, StartScope } from "@/components/start/start-scope";
+import { useLessonStart } from "@/components/start/use-lesson-start";
 import { cn } from "@/lib/utils";
 
 /** An arc search found, with its course. */
@@ -37,8 +38,10 @@ export interface FoundArc {
 	arc: CourseMapArc;
 }
 
-/** Every course, arc, topic and session whose title matches the query,
- *  best first, sessions newest first; courses and arcs only when the app has a course page to
+/** Every course, arc, topic and session whose title matches the query
+ *  (`titleScore`), best first, sessions newest first, and `top`, the row
+ *  Enter opens: the best match of all, the first shown on a tie (its
+ *  `data-sidebar-row`); courses and arcs only when the app has a course page to
  *  open, an arc read from the course's map (`map.arcs`). Topics are
  *  every topic on the courses' maps in the inbox's scope, those not
  *  started included (a unit built for each, `unitFor`): the inbox lists
@@ -49,14 +52,9 @@ export function searchInbox(
 	chats: readonly ChatListItem[],
 	query: string,
 	courses: readonly StudyCourse[] = [],
-): { courses: StudyCourse[]; arcs: FoundArc[]; units: Unit[]; sessions: ChatListItem[] } {
-	const best = <T,>(items: readonly T[], title: (item: T) => string): T[] =>
-		items
-			.map((item) => ({ item, score: fuzzyScore(query.trim(), title(item)) }))
-			.filter((r): r is { item: T; score: number } => r.score !== null)
-			.sort((a, b) => b.score - a.score)
-			.map((r) => r.item);
-	return {
+): { courses: StudyCourse[]; arcs: FoundArc[]; units: Unit[]; sessions: ChatListItem[]; top: string | null } {
+	const best = <T,>(items: readonly T[], title: (item: T) => string): T[] => rankByTitle(items, query, title);
+	const found = {
 		courses: best(courses, (c) => c.map.title),
 		arcs: best(
 			courses.flatMap((course) => (course.map.arcs ?? []).map((arc) => ({ course, arc }))),
@@ -66,6 +64,18 @@ export function searchInbox(
 		// Sessions are history: newest first, as everywhere they are listed.
 		sessions: filterSessions([...chats], query).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
 	};
+	// In the order the rows are drawn, each with its row's name and title.
+	const shown: Array<[string, string]> = [
+		...found.courses.map((c): [string, string] => [`course:${c.map.workspace}`, c.map.title]),
+		...found.arcs.map(({ course, arc }): [string, string] => [`arc:${course.map.workspace}#${arc.handle}`, arc.title]),
+		...found.units.map((u): [string, string] => [u.key, u.topic.title]),
+		...found.sessions.map((c): [string, string] => [`chat:${c.id}`, c.title]),
+	];
+	const top = shown.reduce<[string, number] | null>((at, [key, title]) => {
+		const score = titleScore(title, query);
+		return at && at[1] >= score ? at : [key, score];
+	}, null);
+	return { ...found, top: top?.[0] ?? null };
 }
 
 /** The inbox's units, then a unit for every other topic on the maps of
@@ -86,14 +96,14 @@ const SEARCH_LABEL = KEYBOARD_ACTIONS.find((action) => action.id === "sessions-s
 
 /** A results heading, T3 Code's quiet 12px label. */
 function ResultsLabel({ children }: { children: React.ReactNode }) {
-	return <li className="flex h-8 list-none items-center px-2 text-label font-medium text-muted-foreground">{children}</li>;
+	return <li className="flex h-8 list-none items-center px-2 text-callout text-muted-foreground">{children}</li>;
 }
 
 /** A top row that opens a page, Home or Calendar: the selected fill on
  *  its own page. */
 const navLinkClass = (here: boolean) =>
 	cn(
-		"flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-control font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
+		"flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-body outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
 		here ? "bg-fill-selected text-foreground" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
 	);
 
@@ -103,7 +113,11 @@ const navLinkClass = (here: boolean) =>
  * lesson beside it, then one list: Home's Today, each line that needs him
  * now as a card that opens its page, with everything else on the folded
  * shelves at the foot (inbox-today.md). Background work shows only while
- * one runs; Settings is the footer's icon. Its right edge drags to resize,
+ * one runs; Settings is the footer's icon. Every press in it that starts a
+ * lesson (a topic's, a Today card's) goes through its one start
+ * (`StartScope`): signed out, sign-in opens; a start that fails says so in
+ * the footer beside Settings, out of the list, so no row moves and it shows
+ * at any scroll. Its right edge drags to resize,
  * as T3 Code's does; the width lasts across reloads. Folded, it is a rail
  * of icons (`SidebarRail`).
  */
@@ -137,6 +151,8 @@ export function UnitSidebar() {
 			s,
 		};
 	}, [state, scope, folded, fold, s]);
+	// A found topic's press reads its course's map, as its page does (`topicPress`).
+	const maps = useMemo(() => new Map(state.status === "ready" ? state.courses.map((c) => [c.map.workspace, c.map]) : []), [state]);
 	const walked = s.kbdIndex !== null ? found?.sessions[s.kbdIndex]?.id : undefined;
 	const isOpen = (u: Unit) => isUnitOpen(u, s.pathname);
 	const today = state.status === "ready" ? state.inbox.today : "";
@@ -145,21 +161,38 @@ export function UnitSidebar() {
 	const width = useSidebarWidth();
 	const sidebarRef = useRef<HTMLElement>(null);
 	const sidebarId = useId();
+	const lesson = useLessonStart();
 
 	return (
-		<>
+		<StartScope lesson={lesson}>
 			<aside
 				ref={sidebarRef}
 				id={sidebarId}
 				style={{ "--sidebar-width": `${width}px` } as React.CSSProperties}
-				className={cn("sidebar-motion shrink-0 overflow-hidden duration-200 motion-reduce:transition-none", open ? "w-(--sidebar-width)" : "lh-rail w-12")}
+				className={cn("sidebar-width-motion relative z-20 shrink-0", open ? "w-(--sidebar-width)" : "w-12")}
 				data-testid="sidebar"
 				data-state={open ? "open" : "folded"}
 			>
-				{!open ? (
-					<SidebarRail pathname={s.pathname} onOpen={toggle} onNewLesson={() => s.router.push("/chat/new")} onSettings={openSettings} />
-				) : (
-				<div className="flex h-full w-(--sidebar-width) flex-col border-r bg-background">
+				{/* One sidebar, folded by its edge (unit-inbox.md, "Folded"): the
+				    rail lies under the panel, always drawn, and the panel's right
+				    edge sweeps between its width and the window's left while
+				    everything in it holds still, cut off by the moving edge, so
+				    the rail is uncovered (or covered) in the same motion. No layer
+				    fades. Only transforms move: the page takes its new width once
+				    and never re-lays out frame by frame, so a heavy page (Home's
+				    map) cannot stall the sweep. The hidden one is inert. */}
+				<div inert={open} className="absolute inset-y-0 left-0 w-12">
+					<SidebarRail pathname={s.pathname} onNewLesson={() => s.router.push("/chat/new")} onSettings={openSettings} />
+				</div>
+				<div
+					inert={!open}
+					data-slot="sidebar-panel"
+					className={cn(
+						"sidebar-motion absolute inset-y-0 left-0 w-(--sidebar-width) overflow-hidden border-r bg-background",
+						!open && "invisible -translate-x-(--sidebar-width)",
+					)}
+				>
+				<div data-slot="sidebar-panel-content" className={cn("sidebar-motion flex size-full flex-col", !open && "translate-x-(--sidebar-width)")}>
 					<div className="lh-drag lh-lights-band shrink-0" />
 
 					<div className="lh-drag mb-px flex shrink-0 items-center gap-1 px-2 pt-2">
@@ -198,7 +231,7 @@ export function UnitSidebar() {
 					<div data-slot="sidebar-header" className="flex shrink-0 items-center gap-1 px-2">
 						<InputGroup
 							variant="quiet"
-							className="flex-1 pr-0.5 text-control font-medium text-muted-foreground hover:text-foreground focus-within:text-foreground"
+							className="flex-1 pr-0.5 text-body text-muted-foreground hover:text-foreground focus-within:text-foreground"
 						>
 							<Hint label={SEARCH_LABEL} action="sessions-search" side="bottom">
 								<label className="flex h-full min-w-0 flex-1 cursor-text items-center gap-2 pl-2">
@@ -214,12 +247,12 @@ export function UnitSidebar() {
 												focusFirstRow();
 												return;
 											}
-											s.onSearchKeyDown(e, found?.sessions ?? null);
+											s.onSearchKeyDown(e, found?.sessions ?? null, found?.top ?? null);
 										}}
 										placeholder="Search"
 										aria-label={SEARCH_LABEL}
 										spellCheck={false}
-										className="h-auto px-0 py-0 text-control font-medium text-foreground md:text-control"
+										className="h-auto px-0 py-0 text-body text-foreground"
 									/>
 									{s.query && (
 										<InputGroupButton variant="quiet" size="icon-xs" aria-label="Clear search" onClick={() => s.changeQuery("")} className="size-5 hover:bg-transparent">
@@ -247,13 +280,13 @@ export function UnitSidebar() {
 						</Hint>
 					</div>
 
-					<ScrollArea viewportRef={s.listRef} bar={false} className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full focus-visible:ring-inset">
-						<ul data-testid="unit-inbox" onKeyDown={onSidebarTreeKeyDown} className="flex min-h-full flex-col gap-px p-2">
+					<div ref={s.listRef} className="min-h-0 flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+						<ul data-testid="unit-inbox" onKeyDown={onSidebarTreeKeyDown} onClick={(e) => { if (found && opensSearchResult(e.target)) s.changeQuery(""); }} className="flex min-h-full flex-col gap-px p-2">
 							{!now ? (
 								<NowSkeleton />
 							) : found ? (
 								found.courses.length + found.arcs.length + found.units.length + found.sessions.length === 0 ? (
-									<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Nothing matches</li>
+									<li className="list-none px-2 py-6 text-center text-callout text-muted-foreground">Nothing matches</li>
 								) : (
 									<>
 										{found.courses.length + found.arcs.length > 0 && <ResultsLabel>Courses</ResultsLabel>}
@@ -266,7 +299,7 @@ export function UnitSidebar() {
 										{found.units.length > 0 && <ResultsLabel>Topics</ResultsLabel>}
 										{/* One row design for every topic found: its course, then its title (round 6: known topics drew slim rows among the cards). */}
 										{found.units.map((u) => (
-											<TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} />
+											<TopicCard key={u.key} unit={u} map={maps.get(u.course.workspace)!} chats={s.chats ?? []} today={today} active={isOpen(u)} />
 										))}
 										{found.sessions.length > 0 && <ResultsLabel>Sessions</ResultsLabel>}
 										{found.sessions.map((c) => (
@@ -278,7 +311,7 @@ export function UnitSidebar() {
 								<TodayList {...now} />
 							)}
 						</ul>
-					</ScrollArea>
+					</div>
 
 					{running && <ActivitySection />}
 
@@ -297,13 +330,14 @@ export function UnitSidebar() {
 								<SettingsIcon />
 							</Button>
 						</Hint>
+						<StartFailure className="min-w-0 flex-1 text-callout" />
 					</div>
 				</div>
-				)}
+				</div>
 
 				<DeleteSessionDialog chat={s.deleting} onClose={() => s.setDeleting(null)} onDeleted={s.onDeleted} />
 			</aside>
 			{open && <SidebarResizeHandle width={width} sidebarId={sidebarId} sidebar={sidebarRef} />}
-		</>
+		</StartScope>
 	);
 }

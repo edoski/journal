@@ -8,6 +8,7 @@ import {
 	SIDEBAR_KEY_STEP,
 	SIDEBAR_MIN_WIDTH,
 	storeSidebarWidth,
+	useSidebarMaxWidth,
 } from "@/components/unit-inbox/sidebar-width";
 
 interface Drag {
@@ -58,7 +59,7 @@ export function SidebarResizeHandle({ width, sidebarId, sidebar }: { width: numb
 		};
 	}, []);
 
-	const max = maxSidebarWidth(typeof window === "undefined" ? Infinity : window.innerWidth);
+	const max = useSidebarMaxWidth();
 	const step = (next: number) => storeSidebarWidth(clampSidebarWidth(next, window.innerWidth));
 
 	return (
@@ -107,7 +108,7 @@ export function SidebarResizeHandle({ width, sidebarId, sidebar }: { width: numb
 					onDoubleClick={() => storeSidebarWidth(null)}
 					onKeyDown={(e) => {
 						const next =
-							e.key === "ArrowLeft" ? width - SIDEBAR_KEY_STEP : e.key === "ArrowRight" ? width + SIDEBAR_KEY_STEP : e.key === "Home" ? SIDEBAR_MIN_WIDTH : e.key === "End" ? max : null;
+							e.key === "ArrowLeft" ? width - SIDEBAR_KEY_STEP : e.key === "ArrowRight" ? width + SIDEBAR_KEY_STEP : e.key === "Home" ? SIDEBAR_MIN_WIDTH : e.key === "End" ? maxSidebarWidth(window.innerWidth) : null;
 						if (next === null) return;
 						e.preventDefault();
 						step(next);

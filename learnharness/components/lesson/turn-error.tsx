@@ -4,46 +4,41 @@ import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { LESSON_WORDS } from "@/components/study-words";
 import { turnErrorText } from "./turn-error-text";
 
-const ACTION = "h-8 px-2 text-row";
+const ACTION = "h-8 px-2 text-body";
 
 /** A failed reply under the Proposed design (spec: turn-error.md): one plain
- *  sentence in the danger colour, then Retry, Sign in for a signed-out
- *  Claude, Open Settings for a rejected
- *  key, Home for a lesson deleted elsewhere, and Details for the provider's
- *  own text. */
-export function TurnError({ message, onRetry, retryLabel = "Retry", onOpenSettings, onSignIn, children }: {
+ *  sentence in the danger colour, then Try again, the one word every turn
+ *  line uses for it (round 16, m3; a signed-out Claude's sign-in is the pill
+ *  above the box, round 15 M2), Open Settings for a rejected key, Home for a
+ *  lesson deleted elsewhere, and Details for the provider's own text. */
+export function TurnError({ message, again = false, kept = false, onRetry, onOpenSettings, children }: {
 	message: string;
+	/** The refused turn carried words he typed, now back in the box. */
+	kept?: boolean;
+	/** The press before failed the same way: the line says so and enters
+	 *  again, so every press shows (round 9). */
+	again?: boolean;
 	/** Present while the failed turn can be retried. */
 	onRetry?: () => void;
-	/** The retry's words: Try again for a dropped connection, as the line
-	 *  for a reply that never came says it. */
-	retryLabel?: string;
 	onOpenSettings: () => void;
-	/** Opens the sign-in dialog, for a turn refused because Claude is signed out. */
-	onSignIn?: () => void;
 	/** A provider-specific prompt shown beside the sentence (the Claude plan limit). */
 	children?: ReactNode;
 }) {
-	const text = turnErrorText(message);
+	const text = turnErrorText(message, again, kept);
 	const [open, setOpen] = useState(false);
 	const detailsId = useId();
 	return (
-		<div role="alert" data-testid="turn-error" data-kind={text.kind} className="flex flex-wrap items-center gap-1 text-row">
+		<div role="alert" data-testid="turn-error" data-kind={text.kind} className={cn("flex flex-wrap items-center gap-1 text-body", again && "lh-card-enter")}>
 			<span data-testid="turn-error-sentence" className="mr-2 min-w-0 text-danger">
 				{text.sentence}
-				{text.then === "sign-in-retry" && (onRetry ? " Sign in, then press Retry." : " Sign in, then send again.")}
 			</span>
 			{children}
 			{onRetry && text.kind !== "gone" && (
-				<Button variant="quiet" size="sm" data-testid="retry-failed-turn" onClick={onRetry} className={cn(ACTION, "font-medium text-foreground")}>
-					{retryLabel}
-				</Button>
-			)}
-			{text.kind === "signed-out" && onSignIn && (
-				<Button variant="quiet" size="sm" data-testid="turn-error-sign-in" onClick={onSignIn} className={cn(ACTION, "font-medium text-foreground")}>
-					Sign in
+				<Button variant="quiet" size="sm" data-testid="retry-failed-turn" onClick={onRetry} className={cn(ACTION, "text-foreground")}>
+					{LESSON_WORDS.tryAgain}
 				</Button>
 			)}
 			{text.kind === "key" && (
@@ -52,7 +47,7 @@ export function TurnError({ message, onRetry, retryLabel = "Retry", onOpenSettin
 				</Button>
 			)}
 			{text.kind === "gone" && (
-				<Button asChild variant="quiet" size="sm" data-testid="turn-error-home" className={cn(ACTION, "font-medium text-foreground")}>
+				<Button asChild variant="quiet" size="sm" data-testid="turn-error-home" className={cn(ACTION, "text-foreground")}>
 					<Link href="/">Go to Home</Link>
 				</Button>
 			)}

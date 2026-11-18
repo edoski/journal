@@ -10,11 +10,9 @@ export type TurnErrorKind = "signed-out" | "key" | "busy" | "offline" | "gone" |
 
 export interface TurnErrorText {
 	kind: TurnErrorKind;
+	/** What happened; the line's own button, Try again, is what to do
+	 *  (round 16, m2: "Sign in, then press Retry." beside no sign-in). */
 	sentence: string;
-	/** What to do next names a button: Sign in, then Retry when the line
-	 *  offers it (round 7: a token failure said "press Refresh" beside a
-	 *  lone Retry). */
-	then?: "sign-in-retry";
 	/** The raw text, shown on demand; null when the sentence is the whole message. */
 	details: string | null;
 }
@@ -30,7 +28,17 @@ export const UNREACHABLE_APP = "Failed to fetch";
 
 /** The browser's own words when the request never reached the app: Chrome, Safari, Firefox. */
 const UNREACHABLE = /^(failed to fetch|load failed|networkerror when attempting to fetch resource\.?)$/i;
-import { CLAUDE_SIGNED_OUT_STARTS, isProviderKeyRefusal, PROVIDER_KEY_MISSING_CODE } from "@/src/core";
+import { CLAUDE_SIGNED_OUT_STARTS, isProviderKeyRefusal, NO_KEY, PROVIDER_KEY_MISSING_CODE } from "@/src/core";
+
+/** Claude Code's own failures inside a turn (a compaction that keeps
+ *  refilling, a reply cut midway, nothing sent): the lesson says the tutor
+ *  stopped, and names Claude Code only in Details (round 15, m22:
+ *  "Claude Code stopped with an error before it finished. Retry. No API
+ *  key was used."). */
+const CLAUDE_CODE_STOPPED = /^Claude Code (stopped with an error|ended before finishing|sent nothing)\b/;
+const CLAUDE_CODE_MIDWAY = /^Claude Code ended the reply midway\b/;
+/** The details keep what Claude Code said, without the line meant for Settings. */
+const claudeCodeDetails = (text: string) => text.replace(/\s*Retry\.$/, "");
 
 /** The chat routes' answer for a session that no longer exists. */
 const UNKNOWN_CHAT = "Unknown chat";
@@ -75,16 +83,25 @@ export function isCourseDeletedRefusal(message: string | undefined): boolean {
 	}
 }
 
-export function turnErrorText(message: string): TurnErrorText {
-	const raw = message.trim();
+/** `again`: the press before failed the same way, so the line says so
+ *  where its words allow (round 9: a second Enter changed nothing).
+ *  `kept`: the refused turn carried words he typed, which went back into
+ *  the box; a press with no words (Next problem) says nothing of the box
+ *  (round 11, 4 minor 3: "What you wrote is still in the box." over an
+ *  empty box). */
+export function turnErrorText(message: string, again = false, kept = false): TurnErrorText {
+	// The lesson's line never mentions an API key (round 15, m22).
+	const raw = message.trim().endsWith(NO_KEY.trim()) ? message.trim().slice(0, -NO_KEY.trim().length).trim() : message.trim();
+	if (CLAUDE_CODE_STOPPED.test(raw)) return { kind: "failed", sentence: "The tutor stopped before replying.", details: claudeCodeDetails(raw) };
+	if (CLAUDE_CODE_MIDWAY.test(raw)) return { kind: "failed", sentence: "The tutor stopped partway through its reply.", details: claudeCodeDetails(raw) };
 	if (UNREACHABLE.test(raw)) {
-		return { kind: "offline", sentence: "Couldn't reach the app. Check it's running, then try again.", details: null };
+		return { kind: "offline", sentence: `${again ? "Still can't" : "Couldn't"} reach the app. Check it's running, then try again.`, details: null };
 	}
 	if (parseProviderKeyRefusal(raw)) {
-		return { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box.", details: null };
+		return { kind: "signed-out", sentence: `Claude isn't signed in, so the tutor couldn't reply.${kept ? " What you wrote is still in the box." : ""}`, details: null };
 	}
 	if (CLAUDE_SIGNED_OUT_STARTS.some((start) => raw.startsWith(start))) {
-		return { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply.", then: "sign-in-retry", details: null };
+		return { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply.", details: null };
 	}
 	const route = routeError(raw);
 	if (route === UNKNOWN_CHAT) return { kind: "gone", sentence: "This lesson was deleted.", details: null };
@@ -93,22 +110,29 @@ export function turnErrorText(message: string): TurnErrorText {
 		return { kind: "key", sentence: "The provider rejected your API key.", details: raw };
 	}
 	if (BUSY_STATUSES.has(status) || BUSY.test(raw)) {
-		return { kind: "busy", sentence: "The provider is busy. Wait a moment, then retry.", details: raw };
+		return { kind: "busy", sentence: "The provider is busy. Wait a moment, then try again.", details: raw };
 	}
 	const text = route ?? raw;
 	if (isWritten(text)) return { kind: "written", sentence: text, details: null };
 	return { kind: "failed", sentence: "The reply failed.", details: text === "" ? null : text };
 }
 
+/** Whether a failure's line says Claude isn't signed in: a send refused
+ *  before the turn started, or a turn Claude Code failed for it (round 14,
+ *  4 minor 6: the second kind stayed red after sign-in until Retry). */
+export function isSignedOutLine(message: string | undefined): boolean {
+	return message !== undefined && turnErrorText(message).kind === "signed-out";
+}
+
 /** Whether the line for a send refused because Claude was signed out has
  *  outlived its cause (round 8: it stayed red after he signed in and
- *  pressed Refresh). It waits for the account to read signed out at least
- *  once while the line shows (`seenSignedOut`, a status read just before
- *  the refusal can still say connected), then clears the moment it reads
- *  connected. Pure. */
-export function refusalWatch(seenSignedOut: boolean, refusal: boolean, connected: boolean | undefined): { seenSignedOut: boolean; clear: boolean } {
-	if (!refusal) return { seenSignedOut: false, clear: false };
-	if (connected === false) return { seenSignedOut: true, clear: false };
-	if (connected === true && seenSignedOut) return { seenSignedOut: false, clear: true };
-	return { seenSignedOut, clear: false };
+ *  pressed Refresh). `since` is the status reading count when the line
+ *  appeared (`read`, model-status.ts): a reading from before the refusal
+ *  can still say connected, so the line clears on the first reading after
+ *  it that says connected (round 10: waiting to see "signed out" first
+ *  kept it forever when no reading ever said so). Pure. */
+export function refusalWatch(since: number | null, refusal: boolean, connected: boolean | undefined, read: number): { since: number | null; clear: boolean } {
+	if (!refusal) return { since: null, clear: false };
+	if (since === null) return { since: read, clear: false };
+	return { since, clear: connected === true && read > since };
 }

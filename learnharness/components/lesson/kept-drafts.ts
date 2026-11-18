@@ -12,18 +12,30 @@
  * question to be asked again after Hint, a side question or Done for today).
  */
 
-import { sameQuestionKey, type Confidence, type Photo, type QuestionFormDraft } from "@/src/core";
+import { sameQuestionKey, type Confidence, type LeftDraft, type Photo, type QuestionFormDraft } from "@/src/core";
 
 const PREFIX = "lh.kept.";
 
 /** The New lesson box's scope. */
 export const NEW_LESSON_BOX = "new";
 
-/** Leaves words for a new lesson: added to what the New lesson box holds
- *  (a deleted course's lesson sends what he wrote there, round 7). */
-export function keepForNewLesson(words: string): void {
-	const held = keptWords(NEW_LESSON_BOX)?.text?.trim();
-	keepWords(NEW_LESSON_BOX, { text: held ? `${held}\n\n${words}` : words });
+/** Pieces of his writing as one text, each as he typed it, trailing space
+ *  too (round 9: "v = " came back as "v ="): only the joint between two
+ *  pieces is tidied, and empty pieces drop. Pure. */
+export function joinAsTyped(pieces: readonly (string | null | undefined)[]): string {
+	const parts = pieces.filter((w): w is string => !!w?.trim());
+	return parts.map((w, i) => (i < parts.length - 1 ? w.trimEnd() : w)).map((w, i) => (i > 0 ? w.trimStart() : w)).join("\n\n");
+}
+
+/** Leaves his words for a new lesson, after what the New lesson box holds
+ *  (a deleted course's lesson sends what he wrote there, round 7). The
+ *  same message twice (sent and refused, and still in the box) is kept
+ *  once. Whether anything was kept. */
+export function keepForNewLesson(...words: readonly (string | null | undefined)[]): boolean {
+	const distinct = words.filter((w, i) => w?.trim() && words.findIndex((o) => o?.trim() === w.trim()) === i);
+	if (distinct.length === 0) return false;
+	keepWords(NEW_LESSON_BOX, { text: joinAsTyped([keptWords(NEW_LESSON_BOX)?.text, ...distinct]) });
+	return true;
 }
 
 /** A question form's words as stored: its selection as plain indexes. */
@@ -285,8 +297,7 @@ export function takeCarry(carryScope: string, question: string, reaskOf?: string
 /** The carried work as the next question's draft: a typed answer goes in
  *  the answer box of a question that takes one, else in Your thinking. */
 export function carriedForm(carry: KeptWords, textMode: boolean): QuestionFormDraft | undefined {
-	const words = carry.form ? [carry.form.text, carry.form.other, carry.form.thinking] : [carry.text];
-	const text = words.map((w) => w?.trim() ?? "").filter(Boolean).join("\n\n");
+	const text = joinAsTyped(carry.form ? [carry.form.text, carry.form.other, carry.form.thinking] : [carry.text]);
 	if (!text) return undefined;
 	return {
 		selection: { selected: new Set(), otherSelected: false },
@@ -295,6 +306,29 @@ export function carriedForm(carry: KeptWords, textMode: boolean): QuestionFormDr
 		text: textMode ? text : "",
 		confidence: carry.form?.confidence ?? "neutral",
 	};
+}
+
+/** A question box's words as the half answer Done for today keeps with
+ *  the lesson (`LeftDraft`): what he typed, as one text, and how sure he
+ *  said he was; null when he typed nothing. Pure. */
+export function leftDraftOf(kept: KeptWords | undefined): LeftDraft | null {
+	const text = joinAsTyped(kept?.form ? [kept.form.text, kept.form.other, kept.form.thinking] : [kept?.text]);
+	if (!text) return null;
+	const confidence = kept?.form?.confidence ?? kept?.confidence;
+	return { text, ...(confidence ? { confidence } : {}) };
+}
+
+/** The half answer kept with the question `toolCallId`, which Done for
+ *  today set aside (`QuestionAnswerData.draft`); null when none. Pure. */
+export function leftDraftAt(messages: ReadonlyArray<{ parts: ReadonlyArray<{ toolCallId?: string; output?: unknown }> }>, toolCallId: string): LeftDraft | null {
+	for (const message of messages) {
+		for (const part of message.parts) {
+			if (part.toolCallId !== toolCallId) continue;
+			const draft = (part.output as { draft?: unknown } | undefined)?.draft as LeftDraft | undefined;
+			if (draft && typeof draft.text === "string" && draft.text.trim()) return draft;
+		}
+	}
+	return null;
 }
 
 /** Forgets a lesson's question and problem boxes other than the ones still

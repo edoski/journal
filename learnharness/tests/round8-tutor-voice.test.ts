@@ -9,12 +9,13 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it } from "node:test";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { fauxAssistantMessage, type ToolCall } from "@earendil-works/pi-ai";
 import type { LhMessage } from "../src/core/native-messages.ts";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-round8-voice-"));
 const originalEnv = process.env;
-process.env = { ...originalEnv, NODE_ENV: "test", LH_DATA_DIR: path.join(scratch, "data"), LH_CREDENTIALS_DIR: scratch, HOME: path.join(scratch, "home") };
+process.env = { ...originalEnv, NODE_ENV: "test", LH_DATA_DIR: path.join(scratch, "data"), HOME: path.join(scratch, "home") };
 after(() => {
 	process.env = originalEnv;
 	fs.rmSync(scratch, { recursive: true, force: true });
@@ -23,7 +24,7 @@ after(() => {
 const { VoiceGuard } = await import("../src/agent/voice-guard.ts");
 const { voiceBreaks, SENTENCE_WORDS } = await import("../src/core/voice-check.ts");
 const { SEND_TO_USER_TOOL, newUserMessage, newHandoffMessage } = await import("../src/core/native-messages.ts");
-const { HANDOFF_TEXT } = await import("../src/core/contracts/chat.ts");
+const { HANDOFF_TEXT, probeFeedbackText } = await import("../src/core/contracts/chat.ts");
 
 let n = 0;
 const send = (message: string): ToolCall => ({ type: "toolCall", id: `send-${++n}`, name: SEND_TO_USER_TOOL, arguments: { message } });
@@ -97,14 +98,26 @@ describe("rewrites are read again, and the guard's misses (m1, m2)", () => {
 		assert.deepEqual(rules(guard, send("$2$ pivots survive, so the rank is $2$.")), ["symbol"]);
 	});
 
-	it("holds the turn's question once for each refused message, so the second rewrite still comes first", () => {
+	it("keeps the turn's question through every refused rewrite, so the rewrite that passes still comes first (kept, not refused, since round 12, 3 M1)", async () => {
 		const guard = new VoiceGuard(answering("rank 2"));
-		assert.deepEqual(rules(guard, send("You got it right: rank 2.")), ["echo"]);
-		assert.deepEqual(rules(guard, ask("What is $\\dim \\ker A$?")), ["owed"]);
-		assert.deepEqual(rules(guard, send("Yes, rank 2.")), ["echo"]);
-		assert.deepEqual(rules(guard, ask("What is $\\dim \\ker A$?")), ["owed"]);
-		assert.deepEqual(rules(guard, send("The pivots sit in columns 1 and 3.")), []);
-		assert.deepEqual(rules(guard, ask("What is $\\dim \\ker A$?")), []);
+		const reply = (content: ToolCall[]) => ({ ...fauxAssistantMessage(""), content });
+		const question = ask("What is $\\dim \\ker A$?", "explain", { nodeId: "rank", correctAnswer: "1, by rank-nullity." });
+		const first = reply([send("You got it right: rank 2."), question]);
+		assert.deepEqual(rules(guard, first.content[0] as ToolCall), ["echo"]);
+		assert.deepEqual(rules(guard, question), []);
+		const explain = { name: "explain", label: "explain", description: "", parameters: {} as never, execute: async () => ({ content: [{ type: "text" as const, text: "Question posed." }], details: null, terminate: true }) } as AgentTool<any>;
+		const kept = await guard.wrap(explain).execute(question.id, question.arguments);
+		assert.equal(kept.terminate, false, "kept, and the turn goes on");
+		guard.settle(first);
+		assert.deepEqual(first.content.map((b) => (b as ToolCall).id), [(first.content[0] as ToolCall).id], "it leaves the reply that asked it");
+		const second = reply([send("Yes, rank 2.")]);
+		assert.deepEqual(rules(guard, second.content[0] as ToolCall), ["echo"]);
+		guard.settle(second);
+		assert.equal(second.content.length, 1, "a refused rewrite poses nothing");
+		const third = reply([send("The pivots sit in columns 1 and 3.")]);
+		assert.deepEqual(rules(guard, third.content[0] as ToolCall), []);
+		guard.settle(third);
+		assert.deepEqual(third.content.map((b) => (b as ToolCall).id), [(third.content[0] as ToolCall).id, question.id], "posed under the rewrite that passed");
 	});
 
 	it("asks for a reason as \", and why?\", never \"with the reason the formula counts it\"", () => {
@@ -150,7 +163,7 @@ describe("the first teaching step builds on the probe (M2, m11)", () => {
 	it("refuses the \"Today: …\" goal line, and the handoff no longer asks for it", () => {
 		assert.ok(ruled("Today: why $\\ker A = \\{0\\}$, full rank and $\\det A \\neq 0$ all say that $A$ can be undone.").includes("plan"));
 		assert.doesNotMatch(HANDOFF_TEXT, /goal in one line/);
-		assert.match(HANDOFF_TEXT, /already read the probe's feedback/);
+		assert.match(probeFeedbackText(["The base and the exponent change together."]), /already read the probe's feedback/);
 	});
 });
 

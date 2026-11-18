@@ -1,7 +1,8 @@
+import { homedir } from "node:os";
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import { invalidInputResult, questionResult } from "./tool-execute.ts";
-import type { Api, Model, Usage } from "@earendil-works/pi-ai";
-import { SdkAgent } from "./sdk/agent.ts";
+import type { ToolCall, Usage } from "@earendil-works/pi-ai";
+import { SdkAgent, type SdkAgentConfig } from "./sdk/agent.ts";
 import type { SdkEngine } from "./sdk/engine.ts";
 import type { SessionStore } from "./sdk/session-files.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
@@ -18,14 +19,15 @@ import {
 import { practiceTools, type PracticeToolContext } from "./tools/practice.ts";
 import { healToolRecord, withArgumentHeal } from "./tools/heal.ts";
 import { sendToUserTool } from "./tools/send-to-user.ts";
-import { createReadTool, readTool } from "./tools/read.ts";
-import { createFindTool, findTool } from "./tools/find.ts";
-import { createGrepTool, grepTool } from "./tools/grep.ts";
-import { createLsTool, lsTool } from "./tools/ls.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS } from "../core/pending.ts";
-import { MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL, type LhMessage } from "../core/native-messages.ts";
+import { MODE_HANDOFF_TOOLS, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, opensTurn, type LhMessage } from "../core/native-messages.ts";
+import { LESSON_PROGRESS_TOOL, lessonProgressOf } from "../core/contracts/plan.ts";
+import { CHAT_EFFORT, CLAUDE_MODEL } from "../core/contracts/claude.ts";
+
+const PROBE_DONE_TOOL = "probe_done";
 import { VoiceGuard } from "./voice-guard.ts";
+import { ClosedTurn } from "./closed-turn.ts";
 
 /**
  * The two teaching-side agents (docs/probe-teach-split.md): the PROBER and
@@ -91,10 +93,14 @@ export interface AgentBuildOptions {
 	session?: ChatSession;
 	/** Where the app keeps its copy of that session. */
 	sessionStore?: SessionStore;
+	/** What the summary keeps when Claude Code compacts the session. */
+	compactionInstructions?: (messages: LhMessage[]) => string;
 	/** The session's course link: present = the course-record tools join
 	 *  the registry and the course doctrine joins the prompt, for every
 	 *  agent kind. Absent = no course (nothing changes). */
 	course?: CourseToolContext;
+	/** The process started for this turn while he thought (prestart.ts). */
+	claim?: SdkAgentConfig["claim"];
 }
 
 /**
@@ -104,63 +110,87 @@ export interface AgentBuildOptions {
  * validation does not: the model retries within the same turn. Practice's
  * problem pose and the mode handoffs have the same wait-for-the-answer
  * contract, mixed batches included (sdk/agent.ts holds a clean pose until
- * every pose of its reply resolved cleanly).
+ * every pose of its reply resolved cleanly). The prober's clean probe_done
+ * ends its turn too: the teacher opens the lesson next, and closing words
+ * after it were only written to be withheld (round 9: 7 s of the 70 s
+ * before teaching).
  */
-function endsTurnFor(kind: AgentKind): (toolName: string) => boolean {
-	return (name) =>
+export function endsTurnFor(kind: AgentKind): (toolName: string, earlier?: readonly ToolCall[]) => boolean {
+	return (name, earlier = []) =>
 		(QUESTION_TOOLS as readonly string[]).includes(name) ||
 		(kind === "practice" && name === PRACTICE_PROBLEM_TOOL) ||
-		MODE_HANDOFF_TOOLS[name] !== undefined;
+		(kind === "prober" && name === PROBE_DONE_TOOL) ||
+		MODE_HANDOFF_TOOLS[name] !== undefined ||
+		(name === SEND_TO_USER_TOOL && closedBefore(kind, earlier));
 }
 
-const SEARCH_TOOLS: Record<string, { shared: AgentTool<any>; create: (courseDir: string) => AgentTool<any> }> = {
-	find: { shared: findTool, create: createFindTool },
-	grep: { shared: grepTool, create: createGrepTool },
-	ls: { shared: lsTool, create: createLsTool },
-};
+/** Whether this turn already closed what it was for, so the words after it
+ *  are its last: practice's clean conclude ("Then you END YOUR TURN") and
+ *  the lesson's close (`lesson_progress` with `close`, "then write your
+ *  closing words"). The model's own end after those words was one more
+ *  call that wrote only ordinary text the voice guard withholds: 6 to 16 s
+ *  with nothing on his screen after a practice problem (round 13, 4 #2). */
+function closedBefore(kind: AgentKind, earlier: readonly ToolCall[]): boolean {
+	if (kind === "practice") return earlier.some((c) => c.name === PRACTICE_CONCLUDE_TOOL);
+	if (kind === "teacher") return earlier.some((c) => c.name === LESSON_PROGRESS_TOOL && lessonProgressOf(c.arguments)?.close === true);
+	return false;
+}
 
-/** The shared file tools, bound to this agent: `read` to its model, so
- *  images fit its limits, and in a course session the searches to the course
- *  folder, so a search with no path stays out of the rest of the learner's
- *  home. A tool that is not the shared one is left as it is. */
-function sessionTool(tool: AgentTool<any, any>, model: Model<Api>, courseDir: string | undefined): AgentTool<any, any> {
-	if (tool.name === "read" && tool.execute === readTool.execute) {
-		return { ...tool, execute: createReadTool(model).execute as AgentTool<any>["execute"] };
-	}
-	const search = SEARCH_TOOLS[tool.name];
-	if (!courseDir || !search || tool.execute !== search.shared.execute) return tool;
-	return withArgumentHeal(search.create(courseDir));
+/** Claude Code's own file tools, which every tutor agent reads his files with. */
+const FILE_TOOLS = ["Read", "Grep", "Glob"] as const;
+
+/** Where his files are, for the file tools' paths: his home and, in a
+ *  course, the course folder a search starts in. */
+function foldersPrompt(course: CourseToolContext | undefined): string {
+	return [`His home folder: ${homedir()}`, ...(course ? [`This course's folder: ${course.course.workspace}`] : [])].join("\n");
+}
+
+/** A lesson turn's effort: `CHAT_EFFORT`, save the turn the probe's end
+ *  wakes, which writes the lesson's plan at CLAUDE_MODEL's effort. */
+export function turnEffort(messages: readonly LhMessage[]): "high" | "medium" {
+	const input = messages.findLast(opensTurn);
+	return input?.role === "custom" && input.customType === "probe-handoff" ? CLAUDE_MODEL.thinkingLevel : CHAT_EFFORT;
 }
 
 function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: AgentTool<any, any>[]) {
 	if (!opts.engine) throw new Error(`no engine injected for the ${kind}`);
 	const engine = opts.engine;
 	const composed = composedInstructions[kind]!;
-	const systemPrompt = opts.course ? `${composed}\n\n---\n\n${courseRecordPrompt(kind, { arcs: opts.course.arcs })}` : composed;
+	const systemPrompt = [composed, ...(opts.course ? [courseRecordPrompt(kind, { arcs: opts.course.arcs })] : []), foldersPrompt(opts.course)].join("\n\n---\n\n");
 	// Every message and question of the turn is read against the voice
 	// before he sees it, and one that breaks it is rewritten.
-	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind));
+	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind), opts.course?.review === true, opts.course !== undefined);
 	const spoken = (tool: AgentTool<any, any>) => (voice.guards(tool.name) ? voice.wrap(tool) : tool);
+	// Nothing new starts once the session closed for today in this turn.
+	const closing = new ClosedTurn((opts.messages ?? []) as LhMessage[]);
 	return new SdkAgent({
 		engine,
 		systemPrompt,
 		// Conditional registry inclusion: when a tool's gate is closed, neither
-		// the tool nor its usage instructions reach the model. The shared file
-		// tools are bound to this agent (sessionTool), in every registry
-		// including explicit ones; explicit registries opt out of send_to_user.
+		// the tool nor its usage instructions reach the model. Explicit
+		// registries opt out of send_to_user.
 		tools: [
-			...tools.map((tool) => sessionTool(tool, engine.model, opts.course?.course.workspace)),
+			...tools,
 			...(opts.course ? Object.values(courseTools(opts.course)) : []),
 			...(opts.tools === undefined ? [withArgumentHeal(sendToUserTool)] : []),
-		].map(spoken),
-		screen: (call) => voice.screen(call),
+		].map(spoken).map((tool) => closing.wrap(tool)),
+		screen: (call) => {
+			closing.screen(call);
+			voice.screen(call);
+		},
+		settle: (message) => voice.settle(message),
+		heard: () => voice.heard(),
 		// Ordinary text never reaches him where send_to_user is his channel.
 		...(opts.tools === undefined ? { screenText: (text: string) => voice.screenText(text), beforeEnd: () => voice.beforeEnd() } : {}),
+		builtins: FILE_TOOLS,
+		effort: turnEffort((opts.messages ?? []) as LhMessage[]),
 		messages: opts.messages ?? [],
 		endsTurn: endsTurnFor(kind),
 		session: opts.session,
 		sessionStore: opts.sessionStore,
+		compactionInstructions: opts.compactionInstructions,
 		onUsage: opts.onUsage,
+		claim: opts.claim,
 	});
 }
 
@@ -172,7 +202,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
  * handler keys teacher construction on.
  */
 export function createProberAgent(ctx: ProberToolContext, opts: AgentBuildOptions = {}) {
-	return baseAgentOptions("prober", opts, Object.values(createProberTools(ctx)));
+	return baseAgentOptions("prober", opts, Object.values(createProberTools({ ...ctx, course: opts.course !== undefined })));
 }
 
 /**

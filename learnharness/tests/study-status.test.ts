@@ -75,3 +75,60 @@ describe("a course's last study counts its sessions", async () => {
 		assert.equal(withSessionStudy(course, []).lastActiveDaysAgo, 3);
 	});
 });
+
+describe("Home's read runs no course's day plan again (round 13, N2)", () => {
+	it("takes each course's day from the listing's own plan --all --days 1, the entry that course's plan prints", async () => {
+		const verbs: string[] = [];
+		const entry = (workspace: string, last: number) => ({ workspace, last_studied: { date: "2026-11-12", days_ago: last }, due: [], plan: { days: [{ date: "2026-11-14", new: [] }] } });
+		const plan = { today: "2026-11-14", capacity: {}, courses: [entry("/s/algebra", 2), entry("/s/geometry", 5)] };
+		const records: CourseRecords = {
+			list: async () => ({ available: true, courses: [summary("/s/algebra"), summary("/s/geometry")], unreadable: [], plan }),
+			map: async (workspace) => ({ ok: true, map: { workspace, title: workspace, today: "2026-11-14", revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [], edges: [] } }),
+			run: async (_workspace, verb) => {
+				verbs.push(verb.verb);
+				return { ok: false, kind: "io", message: "no plan" };
+			},
+			create: async () => ({ ok: false, kind: "io", message: "unused" }),
+		};
+		stores.courseRecords = records;
+
+		const listing = await studyStatus();
+
+		assert.ok(listing.available);
+		assert.deepEqual(verbs, [], "nine engine runs a read became five: the list and a map per course");
+		assert.deepEqual(listing.courses.map((c) => [c.map.workspace, c.lastActiveDaysAgo]), [["/s/algebra", 2], ["/s/geometry", 5]]);
+	});
+});
+
+describe("Home's read waits for one engine run, not two (round 15, P7)", () => {
+	it("starts every registered course's map beside the listing's plan, and reads each map once", async () => {
+		const events: string[] = [];
+		let release!: () => void;
+		const listed = new Promise<void>((resolve) => (release = resolve));
+		const records: CourseRecords = {
+			registered: () => ["/s/algebra", "/s/geometry"],
+			list: async () => {
+				events.push("list");
+				await listed;
+				events.push("listed");
+				return { available: true, courses: [summary("/s/algebra"), summary("/s/geometry")], unreadable: [] };
+			},
+			map: async (workspace) => {
+				events.push(`map ${workspace}`);
+				return { ok: true, map: { workspace, title: workspace, today: "2026-11-14", revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [], edges: [] } };
+			},
+			run: async () => ({ ok: false, kind: "io", message: "no plan" }),
+			create: async () => ({ ok: false, kind: "io", message: "unused" }),
+		};
+		stores.courseRecords = records;
+
+		const read = studyStatus();
+		await new Promise((resolve) => setImmediate(resolve));
+		release();
+		const listing = await read;
+
+		assert.ok(listing.available);
+		assert.deepEqual(events, ["map /s/algebra", "map /s/geometry", "list", "listed"], "the maps ran while the plan did, each once");
+		assert.deepEqual(listing.courses.map((c) => c.map.workspace), ["/s/algebra", "/s/geometry"]);
+	});
+});

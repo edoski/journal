@@ -6,8 +6,8 @@ The topic page (`/unit/<course>/<topic>`): `UnitPage` in `../unit-page.tsx` draw
 
 | His question | Where it is answered |
 |---|---|
-| What is the one thing to do now? | Now in the history pane (`pickup/pickup.md`): Resume, Open, Review, Continue, Start, or Study |
-| Is there anything to review, and when? | The head line, in the app's one wording (`components/study-words.ts`): "Due today", "10d overdue" (at any level, as the action), or "Back in 5d" |
+| What is the one thing to do now? | Now in the history pane (`pickup/pickup.md`): Resume, Review, Continue, Start, or Study (`pressWord`), on the page's press (`PagePress`) |
+| Is there anything to review, and when? | The head line, in the app's one wording (`components/study-words.ts`): "Due today", "Due 5 Nov" (at any level, as the action), or "Back in 5d" |
 | Where do I pick this up? | Now and Next in the history pane: the session that waits or is being written, at the step it is on, and each open task that holds the topic, at its step. Else Earlier dates the last study |
 
 ## The one action, first match wins (`topicAction`)
@@ -28,10 +28,10 @@ The app's one lever on the tutor is the session's first message; the tutor's own
 
 ## Shared
 
-- `topic-facts.ts`: every fact the page reads, pure, engine fields and session facts only, the one clock the engine's study day (`map.today`), a session dated by its local day and never after the engine's; tested in `tests/topic-facts.test.ts`. `topicFacts` folds them into `TopicFacts`. The page's short words for time are Home's, pinned by test to `studiedAgo`; where he stands and why the topic needs him are the app's one wording (`components/study-words.ts`): the standing follows the pie, so a weak topic he could do on his own says "Right with help" beside its 3/4 pie.
+- `topic-facts.ts`: every fact the page reads, pure, engine fields and session facts only, the one clock the engine's study day (`map.today`), a session dated by its local day and never after the engine's; tested in `tests/topic-facts.test.ts`. `topicFacts` folds them into `TopicFacts`. The page's short words for time are the app's one form (`agoWords`); where he stands and why the topic needs him are the app's one wording (`components/study-words.ts`): the standing follows the pie, so a weak topic he could do on his own says "Right with help" beside its 3/4 pie.
 - `use-topic-read.ts`: `useTopicRead` over `GET /api/topic` (`src/server/topic.ts`, contract `src/core/contracts/topic.ts`, tested in `tests/topic-read.test.ts`): the engine's scored attempts on the topic, each with the session that saved it (`session`, from each named session's `markLinks`: its save receipts and practice concludes; a re-mark takes the session of the attempt it corrects), where its record says it is in his material (`refs`, each source by its title, with its place) and when each open task was last touched (`show`), and the plan of each of its 20 newest sessions with the step its newest tagged question is about. Nothing else of a transcript leaves the server. Read again on `turn-settled`, `chats-changed` and `record-changed`; a failed read keeps the last good one.
-- `topic-page.tsx`: `TopicPage` (the start, the hybrid body in the shared page frame with a start's error under its head, the setup dialog; no composer: a new lesson starts from the sidebar's New lesson) `TopicPageProps` (what the body takes: `facts`, `busy`, `onAct`, `onTask`) and `TopicNotice` (the one plain sentence in the frame while the page loads or when the topic is not in the record).
-- `topic-head.tsx` (`topic-head.md`), `why-mark.tsx` (Home's why mark restated) and `row-classes.ts` (Home's Hybrid row classes restated).
+- `topic-page.tsx`: `TopicPage` (the page's one start, `StartScope`, around the hybrid body in the shared page frame: the action, a task's press and the composer at its foot, the course page's `CourseComposer` with the topic chosen, share one sign-in and one failure line under the head, as on the course page) `TopicPageProps` (what the body takes: `facts`, `busy`, `onAct`, `onTask`); while the page reads, or when the engine is down or the topic is not in the record, the page's notice (`PageNotice`, `PageReading`, `../../page-frame/page-frame.md`, "Notices").
+- `topic-head.tsx` (`topic-head.md`) and `row-classes.ts` (Home's Hybrid row classes restated).
 
 ## The signal test
 

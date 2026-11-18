@@ -73,8 +73,10 @@ export interface AnswerMark {
 	rows: MarkRow[];
 	/** He disputed this mark and the tutor re-judged it. */
 	disputed: boolean;
-	/** The tutor's ruling on the newest dispute, in its words. */
-	ruling: string | null;
+	/** A ruling changed what an attempt counts as: its result, how it
+	 *  counted or its confidence. The ruling's words are the tutor's reply,
+	 *  never repeated on the mark (round 16, m20). */
+	changed: boolean;
 }
 
 /** GET /api/chats/:id/marks: each marked answer's mark, keyed by the

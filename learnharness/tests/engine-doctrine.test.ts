@@ -84,6 +84,11 @@ describe("engine doctrine", () => {
 		assert.ok(courseRecordPrompt("teacher", ARCS).includes(opening) && courseRecordPrompt("practice", ARCS).includes(opening));
 	});
 
+	it("the teacher and practice answer a question he sends while they are still replying (round 10, 4 minor 2)", () => {
+		const rule = "A message the learner sends while you are still replying reaches you mid-reply. When it asks a question, answer it in a sentence or two before you go on, even when the reply was about something else.";
+		for (const agent of ["teacher", "practice"] as const) assert.ok(normalize(courseRecordPrompt(agent, ARCS)).includes(rule), agent);
+	});
+
 	it("carries the rules the app's prompts point to", () => {
 		const prober = normalize(courseRecordPrompt("prober", ARCS));
 		assert.ok(prober.includes("Enter near the hardest thing the goal needs and let a miss walk you down."));

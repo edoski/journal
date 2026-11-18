@@ -4,7 +4,7 @@ import * as React from "react"
 import { Popover as PopoverPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
-import { OVERLAY_ATTRS, OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/overlay"
+import { OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/overlay"
 
 /** shadcn popover on the Proposed tokens (spec: popover.md). */
 
@@ -37,7 +37,6 @@ function PopoverContent({
     <PopoverPrimitive.Portal forceMount={props.forceMount}>
       <PopoverPrimitive.Content
         data-slot="popover-content"
-        {...OVERLAY_ATTRS}
         ref={(el) => {
           node.current = el
           if (typeof ref === "function") ref(el)
@@ -54,7 +53,7 @@ function PopoverContent({
         className={cn(
           OVERLAY_LAYER,
           OVERLAY_MOTION,
-          "w-80 origin-(--radix-popover-content-transform-origin) rounded-xl border bg-popover p-4 text-row text-popover-foreground shadow-lg outline-none",
+          "w-80 origin-(--radix-popover-content-transform-origin) rounded-xl border bg-popover p-4 text-body text-popover-foreground shadow-lg outline-none",
           className
         )}
         {...props}
@@ -84,7 +83,7 @@ function PopoverTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="popover-title"
-      className={cn("text-row font-semibold text-foreground", className)}
+      className={cn("text-headline text-foreground", className)}
       {...props}
     />
   )
@@ -98,7 +97,7 @@ function PopoverDescription({
   return (
     <p
       data-slot="popover-description"
-      className={cn("text-label text-muted-foreground", className)}
+      className={cn("text-callout text-muted-foreground", className)}
       {...props}
     />
   )

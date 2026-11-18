@@ -75,7 +75,7 @@ export function CourseMapStatus({ course, title, onClose, fetchLike = fetch }: {
 			<DialogHeader>
 				<DialogTitle>{title ?? `${courseLabel(course)} is ready`}</DialogTitle>
 			</DialogHeader>
-			<p className="flex items-start gap-2 text-row text-muted-foreground" role="status">
+			<p className="flex items-start gap-2 text-body text-muted-foreground" role="status">
 				{(status === null || status.state === "building") && <LoaderCircleIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin motion-reduce:animate-none" />}
 				<span>{words.text}</span>
 			</p>

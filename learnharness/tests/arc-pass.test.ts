@@ -60,6 +60,7 @@ import type { SdkEngine } from "../src/agent/models.ts";
 import { arcPassLedgersAt } from "../src/store/arc-pass-ledgers.ts";
 import { createCourseRecords } from "../src/store/course-records.ts";
 import type { ArcPassLedgers } from "../src/core/ports.ts";
+import { realEngineMissing } from "./helpers/real-engine.ts";
 
 const topic = (title: string, needs: string[] = [], over: Partial<ViewTopic> = {}): ViewTopic => ({ title, needs, contrasts: [], refs: [], aliases: [], ...over });
 
@@ -358,10 +359,21 @@ describe("the cut's shape rules", () => {
 		assert.equal(arcPassProblems({ ...shared, arcs: shared.arcs.map((a) => ({ ...a, shares: "the chapter teaches both ideas" })) }, view(CALC)), null);
 	});
 
-	it("an exam's scope only with an exam date, and leaves out only topics of its arcs", () => {
+	it("an exam's scope only with an exam date, and leaves out only topics of an arc after its own", () => {
 		assert.match(arcPassProblems({ ...good, examArcs: ["limits-continuity"] }, view(CALC))!, /no exam date/);
-		assert.match(arcPassProblems({ ...good, examArcs: ["limits-continuity"], leavesOut: ["chain"] }, view(CALC, { examDate: "2026-12-01" }))!, /"chain", which is in none of examArcs/);
+		const dated = view(CALC, { examDate: "2026-12-01" });
+		assert.equal(arcPassProblems({ ...good, examArcs: ["limits-continuity"], leavesOut: ["chain"] }, dated), null, "an arc after the exam's");
+		assert.match(arcPassProblems({ ...good, examArcs: ["derivatives"], leavesOut: ["limits"] }, dated)!, /"limits", in "limits-continuity", an arc before the exam's/);
 		assert.match(arcPassProblems({ ...good, leavesOut: ["chain"] }, view(CALC))!, /leavesOut needs examArcs/);
+	});
+
+	it("A10: no arc holds topics both inside and outside the exam's scope known as the arcs form (round 15, m11)", () => {
+		// The demo world's Probability cut put Covariance, which its exam leaves out, in the exam's Expectation arc.
+		const dated = view(CALC, { examDate: "2026-12-01" });
+		assert.match(arcPassProblems({ ...good, examArcs: ["limits-continuity", "derivatives"], leavesOut: ["chain"] }, dated)!, /"chain", which the exam leaves out, is in "derivatives", one of examArcs/);
+		assert.match(arcPassProblems({ ...good, examArcs: ["limits-continuity", "derivatives"] }, { ...dated, leftOut: ["riemann"] })!, /"riemann", which the exam leaves out, is in "derivatives"/, "the record's own leaves_out too");
+		const apart = { ...good, arcs: [good.arcs[0]!, { ...good.arcs[1]!, topics: ["derivative", "chain"] }, { ...arc("integrals", "Integrals", ["riemann"]), single: "The exam leaves it out" }] };
+		assert.equal(arcPassProblems({ ...apart, examArcs: ["limits-continuity", "derivatives"], leavesOut: ["riemann"] }, dated), null);
 	});
 
 	it("R4: with registered material, every arc cites the unit it follows", () => {
@@ -560,7 +572,6 @@ describe("the ledger", () => {
 
 // ─── runs, on the real engine ────────────────────────────────────────────────
 
-const realEngine = fs.existsSync(LEARNING_ENGINE.python);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-arc-pass-"));
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
@@ -638,7 +649,7 @@ function scriptedModel(
 	return Object.assign(state, fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple }));
 }
 
-describe("the grouping pass (real engine, scripted model)", { skip: !realEngine && "learning engine not installed" }, () => {
+describe("the grouping pass (real engine, scripted model)", { skip: realEngineMissing(LEARNING_ENGINE.python) }, () => {
 	const home = path.join(TMP, "home");
 	fs.mkdirSync(home, { recursive: true });
 	const env = { ...process.env, HOME: home, LEARNING_TODAY: "2026-11-14" };
@@ -741,6 +752,19 @@ describe("the grouping pass (real engine, scripted model)", { skip: !realEngine 
 		assert.deepEqual(result.status === "formed" && result.edges.diffs.filter((d) => d.change === "add").map((d) => `${d.topic}<-${d.need}`), ["chain<-continuity"]);
 		assert.deepEqual(result.status === "formed" && result.edges.refused.map((a) => `${a.topic}<-${a.need}`), ["continuity<-derivative"]);
 		assert.deepEqual(result.status === "formed" && result.edges.kinds?.map((k) => `${k.topic}<-${k.need} ${k.kind}`), ["continuity<-derivative placement", "chain<-continuity definition"]);
+	});
+
+	it("a copy run told to cut on the stored edges keeps the material's cut where a proposed add would refuse it, and still proposes the add", async () => {
+		const readers = { continuity: [{ need: "derivative", step: "a continuity exercise differentiates the function first" }] };
+		const kinds = { "continuity<-derivative": "method" } as const;
+		const stored = scriptedModel(EDGES, [CUT], undefined, {}, readers, [], [], {}, kinds);
+		const result = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: stored }).run(course("cut-stored"), { edges: "propose", cutOn: "stored" });
+		assert.equal(result.status, "formed", JSON.stringify(result));
+		assert.deepEqual(stored.refusals, [], "the cut puts continuity before the derivative, as the material does");
+		assert.deepEqual(result.status === "formed" && result.edges.diffs.filter((d) => d.change === "add").map((d) => `${d.topic}<-${d.need}`), ["continuity<-derivative"]);
+		const proposed = scriptedModel(EDGES, [CUT], undefined, {}, readers, [], [], {}, kinds);
+		await assert.rejects(createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: proposed }).run(course("cut-proposed"), { edges: "propose" }), /never submitted/);
+		assert.match(proposed.refusals.join("\n"), /needs "derivative", a prerequisite the edge step proposes/, "by default the cut holds every proposal");
 	});
 
 	it("the loop check settles a loop the readers' uses close, and a stored edge it rules against is dropped", async () => {

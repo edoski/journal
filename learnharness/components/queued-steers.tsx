@@ -26,7 +26,7 @@ export function QueuedSteersBody({ steers }: { steers: QueuedSteerLine[] }) {
 		<div className="flex flex-col items-end gap-0.5 pb-1 pr-4" data-testid="queued-steers">
 			{steers.map((s) => (
 				<Hint key={s.id} label={s.text} side="left">
-					<span className="block max-w-[240px] truncate text-label text-muted-foreground">{s.text}</span>
+					<span className="block max-w-[240px] truncate text-callout text-muted-foreground">{s.text}</span>
 				</Hint>
 			))}
 		</div>

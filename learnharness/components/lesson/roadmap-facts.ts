@@ -4,7 +4,7 @@
  * done, and where in the transcript each step was first taught. Pure.
  */
 
-import { POSITION_QUESTION_TOOLS, type DerivedPlanStatuses, type PlanNodeStatus, type PlanTree } from "@/src/core";
+import { derivePlanStatuses, POSITION_QUESTION_TOOLS, type DerivedPlanStatuses, type PlanNodeStatus, type PlanTree } from "@/src/core";
 import { topoFor, type PopupMessage } from "@/components/lesson/plan-facts";
 
 export interface RoadmapStep {
@@ -21,7 +21,11 @@ export interface RoadmapStep {
 	taught: boolean;
 }
 
-/** The steps in teaching order (each after everything it rests on). */
+/** The steps in teaching order (each after everything it rests on). A
+ *  step always shows its title, which names the idea learned: `plan_init`
+ *  refuses a title that states its result (round 9, M1), so none is held
+ *  while his prediction is open (round 15, m15: the row then read "Your
+ *  prediction first", a move, not the idea). */
 export function roadmapSteps(tree: Pick<PlanTree, "nodes" | "edges">, statuses: DerivedPlanStatuses, taught: ReadonlySet<string>): RoadmapStep[] {
 	const steps = topoFor(tree.nodes, tree.edges).order.map((n): RoadmapStep => ({
 		id: n.id,
@@ -38,6 +42,13 @@ export function roadmapSteps(tree: Pick<PlanTree, "nodes" | "edges">, statuses: 
 	const next = steps.findIndex((s, i) => i > current && s.status === "upcoming");
 	if (next >= 0) steps[next]!.next = true;
 	return steps;
+}
+
+/** The lesson's steps from its transcript, as the strip and panel draw
+ *  them: where he is is the newest tagged question's step, a prediction
+ *  on it open or not. `taught` are the steps with a place to open. */
+export function lessonRoadmapSteps(tree: PlanTree, messages: Parameters<typeof derivePlanStatuses>[1], taught: ReadonlySet<string>): RoadmapStep[] {
+	return roadmapSteps(tree, derivePlanStatuses(tree, messages), taught);
 }
 
 /** The words beside the strip: the step he is on, else the next one,

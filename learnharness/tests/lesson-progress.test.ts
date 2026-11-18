@@ -53,7 +53,7 @@ function evening(): LhMessage[] {
 }
 
 const listItem = (messages: LhMessage[]) =>
-	({ id: "chat_eigen", title: "Eigenvalues", kind: "teach", busy: false, compacting: false, pendingQuestion: null, pendingProblem: null, ended: sessionEndOf(messages, TREE) }) as unknown as ChatListItem;
+	({ id: "chat_eigen", title: "Eigenvalues", kind: "teach", busy: false, pendingQuestion: null, pendingProblem: null, ended: sessionEndOf(messages, TREE) }) as unknown as ChatListItem;
 
 describe("steps the tutor's turn marks done", () => {
 	it("show as done on the map even with no check tagged to them", () => {
@@ -149,7 +149,7 @@ describe("the close marks the lesson's new topics introduced", () => {
 		const res = await tool.execute("t1", { done: ["eigen"], close: true });
 		const body = JSON.parse((res.content[0] as { text: string }).text) as { days: Record<string, { planned: string; planned_words: string }> };
 		assert.deepEqual(body.days, {
-			eigen: { planned: "2026-11-13", planned_words: "Friday 13 November, in 5 days" },
+			eigen: { planned: "2026-11-13", planned_words: "Friday 13 November" },
 			rank: { planned: "2026-11-09", planned_words: "tomorrow, Monday 9 November" },
 		});
 	});

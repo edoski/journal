@@ -1,7 +1,11 @@
 import { clearOpeningPrompt, OPENING_PROMPT_FAILURE, stashOpeningPrompt } from "./opening-prompt";
 
 export interface SessionCreation {
+	/** Its opening words, and its name unless `name` gives one. */
 	title: string;
+	/** Its name in the sidebar and the breadcrumb when the opening is a
+	 *  long question the app asks for him (round 11, 1 N14). */
+	name?: string;
 	kind?: "practice";
 	/** The picked course's workspace (the course chooser). */
 	course?: { workspace: string };

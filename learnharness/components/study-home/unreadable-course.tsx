@@ -11,7 +11,7 @@ export function unreadableLine(problem: UnreadableProblem): string {
  *  record can't be read: its name, then the line. */
 export function UnreadableLines({ courses }: { courses: readonly UnreadableCourse[] }) {
 	return courses.map((course) => (
-		<p key={course.workspace} data-slot="unreadable-course" className="shrink-0 text-row text-muted-foreground">
+		<p key={course.workspace} data-slot="unreadable-course" className="shrink-0 text-body text-muted-foreground">
 			<span className="text-foreground">{course.title}</span> {unreadableLine(course.problem)}
 		</p>
 	));

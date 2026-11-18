@@ -32,6 +32,7 @@ export type KeyAction =
 	| "open-settings"
 	| "page-move"
 	| "page-open"
+	| "list-ends"
 	| "calendar-today"
 	| "calendar-week"
 	| "calendar-month"
@@ -51,7 +52,14 @@ export type KeyAction =
 	| "stop-reply"
 	| "attach-photo"
 	| "question-pick-digit"
-	| "question-ask-instead";
+	| "question-ask-instead"
+	| "home-course"
+	| "home-map-enlarge"
+	| "home-arc-up"
+	| "home-arc-down"
+	| "home-here"
+	| "home-rows"
+	| "home-course-page";
 
 /** Where Settings and the cheat sheet group an action (display only —
  *  dispatch is global; a seam that isn't mounted simply no-ops). */
@@ -66,7 +74,7 @@ export const KEY_SCOPES: readonly { scope: KeyScope; label: string }[] = [
 
 /** A finer heading the Proposed cheat sheet files an action under, inside
  *  its scope's place. Settings lists by scope alone. */
-export type KeyGroup = "pages" | "calendar";
+export type KeyGroup = "pages" | "calendar" | "home";
 
 export interface KeyActionDef {
 	id: KeyAction;
@@ -123,6 +131,8 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	// walk its rows and links, and Enter opens them natively.
 	{ id: "page-move", label: "Move between rows and links", scope: "global", binding: "arrows", displayOnly: true, group: "pages" },
 	{ id: "page-open", label: "Open the row or link", scope: "global", binding: "enter", displayOnly: true, group: "pages" },
+	// Every page's list walk (components/list-walk/use-list-walk.ts): Home's Today, the course page's road, the topic page's sections.
+	{ id: "list-ends", label: "Jump to the list's first or last row", scope: "global", binding: "home-end", displayOnly: true, group: "pages" },
 	// The calendar's letters, Google Calendar's; only the mounted calendar listens.
 	{ id: "calendar-today", label: "Go to today", scope: "global", binding: "t", group: "calendar" },
 	{ id: "calendar-week", label: "Show the week", scope: "global", binding: "w", group: "calendar" },
@@ -132,7 +142,18 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	// The composer's confidence icon owns these while it is mounted (prose-composer.tsx).
 	{ id: "confidence-up", label: "More sure", scope: "lesson", binding: "alt+arrowup", displayOnly: true },
 	{ id: "confidence-down", label: "Less sure", scope: "lesson", binding: "alt+arrowdown", displayOnly: true },
-	{ id: "pick-course", label: "Pick a course", scope: "lesson", binding: "mod+o" },
+	// The course picker of a new lesson's box, New lesson's and Home's: nothing in an open lesson (round 16, m28).
+	{ id: "pick-course", label: "Pick the course for a new lesson", scope: "global", binding: "mod+o" },
+	// Home owns its keys (components/study-home/home-keys.ts), so they never leak to other pages.
+	{ id: "home-course", label: "The course left or right on the map", scope: "global", binding: "arrows-lr", displayOnly: true, group: "home" },
+	{ id: "home-map-enlarge", label: "Enlarge the map, and back", scope: "global", binding: "mod+e", displayOnly: true, group: "home" },
+	// The map's arcs (components/course-map/arc-keys.ts).
+	{ id: "home-arc-up", label: "The arc above on the map", scope: "global", binding: "shift+arrowup", displayOnly: true, group: "home" },
+	{ id: "home-arc-down", label: "The arc below on the map", scope: "global", binding: "shift+arrowdown", displayOnly: true, group: "home" },
+	{ id: "home-here", label: "Go to You are here on the map", scope: "global", binding: "mod+j", displayOnly: true, group: "home" },
+	{ id: "home-rows", label: "Move between Today's rows", scope: "global", binding: "arrows-ud", displayOnly: true, group: "home" },
+	// Letters type into Home's composer (Edo, 18 Nov 2026): Enter opens the row, as on every page, and the rest are ⌘ chords.
+	{ id: "home-course-page", label: "Open the row's course page, else the map's", scope: "global", binding: "mod+enter", displayOnly: true, group: "home" },
 ];
 
 const STORAGE_KEY = "lh:keymap";
@@ -263,6 +284,9 @@ const KEY_GLYPH: Record<string, string> = {
 	space: "Space",
 	// Display-only: the four arrows as one cheat-sheet row (page-move).
 	arrows: "↑ ↓ ← →",
+	"arrows-lr": "← →",
+	"arrows-ud": "↑ ↓",
+	"home-end": "Home End",
 };
 
 /** Format a binding for display: "mod+shift+f" → "⌘⇧F". */

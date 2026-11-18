@@ -41,8 +41,12 @@ export interface ServerEvents {
 	 *  shows the one name the list does. `deleted` names a session just
 	 *  deleted, so a window that has it open says so at once. */
 	"chats-changed": { named?: { id: string; title: string }; deleted?: string };
-	/** The course list changed: a course was created, renamed or deleted. */
-	"courses-changed": Record<string, never>;
+	/** The course list changed: a course was created, renamed or deleted.
+	 *  `deleted` names a course just deleted, so a lesson of it says so at
+	 *  once, with no read of the list (round 13, 4 #4: the other window
+	 *  learned of a delete 8.6 s later, after an engine read of every
+	 *  course). */
+	"courses-changed": { deleted?: string };
 	/** A course's engine record changed: a save through the app, or another
 	 *  host's (Claude Code, Claude Desktop) seen on disk. Views of that
 	 *  course's levels, reviews and tasks refetch. */
@@ -51,12 +55,12 @@ export interface ServerEvents {
 	 *  Same notify-then-fetch contract as the turn events: open views of
 	 *  the chat refetch and adopt the durable record. */
 	"record-changed": { chatId: string };
-	/** A compaction started/finished for the chat (owner round 14,
-	 *  2026-10-05). running=true is the SEND GATE: while a compaction is
-	 *  in flight the server structurally refuses model interaction for
-	 *  the chat; the client mirrors it by disabling the composer/dock
-	 *  submit. */
-	"compaction-changed": { chatId: string; running: boolean };
+	/** The server is setting up a turn it starts itself (a handoff to
+	 *  practice, a job's result): waking=true before its course brief,
+	 *  false once the turn is running or was refused. The lesson shows
+	 *  its working line meanwhile (round 8: about 10 s of nothing before
+	 *  practice woke). */
+	"turn-waking": { chatId: string; waking: boolean };
 }
 
 export type ServerEventType = keyof ServerEvents;
@@ -78,7 +82,7 @@ export const SERVER_EVENT_TYPES = [
 	"courses-changed",
 	"course-changed",
 	"record-changed",
-	"compaction-changed",
+	"turn-waking",
 ] as const satisfies readonly ServerEventType[];
 
 /** One notification: the type discriminates the payload (distributed over

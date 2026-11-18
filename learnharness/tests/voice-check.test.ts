@@ -13,7 +13,7 @@ import { describe, it } from "node:test";
 import { PATHS } from "../config.ts";
 import { courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 import { composeInstructions } from "../src/agent/teacher-agent.ts";
-import { CONCLUDE_ACK_TEXT, DONE_TONIGHT_TEXT, HANDOFF_TEXT, MODE_HANDOFF_TEXT, NEXT_PROBLEM_TEXT, sessionResumeText } from "../src/core/contracts/chat.ts";
+import { CONCLUDE_ACK_TEXT, DONE_TONIGHT_TEXT, HANDOFF_TEXT, MODE_HANDOFF_TEXT, NEXT_PROBLEM_TEXT, REVIEW_HANDOFF_TEXT, sessionResumeText } from "../src/core/contracts/chat.ts";
 import { PROBE_DONE_ACK_TEXT } from "../src/core/contracts/probe.ts";
 import { promptVoiceBreaks, sessionVoiceBreaks, voiceBreaks, type TurnKind, type VoiceRule } from "../src/core/voice-check.ts";
 
@@ -38,6 +38,8 @@ const BROKEN: ReadonlyArray<{ text: string; kind?: TurnKind; breaks: VoiceRule }
 	{ text: "### From the equation to numbers\n\nFor a $2 \\times 2$ matrix the characteristic polynomial has a shortcut.", kind: "teach", breaks: "headings" },
 	{ text: "Want a quick question on it?", kind: "teach", breaks: "offer" },
 	{ text: "You already know everything the Poisson formula is built from. The lesson starts with your chip example and works the formula out from it.", breaks: "plan" },
+	// Round 9 (4 #2): "hello? did that go through?" sent while a question was open.
+	{ text: "Your message arrived in the answer field for the method question, so that question is now closed. Here is a new matrix to work instead.", breaks: "machinery" },
 ];
 
 /** The best passages of the same lessons: the voice as written. */
@@ -95,6 +97,7 @@ const TEXTS: ReadonlyArray<[string, string]> = [
 	...Object.entries(DONE_TONIGHT_TEXT).map(([agent, text]): [string, string] => [`Done for today (${agent})`, text]),
 	...Object.entries(MODE_HANDOFF_TEXT).map(([mode, text]): [string, string] => [`handoff to ${mode}`, text]),
 	["plan handoff", HANDOFF_TEXT],
+	["review handoff", REVIEW_HANDOFF_TEXT],
 	["next problem", NEXT_PROBLEM_TEXT],
 	["conclude ack", CONCLUDE_ACK_TEXT],
 	["probe ack", PROBE_DONE_ACK_TEXT],
@@ -114,5 +117,15 @@ describe("every text the agents read follows the voice", () => {
 	it("catches an example offered as a model, and passes one the text forbids", () => {
 		assert.deepEqual(promptVoiceBreaks('Announce the job ("let me verify the version while we continue").').map((b) => b.rule), ["narration"]);
 		assert.deepEqual(promptVoiceBreaks('Never narrate ("let me verify the version while we continue").'), []);
+	});
+});
+
+describe("a message that doesn't attempt the question (round 9, 4 #2)", () => {
+	const prompt = fs.readFileSync(path.join(import.meta.dirname, "../src/agent/prompts/shared/20-question-tools.md"), "utf8");
+	it("is answered and the same question asked again, never closed as his answer", () => {
+		assert.match(prompt, /\*\*A message is not an answer\.\*\*[^\n]*did that go through[^\n]*ask the same check again/);
+	});
+	it("is never told in the app's own words: no prompt the tutor reads calls his reply a field or a box", () => {
+		assert.doesNotMatch(prompt, /answer (?:field|box)/i);
 	});
 });

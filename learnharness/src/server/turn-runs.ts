@@ -34,6 +34,7 @@ interface LhTurnRunsGlobal {
 	__lhTurnRuns?: Map<string, PiTurnHandle>;
 	__lhTurnFailures?: Map<string, string>;
 	__lhTurnStopping?: Set<string>;
+	__lhTurnWaking?: Set<string>;
 }
 
 function runs(): Map<string, PiTurnHandle> {
@@ -65,6 +66,21 @@ export function clearTurnFailure(chatId: string): void {
 function stopping(): Set<string> {
 	const g = globalThis as typeof globalThis & LhTurnRunsGlobal;
 	return (g.__lhTurnStopping ??= new Set<string>());
+}
+
+/** Chats whose next turn the server is setting up itself (a handoff's
+ *  next agent, a job's result: jobs.ts's wake), before it begins. */
+function waking(): Set<string> {
+	const g = globalThis as typeof globalThis & LhTurnRunsGlobal;
+	return (g.__lhTurnWaking ??= new Set<string>());
+}
+
+/** The wake pipeline marks the setup of a turn it starts: the lesson
+ *  shows it as busy, with Stop (round 14, 3 M2), so his Stop meanwhile
+ *  stops that turn as it starts. */
+export function markWaking(chatId: string, on: boolean): void {
+	if (on) waking().add(chatId);
+	else waking().delete(chatId);
 }
 
 /** Register the chat's running turn (chat-handler, right after the turn
@@ -102,8 +118,9 @@ export function runningTurn(chatId: string): PiTurnHandle | undefined {
  *  honest 409 — there was nothing to abort, the caller refetches. */
 export function abortTurn(chatId: string): { ok: true } | { ok: false; reason: "not_running" } {
 	const handle = runs().get(chatId);
-	if (!handle) return { ok: false, reason: "not_running" };
-	handle.abort();
+	if (handle) handle.abort();
+	else if (waking().has(chatId)) stopping().add(chatId);
+	else return { ok: false, reason: "not_running" };
 	return { ok: true };
 }
 

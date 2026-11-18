@@ -2,7 +2,7 @@ from datetime import date, timedelta
 import math
 from typing import Any
 
-from learning import agenda, capacity, progress, schema
+from learning import agenda, capacity, preferences, progress, schema
 from learning.capacity import Capacity, Done, Limit, Weekday
 
 # The final review these tests were written for; a save derives it from his
@@ -803,13 +803,15 @@ def test_a_night_with_nothing_saved_moves_no_estimate() -> None:
 
 def studied(record: dict[str, Any], first: int, last: int) -> dict[str, Any]:
     """Each day from ``first`` to ``last``, the reviews due answered right, as
-    many as its weekday's number (all of them on ``last``), so he stops short
-    on some days and the plan learns his limits from the record."""
+    many as its weekday's number, so he stops short on some days and the plan
+    learns his limits from the record; on ``last``, what its plan proposes."""
     for offset in range(first, last + 1):
         day = on(offset)
         due = progress.due(record, day, limit=0)
-        count = len(due) if offset == last else 1 + day.weekday() % 3
+        count = 1 + day.weekday() % 3
         topics = [item["topic"] for item in due[:count]]
+        if offset == last:
+            topics = plan_for(record, day)["reviews"]
         if topics:
             record = save(record, {"observations": [answer(t) for t in topics]}, day)
     return record
@@ -840,9 +842,18 @@ def test_a_fractional_pace_starts_on_some_days_and_leaves_the_rest_to_a_course_w
     assert [a + b for a, b in zip(paced, others, strict=True)] == [1] * 28
 
 
+def set_by_course(record: dict[str, Any]) -> dict[str, Any]:
+    """The record with its final review set as a course sets it
+    (``final_review_days``): a start the record holds before it has begun is
+    read again from his pace for each day the plan replays."""
+    lead = {preferences.FINAL_REVIEW_DAYS: str(LEAD)}
+    stored = progress.with_final_review(record, None)
+    return {**stored, "preferences": {**record["preferences"], **lead}}
+
+
 def test_the_plan_made_on_two_consecutive_days_gives_the_same_dates() -> None:
     capacity_ = week(10, 1, EVERY_DAY)
-    records = {"exam": course(27, exam=60), "open": course(30)}
+    records = {"exam": set_by_course(course(27, exam=60)), "open": course(30)}
     first = plan(records, 28, capacity_)
     for name, days in first.days.items():
         if days[0]["new"]:
@@ -1008,3 +1019,157 @@ def test_a_topic_that_does_not_fit_before_its_exam_names_the_exam_not_other_cour
     late = together.does_not_fit["exam"]
     assert set(late) & set(started(together.days["exam"])), "started after it"
     assert not set(late) & set(together.starts_after.get("exam", {}))
+
+
+def test_one_answer_today_moves_no_other_topics_day_in_any_course() -> None:
+    """Round 9 (1 D4): one review answer moved about twelve days he had been
+    told, in its own course and another, within the day."""
+    records = {
+        "algebra": studied(taught(course(24), on(-36)), -35, -1),
+        "chance": studied(taught(course(16, exam=40), on(-30)), -29, -1),
+    }
+    before = agenda.plan(records, MONDAY, 60)
+    told = {name: before.when(name, MONDAY, True) for name in records}
+    for name, result in (("algebra", "partial"), ("chance", "correct")):
+        topic = before.days[name][2]["reviews"][0]
+        records[name] = save(
+            records[name], {"observations": [answer(topic, result)]}, MONDAY
+        )
+        after = agenda.plan(records, MONDAY, 60)
+        for other in records:
+            now = after.when(other, MONDAY, True)
+            kept = {k: v for k, v in now.reviews.items() if k != topic or other != name}
+            assert kept == {
+                k: v
+                for k, v in told[other].reviews.items()
+                if k != topic or other != name
+            }, (name, other)
+            assert now.starts == told[other].starts, (name, other)
+
+
+def test_inside_a_final_review_its_topics_left_take_a_spare_start_before_a_course_without_an_exam() -> (
+    None
+):
+    """Round 9 (1 D2): two days before the Probability exam, Real Analysis
+    started Continuity while the head said there was no room for Geometric."""
+    exam = course(2, exam=5)
+    together = plan({"exam": exam, "open": course(10)}, 5, week(10, 1, EVERY_DAY))
+    assert started(together.days["exam"]) == {
+        "t00": on(0).isoformat(),
+        "t01": on(1).isoformat(),
+    }
+    assert started(together.days["open"]) == {
+        "t00": on(2).isoformat(),
+        "t01": on(3).isoformat(),
+        "t02": on(4).isoformat(),
+    }
+
+
+def saved_at(
+    record: dict[str, Any], patch: dict[str, Any], day: date, clock: str
+) -> dict[str, Any]:
+    """``save`` at ``clock`` (HH:MM) on ``day``: the order of a day's saves."""
+    now = f"{day.isoformat()}T{clock}:00+00:00"
+    patched, outcome = schema.apply_patch(record, patch, today=day, now=now)
+    scheduled, _ = progress.schedule(planned(patched), outcome, day)
+    return schema.validate_record(scheduled)
+
+
+def due_tomorrow() -> dict[str, Any]:
+    """One topic answered right on two days, the engine's next step for it
+    tomorrow."""
+    record = save(course(1), {"topics": {"t00": {"introduced": True}}}, on(-3))
+    record = save(record, {"observations": [answer("t00")]}, on(-3))
+    record = save(record, {"observations": [answer("t00")]}, on(-2))
+    assert record["topics"]["t00"]["review"]["due"] == on(1).isoformat()
+    return record
+
+
+def reviewed_on(result: agenda.Plan, name: str, topic: str) -> list[str]:
+    return [day["date"] for day in result.days[name] if topic in day["reviews"]]
+
+
+def test_a_save_that_leaves_a_topic_not_ready_takes_its_review_with_its_start() -> None:
+    """Round 10 (1 M1): the Binomial answer left Poisson not ready, so its
+    start moved from 11 to 18 Nov, while its first review stayed on 12 Nov,
+    before its first lesson."""
+    record = course(2, needs={"t01": ["t00"]})
+    record = save(record, {"topics": {"t00": {"introduced": True}}}, on(-10))
+    record = save(record, {"observations": [answer("t00")]}, on(-9))
+    record = save(
+        record, {"topics": {"t00": {"review": {"due": on(4).isoformat()}}}}, MONDAY
+    )
+    capacity_ = week(2, 1, EVERY_DAY)
+    morning = plan({"c": record}, 10, capacity_)
+    assert started(morning.days["c"])["t01"] == MONDAY.isoformat()
+    assert reviewed_on(morning, "c", "t01")[0] == on(1).isoformat()
+    slipped = saved_at(
+        record, {"observations": [answer("t00", "incorrect")]}, MONDAY, "10:00"
+    )
+    after = plan({"c": slipped}, 10, capacity_)
+    start = started(after.days["c"]).get("t01")
+    reviews = reviewed_on(after, "c", "t01")
+    assert start is None and not reviews or start is not None and min(reviews) > start
+
+
+def test_a_day_told_at_a_save_holds_through_a_later_save_in_another_course() -> None:
+    """Round 10 (1 M1, 3 M1): a save told Eigen Thu 12 Nov; the Binomial
+    review's save an hour later, in Probability, moved it to Fri 20 Nov. A
+    told day moves only for a save on its own topic."""
+    other = due_tomorrow()
+    fresh = course(1)
+    capacity_ = week(1, 0, EVERY_DAY)
+    first = saved_at(
+        fresh,
+        {"topics": {"t00": {"introduced": True}}, "observations": [answer("t00")]},
+        MONDAY,
+        "10:00",
+    )
+    told = plan({"fresh": first, "other": other}, 10, capacity_)
+    assert reviewed_on(told, "fresh", "t00")[0] == on(1).isoformat()
+    early = saved_at(other, {"observations": [answer("t00")]}, MONDAY, "11:00")
+    later = plan({"fresh": first, "other": early}, 10, capacity_)
+    assert reviewed_on(later, "fresh", "t00")[0] == on(1).isoformat()
+
+
+def test_a_night_after_a_finished_day_keeps_every_day_he_was_told() -> None:
+    """Round 10 (1 M2): a finished day with unchanged rates moved 19 dates
+    overnight, as the next morning planned afresh and dropped what the
+    day's saves had held. The night moves nothing but what its day left."""
+    other = due_tomorrow()
+    first = saved_at(
+        course(1),
+        {"topics": {"t00": {"introduced": True}}, "observations": [answer("t00")]},
+        MONDAY,
+        "10:00",
+    )
+    records = {"fresh": first, "other": other}
+    capacity_ = week(1, 0, EVERY_DAY)
+    tonight = agenda.plan(records, MONDAY, 10, capacity_)
+    assert tonight.days["fresh"][0] == {
+        "date": MONDAY.isoformat(),
+        "reviews": [],
+        "new": [],
+    }
+    assert tonight.days["other"][0]["reviews"] == []
+    tomorrow = agenda.plan(records, on(1), 9, capacity_)
+    assert tomorrow.days == {name: days[1:] for name, days in tonight.days.items()}
+
+
+def test_inside_a_final_review_the_review_its_next_topic_waits_on_comes_first() -> None:
+    """Round 10 (1 M4): two days before the Probability exam, its final
+    review checked Total probability first, so Expectation, waiting on
+    Random variables, started the day before the exam, too late for a
+    review, and Linear Algebra took the day's new topic."""
+    exam = course(3, exam=3, needs={"t02": ["t00"]})
+    exam = save(
+        exam,
+        {"topics": {"t00": {"introduced": True}, "t01": {"introduced": True}}},
+        on(-12),
+    )
+    exam = save(exam, {"observations": [answer("t01", "partial")]}, on(-6))
+    exam = save(exam, {"observations": [answer("t00", "partial")]}, on(-2))
+    together = agenda.afresh({"exam": planned(exam)}, MONDAY, 6, week(1, 1, EVERY_DAY))
+    assert together.days["exam"][0]["reviews"] == ["t00"]
+    assert started(together.days["exam"]) == {"t02": MONDAY.isoformat()}
+    assert reviewed_on(together, "exam", "t02")[0] < on(3).isoformat()

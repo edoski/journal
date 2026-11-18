@@ -1,6 +1,6 @@
 # Skeleton
 
-A quiet block that holds a part's place while its data is read: the course page's header while `/api/study` answers. `skeleton.tsx`, shadcn's skeleton (new-york), `data-slot="skeleton"`.
+A quiet block that holds a part's place while its data is read: the sidebar's Today cards while they are read (`../unit-inbox/now-skeleton.tsx`). A page says it is reading in one sentence instead (`PageReading`, `../page-frame/page-frame.md`). `skeleton.tsx`, shadcn's skeleton (new-york), `data-slot="skeleton"`.
 
 | Part | Notes |
 |---|---|

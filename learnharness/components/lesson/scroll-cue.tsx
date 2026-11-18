@@ -101,7 +101,7 @@ export function ScrollCueButton({ anchorRef, onJump, className }: {
 	const place = "pointer-events-auto absolute left-1/2 -translate-x-1/2 rounded-full dark:bg-background dark:hover:bg-muted";
 	if (cue === "new-reply") {
 		return (
-			<Button type="button" variant="outline" size="sm" data-testid="new-reply-cue" onClick={onJump} className={cn(place, "h-8 gap-1.5 px-3 text-row", className)}>
+			<Button type="button" variant="outline" size="sm" data-testid="new-reply-cue" onClick={onJump} className={cn(place, "h-8 gap-1.5 px-3 text-body", className)}>
 				{LESSON_WORDS.newReply}
 				<ArrowDownIcon className="size-4" />
 			</Button>

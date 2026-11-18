@@ -1,10 +1,9 @@
-import type { ChatListItem, CourseMap, CourseMapTopic, CourseReadiness, CourseStanding, ReadinessPart, StudyCourse } from "@/src/core";
-import type { StripArc } from "@/components/course-map/arc-strip";
+import { TOPIC_LEVELS, namedArc, type ChatListItem, type CourseMap, type CourseMapTopic, type CourseReadiness, type CourseStanding, type MistakeAnswer, type NamedArc, type OpenMistake, type ReadinessPart, type StudyCourse, type TopicHandle } from "@/src/core";
 import { misfitWords } from "@/components/calendar/calendar-facts";
-import { resumableSession } from "@/components/nav/session-state";
-import { topicSessions } from "@/components/unit-inbox/units";
+import { topicPress } from "@/components/unit-inbox/start-unit";
+import type { SessionCreation } from "@/components/start-session";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { finalReviewMissWords, notReadyWords, READY_WORDS, shortDay, slipMark, type SlipKey } from "@/components/study-words";
+import { finalReviewMissWords, MARK_WORDS, notReadyHeading, notReadyWords, READY_WORDS, shortDay, slipMark, type SlipKey } from "@/components/study-words";
 import { namesWords } from "@/components/course-page/course-head/head-facts";
 import type { CourseArcSection } from "@/components/course-page/course-model";
 
@@ -27,39 +26,62 @@ export function partState(part: ReadinessPart): PartState {
 /** The answer to "am I ready for the exam, and where not?":
  *  - `short`: topics with no room before the exam, else taught topics the
  *    final review has no room for, named (the run-up's words);
- *  - `notYet`: the arcs not ready, as their bubbles (`arcs`), none when no
- *    arc is ready; in a course the page shows without arcs, the topics,
- *    named (`words`);
+ *  - `notYet`: in a course the page shows with arcs, that alone, since a
+ *    list of the arcs not ready yet gave him nothing to act on while all of
+ *    it still fits (round 16, m6: six of seven arcs, 25 days before the
+ *    exam); without arcs, the topics, named (`words`): every one when they
+ *    are few, else the least ready and "and the rest", a press that shows
+ *    `rest` (every topic the line means, least ready first, under
+ *    `heading`; null when it names them all);
  *  - `ready`: every part solid. */
-export type ExamReady = { kind: "short"; words: string } | { kind: "notYet"; words: string; arcs: readonly StripArc[] } | { kind: "ready"; words: string };
+export type ExamReady =
+	| { kind: "short"; words: string }
+	| { kind: "notYet"; words: string; rest: { heading: string; topics: readonly CourseMapTopic[] } | null }
+	| { kind: "ready"; words: string };
 
-export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topics" | "exam">, arcs: readonly CourseArcSection[] | null): ExamReady {
+/** How many least-ready topics the line names before "and the rest": a
+ *  line of every name said little about what to do (round 9, 2 m13: nine of
+ *  Linear Algebra's ten started topics); a list one longer is named whole,
+ *  so the press always holds at least two more. */
+export const READY_NAMED = 3;
+
+/** The topics least ready for the exam first, from the engine's standing
+ *  facts: a topic with a mistake still open (`standing.mistakes`) before
+ *  one without, the newest mistake first; then the lower engine level (its
+ *  `progress` standing, on the map: introduced, attempted, assisted, then
+ *  on his own); then the engine's weak verdict; then the engine's path
+ *  order, which only breaks a tie. Pure. */
+export function leastReadyFirst(handles: readonly TopicHandle[], map: Pick<CourseMap, "topics">, mistakes: readonly OpenMistake[]): CourseMapTopic[] {
+	const open = new Map(mistakes.map((m, at) => [m.topic, at]));
+	const ranked = handles.flatMap((handle, at) => {
+		const topic = map.topics.find((t) => t.handle === handle);
+		return topic ? [{ topic, mistake: open.get(handle) ?? mistakes.length, level: TOPIC_LEVELS.indexOf(topic.level), weak: topic.weak ? 0 : 1, at }] : [];
+	});
+	return ranked.sort((a, b) => a.mistake - b.mistake || a.level - b.level || a.weak - b.weak || a.at - b.at).map((r) => r.topic);
+}
+
+export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topics" | "exam" | "today">, arcs: readonly CourseArcSection[] | null, mistakes: readonly OpenMistake[]): ExamReady {
 	const titleOf = (handle: string) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 	const wontFit = readiness.parts.flatMap((p) => p.wontFit);
 	if (wontFit.length > 0) return { kind: "short", words: misfitWords(wontFit.map(titleOf))! };
 	// Never "ready" while the final review leaves a taught topic out (the engine's `map`).
-	if (map.exam?.unreviewed?.length) return { kind: "short", words: finalReviewMissWords(map.exam.unreviewed.map(titleOf)) };
+	if (map.exam?.unreviewed?.length) return { kind: "short", words: finalReviewMissWords(map.exam.unreviewed.map(titleOf), map.exam, map.today) };
 	const notReady = readiness.parts.filter((p) => partState(p) === "notYet");
 	if (notReady.length === 0) return { kind: "ready", words: READY_WORDS.ready };
-	if (arcs && notReady.length === readiness.parts.length) return { kind: "notYet", words: READY_WORDS.notYet, arcs: [] };
-	if (arcs) {
-		const shown = notReady.flatMap((p) => {
-			const section = arcs.find((s) => s.arc.handle === p.arc);
-			return section ? [{ handle: section.arc.handle, title: section.arc.title, share: section.share }] : [];
-		});
-		if (shown.length > 0) return { kind: "notYet", words: READY_WORDS.notYetIn, arcs: shown };
-	}
+	if (arcs) return { kind: "notYet", words: READY_WORDS.notYet, rest: null };
 	const notYet = notReady.flatMap((p) => p.notYet);
 	const kind = notYet.length > 0 ? "notYet" : "toStart";
-	const names = namesWords((kind === "notYet" ? notYet : notReady.flatMap((p) => p.toStart)).map(titleOf));
-	return { kind: "notYet", words: notReadyWords(kind, names), arcs: [] };
+	const topics = leastReadyFirst(kind === "notYet" ? notYet : notReady.flatMap((p) => p.toStart), map, mistakes);
+	if (topics.length <= READY_NAMED + 1) return { kind: "notYet", words: notReadyWords(kind, namesWords(topics.map((t) => t.title))), rest: null };
+	const named = topics.slice(0, READY_NAMED).map((t) => t.title).join(", ");
+	return { kind: "notYet", words: notReadyWords(kind, named), rest: { heading: notReadyHeading(kind), topics } };
 }
 
 /** One open mistake as a row: the topic, what went wrong in the tutor's
- *  words (the diagnosis, else the newest answer), its slip's icon, when,
- *  whether it had help, what it was on, the topic's arc bubble, and what
- *  a press does: Resume the session that waits on the topic, else start
- *  one on it, as the sidebar's rows do. */
+ *  words (the diagnosis, else the newest answer under its mark), its slip's
+ *  icon, when, whether it had help, what it was on, and what a press does:
+ *  Resume the session that waits on the topic, else start one on it, as
+ *  the sidebar's rows do. */
 export interface MistakeRow {
 	topic: CourseMapTopic;
 	slip: SlipKey;
@@ -69,10 +91,20 @@ export interface MistakeRow {
 	helped: boolean;
 	/** What it was on, with his answer: the row's hint. */
 	hint: string | null;
-	arc: StripArc | null;
+	/** The session its press opens: the one the topic's page would. */
 	resume: ChatListItem | null;
+	/** What its press starts when it opens none: the open task continued
+	 *  from the lesson that holds it, as the topic's page does, else a
+	 *  session on the topic. */
+	creation: SessionCreation;
 	workspace: string;
 	href: string;
+}
+
+/** A row's press from its topic's action (`topicPress`). Pure. */
+function pressOf(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): Pick<MistakeRow, "resume" | "creation"> {
+	const { resume, creation } = topicPress(topic, map, chats);
+	return { resume, creation };
 }
 
 const days = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
@@ -84,10 +116,24 @@ function mistakeDayWords(day: string, today: string): string {
 	return days(day, today) <= 0 ? "Today" : shortDay(day);
 }
 
+/** What went wrong, as a row says it: the tutor's diagnosis, else the
+ *  newest answer's sentence under its mark, since that sentence says what
+ *  he did, not what was wrong (round 16, m17: "Explained why an
+ *  eigenvector stays on its own line under A" read as an achievement under
+ *  "Mistakes to fix"). */
+function mistakeWords(gap: string | null, newest: MistakeAnswer): string {
+	if (gap) return gap;
+	const text = /^\p{Lu}\p{Ll}/u.test(newest.text) ? newest.text[0]!.toLowerCase() + newest.text.slice(1) : newest.text;
+	return `${MARK_WORDS.result[newest.result]}: ${text}`;
+}
+
 /** The open mistakes in the engine's order, newest first, as rows; a
- *  topic the map no longer lists is left out. `arcs` are the arcs the page
- *  shows, whose bubbles the rows wear. */
-export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats: readonly ChatListItem[], arcs: readonly CourseArcSection[] | null): MistakeRow[] {
+ *  topic the map no longer lists is left out. A row's press is its topic page's
+ *  action (`topicAction`): the session waiting on the topic, else the open
+ *  task continued from the lesson that holds it, else a session on the
+ *  topic (round 10, 2 m1: the Eigen row started a fresh session while the
+ *  lesson's task waited). */
+export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats: readonly ChatListItem[]): MistakeRow[] {
 	const { map } = course;
 	return standing.mistakes.flatMap((m) => {
 		const topic = map.topics.find((t) => t.handle === m.topic);
@@ -96,18 +142,16 @@ export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats
 		// The icon the sidebar and the map draw for the topic's slip, else this mistake's own.
 		const shared = slipMark(topic.signals, (h) => map.topics.find((t) => t.handle === h)?.title ?? h).key;
 		const slip: SlipKey = shared !== "repaired" && shared !== "check" ? shared : newest?.confident ? "confident" : newest?.chose ? "mixed" : m.gap ? "gap" : "lapsed";
-		const section = arcs?.find((s) => s.arc.handle === topic.arc);
 		const said = newest ? [newest.on, newest.response && `You answered ${newest.response}`].filter((s): s is string => Boolean(s)) : [];
 		return [
 			{
 				topic,
 				slip,
-				words: m.gap ?? newest!.text,
+				words: mistakeWords(m.gap, newest!),
 				when: m.latest ? mistakeDayWords(m.latest, map.today) : null,
 				helped: Boolean(newest?.helped),
 				hint: said.length > 0 ? said.join(". ") : null,
-				arc: section ? { handle: section.arc.handle, title: section.arc.title, share: section.share } : null,
-				resume: resumableSession(topicSessions(chats, map.workspace, topic.handle)),
+				...pressOf(topic, map, chats),
 				workspace: map.workspace,
 				href: unitHref(map.workspace, topic.handle),
 			},

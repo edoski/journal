@@ -11,6 +11,7 @@ import type { PlanNodeStatus, PlanTree } from "./plan.ts";
 import type { CourseLink } from "./course.ts";
 import type { MarkResult } from "./marks.ts";
 import type { ChatSession } from "../sdk-session.ts";
+import { SENTENCE_WORDS } from "../voice-check.ts";
 
 // ─── Chat records (the session store's on-disk format) ───────────────────────
 
@@ -45,6 +46,12 @@ export interface ChatRecord {
 	 *  topics), set at creation, else the topic its first plan's goal names
 	 *  (`SessionGoal`). Set once; the step the lesson is on never moves it. */
 	topics?: readonly string[];
+	/** Started by a press on its topics (a topic's page, Home, the
+	 *  calendar), so its first message is the app's instruction to the
+	 *  tutor, never his words: the transcript draws no bubble for it
+	 *  (`appOpeningAt`; round 9: "Poisson distribution" as his first
+	 *  message). Set at creation. */
+	appOpening?: true;
 	/** The arc this session checks, by handle: set at creation when he
 	 *  starts it from an arc's Check it on the course page, so the course
 	 *  brief carries that arc's check (`arcs_ready`). */
@@ -65,8 +72,7 @@ export interface ChatRecord {
 	 * re-POSTs its message list every turn and its copies never carry
 	 * server-stamped fields, so anything inside message objects gets clobbered
 	 * by the next persist. Keyed by messageId so the transcript view can fold
-	 * each entry onto its message; aggregates are folds over this log
-	 * (core/prices.ts). */
+	 * each entry onto its message. */
 	turns?: TurnUsage[];
 	/** The lesson digest's ledger: what the background digest already carried
 	 *  into the course record from this session. */
@@ -133,7 +139,7 @@ export interface CallUsage {
 /** One billing turn: one full invocation of the teacher (a client turn or a
  * wake turn — same handler, same log). A turn with tool calls spans several
  * agent steps, and each step bills separately. Capture lands at the persist
- * seam (server); cost is INFERRED at read time from core/prices.ts. */
+ * seam (server). */
 export interface TurnUsage {
 	/** Unique per REQUEST (turn): one invocation of the handler — the
 	 *  idempotency key for the append-only log. Continuation turns share a
@@ -182,14 +188,64 @@ export interface TurnUsage {
  *  approval of a map of material he doesn't know yet; he interrupts when
  *  he wants). No goal line (round 8: "Today: …" previewed the lesson), and
  *  the step builds on the probe's feedback, which he already read (round
- *  8: the first step re-taught it on the same matrix). */
+ *  8: the first step re-taught it on the same matrix). Its length is the
+ *  voice's own count (round 15, M9: three of the six measured first steps
+ *  came back refused, each four sentences with one over the word limit,
+ *  and the rewrite cost a high-effort reply of 5 to 8 s). */
 export const HANDOFF_TEXT =
 	"Next: plan the full teaching arc from my current understanding to the goal understanding. " +
 	"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
-	"When it's genuinely reasoned out, call plan_init and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else. " +
-	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again.";
+	"When it's genuinely reasoned out, call plan_init and, in that same reply, start teaching with the first step alone: one idea in two to four sentences, " +
+	`each of ${SENTENCE_WORDS} words or fewer, since a longer one counts as two, ` +
+	"then its question, never waiting for plan_init's result; I'll interrupt if I want something else.";
+
+/** What the wake says of the probe's last answer, read from the record
+ *  once the probe's turn has landed (round 15, m13: the first step opened
+ *  "Your answer took the limit of the base alone…" under the feedback
+ *  "The base and the exponent change together…", since the wake said only
+ *  "the probe's feedback above"): the feedback he read after it, quoted as
+ *  already said; or that it got only its mark (round 14); or nothing when
+ *  the probe asked nothing. */
+export function probeFeedbackText(said: readonly string[] | null): string {
+	if (said === null) return "";
+	if (said.length === 0) return "My last probe answer got only its mark, with no words: when it was not right, the first step's first sentence names the part it missed, and the step builds from there.";
+	return `I have already read the probe's feedback on my last answer: ${said.map((t) => `"${t.trim()}"`).join(" ")} That is said: the first step builds on it with something new, and never says its point again, in any words.`;
+}
+
+/** The wake in a session that continues an open task (round 11, 2 N2: the
+ *  lesson's wake turned Problem sheet 4, answered right at part (c), into a
+ *  nine-step rank–nullity lesson from its basics put in front of part (d),
+ *  which he had just been asked to type). The task's next step is the plan;
+ *  a gap the assessment names may come before it; a step that needs his
+ *  material waits for it. */
+export const TASK_HANDOFF_TEXT =
+	"Next: carry on with my open task at the step the assessment says comes next. It is my task, not a lesson: plan only that step with plan_init, one node named for the part it is, with a node before it only for a gap the assessment names, never a lesson on the topic from its basics. " +
+	"If the step needs something from me first, such as a part's text, ask me for it in one plain line, unless that is already asked above, and end your turn; work the step once I send it. Otherwise pose the step straight away.";
+
+/** The model-facing words of Continue pressed on an open task this session
+ *  holds, when nothing in it waits on him (round 13, 2 M1): Continue
+ *  Problem sheet 4 opened the sheet's finished chat with no turn, and his
+ *  "let us continue the sheet" was planned as a lesson from the basics, so
+ *  part (c) was put off to next time. The task's step is the record's, in
+ *  the course brief above. */
+export function taskContinueText(tasks: readonly string[]): string {
+	const named = tasks.map((key) => `\`${key}\``).join(" and ");
+	return (
+		`[CONTINUE MY TASK] I pressed Continue on my open task ${named}. Carry on at its saved step, as the course record above gives it. ` +
+		"It is my task, not a lesson: never a lesson on the topic from its basics, and a step before it only for a gap the record names. If you plan, plan only that step with plan_init, one node named for the part it is. " +
+		"If the step needs something from me first, such as a part's text, ask me for it in one plain line and end your turn; otherwise pose the step straight away. Never say this message."
+	);
+}
+
+/** What a review's wake adds (round 9, 2 m4): a review that turns into
+ *  teaching closed on "the lesson", since the wake asked only to start
+ *  teaching. The step opens on its content (round 16, m10: the line this
+ *  wake asked for, "Let's re-teach the counting step.", told him nothing
+ *  his step strip did not). */
+export const REVIEW_HANDOFF_TEXT =
+	"This session is my review. Where its answers show I need part of the topic taught again, teach that part as the first step, opening on its content with no line announcing it, and call the session my review to its close, never the lesson.";
 
 /** The model-facing opening of a fresh session that picks up a finished
  *  lesson: its plan carries over, so the teacher neither probes nor plans
@@ -211,7 +267,7 @@ export const MODE_HANDOFF_TEXT: Readonly<Record<"teach" | "practice", string>> =
 	practice:
 		"[PRACTICE] — the session moves to practice, on the scope the handoff above names (a whole lesson when it lists `topics`). Choose the material as your system prompt says and pose the first problem, with no line before it about what you chose or why.",
 	teach:
-		"[TEACHING] — the session moves back to teaching, on what the handoff above names. Carry on from there as your system prompt says.",
+		"[TEACHING] — the session moves back to teaching, on what the handoff above names. Carry on from there as your system prompt says: what you explain is one teaching step, in two to four sentences and at most one display, then its check.",
 };
 
 /** The handoff tools' ack: the turn ends at the handoff, and the next
@@ -256,19 +312,32 @@ export const NEXT_PROBLEM_TEXT =
  *  close. What he left open comes back as it was, so the close says only
  *  what he picks up and when: a cue toward its answer would make the
  *  pick-up count as helped (round 5, 14 Nov 2026). */
-const DONE_CLOSE =
-	"Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel problem, part (c) of the sheet), never by what it asks, and its day when the plan gives one. Never a step, cue, method or hint toward anything he left open, and no praise or summary of the session.";
+const DONE_LIMITS = "Never a step, cue, method or hint toward anything he left open, and no praise or summary of the session.";
+/** An answer he sent just before pressing Done is graded in the closing
+ *  turn; its card said "Partly right" with no reason, straight before the
+ *  close (round 11, 4 minor 1). */
+const DONE_GRADED = "An answer he sent before pressing it is still graded and saved as usual; when it was not fully right, first say in one sentence what it missed, as its own message, then close.";
+const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one; a topic not started is one he starts, never a review; a question he left a half answer on (\`draftKept\`) is his half answer waiting for him there. ${DONE_LIMITS}`;
+/** Practice keeps nothing of a problem dropped at Done for today, so its
+ *  close names only what the record keeps (round 9, 3 m7: "You still have
+ *  the kernel problem you closed … to pick up"), and only this session's:
+ *  another session's open work is Home's to name (round 12, 3 D7: Rank
+ *  practice closed on "Part (c) of Problem sheet 4 is still open"). The
+ *  problem he left open is named once, as set aside (round 14, m31: "Your
+ *  Rank and the column space review is on Wednesday 11 November." left the
+ *  4 × 6 system unnamed). */
+const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: a problem he left open, named once by what it is on (the 4 × 6 system), as set aside, never as something he picks up; then only what his record keeps for next time from this session, an open task this session worked on at its place (part (c) of the sheet), never another session's open work, and the day of his next review when the plan gives one, never by what it asks; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
 
 export const DONE_TONIGHT_TEXT = {
 	prober:
 		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. " +
-		DONE_CLOSE,
+		`${DONE_GRADED} ${DONE_CLOSE}`,
 	teacher:
 		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. Close the session now: call `lesson_progress` with `close: true` (and `done` for any step he finished). " +
-		DONE_CLOSE,
+		`${DONE_GRADED} ${DONE_CLOSE}`,
 	practice:
-		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and a question he left open was never answered: don't grade either, and pose nothing more today. " +
-		DONE_CLOSE,
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and nothing keeps it, so name it only as set aside, never as something he picks up or still has; a question he left open was never answered: don't grade either, and pose nothing more today. " +
+		`${DONE_GRADED} ${DONE_CLOSE_PRACTICE}`,
 } as const;
 
 /** The mark he thinks is right, in the record's words and his. */
@@ -283,7 +352,7 @@ const PROPOSED_WORDS: Readonly<Record<MarkResult, string>> = {
  *  already counts as your own work, with no help" sat on a card that said
  *  otherwise). */
 const CARD_WORDS_FOR_RULING =
-	'His card says how each attempt went: help given reads "With help"; a prediction before its step was taught reads "Prediction, not counted"; an answer he gave up on reads "Gave up"; a right answer recorded as uncertain reads "Not yet confirmed"; any other attempt with no help reads "On your own", a guess or a partly right one included, with his confidence beside it. In your ruling and in `ruling`, say how it went in the card\'s words for the attempt as you re-mark it.';
+	'His card says how each attempt went: help given reads "With help"; a prediction before its step was taught reads "Prediction, not counted"; an answer he gave up on reads "Gave up"; a right answer recorded as uncertain reads "Not yet confirmed"; any other attempt with no help reads "On your own", a guess or a partly right one included, with his confidence beside it as "Guessing" or "Confident", never "sure" or "guess". In your ruling and in `ruling`, say how it went in the card\'s words for the attempt as you re-mark it, lowercase inside a sentence ("it stays with help").';
 
 /** The longest question excerpt a dispute quotes. */
 const DISPUTE_QUOTE = 400;
@@ -300,13 +369,15 @@ const PROPOSED_HOW_WORDS: Readonly<Record<"ownWork" | "withHelp", string>> = {
 };
 
 export function disputeText(
-	dispute: { observations: readonly string[]; said?: string; proposed?: MarkResult; proposedHow?: "ownWork" | "withHelp" },
+	dispute: { observations: readonly string[]; row?: string; said?: string; proposed?: MarkResult; proposedHow?: "ownWork" | "withHelp" },
 	question: string,
 ): string {
 	const quoted = question.length > DISPUTE_QUOTE ? `${question.slice(0, DISPUTE_QUOTE)}…` : question;
 	return [
 		`[MARK DISPUTED] — the learner pressed Dispute on the mark recorded for his answer to: "${quoted}".`,
-		`The attempts that stand for it: ${dispute.observations.join(", ")}.`,
+		dispute.row
+			? `He disputes one try on its card, "${dispute.row}"; the attempt that stands for that try: ${dispute.observations.join(", ")}. Re-judge that try only.`
+			: `The attempts that stand for it: ${dispute.observations.join(", ")}.`,
 		dispute.said ? `What he says is wrong with the mark: "${dispute.said}"` : null,
 		dispute.proposed ? `The mark he thinks is right: ${PROPOSED_WORDS[dispute.proposed]}.` : null,
 		dispute.proposedHow ? `How he thinks it should count: ${PROPOSED_HOW_WORDS[dispute.proposedHow]}.` : null,
@@ -331,17 +402,23 @@ export function isPracticeRequest(value: unknown): value is PracticeRequest {
 
 /** What the agent reads for each request (the marker's content head). */
 export const PRACTICE_REQUEST_TEXT: Readonly<Record<PracticeRequest, string>> = {
-	hint: "[HINT] — the learner pressed Hint on the active problem. This is a request, not an answer: give the next rung of the hint ladder, one rung only, then wait for his work.",
+	hint: "[HINT] — the learner pressed Hint on the active problem. This is a request, not an answer: give the next rung of the hint ladder, one rung only, above what his work so far and your last message already give him: one move or fact neither says, never his work or your nudge said again in other words, and never his own idea handed back for him to check. Then wait for his work.",
 	show: "[SHOW ME] — the learner pressed Show me on the active problem. This is a request, not an answer: he stops working on it. Conclude it now (surrendered with rung R5, unless his work already solved it) so the committed solution shows, then point at the step where his work stopped.",
 	explain:
-		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`.",
+		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`, with no words between: the problem's card shows how it ended, and the teaching follows.",
 };
 
 /** Which rung a Hint request asks for, by how many hints this problem has
- *  had: the first is a question, the second a nudge, the third and later
- *  one step. Show me reveals the rest. */
+ *  had: the first says where to look, unless he was already told where
+ *  (round 16, m12: after "What does R3 − R1 − R2 give you?", the first hint
+ *  could only say "Your suspicion about row 3 is something you can check
+ *  yourself"), the second a nudge, the third and later one step. Show me
+ *  reveals the rest. Every rung is a statement:
+ *  the first asked "one question that points at where to look", and the
+ *  hint only rephrased the problem (round 15, m16: "Does a row of A with
+ *  nonzero entries still have to be nonzero once elimination is done?"). */
 export function hintRungText(nth: number): string {
-	if (nth <= 1) return "This is his first hint on this problem: ask him one question that points at where to look (R0 or R1). No method, no step, no answer.";
+	if (nth <= 1) return "This is his first hint on this problem: say where to look (R0 or R1), as one statement in this problem's own terms of what it did not give him, never a question and never the problem in other words. No method, no step, no answer. When his work or your last message already says where to look, that rung is given: name the pattern or the idea instead (R2 or R3).";
 	if (nth === 2) return "This is his second hint on this problem: one nudge that names the pattern or the idea (R2 or R3). Carrying it out stays his.";
 	return `This is hint ${nth} on this problem: one step, worked or outlined (R4 or R5), never the rest of the solution. Show me is how he sees the rest.`;
 }
@@ -432,13 +509,34 @@ export interface ChatSummary {
 	/** The tutor's last turn ended because he stopped it (`stoppedByHim`),
 	 *  not because the app restarted: a cut session then says he stopped it. */
 	stopped?: true;
+	/** The tutor's last turn failed (Claude Code refused or broke off), so
+	 *  it never replied: a paused session says it couldn't reply. */
+	failed?: true;
+	/** He has said nothing in it past the words it opened with, so it
+	 *  holds nothing of his to pick up (`currentSessions`). */
+	untouched?: true;
 	/** The engine tasks the session last saved as open, by key
 	 *  (sessionTasksOf): the work it holds at a step the engine keeps. */
 	tasks?: readonly string[];
+	/** The title its saves gave the first task they opened, kept once the
+	 *  task closes (sessionTaskTitleOf), so it is named one way all day. */
+	taskTitle?: string;
 	/** It is a review of course topics: opened on topics with a review's
 	 *  words (`openedAsReview`), whatever it is named now. The list always
 	 *  sets it; a summary made elsewhere may leave it out. */
 	review?: boolean;
+	/** He studied in it (`studiedIn`): he answered something, or wrote
+	 *  after its opening. The list always sets it; a summary made elsewhere
+	 *  may leave it out, which reads as not studied. */
+	studied?: boolean;
+	/** When his newest input in it came (`opensTurn`: a message, an
+	 *  answer, a handoff), ISO; absent before any. A write that was not his
+	 *  (a left question posed again on opening it) never moves it. */
+	studiedAt?: string;
+	/** The local days, YYYY-MM-DD and in order, on which his input came:
+	 *  every day he worked in it, a lesson begun one day and left the next
+	 *  included (round 16, m8). */
+	studiedDays?: readonly string[];
 }
 
 /** The sidebar's session row: a summary + live liveness. The chats list
@@ -450,11 +548,6 @@ export interface ChatSummary {
  *  split at exactly the record/liveness seam. */
 export interface ChatListItem extends ChatSummary {
 	busy: boolean;
-	/** Live compaction liveness (turn-liveness's twin): true while a
-	 *  background context compaction holds the chat's model gate. The
-	 *  route attaches it from the compaction registry — never
-	 *  record-derived (the marker persists, the RUN is ephemeral). */
-	compacting: boolean;
 	/** Its course was deleted (the record is gone, `courseDeleted` on the
 	 *  server): the session is history, off Today, kept in search and the
 	 *  calendar. The route attaches it; absent reads as not deleted. */
@@ -486,6 +579,9 @@ export interface ArtifactPartProps {
 		 *  the modelSolution committed at POSE time, folded onto the part by
 		 *  projectView — the reveal is never re-authored. */
 		reveal?: unknown;
+		/** A demo or figure call's delivered result, joined onto the part
+		 *  by projectView (view.ts `PlacedArtifact`): drawn at the call. */
+		artifact?: unknown;
 	};
 }
 

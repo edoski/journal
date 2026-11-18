@@ -14,7 +14,8 @@
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { emit } from "../core/events.ts";
+import { studyDay } from "../core/day-words.ts";
+import { emit, subscribe } from "../core/events.ts";
 import {
 	courseLabel,
 	type CourseResult,
@@ -53,27 +54,19 @@ function exec(engine: EngineCommand, args: string[], stdin: string): Promise<Exi
 	return new Promise((resolve) => {
 		let stdout = "";
 		let stderr = "";
-		let timedOut = false;
-		let settled = false;
-		const finish = (exit: Exit) => {
-			if (settled) return;
-			settled = true;
-			clearTimeout(timer);
-			resolve(exit);
-		};
 		const child = spawn(engine.python, ["-m", "learning", ...args], {
 			cwd: engine.root,
 			env: { ...(engine.env ?? process.env), PYTHONPATH: engine.root, PYTHONIOENCODING: "utf-8" },
 			stdio: ["pipe", "pipe", "pipe"],
+			timeout: engine.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+			killSignal: "SIGKILL",
 		});
-		const timer = setTimeout(() => {
-			timedOut = true;
-			child.kill("SIGKILL");
-		}, engine.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 		child.stdout.setEncoding("utf-8").on("data", (chunk: string) => (stdout += chunk));
 		child.stderr.setEncoding("utf-8").on("data", (chunk: string) => (stderr += chunk));
-		child.on("error", (error) => finish({ code: null, stdout, stderr, timedOut, spawnError: error.message }));
-		child.on("close", (code) => finish({ code, stdout, stderr, timedOut }));
+		// Only spawn's timeout kills the engine, so a killed child timed out.
+		// A spawn failure may fire close after error; the promise keeps the first.
+		child.on("error", (error) => resolve({ code: null, stdout, stderr, timedOut: child.killed, spawnError: error.message }));
+		child.on("close", (code) => resolve({ code, stdout, stderr, timedOut: child.killed }));
 		child.stdin.on("error", () => {});
 		child.stdin.end(stdin);
 	});
@@ -98,7 +91,7 @@ function argsFor(verb: CourseVerb): { args: string[]; stdin: string } {
 		case "standing":
 			return { args: ["standing"], stdin: "" };
 		case "sources":
-			return { args: "scan" in verb ? ["sources", "--scan"] : ["sources", "--add", ...verb.add], stdin: "" };
+			return { args: "scan" in verb ? ["sources", verb.scan === true ? "--scan" : `--scan=${verb.scan}`] : ["sources", "--add", ...verb.add], stdin: "" };
 		case "forget-course":
 			return { args: ["forget", "--course"], stdin: "" };
 	}
@@ -253,8 +246,13 @@ function movedOf(value: unknown): { moved: TopicMoved } | Record<string, never> 
 	const m = record(value);
 	const from = str(m?.from);
 	if (!m || !from) return {};
-	if (m.by === "study") return { moved: { from, by: "study", courses: strings(m.courses) } };
-	return m.by === "missed" || m.by === "left" ? { moved: { from, by: m.by } } : {};
+	if (m.by === "study") {
+		const waitsOn = strings(m.waits_on);
+		return { moved: { from, by: "study", courses: strings(m.courses), day: m.day === "yesterday" ? "yesterday" : "today", ...(waitsOn.length > 0 ? { waitsOn } : {}) } };
+	}
+	if (m.by === "answered") return { moved: { from, by: "answered" } };
+	const on = str(m.on);
+	return m.by === "missed" || m.by === "left" ? { moved: { from, by: m.by, ...(on ? { on } : {}) } } : {};
 }
 
 /** One `map` topic with its raw edges, arc and start reason; null when it
@@ -328,16 +326,19 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 		m,
 		parsed.map((t) => ({ handle: t.handle, excluded: t.excluded !== undefined, arc: t.rawArc })),
 	);
+	const titles = new Map(parsed.map((t) => [t.handle as string, t.title]));
 	const topics = parsed.map(({ needs: _needs, contrasts: _contrasts, rawArc, rawWhy, ...topic }): CourseMapTopic => {
 		const arc = block.arcOf(rawArc);
 		const startsWhy = startsWhyOf(rawWhy, listed, block.arcOf);
-		return { ...topic, ...(arc ? { arc } : {}), ...(startsWhy ? { startsWhy } : {}) };
+		const moved = topic.moved?.by === "study" && topic.moved.waitsOn ? { moved: { ...topic.moved, waitsOn: topic.moved.waitsOn.map((h) => titles.get(h) ?? h) } } : {};
+		return { ...topic, ...moved, ...(arc ? { arc } : {}), ...(startsWhy ? { startsWhy } : {}) };
 	});
 	const current = str(m.current);
 	const tasks = (Array.isArray(m.tasks) ? m.tasks : []).flatMap((entry) => {
 		const t = record(entry);
 		const key = str(t?.key);
-		return t && key ? [{ key, title: str(t.title) ?? key, step: str(t.step), updated: str(t.updated) }] : [];
+		const topics = Array.isArray(t?.topics) ? t.topics.filter((h): h is TopicHandle => typeof h === "string" && listed.has(h)) : null;
+		return t && key ? [{ key, title: str(t.title) ?? key, step: str(t.step), updated: str(t.updated), ...(topics ? { topics } : {}) }] : [];
 	});
 	return {
 		workspace,
@@ -359,7 +360,7 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
  *  the material folder, so it announces nothing: announcing it made every
  *  reader that refetches on `course-changed` and scans again loop. */
 const WRITE_VERBS: ReadonlySet<CourseVerb["verb"]> = new Set(["save", "sources", "forget-course"]);
-const writes = (verb: CourseVerb): boolean => WRITE_VERBS.has(verb.verb) && !("scan" in verb);
+const isWrite = (verb: CourseVerb): boolean => WRITE_VERBS.has(verb.verb) && !("scan" in verb);
 
 /** Whether the course was deleted: the engine's `forget --course` unlinks
  *  the record and leaves the initialised `.study` folder behind. An
@@ -387,11 +388,142 @@ export function watchCourseRecord(workspace: string, onChange: () => void): () =
 	}
 }
 
+/** A file's identity as a key: the engine replaces a record whole on every
+ *  save, so a write moves its inode, and an edit in place its size or time.
+ *  A folder's moves when an entry comes or goes. "-" when it is missing. */
+function stamp(file: string): string {
+	try {
+		const s = fs.statSync(file, { bigint: true });
+		return `${s.ino}:${s.size}:${s.mtimeNs}`;
+	} catch {
+		return "-";
+	}
+}
+
+/** The registered workspaces in the engine's registry, `{workspaces: {dir: …}}`;
+ *  none when it is missing or unreadable (the engine then reads none). */
+function registered(registry: string): string[] {
+	try {
+		const parsed = JSON.parse(fs.readFileSync(registry, "utf-8")) as { workspaces?: unknown };
+		return Object.keys(record(parsed.workspaces) ?? {}).sort();
+	} catch {
+		return [];
+	}
+}
+
+/** The engine's support folder (`learning/workspace.py`): its registry and global preferences. */
+const supportOf = (env: NodeJS.ProcessEnv): string => path.join(env.HOME ?? "", "Library", "Application Support", "Learning");
+
+/** What one engine read reads besides its arguments, as one key: the study
+ *  day (`learning/clock.py`), the engine's registry and global preferences
+ *  in its support folder (`learning/workspace.py`), and for every registered
+ *  course, every course's history feeding his pace, its `.study` marker,
+ *  record and deleted records. The read is the same while this key is. */
+function readState(env: NodeJS.ProcessEnv): { key: string; listed: ReadonlySet<string> } {
+	const support = supportOf(env);
+	const registry = path.join(support, "workspaces.json");
+	const workspaces = registered(registry);
+	const courses = workspaces.map((w) => folderState(w));
+	return { key: [studyDay(env), stamp(registry), stamp(path.join(support, "preferences.json")), ...courses].join("\n"), listed: new Set(workspaces) };
+}
+
+function folderState(workspace: string): string {
+	const study = path.join(workspace, ".study");
+	return `${workspace} ${stamp(path.join(study, "workspace.json"))} ${stamp(path.join(study, "course.json"))} ${stamp(path.join(study, "forgotten"))}`;
+}
+
+/** The verbs whose every input is in `readState`, `map` among them, kept
+ *  until it moves. `plan` is kept too, keyed also on what it reads of his
+ *  Journal (`journalState`); `sources --scan` walks the material folder and
+ *  is never shared. */
+const KEPT_READS: ReadonlySet<string> = new Set(["show", "resume", "standing", "arcs", "search"]);
+
+/** The days of his Journal any plan reads at least: the engine's
+ *  `progress.WEEK_DAYS`, its week of recorded study. */
+export const JOURNAL_WEEK_DAYS = 7;
+
+/** What `plan --days N` reads of his Journal (`sync/study/context.py`,
+ *  `journal_summary`), as one key: the vault's `journal/PROTOCOL.md` (his
+ *  study schedule) and the day notes of the last `max(N, a week)` days up to
+ *  the study day, each by its stamp. The vault is the engine's: `VAULT_DIR`,
+ *  else his Obsidian vault in iCloud (`sync/config.py`). */
+function journalState(env: NodeJS.ProcessEnv, days: number): string {
+	const home = env.HOME ?? "";
+	const vault = (env.VAULT_DIR ?? path.join(home, "Library", "Mobile Documents", "iCloud~md~obsidian", "Documents", "the-vault")).replace(/^~(?=$|\/)/, home);
+	const journal = path.join(vault, "journal");
+	const today = Date.parse(`${studyDay(env)}T00:00:00Z`);
+	const notes = Array.from({ length: Math.max(days, JOURNAL_WEEK_DAYS) }, (_, back) => new Date(today - back * 86_400_000).toISOString().slice(0, 10));
+	return [stamp(path.join(journal, "PROTOCOL.md")), ...notes.map((day) => stamp(path.join(journal, `${day}.md`)))].join(" ");
+}
+
+/** The engine's kept reads, one set per engine (its interpreter and
+ *  repository), on `globalThis` so every route's copy of this module shares
+ *  them. `writes` moves on every write the app makes or announces. */
+interface EngineReads {
+	reads: Map<string, { state: string; exit: Promise<Exit> }>;
+	writes: number;
+	current: string;
+}
+type EngineReadsGlobal = { __lhEngineReads?: Map<string, EngineReads> };
+
+function engineReads(engine: EngineCommand): EngineReads {
+	const g = globalThis as typeof globalThis & EngineReadsGlobal;
+	const all = (g.__lhEngineReads ??= new Map());
+	const id = `${engine.python}\u0000${engine.root}\u0000${(engine.env ?? process.env).HOME ?? ""}`;
+	let found = all.get(id);
+	if (!found) {
+		const created: EngineReads = { reads: new Map(), writes: 0, current: "" };
+		// A write announced by another path (the folder watch, the map
+		// builder, a test) drops what was read before it.
+		subscribe((event) => {
+			if (event.type === "course-changed" || event.type === "courses-changed") created.writes++;
+		});
+		all.set(id, created);
+		found = created;
+	}
+	return found;
+}
+
 export function createCourseRecords(engine: EngineCommand): CourseRecords {
+	// One engine run per read of one state of the records (round 13, N2):
+	// every page, window and turn reads the engine, and a child replays every
+	// course's history each time, so one save set off a dozen identical reads
+	// at once, each 10 to 34 s on a loaded Mac, with the tutor's own saves
+	// waiting behind them. Every reader of a read the state still holds gets
+	// the one run; a failed run is not kept.
+	const kept = engineReads(engine);
+	const { reads } = kept;
+	/** One read, kept while the records' state and its own further inputs
+	 *  (`also`: a plan's Journal) hold. */
+	const shared = (workspace: string | null, args: string[], verbName: string, also = ""): Promise<CourseResult> => {
+		const { key, listed } = readState(engine.env ?? process.env);
+		const state = `${kept.writes}\n${key}`;
+		if (state !== kept.current) {
+			kept.current = state;
+			for (const [read, entry] of reads) if (entry.state !== state) reads.delete(read);
+		}
+		const read = [...args, ...(workspace && !listed.has(workspace) ? [folderState(workspace)] : []), also].join("\u0000");
+		const found = reads.get(read);
+		// Each reader parses the output itself, so none sees another's edits.
+		if (found?.state === state) return found.exit.then((exit) => toResult(exit, verbName));
+		const exit = exec(engine, args, "");
+		reads.set(read, { state, exit });
+		void exit.then((e) => {
+			if (!toResult(e, verbName).ok && reads.get(read)?.exit === exit) reads.delete(read);
+		});
+		return exit.then((e) => toResult(e, verbName));
+	};
+	const journal = (days: number) => journalState(engine.env ?? process.env, days);
+	const written = <T>(result: T): T => {
+		kept.writes++;
+		return result;
+	};
 	return {
 		forgotten: courseRecordForgotten,
+		// A deleted course stays registered with its record gone: it has no map.
+		registered: () => registered(path.join(supportOf(engine.env ?? process.env), "workspaces.json")).filter((w) => fs.existsSync(path.join(w, ".study", "course.json"))),
 		async list() {
-			const result = toResult(await exec(engine, ["plan", "--all", "--days", "1"], ""), "plan");
+			const result = await shared(null, ["plan", "--all", "--days", "1"], "plan", journal(1));
 			if (!result.ok) return { available: false, reason: result.message };
 			const entries = (result.json as { courses?: unknown }).courses;
 			const read = (Array.isArray(entries) ? entries : []).map(entryOf);
@@ -399,27 +531,33 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 				available: true,
 				courses: read.flatMap((r) => (r && "course" in r ? [r.course] : [])),
 				unreadable: read.flatMap((r) => (r && "unreadable" in r ? [r.unreadable] : [])),
+				plan: result.json,
 			};
 		},
 		async run(workspace, verb) {
 			const { args, stdin } = argsFor(verb);
+			if (verb.verb === "plan") return shared(workspace, ["--workspace", workspace, ...args], verb.verb, journal(verb.days ?? 1));
+			if (KEPT_READS.has(verb.verb)) return shared(workspace, ["--workspace", workspace, ...args], verb.verb);
 			const result = toResult(await exec(engine, ["--workspace", workspace, ...args], stdin), verb.verb);
 			// A save that timed out may have landed too: announce it.
-			if (writes(verb) && (result.ok || result.kind === "io")) emit("course-changed", { workspace });
+			if (isWrite(verb) && (result.ok || result.kind === "io")) {
+				written(null);
+				emit("course-changed", { workspace });
+			}
 			return result;
 		},
 		async map(workspace, here) {
-			const result = toResult(await exec(engine, ["--workspace", workspace, "map", ...(here ? ["--here", here] : [])], ""), "map");
+			const result = await shared(workspace, ["--workspace", workspace, "map", ...(here ? ["--here", here] : [])], "map");
 			if (!result.ok) return result;
 			const map = courseMapOf(workspace, result.json);
 			return map ? { ok: true, map } : { ok: false, kind: "io", message: "map printed an unexpected shape" };
 		},
 		async create(directory, { title, exam }) {
-			const init = toResult(await exec(engine, ["--workspace", directory, "init"], ""), "init");
+			const init = written(toResult(await exec(engine, ["--workspace", directory, "init"], ""), "init"));
 			if (!init.ok) return init;
 			const workspace = str((init.json as { workspace?: unknown } | null)?.workspace) ?? directory;
 			const record = exam ? { title, exam: { date: exam } } : { title };
-			const saved = toResult(await exec(engine, ["--workspace", workspace, "save"], JSON.stringify(record)), "save");
+			const saved = written(toResult(await exec(engine, ["--workspace", workspace, "save"], JSON.stringify(record)), "save"));
 			emit("course-changed", { workspace });
 			return saved.ok ? { ok: true, workspace } : saved;
 		},

@@ -4,7 +4,7 @@ import React, { act } from "react";
 import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import { createRoot, type Root } from "react-dom/client";
+import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { SetupDialog } from "../components/setup-dialog.tsx";
 import { CLAUDE_MODEL } from "../src/core/index.ts";
 
@@ -87,13 +87,13 @@ describe("setup polish interactions", () => {
 	it("the sign-in stage shows the connections, Escape closes setup, and an outside press closes it", async () => {
 		await mount();
 		assert.ok(document.querySelector('[data-testid="setup-stage-keys"] [data-testid="claude-connection"]'));
-		assert.equal(document.querySelector('[data-testid="setup-key-input"]'), null, "no key field");
+		assert.ok(document.querySelector('[data-testid="setup-key-input"]') === null, "no key field");
 		await escape();
 		assert.equal(closed, 1);
 		await mount();
 		await click(element('[data-slot="dialog-overlay"]'));
 		assert.equal(closed, 1, "the overlay closes a fresh setup");
-		assert.equal(document.querySelector('[data-testid="setup-dialog"]'), null);
+		assert.ok(document.querySelector('[data-testid="setup-dialog"]') === null);
 	});
 
 	it("inside press followed by overlay release and ancestor click does not dismiss setup", async () => {
@@ -110,13 +110,30 @@ describe("setup polish interactions", () => {
 		assert.equal(element('[data-slot="dialog-title"]').textContent, "Sign in to Claude");
 		assert.ok(element('[data-testid="setup-dialog"]').textContent!.includes(`Lessons run on ${CLAUDE_MODEL.name} through your Claude plan.`));
 		assert.ok(document.querySelector('[data-testid="setup-stage-keys"] [data-testid="claude-connection"]'));
-		assert.equal(document.querySelector('[data-testid="setup-key-input"]'), null, "no key field");
+		assert.ok(document.querySelector('[data-testid="setup-key-input"]') === null, "no key field");
 	});
 
 	it("closes itself once the account in use is signed in", async () => {
 		connected = true;
 		await mount();
 		assert.equal(closed, 1);
-		assert.equal(document.querySelector('[data-testid="setup-dialog"]'), null);
+		assert.ok(document.querySelector('[data-testid="setup-dialog"]') === null);
+	});
+
+	it("Sign in re-checks the account and opens while it is signed out, though an older read said connected (round 10, 4 minor 1, 61b)", async () => {
+		connected = true;
+		await mount();
+		assert.equal(closed, 1, "the account read connected");
+		await act(async () => { root?.unmount(); });
+		host?.remove();
+		connected = false; // the account signed out since that read
+		await mount();
+		assert.equal(closed, 0, "the dialog waits for a read taken since it opened");
+		assert.ok(document.querySelector('[data-testid="setup-dialog"]') !== null, "Sign in opens the dialog");
+	});
+
+	it("names Claude once: no group heading repeats the row's name (round 10, 4 minor 7)", async () => {
+		await mount();
+		assert.ok(document.querySelector('[data-testid="setup-stage-keys"] h3') === null, "no group heading");
 	});
 });

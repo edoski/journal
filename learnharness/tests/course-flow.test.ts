@@ -23,8 +23,9 @@ import {
 	type FauxResponseStep,
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
+import { newThinkingMessage } from "../src/core/native-messages.ts";
 import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
-import { fakeEngine, onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
+import { fakeEngine, fakeFor, onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
 const TMP = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-flow-")));
@@ -149,7 +150,7 @@ describe("course chooser routes", () => {
 
 	it("POST /api/chats names a lesson opened on a topic after it, keeps a review's words, and the list knows a review by its opening (round 8, 1 D9 and 2 m5)", async () => {
 		const lesson = (await (await createChat({ title: "Start Rank and the column space", course: { workspace: LINALG }, topics: ["rank"] })).json()) as { id: string; title: string };
-		assert.equal(lesson.title, "Rank and the column space");
+		assert.equal(lesson.title, "Rank and the column space lesson", "named as its task will be (round 16, m4)");
 		const review = (await (await createChat({ title: "Review Rank and the column space", course: { workspace: LINALG }, topics: ["rank"] })).json()) as { id: string; title: string };
 		assert.equal(review.title, "Review Rank and the column space");
 		chatStore.saveMessages(review.id, [{ id: "u1", role: "user", content: "Review Rank and the column space", timestamp: 1 } as never]);
@@ -291,8 +292,15 @@ describe("rename and delete a course", () => {
 	it("DELETE has the engine forget the course record; it leaves the list and its folder stays", async () => {
 		const { stores } = await import("../src/server/stores.ts");
 		stores.courseMapLedgers.save(RUST, { done: [{ fingerprint: "f", files: ["notes.md"], at: "2026-11-08T10:00:00Z" }] } as never);
+		const { subscribe } = await import("../src/core/events.ts");
+		const changes: unknown[] = [];
+		const off = subscribe((e) => {
+			if (e.type === "courses-changed") changes.push(e);
+		});
 		const res = await deleteCourseRoute(send("DELETE", { workspace: RUST }));
+		off();
 		assert.equal(res.status, 200, await res.clone().text());
+		assert.deepEqual(changes, [{ type: "courses-changed", deleted: RUST }], "the change names the course, so its open lessons say so with no read of the list (round 13, 4 #4)");
 		assert.deepEqual(engineCalls().filter((c) => c.args[1] === RUST).at(-1)!.args.slice(2), ["forget", "--course"]);
 		assert.ok(!(await listed()).some((c) => c.workspace === RUST));
 		assert.ok(fs.existsSync(RUST));
@@ -357,15 +365,22 @@ describe("a course-linked turn", () => {
 			return createPracticeAgent({ chatId: id, chatStore }, { ...opts, ...onFake(engine, opts) });
 		};
 		await turn(id, { type: "text", text: "practice rank" }, factory);
+		// His first try and the nudge, which the conclude's firstTry names (round 16, M2: a first try is an answer of his the session holds).
+		const nudge = { id: "a_nudge", role: "assistant", content: [{ type: "text", text: "Not yet. What is row 2 minus twice row 1?" }], stopReason: "stop", timestamp: Date.now() };
+		chatStore.saveMessages(id, [...chatStore.getChat(id)!.messages, newThinkingMessage("p1", "2", "guessing"), nudge as never]);
 		await turn(id, { type: "thinking", problemCallId: "p1", text: "1, the rows are dependent", confidence: "confident" }, factory);
 
 		assert.deepEqual(seenCourse, { workspace: LINALG, title: "Linear Algebra" });
 		const linked = engineCalls().filter((c) => c.args[0] === "--workspace" && c.args[1] === LINALG);
 		const verbs = linked.map((c) => c.args[2]);
-		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show" && v !== "map"), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
-		assert.equal(verbs.filter((v) => v === "map").length, 2, "each brief reads every course's daily plan");
-		assert.equal(verbs.filter((v) => v === "show").length, 2, "each turn reads whether the course has arcs");
-		assert.equal(verbs.filter((v) => v === "plan").length, 2, "each brief reads the daily plan, practice's exam run-up with it");
+		// The second turn's brief reads nothing: no course changed since the
+		// first read them (round 12, 3 D8: eleven engine processes a turn).
+		// The agent's own course_resume reads what the brief read, so it is the
+		// brief's run (round 13, N2: one engine run per read of one state).
+		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show" && v !== "map"), ["resume", "save"], "the turn brief's resume, which the agent's resume shares, and conclude's save");
+		assert.equal(verbs.filter((v) => v === "map").length, 1, "the brief reads every course's daily plan, once");
+		assert.equal(verbs.filter((v) => v === "show").length, 1, "each turn asks whether the course has arcs; no record changed between the two, so the second turn's answer is the first's run");
+		assert.equal(verbs.filter((v) => v === "plan").length, 1, "the brief reads the daily plan, practice's exam run-up with it, once");
 		const save = linked.find((c) => c.args[2] === "save")!;
 		const statement = "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.";
 		assert.deepEqual(JSON.parse(save.stdin), {
@@ -377,6 +392,60 @@ describe("a course-linked turn", () => {
 		const ack = chatStore.getChat(id)!.messages.find((m) => (m as { toolName?: string }).toolName === "conclude") as { isError: boolean; content: Array<{ text: string }> };
 		assert.equal(ack.isError, false);
 		assert.match(ack.content[0]!.text, /Course record: \{"revision":1,"changed":true,"observations":\["o1","o2"\]\}/);
+	});
+
+	it("practice: Done for today pressed while his answer is graded saves it through conclude, with his Guessing, and its card shows the mark (round 13, 4 M2)", async () => {
+		const { id } = (await (await createChat({ title: "practice rank", kind: "practice", course: { workspace: LINALG } })).json()) as { id: string };
+		const pose = { statement: "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.", mode: "recall", topics: ["rank"], modelSolution: "Row 2 is twice row 1, so the rank is 1." };
+		const histories: string[] = [];
+		let thinking: () => void = () => {};
+		const graded = new Promise<void>((resolve) => (thinking = resolve));
+		const faux = createFauxCore({});
+		faux.setResponses([
+			() => fauxAssistantMessage([fauxToolCall("problem", pose, { id: "p1" })], { stopReason: "toolUse" }),
+			// The grading turn: still thinking when he presses Done for today.
+			((_ctx: unknown, opts: { signal?: AbortSignal } | undefined) =>
+				new Promise((resolve) => {
+					thinking();
+					const cut = () => resolve(fauxAssistantMessage([], { stopReason: "aborted" }));
+					if (opts?.signal?.aborted) return cut();
+					opts?.signal?.addEventListener("abort", cut, { once: true });
+				})) as unknown as FauxResponseStep,
+			(context: TranscriptContext) => {
+				histories.push(JSON.stringify(context.messages));
+				return fauxAssistantMessage([fauxToolCall("conclude", { outcome: "solved", verdict: "Right: row 2 is twice row 1.", rung: null, missClass: null, retest: false, result: "correct", response: "1" }, { id: "c1" })], { stopReason: "toolUse" });
+			},
+			() => sendToUser("Your Rank review comes back on Thursday."),
+			() => fauxAssistantMessage(""),
+		]);
+		const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
+		const factory: Factory = (opts) => createPracticeAgent({ chatId: id, chatStore }, { ...opts, ...onFake(engine, opts) });
+		await turn(id, { type: "text", text: "practice rank" }, factory);
+		const saves = () => engineCalls().filter((c) => c.args[1] === LINALG && c.args[2] === "save");
+		const before = saves().length;
+
+		const ask = (input: unknown) => handleChatRequest(post("/api/chat", { chatId: id, input }), factory);
+		assert.equal((await ask({ type: "thinking", problemCallId: "p1", text: "1, the rows are dependent", confidence: "guessing" })).status, 200);
+		const grading = runningTurn(id);
+		assert.ok(grading, "the tutor is grading his answer");
+		const cut = new Response(grading.subscribe()).text();
+		await graded;
+		assert.equal((await ask({ type: "tonight" })).status, 200);
+		await cut;
+		const closing = runningTurn(id);
+		if (closing) await new Response(closing.subscribe()).text();
+
+		const messages = chatStore.getChat(id)!.messages;
+		assert.equal(messages.some((m) => (m as { customType?: string }).customType === "problem-dismissed"), false, "the answer he sent is not left for next time");
+		assert.match(histories[0]!, /UNGRADED WORK/, "the closing turn is told to grade it");
+		const [observation] = JSON.parse(saves()[before]!.stdin).observations as Record<string, unknown>[];
+		assert.equal(saves().length, before + 1, "one save");
+		assert.equal(observation!.result, "correct");
+		assert.equal(observation!.sure, "guess", "his Guessing is saved with the attempt");
+		const { markLinks } = await import("../src/core/answer-marks.ts");
+		const links = markLinks(chatStore.getChat(id)!);
+		assert.deepEqual(Object.keys(links), ["c1"], "the attempt marks his answer's card, the problem's conclusion");
+		assert.equal(links.c1!.length, 1);
 	});
 
 	it("practice: a message sent from Ask concludes nothing and carries no confidence (round 5)", async () => {
@@ -416,20 +485,19 @@ describe("a course-linked turn", () => {
 		assert.equal("sure" in observation!, false, "the Guessing of an earlier note is not this give-up's confidence");
 	});
 
-	it("a course session's file search defaults to the course folder", async () => {
+	it("a course session's agents read his files with Claude Code's tools, told the course folder a search starts in", async () => {
+		const faux = scripted([() => fauxAssistantMessage([fauxText("ok")])]);
+		const fake = fakeFor(faux);
 		const agent = createPracticeAgent(
 			{ chatId: "chat_files", chatStore },
-			{ engine: fakeEngine(scripted([])), course: { course: { workspace: LINALG, title: "Linear Algebra" }, records: {} as never, arcs: false } },
+			{ engine: fake.engine, course: { course: { workspace: LINALG, title: "Linear Algebra" }, records: {} as never, arcs: false } },
 		);
-		for (const name of ["find", "grep", "ls"]) {
-			const tool = agent.state.tools.find((t) => t.name === name)!;
-			const description = (tool.parameters as { properties: { path: { description: string } } }).properties.path.description;
-			assert.match(description, /default: the course folder; a relative path starts from the learner's home/, name);
-		}
-		fs.writeFileSync(path.join(LINALG, "lecture-1.md"), "rank\n");
-		const ls = agent.state.tools.find((t) => t.name === "ls")!;
-		const listing = await ls.execute("ls1", ls.prepareArguments ? ls.prepareArguments({}) : {});
-		assert.equal((listing.content[0] as { text: string }).text, path.join(LINALG, "lecture-1.md"), "ls with no path lists the course folder, as paths read opens");
+		assert.ok(agent.state.systemPrompt.includes(`This course's folder: ${LINALG}`), "the prompt names the course folder");
+		assert.ok(agent.state.systemPrompt.includes(`His home folder: ${os.homedir()}`), "and his home");
+		await agent.continue();
+		assert.deepEqual(fake.calls[0]!.tools, ["Read", "Grep", "Glob"], "his files are Claude Code's Read, Grep and Glob");
+		assert.deepEqual(fake.calls[0]!.allowedTools?.slice(1), ["Read", "Grep", "Glob"], "which run without a permission prompt");
+		assert.deepEqual(agent.state.tools.filter((t) => ["read", "ls", "find", "grep"].includes(t.name)), [], "the app has no file tools of its own");
 	});
 
 	it("each turn reads whether the course has arcs, and only a course with arcs gets the arcs doctrine (round 4)", async () => {
@@ -444,7 +512,9 @@ describe("a course-linked turn", () => {
 		};
 		const flat = (await (await createChat({ title: "no arcs yet", course: { workspace: LINALG } })).json()) as { id: string };
 		await turn(flat.id, { type: "text", text: "teach me rank" }, build(flat.id));
+		// The course gains arcs the way it does for real: a save, announced.
 		process.env.FAKE_ENGINE_SHOW = JSON.stringify({ arcs: { spaces: { title: "Vector spaces" } }, topics: {} });
+		(await import("../src/core/events.ts")).emit("course-changed", { workspace: LINALG });
 		try {
 			const grouped = (await (await createChat({ title: "arcs", course: { workspace: LINALG } })).json()) as { id: string };
 			await turn(grouped.id, { type: "text", text: "teach me rank" }, build(grouped.id));

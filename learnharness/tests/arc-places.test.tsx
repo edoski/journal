@@ -11,7 +11,7 @@ import React from "react";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ArcHandle, CourseMapTopic, StartsWhy, StudyCourse, TopicHandle } from "../src/core/index.ts";
@@ -27,6 +27,7 @@ import { TopicCard } from "../components/unit-inbox/unit-row.tsx";
 import { CourseResultRow } from "../components/unit-inbox/course-result-row.tsx";
 import { searchInbox } from "../components/unit-inbox/unit-sidebar.tsx";
 import { arcHref, courseHref } from "../components/unit-inbox/unit-href.ts";
+import { lookWords } from "../components/calendar/calendar-facts.ts";
 import { topicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { TopicHead } from "../components/unit-inbox/topic-page/topic-head.tsx";
 import { pickupSections } from "../components/unit-inbox/topic-page/pickup/pickup-facts.ts";
@@ -59,7 +60,7 @@ describe("Home's rows", () => {
 
 	it("give Home's map the arc of the row he points at: a course's step and a waiting session", () => {
 		const waiting = chat("q", { pendingQuestion: true, updatedAt: `${TODAY}T09:00:00.000Z`, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["eigen", "charpoly"] });
-		const [session, review] = todayRows([LINALG_ARCS], [waiting], TODAY);
+		const [review, session] = todayRows([LINALG_ARCS], [waiting], TODAY);
 		assert.equal(lessonOf(session!).place?.handle, "eigenvalues");
 		assert.equal(lessonOf(review!).place?.handle, "spaces");
 		assert.equal(lessonOf(todayRows([LINALG], [], TODAY)[0]!).place, null, "a course without arcs picks none");
@@ -72,33 +73,39 @@ describe("Home's rows", () => {
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((line) => line.textContent ?? "");
 		assert.equal(lines.length, 2);
 		for (const line of lines) {
-			assert.ok(line.startsWith("Linear Algebra"), line);
+			assert.ok(line.startsWith("LALinear Algebra"), `the badge's letters, then the course alone: ${line}`);
 			assert.ok(!/Vector spaces|Linear systems|Eigenvalues ·| · /.test(line), `no arc on the row: ${line}`);
 		}
 	});
 
-	it("give a planned new topic its reason with its own icon where the reason sits, cut to fit the row, its plain words kept for when it does not fit", () => {
-		const after = planned(LINALG_ARCS, { kind: "after", arc: arc("eigenvalues"), needs: h("eigen"), partners: [] });
-		assert.deepEqual(whyOf(row(after)), { kind: "next", short: "Planned today", starts: { kind: "after", words: "After Eigenvalues and eigenvectors" } });
-		const next = planned(LINALG_ARCS, { kind: "next", arc: arc("eigenvalues") });
-		assert.equal(whyOf(row(next))?.starts?.words, "Next in Eigenvalues");
-		const early = planned(LINALG_ARCS, { kind: "early", arc: arc("eigenvalues"), waitingOn: h("rank"), exam: false });
-		assert.deepEqual(whyOf(row(early))?.starts, { kind: "early", words: "Early, from Eigenvalues" }, "the waiting clause stays on the topic page");
-		const doc = render(<HybridRows rows={[row(after)]} busy={false} onContinue={() => {}} />);
-		const why = doc.querySelector('[data-slot="today-why"]')!;
-		assert.equal(why.getAttribute("data-starts"), "after");
-		assert.equal(why.textContent, "After Eigenvalues and eigenvectors");
-		assert.ok(!doc.querySelector('[data-slot="today-line"]')!.textContent!.startsWith("Linear Algebra ·"), "never on the course line");
+	it("give a planned new topic its plan status as its reason, never an arc's name, on Home's row and the sidebar's card alike (round 15, m1)", () => {
+		// Lens 1: "Start Linear maps… · Back to Linear maps and matrices" on Home, "Planned today" in the sidebar,
+		// "New topic" on the calendar; "Next in Expectation of named distributions" on the exam eve.
+		for (const why of [
+			{ kind: "after", arc: arc("eigenvalues"), needs: h("eigen"), partners: [] },
+			{ kind: "next", arc: arc("eigenvalues") },
+			{ kind: "early", arc: arc("eigenvalues"), waitingOn: h("rank"), exam: false },
+		] as StartsWhy[]) {
+			const course = planned(LINALG_ARCS, why);
+			assert.deepEqual(whyOf(row(course)), { kind: "next", short: "Planned today" }, why.kind);
+			assert.equal(needsYouNow([course], [], TODAY).lines[0]!.slot, "Planned today", `the sidebar's card (${why.kind})`);
+			const doc = render(<HybridRows rows={[row(course)]} busy={false} onContinue={() => {}} />);
+			const mark = doc.querySelector('[data-slot="today-why"]')!;
+			assert.equal(mark.textContent, "Planned today", `Home's row (${why.kind})`);
+			assert.equal(mark.getAttribute("data-starts"), null);
+		}
+		const plainEarly = planned(LINALG, { kind: "early", waitingOn: h("rank"), exam: false });
+		assert.deepEqual(whyOf(row(plainEarly)), { kind: "next", short: "Planned today" }, "no \"Early, ahead of its place\" on today's planned start");
+		const topic = LINALG_ARCS.map.topics[0]!;
+		assert.equal(lookWords({ kind: "new", day: TODAY, topic } as never, TODAY), "Planned today", "the calendar's entry on its day");
+		assert.equal(lookWords({ kind: "new", day: "2026-12-01", topic } as never, TODAY), "New topic", "a later day keeps its kind");
 	});
 
-	it("leave the sidebar card's status with its plain words", () => {
-		const after = planned(LINALG_ARCS, { kind: "after", arc: arc("eigenvalues"), needs: h("eigen"), partners: [] });
-		const [line] = needsYouNow([after], [], TODAY).lines;
-		assert.equal(line!.slot, "Planned today");
-		const doc = render(<NowCard line={line!} unit={topicUnit(buildInbox([after], [], null), after, line!.lead!, [])} active={false} />);
-		const mark = doc.querySelector('[data-slot="why-mark"]')!;
-		assert.equal(mark.textContent?.replace(", ", ""), "Planned today");
-		assert.equal(mark.getAttribute("data-starts"), null);
+	it("give a new topic its Start press, as its row says Start (round 15, m1: Start Linear maps… with a Continue press)", () => {
+		const course = planned(LINALG_ARCS, { kind: "next", arc: arc("eigenvalues") });
+		const lesson = lessonOf(row(course));
+		assert.match(lesson.title, /^Start /);
+		assert.equal(lesson.action, "Start");
 	});
 
 	it("keep today's words for a planned topic in a course without arcs", () => {
@@ -114,7 +121,7 @@ describe("the sidebar's cards", () => {
 		const today = render(<NowCard line={line!} unit={topicUnit(inbox, LINALG_ARCS, line!.lead!, [])} active={false} />);
 		assert.equal(today.querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra");
 		const rank = LINALG_ARCS.map.topics.find((t) => t.handle === "rank")!;
-		const found = render(<TopicCard unit={unitFor(LINALG_ARCS, rank, [])} today={TODAY} active={false} />);
+		const found = render(<TopicCard unit={unitFor(LINALG_ARCS, rank, [])} map={LINALG_ARCS.map} chats={[]} today={TODAY} active={false} />);
 		assert.equal(found.querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra");
 	});
 });
@@ -122,47 +129,48 @@ describe("the sidebar's cards", () => {
 describe("the topic page", () => {
 	const rank = LINALG_ARCS.map.topics.find((t) => t.handle === "rank")!;
 
-	it("keeps the course link alone above the title, never Course · Arc (Edo, 14 Nov 2026)", () => {
+	it("names the course, then its arc, as linked words under the title, never Course · Arc (Edo, 14 Nov 2026)", () => {
 		for (const course of [LINALG_ARCS, LINALG]) {
 			const doc = render(<TopicHead facts={topicFacts({ course, topic: rank, chats: [], read: null })} />);
-			const eyebrow = doc.querySelector('[data-slot="page-eyebrow"]')!;
-			assert.equal(eyebrow.textContent, "Linear Algebra");
-			assert.deepEqual([...eyebrow.querySelectorAll("a")].map((a) => a.getAttribute("href")), [courseHref("/s/linalg")]);
+			assert.ok(doc.querySelector('[data-slot="page-eyebrow"]') === null, "no line above the title");
+			const place = doc.querySelector('[data-slot="crumbs"]')!;
+			assert.equal(place.querySelector('[data-slot="crumb"][data-kind="course"]')?.getAttribute("href"), courseHref("/s/linalg"));
+			assert.doesNotMatch(place.textContent ?? "", /·/);
 		}
 	});
 
-	it("ends its facts row with the arc as a bubble with its ring, opening the course page on that arc, and has none without arcs", () => {
+	it("names the arc after the course as a link, its one label, opening the course page on that arc, and none without arcs", () => {
 		const facts = topicFacts({ course: LINALG_ARCS, topic: rank, chats: [], read: null });
-		assert.deepEqual(facts.arc, { handle: "systems", title: "Linear systems", share: 0 });
+		assert.deepEqual(facts.arc, { number: 2, handle: "systems", title: "Linear systems" });
 		const doc = render(<TopicHead facts={facts} />);
-		const row = doc.querySelector('[data-slot="page-standing"]')!;
-		const pill = row.lastElementChild!.querySelector('[data-slot="arc-pill"]')!;
-		assert.ok(pill, "the pill is the row's last fact");
-		assert.equal(pill.textContent, "Linear systems");
-		assert.equal(pill.getAttribute("href"), arcHref("/s/linalg", "systems"));
-		assert.equal(pill.getAttribute("href"), `${courseHref("/s/linalg")}?arc=systems`);
-		assert.ok(pill.querySelector("svg"), "its ring");
-		assert.ok(pill.getAttribute("class")!.includes("whitespace-nowrap") && pill.getAttribute("class")!.includes("truncate") === false, "one line");
-		assert.ok(pill.querySelector(".truncate"), "a long name ends in …");
-		const vectors = LINALG_ARCS.map.topics.find((t) => t.handle === "vectors")!;
-		assert.equal(topicFacts({ course: LINALG_ARCS, topic: vectors, chats: [], read: null }).arc?.share, 1, "Vectors and Linear independence are both his own");
+		const link = doc.querySelector('[data-slot="crumbs"] [data-slot="crumb"][data-kind="arc"]')!;
+		assert.ok(link, "the arc follows the course");
+		assert.equal(link.querySelector('[data-slot="arc-label"]')?.getAttribute("data-arc"), "systems", "the arc's one label, its number then its name");
+		assert.equal(link.textContent, "2Linear systems");
+		assert.equal(link.getAttribute("href"), arcHref("/s/linalg", "systems"));
+		assert.equal(link.getAttribute("href"), `${courseHref("/s/linalg")}?arc=systems`);
+		assert.match(link.getAttribute("class")!, /\btruncate\b/, "a long name ends in …");
+		assert.ok(doc.querySelector('[data-slot="arc-pill"]') === null, "words, never a pill");
 		const plain = render(<TopicHead facts={topicFacts({ course: LINALG, topic: rank, chats: [], read: null })} />);
 		assert.equal(topicFacts({ course: LINALG, topic: rank, chats: [], read: null }).arc, null);
-		assert.equal(plain.querySelector('[data-slot="arc-pill"]'), null);
+		assert.ok(plain.querySelector('[data-slot="crumb"][data-kind="arc"]') === null);
 	});
 
-	it("says why a topic not started comes when it does, under its planned first lesson", () => {
+	it("says why a topic not started comes when it does in Scheduled, never under Now, whose planned day wraps whole", () => {
 		const startsWhy: StartsWhy = { kind: "after", arc: arc("eigenvalues"), needs: h("eigen"), partners: [] };
 		const diag = { ...LINALG_ARCS.map.topics.find((t) => t.handle === "diag")!, starts: "2026-11-11", startsWhy };
 		const course = { ...LINALG_ARCS, map: { ...LINALG_ARCS.map, topics: LINALG_ARCS.map.topics.map((t) => (t.handle === "diag" ? diag : t)) } };
 		const facts = topicFacts({ course, topic: diag, chats: [], read: null });
-		assert.deepEqual(facts.startsWhy, { kind: "after", words: "After Eigenvalues and eigenvectors, which it needs" });
+		assert.deepEqual(facts.startsWhy, { kind: "after", words: "After Eigenvalues and eigenvectors, which it needs", short: "After Eigenvalues and eigenvectors" });
 		const { now } = pickupSections(facts);
-		assert.deepEqual([now.kind, now.note, now.why], ["start", "Planned Wed 11 Nov", facts.startsWhy]);
+		// Round 15, m2: the plan line says why the plan starts it then.
+		assert.deepEqual([now.kind, now.note, now.why], ["start", "Planned Wed 11 Nov · After Eigenvalues and eigenvectors", facts.startsWhy]);
 		const doc = render(<SectionsPane facts={facts} busy={false} onAct={() => {}} onTask={() => {}} shown={null} onShow={() => {}} />);
-		const line = doc.querySelector('[data-slot="pickup-now"] [data-slot="topic-starts-why"]')!;
-		assert.equal(line.textContent, "After Eigenvalues and eigenvectors, which it needs");
-		assert.equal(line.getAttribute("data-kind"), "after");
+		// Round 12, 3 n9: Now carries no reason line, and its planned day wraps whole.
+		assert.ok(doc.querySelector('[data-slot="pickup-now"] [data-slot="topic-starts-why"]') === null, "no reason line under Now");
+		const note = doc.querySelector('[data-slot="pickup-now-note"]')!;
+		assert.equal(note.textContent, "Planned Wed 11 Nov · After Eigenvalues and eigenvectors");
+		assert.ok(!note.className.includes("truncate"), "the planned day is never cut");
 		const withSession = topicFacts({ course, topic: diag, chats: [chat("d", { topics: ["diag"], pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })], read: null });
 		assert.deepEqual(pickupSections(withSession).scheduled?.why, facts.startsWhy, "Scheduled's first lesson says it too, when Now does not start it");
 		const covariance = { ...diag, handle: "covariance" as TopicHandle, starts: undefined, startsWhy: undefined, excluded: "Outside the exam: it covers chapters 2-4, and covariance is section 7.3" };
@@ -177,8 +185,23 @@ describe("the topic page", () => {
 		const diag = { ...LINALG.map.topics.find((t) => t.handle === "diag")!, starts: "2026-12-04" };
 		const map = { ...LINALG.map, exam: { date: "2026-11-29", daysLeft: 21, leavesOut: h("diag") }, topics: LINALG.map.topics.map((t) => (t.handle === "diag" ? diag : t)) };
 		const facts = topicFacts({ course: { ...LINALG, map }, topic: diag, chats: [], read: null });
-		assert.deepEqual(facts.startsWhy, { kind: "after", words: "Not on the exam; after it" });
+		assert.deepEqual(facts.startsWhy, { kind: "after", words: "Not on the exam; after it", short: "Not on the exam; after it" });
 		assert.equal(pickupSections(facts).now.why, facts.startsWhy);
+	});
+
+	it("gives a start the exam leaves out, or has no room for, the head's and calendar's exam words in Now's note (round 13, 1 N1)", () => {
+		// Covariance: not on the exam, planned after it, and waiting behind other courses' new topics too; the exam is why.
+		const covariance = { ...LINALG.map.topics.find((t) => t.handle === "diag")!, starts: "2026-11-24", startsAfter: ["Real Analysis"] };
+		const left = { ...LINALG.map, exam: { date: "2026-11-19", daysLeft: 11, leavesOut: h("diag") }, topics: LINALG.map.topics.map((t) => (t.handle === "diag" ? covariance : t)) };
+		const leftFacts = topicFacts({ course: { ...LINALG, map: left }, topic: covariance, chats: [], read: null });
+		assert.equal(pickupSections(leftFacts).now.note, "Planned Tue 24 Nov · Not on the exam; after it");
+		// Geometric: on the exam, and no room before it to start.
+		const geometric = { ...covariance, startsAfter: undefined, starts: "2026-11-28" };
+		const full = { ...LINALG.map, exam: { date: "2026-11-19", daysLeft: 11, doesNotFit: h("diag"), reasons: { diag: "full" as const } }, topics: LINALG.map.topics.map((t) => (t.handle === "diag" ? geometric : t)) };
+		const fullFacts = topicFacts({ course: { ...LINALG, map: full }, topic: geometric, chats: [], read: null });
+		const doc = render(<SectionsPane facts={fullFacts} busy={false} onAct={() => {}} onTask={() => {}} shown={null} onShow={() => {}} />);
+		assert.equal(doc.querySelector('[data-slot="pickup-now-note"]')?.textContent, "Planned Sat 28 Nov · Not before the exam, every study day is full at your pace");
+		assert.ok(doc.querySelector('[data-slot="pickup-now"] [data-slot="topic-starts-why"]') === null, "still no reason line under Now (round 12, 3 n9)");
 	});
 });
 

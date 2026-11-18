@@ -31,13 +31,16 @@
  * turn rides one composition.
  */
 
-import { dismissedAnswer, type QuestionAnswerData } from "./question-core.ts";
+import { dismissedAnswer, picksStop, type LeftDraft, type QuestionAnswerData } from "./question-core.ts";
 import { parsePhotos, type Photo } from "./photos.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
 import type { LhMessage } from "./native-messages.ts";
 import type { AnswerSaves, SessionMode } from "./contracts/chat.ts";
 import {
 	activeProblemOf,
+	newTaskContinueMessage,
+	sessionTasksOf,
+	needsContinuation,
 	sessionModeOf,
 	concludedByDismissalPair,
 	danglingQuestionOf,
@@ -60,6 +63,8 @@ import {
 	newUngradedAnswerMessage,
 	ungradedAnswerOf,
 	newAskedMessage,
+	newUngradedWorkMessage,
+	workAwaitingGradeOf,
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
 import { markLinks } from "./answer-marks.ts";
@@ -92,12 +97,20 @@ export type ChatInput =
 	 *  chip or Enter on an empty composer. Practice sessions only, and
 	 *  only with nothing active (mid-problem input rides the dock). */
 	| { type: "next" }
-	/** Done for tonight: he stops now, whatever is open. */
-	| { type: "tonight" }
+	/** Done for tonight: he stops now, whatever is open. `draft` is what he
+	 *  had typed in the open question's box (`toolCallId`), kept with the
+	 *  question it was left on (`LeftDraft`). */
+	| { type: "tonight"; draft?: { toolCallId: string } & LeftDraft }
+	/** Continue pressed on an open task the session holds, with nothing
+	 *  in it waiting on him: the tutor carries on at the task's step
+	 *  (round 13, 2 M1). */
+	| { type: "task" }
 	/** His dispute of an answer's mark (Edo, 14 Nov 2026): the answer's
 	 *  call, the attempts that stood for it when he pressed Dispute, and
-	 *  what he said is wrong or the mark he thinks is right (at least one). */
-	| { type: "dispute"; answerId: string; observations: string[]; said?: string; proposed?: MarkResult; proposedHow?: DisputedHow };
+	 *  what he said is wrong or the mark he thinks is right (at least one).
+	 *  `row` names the one try he disputes on a card of several ("First
+	 *  try"), whose attempt alone `observations` holds (round 16, m19). */
+	| { type: "dispute"; answerId: string; observations: string[]; row?: string; said?: string; proposed?: MarkResult; proposedHow?: DisputedHow };
 
 /** A wake-pipeline steer delivery — same turn composition, server-origin.
  *  Wave C (2026-09-26): the idle wake carries EVERY queued marker as its
@@ -280,14 +293,27 @@ export function parseChatInput(input: unknown): ChatInput {
 			};
 		case "next":
 			return { type: "next" };
-		case "tonight":
-			return { type: "tonight" };
+		case "tonight": {
+			const draft = i.draft as { toolCallId?: unknown; text?: unknown; confidence?: unknown } | undefined;
+			if (draft === undefined) return { type: "tonight" };
+			if (!draft || typeof draft.toolCallId !== "string" || !draft.toolCallId || typeof draft.text !== "string") {
+				throw new ChatInputError("tonight input draft requires toolCallId and text");
+			}
+			if (draft.confidence !== undefined && !isConfidence(draft.confidence)) {
+				throw new ChatInputError(`tonight input draft confidence must be one of ${CONFIDENCE_STATES.join(", ")}`);
+			}
+			if (!draft.text.trim()) return { type: "tonight" };
+			return { type: "tonight", draft: { toolCallId: draft.toolCallId, text: draft.text, ...(draft.confidence !== undefined ? { confidence: draft.confidence } : {}) } };
+		}
+		case "task":
+			return { type: "task" };
 		case "dispute": {
 			if (typeof i.answerId !== "string" || i.answerId.length === 0) throw new ChatInputError("dispute input requires answerId");
 			const observations = Array.isArray(i.observations) ? i.observations : [];
 			if (observations.length === 0 || !observations.every((id) => typeof id === "string" && /^o\d+$/.test(id))) {
 				throw new ChatInputError("dispute input requires the observation ids (o12) that stand for the answer");
 			}
+			if (i.row !== undefined && (typeof i.row !== "string" || !i.row.trim())) throw new ChatInputError("dispute input row must name the try");
 			if (i.said !== undefined && typeof i.said !== "string") throw new ChatInputError("dispute input said must be a string");
 			if (i.proposed !== undefined && !isMarkResult(i.proposed)) throw new ChatInputError(`dispute input proposed must be one of ${MARK_RESULTS.join(", ")}`);
 			if (i.proposedHow !== undefined && !(DISPUTED_HOWS as readonly unknown[]).includes(i.proposedHow)) throw new ChatInputError(`dispute input proposedHow must be one of ${DISPUTED_HOWS.join(", ")}`);
@@ -297,6 +323,7 @@ export function parseChatInput(input: unknown): ChatInput {
 				type: "dispute",
 				answerId: i.answerId,
 				observations: observations as string[],
+				...(typeof i.row === "string" ? { row: i.row.trim() } : {}),
 				...(said ? { said } : {}),
 				...(i.proposed !== undefined ? { proposed: i.proposed } : {}),
 				...(i.proposedHow !== undefined ? { proposedHow: i.proposedHow as DisputedHow } : {}),
@@ -328,7 +355,12 @@ export function inputAppends(
 			if (!pending || pending.toolCallId !== input.toolCallId) {
 				throw new ChatInputError("answer input targets no pending question call");
 			}
-			return [newAnswerResult(input.toolCallId, pending.tool, input.answer, input.photos)];
+			const result = newAnswerResult(input.toolCallId, pending.tool, input.answer, input.photos);
+			// His pick of the tutor's own stop is his Done for today (round 14,
+			// M6: "Stop here for today" sent as a plain answer opened sheet 4).
+			return pending.tool === "ask_user_question" && picksStop(pending.input, input.answer)
+				? [result, newDoneTonightMessage(respondingAgentOf(record.messages, record.kind))]
+				: [result];
 		}
 		case "continue":
 			return dismissalConclusion(record);
@@ -366,7 +398,9 @@ export function inputAppends(
 			return [...dismissalConclusion(record), newNextMessage()];
 		}
 		case "tonight":
-			return tonightAppends(record);
+			return tonightAppends(record, input.draft);
+		case "task":
+			return taskContinueAppends(record);
 		case "dispute":
 			return disputeAppends(record, input);
 	}
@@ -419,25 +453,33 @@ export function disputeAppends(record: { messages: LhMessage[]; answerSaves?: An
 	if (question === null || !markLinks(record)[input.answerId]) {
 		throw new ChatInputError("dispute input targets no marked answer");
 	}
-	const { answerId, observations, said, proposed, proposedHow } = input;
-	return [...dismissalConclusion(record), newDisputeMessage({ answerId, observations, ...(said ? { said } : {}), ...(proposed ? { proposed } : {}), ...(proposedHow ? { proposedHow } : {}) }, question)];
+	const { answerId, observations, row, said, proposed, proposedHow } = input;
+	return [...dismissalConclusion(record), newDisputeMessage({ answerId, observations, ...(row ? { row } : {}), ...(said ? { said } : {}), ...(proposed ? { proposed } : {}), ...(proposedHow ? { proposedHow } : {}) }, question)];
 }
 
 /** Done for tonight's appends (pure). Every answerable question in the
  *  newest batch resolves as a dismissal with reason "tonight", adjacent to
  *  its call, so its answer is never revealed and nothing grades it. An
  *  active problem is dropped the way a discard drops it, with its conclude
- *  pair carried now instead of by a later input. The marker comes last:
+ *  pair carried now instead of by a later input, unless his work on it
+ *  waits for its grade (`workAwaitingGradeOf`): the closing turn grades
+ *  that through `conclude`. The marker comes last:
  *  the learner input the turn answers. */
-export function tonightAppends(record: { messages: LhMessage[]; kind?: SessionMode }): LhMessage[] {
+export function tonightAppends(record: { messages: LhMessage[]; kind?: SessionMode }, draft?: { toolCallId: string } & LeftDraft): LhMessage[] {
 	const withheld = questionCallsOf(record.messages)
 		.filter((call) => call.status === "answerable")
-		.map((call) => newAnswerResult(call.toolCallId, call.tool,
-			dismissedAnswer(toolQuestionKind(call.tool), parseQuestionInput(call.tool, call.input)?.question ?? "", "tonight")));
+		.map((call) => {
+			const left = dismissedAnswer(toolQuestionKind(call.tool), parseQuestionInput(call.tool, call.input)?.question ?? "", "tonight");
+			// His half answer stays with the question it was left on.
+			const kept = draft?.toolCallId === call.toolCallId ? { text: draft.text, ...(draft.confidence ? { confidence: draft.confidence } : {}) } : null;
+			return newAnswerResult(call.toolCallId, call.tool, kept ? { ...left, draft: kept } : left);
+		});
 	const active = activeProblemOf(record.messages);
-	const dropped = active
-		? [newProblemDismissedMarker(active.toolCallId), ...concludedByDismissalPair(active.toolCallId, "tonight")]
-		: dismissalConclusion(record);
+	const dropped = !active
+		? dismissalConclusion(record)
+		: workAwaitingGradeOf(record.messages, active.toolCallId)
+			? [newUngradedWorkMessage()]
+			: [newProblemDismissedMarker(active.toolCallId), ...concludedByDismissalPair(active.toolCallId, "tonight")];
 	return [...withheld, ...dropped, ...ungradedNote(record), newDoneTonightMessage(respondingAgentOf(record.messages, record.kind))];
 }
 
@@ -544,4 +586,20 @@ function dismissalConclusion(record: { messages: LhMessage[] }): LhMessage[] {
 /** Is this tool name a question tool (dock-owned, answer-gated)? */
 export function isQuestionTool(name: string): boolean {
 	return (QUESTION_TOOLS as readonly string[]).includes(name);
+}
+
+/** Whether Continue on the task a session holds starts a turn: it holds an
+ *  open task, nothing in it waits on him, and no reply is owed (pure). */
+export function taskTurnOwed(messages: LhMessage[]): boolean {
+	return sessionTasksOf(messages).length > 0 && !danglingQuestionOf(messages) && !activeProblemOf(messages) && !needsContinuation(messages);
+}
+
+/** Continue on a task's appends (pure): refused unless the session holds
+ *  an open task and nothing in it waits on him, since a posed question or
+ *  problem is where he goes on, and his answer is the next input. */
+export function taskContinueAppends(record: { messages: LhMessage[] }): LhMessage[] {
+	const tasks = sessionTasksOf(record.messages);
+	if (tasks.length === 0) throw new ChatInputError("task input requires a session holding an open task");
+	if (danglingQuestionOf(record.messages) || activeProblemOf(record.messages)) throw new ChatInputError("task input requires nothing waiting on him");
+	return [...dismissalConclusion(record), newTaskContinueMessage(tasks)];
 }

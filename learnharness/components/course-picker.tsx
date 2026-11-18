@@ -16,7 +16,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useDialogSubject } from "@/components/ui/overlay";
 import { cn } from "@/lib/utils";
+import { takeHeld } from "@/components/held-asks";
 import { ExamDayField, MaterialField } from "@/components/new-course-fields";
 import { DeleteCourseDialog, RenameCourseDialog } from "@/components/course-manage-dialogs";
 import { useServerEvent } from "@/components/server-events";
@@ -166,34 +168,28 @@ export function CourseControl({ choice }: { choice: CourseChoice }) {
 				onManage={(action, course) => setManaging({ action, course })}
 				asked={choice.asked}
 			/>
-			{creating && (
-				<NewCourseDialog
-					roots={state.roots}
-					onClose={() => setCreating(false)}
-					onCreated={(course) => choice.add(course)}
-					onCloseAutoFocus={focusComposer}
-				/>
-			)}
-			{managing?.action === "rename" && (
-				<RenameCourseDialog
-					course={managing.course}
-					onClose={() => setManaging(null)}
-					onRenamed={(title) => {
-						choice.renamed(managing.course.workspace, title);
-						setManaging(null);
-					}}
-				/>
-			)}
-			{managing?.action === "delete" && (
-				<DeleteCourseDialog
-					course={managing.course}
-					onClose={() => setManaging(null)}
-					onDeleted={() => {
-						choice.removed(managing.course.workspace);
-						setManaging(null);
-					}}
-				/>
-			)}
+			<NewCourseDialog
+				roots={creating ? state.roots : null}
+				onClose={() => setCreating(false)}
+				onCreated={(course) => choice.add(course)}
+				onCloseAutoFocus={focusComposer}
+			/>
+			<RenameCourseDialog
+				course={managing?.action === "rename" ? managing.course : null}
+				onClose={() => setManaging(null)}
+				onRenamed={(title) => {
+					if (managing) choice.renamed(managing.course.workspace, title);
+					setManaging(null);
+				}}
+			/>
+			<DeleteCourseDialog
+				course={managing?.action === "delete" ? managing.course : null}
+				onClose={() => setManaging(null)}
+				onDeleted={() => {
+					if (managing) choice.removed(managing.course.workspace);
+					setManaging(null);
+				}}
+			/>
 		</>
 	);
 }
@@ -202,7 +198,7 @@ export function CourseControl({ choice }: { choice: CourseChoice }) {
  *  every send is blocked with the same words. */
 export function CoursesUnavailable({ reason }: { reason: string }) {
 	return (
-		<p role="alert" data-testid="courses-unavailable" className="text-row text-muted-foreground">
+		<p role="alert" data-testid="courses-unavailable" className="text-body text-muted-foreground">
 			<span className="text-danger">{unavailableMessage(reason)}.</span> If the engine is not found, set
 			LH_LEARNING_ENGINE to its folder and LH_LEARNING_PYTHON to its Python, then restart.
 		</p>
@@ -233,9 +229,14 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 		if (asked > 0) setOpen(true);
 	}, [asked]);
 	useEffect(() => {
-		const onPick = () => setOpen(true);
+		const onPick = (e: Event) => {
+			e.preventDefault();
+			setOpen(true);
+		};
 		const name = kbdEventForAction("pick-course");
 		window.addEventListener(name, onPick);
+		// ⌘O pressed while this page was on its way (⌘N, then ⌘O; held-asks.ts).
+		if (takeHeld("pick-course")) setOpen(true);
 		return () => window.removeEventListener(name, onPick);
 	}, []);
 	return (
@@ -246,7 +247,7 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 				data-slot="composer-chip"
 				aria-label="Course"
 				className={cn(
-					"flex h-8 min-w-0 items-center gap-1.5 rounded-full px-3 text-row outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-fill-hover motion-reduce:transition-none",
+					"flex h-8 min-w-0 items-center gap-1.5 rounded-full px-3 text-body outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-fill-hover motion-reduce:transition-none",
 					picked ? "text-foreground" : "text-muted-foreground",
 				)}
 			>
@@ -371,7 +372,7 @@ export function NewCourseBody({ roots, onClose, onCreated, onCloseAutoFocus, fet
 			</DialogContent>
 		);
 	}
-	const field = "flex flex-col gap-2 text-row font-medium text-foreground";
+	const field = "flex flex-col gap-2 text-body text-foreground";
 	return (
 		<DialogContent aria-describedby={undefined} data-testid="new-course-dialog" className="max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
 			<form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
@@ -388,7 +389,7 @@ export function NewCourseBody({ roots, onClose, onCreated, onCloseAutoFocus, fet
 				</div>
 				<div role="group" aria-labelledby="new-course-material-label" className={field}>
 					<span id="new-course-material-label">Course material</span>
-					<span className="text-label font-normal text-muted-foreground">Slides, notes or past papers. They are copied into the course, so the tutor can read them.</span>
+					<span className="text-callout font-normal text-muted-foreground">Slides, notes or past papers. They are copied into the course, so the tutor can read them.</span>
 					<MaterialField picks={picks} onChange={setPicks} disabled={busy} />
 				</div>
 				{roots.length > 1 && (
@@ -398,11 +399,11 @@ export function NewCourseBody({ roots, onClose, onCreated, onCloseAutoFocus, fet
 					</label>
 				)}
 				{roots.length === 0 && (
-					<p className="text-row text-muted-foreground">
+					<p className="text-body text-muted-foreground">
 						LearnHarness does not know your courses folder yet. Set up the first course from the Terminal with <code>study init</code>.
 					</p>
 				)}
-				{error && <p role="alert" className="text-row text-danger">{error}</p>}
+				{error && <p role="alert" className="text-body text-danger">{error}</p>}
 				<DialogFooter className="pt-2">
 					<Button type="button" variant="quiet" onClick={onClose}>
 						Cancel
@@ -416,10 +417,19 @@ export function NewCourseBody({ roots, onClose, onCreated, onCloseAutoFocus, fet
 	);
 }
 
-export function NewCourseDialog(props: { roots: readonly string[]; onClose: () => void; onCreated: (course: CourseSummary) => void; onCloseAutoFocus?: (e: Event) => void }) {
+export function NewCourseDialog({ roots, ...props }: {
+	/** The folders a new course can go in; null = closed. */
+	roots: readonly string[] | null;
+	onClose: () => void;
+	onCreated: (course: CourseSummary) => void;
+	onCloseAutoFocus?: (e: Event) => void;
+}) {
+	const { open, shown, opening } = useDialogSubject(roots);
 	return (
-		<Dialog open onOpenChange={(open) => !open && props.onClose()}>
-			<NewCourseBody {...props} />
-		</Dialog>
+		shown && (
+			<Dialog open={open} onOpenChange={(next) => !next && props.onClose()}>
+				<NewCourseBody key={opening} roots={shown} {...props} />
+			</Dialog>
+		)
 	);
 }

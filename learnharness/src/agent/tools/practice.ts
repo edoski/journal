@@ -16,10 +16,6 @@
 
 import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { readTool } from "./read.ts";
-import { lsTool } from "./ls.ts";
-import { findTool } from "./find.ts";
-import { grepTool } from "./grep.ts";
 import { jobTools, type JobToolContext } from "./jobs.ts";
 import { teachHandoffTool } from "./handoff.ts";
 import { nameSessionTool } from "./name-session.ts";
@@ -130,19 +126,35 @@ function brokeAtField() {
 		Type.String({
 			minLength: 1,
 			description:
-				"When an answer to a problem with several topics was incorrect or partial: the handle of the topic where it first broke. The miss is charged to that topic alone; give the topics answered right before the break their result in byTopic.",
+				"When an answer to a problem with several topics was incorrect or partial: the handle of the topic where it first broke. The miss is charged to that topic alone, and no other topic is credited. One answer has one result: never a result per topic. A problem whose labelled parts went differently gives parts instead.",
 		}),
 	);
 }
 
-function byTopicField() {
+/** A problem's labelled parts that went differently (round 8's per-part
+ *  charging, kept one result per topic by round 14's M2). */
+function partsField() {
 	return Type.Optional(
-		Type.Record(Type.String(), attemptResult("correct, partial or incorrect"), {
-			description:
-				"When the pose's topics went differently in this answer (a multi-part problem with one part right): the result of each topic that differs from result, by its handle in the pose's topics. Topics left out take result.",
-		}),
+		Type.Array(
+			Type.Object({
+				part: Type.String({ minLength: 1, description: "The part's label as the problem's statement writes it: \"(a)\", \"2)\"." }),
+				topics: Type.Array(Type.String({ minLength: 1 }), { minItems: 1, description: "The posed topics this part tests, each in this part alone." }),
+				result: attemptResult("This part's result."),
+			}),
+			{
+				minItems: 2,
+				description:
+					"Only when the problem's statement has labelled parts ((a), (b)… or 1), 2)…) that test different topics and went differently: each part, the topics it tests and its result, so each topic takes its own part's result. Each topic in one part at most; a topic in no part takes result, which is the whole answer's (partial when the parts differ). A problem with no labelled parts has one result: never parts. Leave brokeAt out.",
+			},
+		),
 	);
 }
+
+/** The record sentence's ask, on the conclusion and its first try: the
+ *  line his topic's history reads for the answer (round 11, 2 n5: the
+ *  history showed the whole problem, and a first try as "First try"). */
+const RECORD_DESCRIPTION =
+	"What he did on this answer, as one short line for his course record in the words a lesson save uses, with math in `$…$` LaTeX: what he got right or where it broke (\"Subtracted the rank from the rows instead of the columns\"), never the problem's statement. His topic's history reads it.";
 
 export const concludeInputObject = Type.Object({
 	outcome: Type.Union(
@@ -179,6 +191,7 @@ export const concludeInputObject = Type.Object({
 			"REQUIRED — the attempt's result for his course record: correct, partial (part of it right: some of its parts right and others not, or a right answer reached by reasoning that does not hold; a verdict that names a part he got right is never incorrect) or incorrect; giving up is incorrect. A right guess is correct; his confidence travels separately. null only with movedOn when he claimed no answer at all, as when he asked to be taught instead: nothing is recorded.",
 	}),
 	response: Type.String({ description: "REQUIRED — his final answer, in a short line, with math in `$…$` LaTeX (it is recorded as the attempt the learner reads later)." }),
+	record: Type.Optional(Type.String({ minLength: 1, description: RECORD_DESCRIPTION })),
 	chose: Type.Optional(
 		Type.String({
 			minLength: 1,
@@ -186,13 +199,16 @@ export const concludeInputObject = Type.Object({
 				"When his final answer used a wrongly chosen method: that method's course topic handle. A wrong method he later corrected goes in firstTry.chose.",
 		}),
 	),
-	byTopic: byTopicField(),
 	brokeAt: brokeAtField(),
+	parts: partsField(),
 	firstTry: Type.Optional(
 		Type.Object(
 			{
-				result: attemptResult("REQUIRED — the result of his first answer."),
+				result: Type.Union([Type.Literal("partial"), Type.Literal("incorrect")], {
+					description: "REQUIRED — the result of his first answer: partial or incorrect, since a right first answer solved the problem and is the conclusion itself.",
+				}),
 				response: Type.String({ description: "REQUIRED — his first answer, in a short line, with math in `$…$` LaTeX." }),
+				record: Type.Optional(Type.String({ minLength: 1, description: RECORD_DESCRIPTION })),
 				sure: Type.Union([...CONFIDENCE_STATES.map((s) => Type.Literal(s)), Type.Null()], {
 					description:
 						"REQUIRED — the Confidence line of the submission that made this first claim (guessing, neutral or confident), or null when it had none. A working note before the claim is not the claim.",
@@ -200,10 +216,10 @@ export const concludeInputObject = Type.Object({
 				chose: Type.Optional(
 					Type.String({ minLength: 1, description: "When the first answer used a wrongly chosen method: that method's course topic handle." }),
 				),
-				byTopic: byTopicField(),
 				brokeAt: brokeAtField(),
+				parts: partsField(),
 			},
-			{ description: "When the problem took more than one answer: his first unaided answer, its result and his confidence in it." },
+			{ description: "When the problem took more than one answer of his: his first unaided answer, which did not solve it, its result and his confidence in it. Never his final answer again; a question or a request is not an answer." },
 		),
 	),
 });
@@ -228,8 +244,21 @@ function explainedBeforeAnyWork(messages: readonly LhMessage[], problemCallId: s
 	return explained && !worked;
 }
 
-/** Save a concluded problem's attempts; a refusal names what to fix. */
-async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, concludeCallId: string): Promise<{ refused?: string; text: string }> {
+/** How many answers of his the session holds on this problem: his work,
+ *  and the work he had written when he asked for help. */
+function answersOn(messages: readonly LhMessage[], problemCallId: string): number {
+	return messages.filter((m) => {
+		if (m.role !== "custom") return false;
+		const details = m.details as { problemCallId?: unknown; text?: unknown } | null;
+		if (details?.problemCallId !== problemCallId) return false;
+		return m.customType === "practice-thinking" || (m.customType === "practice-request" && typeof details.text === "string");
+	}).length;
+}
+
+/** Save a concluded problem's attempts; a refusal names what to fix. An
+ *  attempt the record would not take is kept as `unsaved`, the conclude's
+ *  own observations, which a later save writes as they are. */
+async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, concludeCallId: string): Promise<{ refused?: string; text: string; unsaved?: Record<string, unknown>[] }> {
 	if (input.outcome === "dismissed") return { text: "" };
 	const record = rec.ctx.chatStore.getChat(rec.ctx.chatId);
 	const active = record ? activeProblemOf(record.messages) : null;
@@ -248,13 +277,20 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 		rung: input.rung,
 		result: input.result,
 		response: input.response,
+		...(input.record ? { record: input.record } : {}),
 		...(input.chose ? { chose: input.chose } : {}),
-		...(input.byTopic ? { byTopic: input.byTopic } : {}),
+		// A result per topic, sent unasked, gives one answer two results.
+		...("byTopic" in input ? { byTopic: (input as { byTopic?: unknown }).byTopic } : {}),
 		...(input.brokeAt ? { brokeAt: input.brokeAt } : {}),
+		...(input.parts ? { parts: input.parts } : {}),
 		...(input.firstTry ? { firstTry: input.firstTry } : {}),
 	};
-	const problem = conclusionProblem(conclusion, topics);
+	const problem = conclusionProblem(conclusion, topics, pose.statement);
 	if (problem) return { refused: problem, text: "" };
+	// A first try is an answer of his before the final one, which the
+	// session holds, never the tutor's claim alone (round 16, M2: one answer
+	// after a hint was saved twice, once as a right first try).
+	if (answersOn(record.messages, active.toolCallId) < 2) delete conclusion.firstTry;
 	// His newest message came from Ask: a question, never his answer, and
 	// the confidence of an earlier note is not its (round 5).
 	const final = finalSubmissionOf(record.messages, active.toolCallId);
@@ -282,7 +318,7 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 			: "On your next turn, re-send exactly this with course_save: ";
 	// Each names this conclude, so the problem's card shows the mark.
 	const resend = observations.map((o) => ({ ...o, question: concludeCallId }));
-	return { text: `The attempt was not saved (${saved.message}). ${repair}${JSON.stringify({ observations: resend })}` };
+	return { text: `The attempt was not saved (${saved.message}). ${repair}${JSON.stringify({ observations: resend })}`, unsaved: observations };
 }
 
 export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording): AgentTool<typeof concludeInputObject> {
@@ -307,7 +343,10 @@ export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording):
 			gate.problemActive = false;
 			const ack = concludeResult();
 			if (!recorded.text) return ack;
-			return { ...ack, content: [{ type: "text", text: `${CONCLUDE_ACK_TEXT}\n\n${recorded.text}` }] };
+			// The observations it could not save ride its result, for the save
+			// that sends them again (round 15, M3).
+			const details = recorded.unsaved ? ({ unsaved: recorded.unsaved } as unknown as null) : ack.details;
+			return { ...ack, content: [{ type: "text", text: `${CONCLUDE_ACK_TEXT}\n\n${recorded.text}` }], details };
 		},
 	};
 }
@@ -316,11 +355,10 @@ export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording):
 export function practiceTools(ctx: PracticeToolContext, course?: CourseToolContext): Record<string, AgentTool<any>> {
 	// ONE gate per turn, shared by both tools — the intra-turn truth.
 	const gate = createPracticeGate(ctx);
-	// THE RARELY-NEEDED SET (owner round 10): read/ls/find/grep over the
-	// learner's files (always — the same read-only set the teacher and
-	// prober carry), the research + pdf jobs (available without search
-	// keys; demo/visual stay teach-only), and
-	// the prober's map readers when the settings gate opened.
+	// THE RARELY-NEEDED SET (owner round 10): the research + pdf jobs
+	// (available without search keys; demo/visual stay teach-only), and
+	// the prober's map readers when the settings gate opened. His files are
+	// Claude Code's Read, Grep and Glob, as for every tutor agent.
 	// problem/conclude are the session; these are exceptions the doctrine
 	// says to reach for rarely.
 	const jobs = ctx.jobs ? jobTools(ctx.jobs) : null;
@@ -331,10 +369,6 @@ export function practiceTools(ctx: PracticeToolContext, course?: CourseToolConte
 	return healToolRecord({
 		problem: problemTool(gate),
 		conclude: concludeTool(gate, course ? { ctx, course } : undefined),
-		read: readTool,
-		ls: lsTool,
-		find: findTool,
-		grep: grepTool,
 		...(jobs?.research ? { research: jobs.research } : {}),
 		...(jobs ? { pdf: jobs.pdf! } : {}),
 		...(ctx.deliver ? teachHandoffTool({ chatId: ctx.chatId, chatStore: ctx.chatStore, deliver: ctx.deliver }, gate) : {}),

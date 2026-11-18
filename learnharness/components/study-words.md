@@ -14,7 +14,7 @@ One phrase per step of the topic's pie (`topic-standing.ts` sets the fill from t
 | 3/4 | Right with help |
 | full | On your own |
 
-On a topic not yet solid (`attempted` or `assisted`), the words say how he answered it since his newest answer that was not right, the engine's `right` (`RIGHT_WORDS`, `standingWords`): Right on your own, check another day; Right with help; Right, but a guess; Right, not yet confirmed; Partly right when that newest answer was partly right. Right answers after a review day's wrong first try never read "Tried, not right yet" (round 7); `attempted` with no right answer since keeps it. With no right answer since his newest wrong one, an `assisted` topic, or a weak one he could do on his own whose wrong answer is open, reads Not right last time, never Right with help (round 8), and the head drops the lapse's own Not right last time beside it (`SLIP_SAID_BY`). Right on your own drops "check another day" once its review is due. The pie stays the pie.
+On a topic not yet solid (`attempted` or `assisted`), the words say how he answered it since his newest answer that was not right, the engine's `right` (`RIGHT_WORDS`, `standingWords`): Right on your own, check another day; Right with help; Right, but a guess; Right, not yet confirmed; Partly right when that newest answer was partly right. Right answers after a review day's wrong first try never read "Tried, not right yet" (round 7); `attempted` with no right answer since keeps it. With no right answer since his newest wrong one, an `assisted` topic reads Not right last time, never Right with help (round 8). Right on your own drops "check another day" once its review is due. A topic he is losing reads Slipping (`SLIPPING_WORDS`, Edo, 15 Nov 2026), the warning ink's own word, and the slip beside it says why (`slipMark`): one he could do on his own whose newest counted answer is not right (`slipsNow`). A topic still being learned never slips, whatever its mistakes, and neither does one whose miss he has answered right since: it says how he answered it since (Right on your own, check another day; Right with help when help repaired it), with no slip beside it unless a mistake is open (round 11, 3 N1: Invertible and Poisson read Slipping twenty minutes after their first lesson). The pie stays the pie.
 
 ## Why it needs him
 
@@ -22,11 +22,11 @@ One form each, wherever it shows.
 
 | Reason | Words |
 |---|---|
-| a slip, the first signal that holds, each with its own icon (`slip-icons.ts`) | Fixed, check again later (`repaired` on his own, a check); with no wrong answer open (the engine's `mistake`, which any right answer closes, with help or not), Check on your own (a person with a check), whatever else the record says, since the signals below describe a wrong answer a right one has since answered (round 7: "Not right last time" after a right last try); else Not right last time (`lapsed`, a crossed circle; never "Missed", which beside an overdue review read as a review he skipped); Mistake to fix (`gap`, an alert); Mixed up with Cramer's rule (`choiceErrors`, the method's title, two arrows); Sure, but wrong (`confidentErrors`, a warning); else Mistake to fix. A repair made only with help (`repairedWithHelp`) is not "Fixed", since help may have carried it. |
-| a review come due | Due today, 3d overdue, 16d overdue (always days, round 4) |
+| a slip, the first signal that holds, each with its own icon (`slip-icons.ts`) | Check again another day (`repaired` on his own, a check); with no wrong answer open (the engine's `mistake`, which any right answer closes, with help or not), Check on your own (a person with a check), whatever else the record says, since the signals below describe a wrong answer a right one has since answered (round 7: "Not right last time" after a right last try); else Not right last time (`lapsed`, a crossed circle; never "Missed", which beside an overdue review read as a review he skipped); Mistake to fix (`gap`, an alert); Mixed up with Cramer's rule (`choiceErrors`, the method's title, two arrows); Sure, but wrong (`confidentErrors`, a warning); else Mistake to fix. A repair made only with help (`repairedWithHelp`) is not shown as one, since help may have carried it. The repair's words name what is left, a check on a later day, never "Fixed", which beside Slipping read as its opposite (round 10, 2 m3). |
+| a review come due | Due today, Due 3 Nov (its day, never a count, round 9; never "Due since", which with its icon left a sidebar card no room for its course's name, round 16) |
 | a review dated ahead | its day, never a count: Back Tue 10 Nov (`returnWords`) |
-| unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 20d ago; Unfinished when no day is known. Never the tutor's step text. |
-| a review the plan holds back | the engine's held words (`heldWords`, from the plan's `held`): Waits for your Probability exam when another course's final review came first, else Earlier days are full; once memory's day has passed, since when it was due first and the day the plan brings it back (`reviewWords`): Due since 21 Oct, back 4 Dec; never "Moved from" a memory day still ahead, which nobody told him |
+| unfinished work holds it | Left off today, else its day, Left off 6 Nov (never a count, round 9; never "yesterday", which left a sidebar card no room for its course's name, round 16, m4); Unfinished when no day is known. Never the tutor's step text. |
+| a review the plan holds back | the engine's held words (`heldWords`, from the plan's `held`): Waits for your Probability exam when another course's final review came first, else Earlier days are full; once memory's day has passed, since when it was due first and the day the plan brings it back (`reviewWords`): Due 21 Oct, back 4 Dec; never "Moved from" a memory day still ahead, which nobody told him |
 | a topic not started, on its page's Now row | First lesson (`FIRST_LESSON`): the head already says Not started; under it the day the plan starts it, once (Planned today, Planned Wed 11 Nov) |
 
 ### Which one a topic says
@@ -35,9 +35,9 @@ A topic often has more than one reason, and a row says one. Every surface takes 
 
 1. a session on it waits on him, or the tutor writes in it (Your turn, Working);
 2. a slip;
-3. a review come due (Due today, 3d overdue): the engine dates it today;
-4. unfinished work that holds it (Left off 2d ago);
-5. when its review comes back (Back Tue 10 Nov), a review the plan holds back included (Due since 21 Oct): the engine dates that review on a later day, so the work he left comes first. A review held past memory's day is due already, so it is a fact that needs him, with the review's icon, and the map's card says it as the lists do (round 6: Cramer's rule read Due since 6 Nov in the lists and its standing on the map);
+3. a review come due (Due today, Due 5 Nov): the engine dates it today;
+4. unfinished work that holds it (Left off 6 Nov);
+5. when its review comes back (Back Tue 10 Nov), a review the plan holds back included (Due 21 Oct): the engine dates that review on a later day, so the work he left comes first. A review held past memory's day is due already, so it is a fact that needs him, with the review's icon, and the map's card says it as the lists do (round 6: Cramer's rule read Due since 6 Nov in the lists and its standing on the map);
 6. how long since he studied it.
 
 Both "left off" and "due" are true at once, and neither is wrong: a review due today is today's work, so it leads; a review the plan has moved to a later day is not, so the unfinished work leads until that day. A topic Home's Today takes up says Today's reason instead, wherever it shows (the sidebar's card, the course page's Needs you).
@@ -79,7 +79,8 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 | the tutor's turn ended with no reply | You stopped the tutor before it replied. (his stop, from any window, before it wrote anything) / You stopped the tutor mid-reply. (his stop after it had written to him) / The tutor stopped before replying. (the app restarted while it ran); then Try again |
 | the connection dropped mid-reply | The connection dropped before the tutor finished replying. |
 | another window answered the question he was typing in | Answered in another window. What you typed here is in the box below. (once the next question holds the box: Answered in another window. Press Esc to see what you typed here.) |
-| another window asked for a hint on it, or asked the tutor something | Another window asked for a hint. / Another window asked the tutor something. Then: What you typed here comes back when the tutor asks the question again. |
+| a question or problem opens while the message box holds words he has not sent | Your unsent message is kept. Press Esc to see it. (until he sees it, empties the box or the box shows again) |
+| another window asked for a hint on it, or asked the tutor something | Another window asked for a hint. What you typed here comes back when the hint is done. / Another window asked the tutor something. What you typed here comes back when the tutor asks the question again. |
 | he stops for the day | Done for today; a question he left reads Left for next time, in full; a problem he left reads Left for next time. |
 | he skips | a question: Skipped, then the question; a problem: You skipped this problem. |
 | the lesson's course was deleted | This course was deleted. Its lessons stay as history. (with what he had written: What you wrote here is in the new lesson box.) Start a new lesson |
@@ -111,5 +112,6 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 
 | Where | Words |
 |---|---|
-| a course's progress (Home's ring, the course page's standing line) | No topics on your own yet; Some topics on your own; Most topics on your own (more than half); Every topic on your own (`courseShareWords`). No count: the ring draws the share |
+| a course's progress (the course's badge, the course page's standing line) | No topics on your own yet; Some topics on your own; Most topics on your own (more than half); Every topic on your own (`courseShareWords`). No count: the badge draws the share |
 | a folded list's last row (the sidebar's shelves, the course page's groups) | Show the rest (`moreWords`): every folded list shows all its hidden rows in one press, so the action has one name (round 4 found "Show the rest" and "Show more" side by side). No number: a bare count told him nothing |
+| a press on a topic or a Today line (the topic page's Now, the course page's Now, the sidebar's hover action, the calendar, the exam's ways in) | Resume, Review, Continue, Start, Study (`pressWord`): a session he picks up reads Resume whether it waits on him or the tutor is writing in it, so no caller maps a word of its own (audit 17 Nov 2026, finding 2: the topic page said Open where the course page said Resume). Home's row has no word: the whole row is the press |

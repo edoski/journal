@@ -1,4 +1,4 @@
-import { currentArc, type ArcHandle, type ArcState, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, type RightAnswer, type StartsWhy, type TopicHandle, type TopicMoved, type TopicSignals, type UnreadableProblem } from "@/src/core";
+import { currentArc, type ArcHandle, type ArcState, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, movedWhy, type RightAnswer, type StartsWhy, type TopicHandle, type TopicMoved, type TopicSignals, type UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -19,6 +19,11 @@ export const STANDING_WORDS: Record<Fill, string> = {
 	0.75: "Right with help",
 	1: "On your own",
 };
+
+/** A topic he is losing (`slipsNow`): the warning ink's words, as every
+ *  other state has its own (Edo, 15 Nov 2026), with the slip beside it
+ *  saying why (`slipMark`). */
+export const SLIPPING_WORDS = "Slipping";
 
 /** A topic he cannot yet do on his own, by how he answered it since his
  *  newest answer that was not right (the engine's `right`): the 3/4 pie's
@@ -43,28 +48,52 @@ export const RIGHT_WORDS: Record<RightAnswer, string> = {
  *  (round 8: Eigen read "Right with help" after a Show me). Right on his
  *  own drops "check another day" once that day has come, beside the review
  *  due (round 8). `attempted` with no right answer since keeps its pie's
- *  words; a weak topic he could do on his own keeps its 3/4 pie's words,
- *  but says "Not right last time" while a wrong answer is open. Pure. */
-export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review" | "signals">>): string {
+ *  words. A weak topic he could do on his own says how he answered it
+ *  since its miss: right on his own, or with help when help repaired it.
+ *  A topic that slips says `SLIPPING_WORDS` instead (`standingOf`). Pure. */
+export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review" | "signals" | "tasks">>): string {
+	if (lessonBegun(topic)) return LESSON_BEGUN;
 	const learning = topic.level === "assisted" || topic.level === "attempted";
-	if (learning && topic.right) return topic.right === "unaided" && topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS[topic.right];
-	// No right answer since his newest wrong one: on a topic still being
-	// learned, or one he could do on his own whose wrong answer is open.
-	if (topic.level === "assisted" || (fill === 0.75 && topic.signals?.mistake)) return WRONG_LAST_WORDS;
+	const unaided = () => (topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS.unaided);
+	if (learning && topic.right) return topic.right === "unaided" ? unaided() : RIGHT_WORDS[topic.right];
+	// No right answer since his newest wrong one, on a topic still being learned.
+	if (topic.level === "assisted") return WRONG_LAST_WORDS;
+	// A weak topic he could do on his own that does not slip (`slipsNow`):
+	// its miss answered right since, with help or on his own, or a check left.
+	if (fill === 0.75 && !learning) return topic.signals?.mistake ? WRONG_LAST_WORDS : topic.signals?.repairedWithHelp ? RIGHT_WORDS.helped : unaided();
 	return STANDING_WORDS[fill];
 }
+
+/** A topic not taught yet that an open task holds: a lesson he began,
+ *  which the plan carries on (the engine's `begun`), never "Not started"
+ *  (round 12, 1 D3: "Poisson distribution, Not started · Left off 10 Nov"
+ *  after two Poisson lessons). Pure. */
+export function lessonBegun(topic: Pick<CourseMapTopic, "level"> & Partial<Pick<CourseMapTopic, "tasks">>): boolean {
+	return topic.level === "new" && (topic.tasks?.length ?? 0) > 0;
+}
+
+/** Where he stands on a lesson he began (`lessonBegun`). */
+export const LESSON_BEGUN = "Lesson in progress";
+
+/** What the plan dates for a lesson he began: the day it goes on, as a
+ *  topic page's Scheduled line says it in place of `FIRST_LESSON`. */
+export const LESSON_GOES_ON = "Lesson continues";
 
 /** A topic whose newest answer that counts was not right, and none right
  *  since. */
 const WRONG_LAST_WORDS = "Not right last time";
 
-/** Right on his own, on the day its check has come. */
-const RIGHT_ON_YOUR_OWN = "Right on your own";
+/** Right on his own, on the day its check has come, and a map card's
+ *  short standing for it any day. */
+export const RIGHT_ON_YOUR_OWN = "Right on your own";
 
 /** A slip's words for each of the engine's signals but a mixed-up method,
  *  which names the method (`slipWords`). */
 export const SLIP_WORDS = {
-	repaired: "Fixed, check again later",
+	// Not "Fixed, check again later": beside "Slipping", which the engine
+	// keeps until a later day's answer on his own, it read as its opposite
+	// (round 10, 2 m3).
+	repaired: "Check again another day",
 	// Not "Missed": beside an overdue review he read that as a review he
 	// skipped (round 3). A lapse is an answer that was not right.
 	lapsed: WRONG_LAST_WORDS,
@@ -99,14 +128,6 @@ export function slipMark(signals: TopicSignals, titleOf: (handle: TopicHandle) =
 	if (confidentErrors > 0) return { key: "confident", words: SLIP_WORDS.confident };
 	return { key: "gap", words: SLIP_WORDS.gap };
 }
-
-/** The standing words that already say a slip, where a head would say it
- *  twice: right on his own beside a mistake fixed on his own both say a
- *  check on another day (round 7). */
-export const SLIP_SAID_BY: Readonly<Partial<Record<SlipKey, string>>> = {
-	repaired: RIGHT_WORDS.unaided,
-	lapsed: WRONG_LAST_WORDS,
-};
 
 /** The slip's words alone (`slipMark`). */
 export function slipWords(signals: TopicSignals, titleOf: (handle: TopicHandle) => string): string {
@@ -149,26 +170,55 @@ export const MARK_HOW_WORDS: Record<MarkHow, string> = {
 };
 
 /*
- * Every distance in time counts whole days, one scheme wherever it shows:
- * "3d ago", "13d ago", "45d ago", never weeks or months (round 4: search
- * put "13d ago" beside "2w ago" and "4w ago", where 13 days read as more
- * recent than 14 by a different unit). `distanceWords` already said days.
+ * A time in the past is named by its day, never counted (round 9, 2 m5:
+ * "Due 5 Nov", "Left off 6 Nov" and "Studied 4 Nov" made him count
+ * back): "today", "yesterday", else the day, "3 Nov", as "Due 3 Nov"
+ * and "Back Tue 10 Nov" already said. `today` is the engine's study day.
  */
 
-/** A review come due: "Due today", "3d overdue", "16d overdue". */
-export function overdueWords(overdue: number): string {
+/** The engine day some days before `today`. */
+function dayBefore(today: string, days: number): string {
+	const d = new Date(`${today}T00:00:00Z`);
+	d.setUTCDate(d.getUTCDate() - days);
+	return d.toISOString().slice(0, 10);
+}
+
+/** The day some days before `today`: "today", "yesterday", else "3 Nov". */
+function pastDay(days: number, today: string): string {
+	if (days <= 0) return "today";
+	if (days === 1) return "yesterday";
+	return shortDay(dayBefore(today, days));
+}
+
+/** A review come due: "Due today", else the day it fell due, "Due 3 Nov",
+ *  never "Due since", which with its icon left a sidebar card no room for
+ *  its course's name (round 16, Edo's ruling of 18 Nov 2026). */
+export function overdueWords(overdue: number, today: string): string {
 	if (overdue <= 0) return "Due today";
-	return `${overdue}d overdue`;
+	return dueWords(dayBefore(today, overdue));
+}
+
+/** A review due since a day already past: "Due 3 Nov". */
+function dueWords(day: string): string {
+	return `Due ${shortDay(day)}`;
 }
 
 /** Where unfinished work holding a topic was left, by when, never by the
- *  tutor's step: "Left off today", "Left off yesterday", "Left off 3d
- *  ago", "Left off 20d ago"; "Unfinished" when no day is known. */
-export function leftOffWords(days: number | null): string {
+ *  tutor's step: "Left off today", else its day, "Left off 6 Nov", never
+ *  "yesterday", which left a sidebar card no room for its course's name
+ *  (round 16, m4); "Unfinished" when no day is known. */
+export function leftOffWords(days: number | null, today: string): string {
 	if (days === null) return "Unfinished";
-	if (days <= 0) return "Left off today";
-	if (days === 1) return "Left off yesterday";
-	return `Left off ${days}d ago`;
+	return `Left off ${days <= 0 ? "today" : shortDay(dayBefore(today, days))}`;
+}
+
+/** Where an old lesson's map stopped, when nothing resumes it: "Stopped
+ *  here today", "Stopped here on 6 Nov"; "Left off here" is only for a
+ *  lesson the page resumes (round 16, m22: the 5 and 6 Nov lessons' maps
+ *  said "Left off at A worked example" with no Resume anywhere). */
+export function stoppedHereWords(days: number, today: string): string {
+	const day = pastDay(days, today);
+	return days <= 1 ? `Stopped here ${day}` : `Stopped here on ${day}`;
 }
 
 /** A review the engine has dated ahead, by its day, never a count of
@@ -183,28 +233,17 @@ export function weekdayWords(day: string): string {
 	return SHORT_WEEKDAY.format(new Date(`${day}T00:00:00Z`)).replace(",", "");
 }
 
-/** Some days ago in a trailing column: "Today", "Yesterday", "3d ago",
- *  "40d ago". */
-export function agoWords(days: number): string {
-	if (days <= 0) return "Today";
-	if (days === 1) return "Yesterday";
-	return `${days}d ago`;
+/** A past day in a trailing column: "Today", "Yesterday", "26 Oct". */
+export function agoWords(days: number, today: string): string {
+	const day = pastDay(days, today);
+	return day.charAt(0).toUpperCase() + day.slice(1);
 }
 
-/** Home's clock beside a course or a session, labelled so it never reads
- *  as the line's reason: "Studied today", "Studied yesterday", "Studied 7d
- *  ago" (round 8: "7d ago" above "Planned today" read as a contradiction).
- *  The short days are `agoWords`'. */
-export function studiedAgoWords(days: number): string {
-	return days <= 1 ? studiedDaysWords(days) : `Studied ${agoWords(days)}`;
-}
-
-/** When he last studied something, as a phrase: "Studied today",
- *  "Studied yesterday", "Studied 3 days ago", "Studied 40 days ago". */
-export function studiedDaysWords(days: number): string {
-	if (days <= 0) return "Studied today";
-	if (days === 1) return "Studied yesterday";
-	return `Studied ${days} days ago`;
+/** When he last studied something, as a phrase, labelled so beside a
+ *  line's reason it never reads as one (round 8): "Studied today",
+ *  "Studied yesterday", "Studied 4 Nov". */
+export function studiedDaysWords(days: number, today: string): string {
+	return `Studied ${pastDay(days, today)}`;
 }
 
 /** What a topic page's Now row offers on a topic not started: its first
@@ -232,33 +271,35 @@ export function heldWords(review: CourseMapTopic["review"]): string | null {
 	return review.held.exam ? HELD_WORDS.exam(review.held.exam) : HELD_WORDS.full;
 }
 
-/** What of his study moved a day he was told (`TopicMoved`). */
-const MOVED_BY = {
-	study: (courses: readonly string[]) => ` after your ${listWords(courses)} study today`,
-	missed: ", no study yesterday",
-	left: ", yesterday's plan was not finished",
-} as const;
+/** Why a review waits, as a page or the calendar says it: only when
+ *  another course's exam took its day (`HELD_WORDS.exam`). That earlier
+ *  days are full explains a gap from memory's day, a day he was never told,
+ *  so a row says nothing of it (round 11: "Earlier days are full" under
+ *  a review read as noise). */
+export function heldExamWords(review: CourseMapTopic["review"]): string | null {
+	return review?.kind === "scheduled" && review.held?.exam ? HELD_WORDS.exam(review.held.exam) : null;
+}
 
 /** A day that moved, from when: one he was told ("Moved from 10 Nov after
  *  your Probability study today", round 7: a told day moved in silence),
  *  else a review the plan holds past a day memory asked for that has
- *  passed, "Due since 1 Oct"; null otherwise. Memory's day still ahead was
+ *  passed, "Due 1 Oct"; null otherwise. Memory's day still ahead was
  *  never a day he was told, so nothing moved "from" it (round 8: "Moved
  *  from 11 Nov" named a day he never heard). */
 export function movedWords(review: CourseMapTopic["review"], today: string, told?: TopicMoved): string | null {
-	if (told) return `Moved from ${shortDay(told.from)}${told.by === "study" ? MOVED_BY.study(told.courses) : MOVED_BY[told.by]}`;
+	if (told) return `Moved from ${shortDay(told.from)}${movedWhy(told, today, shortDay)}`;
 	if (review?.kind !== "scheduled" || !review.held) return null;
-	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : null;
+	return review.held.since < today ? dueWords(review.held.since) : null;
 }
 
-/** A review that is due: "Due today", "3d overdue"; one the plan holds
+/** A review that is due: "Due today", "Due 5 Nov"; one the plan holds
  *  past a day memory asked for already says since when, so a review weeks
- *  late never reads as spacing, and the day the plan brings it back, "Due
- *  since 1 Oct, back 3 Dec" (round 8: Calculus' rows gave no return day);
+ *  late never reads as spacing, and the day the plan brings it back, "Due 1
+ *  Oct, back 3 Dec" (round 8: Calculus' rows gave no return day);
  *  any other dated review "Back in 5d". `today` is the engine's day. */
 export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
-	if (review.kind === "due") return overdueWords(review.overdue);
-	if (review.held && review.held.since < today) return `Due since ${shortDay(review.held.since)}, back ${shortDay(review.date)}`;
+	if (review.kind === "due") return overdueWords(review.overdue, today);
+	if (review.held && review.held.since < today) return `${dueWords(review.held.since)}, back ${shortDay(review.date)}`;
 	return returnWords(review.date);
 }
 
@@ -332,14 +373,34 @@ export const EXAM_GAP_WORDS = {
 	review: "Review it today",
 	/** The menu of the other topics he can take up today, beside the pick. */
 	another: "Or another",
+	/** A topic he began, whose press picks its session or task up (round 12, 1 D5). */
+	continue: "Continue it today",
 	ask: "Ask the tutor",
-	/** Each topic in Start one today's menu: "Start Variance", "Review Rank". */
-	startTopic: "Start",
-	reviewTopic: "Review",
 } as const;
 
+/** What a press on a topic or a Today line does: resume a session that
+ *  waits on him (`open`: one the tutor is writing in), review the topic,
+ *  continue a task or a lesson he began, start a topic, or study it again. */
+export type PressKind = "resume" | "open" | "review" | "continue" | "start" | "study";
+
+const PRESS_WORDS = { resume: "Resume", open: "Resume", review: "Review", continue: "Continue", start: "Start", study: "Study" } as const;
+
+/** The press's word. */
+export type PressWord = (typeof PRESS_WORDS)[PressKind];
+
+/** The one word a press says, on every surface (the topic page's Now, the
+ *  course page's Now, the sidebar's hover action, the calendar, the exam's
+ *  ways in): a session he picks up reads Resume whether it waits on him or
+ *  the tutor is writing in it (audit 17 Nov 2026, finding 2: the topic page
+ *  said Open where the course page said Resume). Pure. */
+export function pressWord(kind: PressKind): PressWord {
+	return PRESS_WORDS[kind];
+}
+
 /** A topic the exam's plan leaves out, by title, with the engine's reason
- *  (`exam.reasons`); a topic with no reason reads as `full`. */
+ *  (`exam.reasons`); a topic with no reason is left out for none the
+ *  engine names, and no words give it one (round 13, 1 n4: "your pace
+ *  fills every day of the final review" while two of its days had room). */
 export interface ExamGapTopic {
 	title: string;
 	reason?: ExamGapReason;
@@ -361,8 +422,8 @@ const startsWord = (titles: readonly string[]) => (titles.length === 1 ? "starts
  * cause as study days full at your pace. Null with nothing left out. Pure.
  */
 export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly ExamGapTopic[]): string | null {
-	const by = (topics: readonly ExamGapTopic[], reason: ExamGapReason) => topics.filter((t) => (t.reason ?? "full") === reason).map((t) => t.title);
-	const reasons = (topics: readonly ExamGapTopic[]) => new Set(topics.map((t) => t.reason ?? "full")).size;
+	const by = (topics: readonly ExamGapTopic[], reason: ExamGapReason) => topics.filter((t) => t.reason === reason).map((t) => t.title);
+	const reasons = (topics: readonly ExamGapTopic[]) => new Set(topics.map((t) => t.reason)).size;
 	const sentence = (clauses: readonly string[]) => (clauses.length > 0 ? `${clauses.join(", and ").replace(/^./, (c) => c.toUpperCase())}.` : null);
 	const name = start.length > 1 && reasons(start) > 1;
 	const startFull = by(start, "full");
@@ -389,14 +450,42 @@ export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly
 /** The pick among the topics he can take up today, as its press says it:
  *  "Start Expectation and linearity today", "Review Binomial distribution
  *  today". */
-export function examGapPickWords(starts: boolean, title: string): string {
-	return `${starts ? EXAM_GAP_WORDS.startTopic : EXAM_GAP_WORDS.reviewTopic} ${title} today`;
+export function examGapPickWords(verb: "start" | "review" | "continue", title: string): string {
+	return `${pressWord(verb)} ${title} today`;
+}
+
+/** The taught topics the final review leaves out, a line per reason,
+ *  under the calendar's "Final review" line: "No room in it for Kernel",
+ *  "Poisson starts too close to the exam for a review", "No study day left
+ *  in it for Geometric". Each reason in the head's words (`examGapWhyWords`),
+ *  so the two never disagree (round 9: "No room in it for Poisson" beside
+ *  the head's "starts too close to the exam"). Pure. */
+export function finalReviewGapWords(topics: readonly ExamGapTopic[]): string[] {
+	const by = (reason: ExamGapReason) => topics.filter((t) => t.reason === reason).map((t) => t.title);
+	// "No room in it" is the plain fact: a topic with no reason, or with days full at his pace.
+	const full = topics.filter((t) => t.reason === undefined || t.reason === "full").map((t) => t.title);
+	const [late, noDay] = [by("too_late"), by("no_study_day")];
+	return [
+		...(full.length > 0 ? [`No room in it for ${listWords(full)}`] : []),
+		...(late.length > 0 ? [`${listWords(late)} ${startsWord(late)} too close to the exam for a review`] : []),
+		...(noDay.length > 0 ? [`No study day left in it for ${listWords(noDay)}`] : []),
+	];
+}
+
+/** The final review as he can place it: "the final review from 13 Nov"
+ *  while it is still ahead, so a topic it has no room for reads as
+ *  reviewed before it, never as not reviewed at all (round 11 integration:
+ *  "No room in the final review for Binomial" beside "Review Binomial
+ *  today", which the plan does before the final review); "the final
+ *  review" once it is under way. Pure. */
+function finalReviewName(exam: Pick<CourseExam, "finalReview">, today: string): string {
+	return exam.finalReview && exam.finalReview > today ? `the final review from ${shortDay(exam.finalReview)}` : "the final review";
 }
 
 /** The taught topics the final review has no room for, standing alone
  *  (the calendar's "No room in it for" reads under its final review). */
-export function finalReviewMissWords(titles: readonly string[]): string {
-	return `No room in the final review for ${listWords(titles)}`;
+export function finalReviewMissWords(titles: readonly string[], exam: Pick<CourseExam, "finalReview">, today: string): string {
+	return `No room in ${finalReviewName(exam, today)} for ${listWords(titles)}`;
 }
 
 /** His opening words in a lesson Ask the tutor starts, naming the topics. */
@@ -414,35 +503,48 @@ export function leftOutWords(topic: Pick<CourseMapTopic, "handle" | "starts">, e
 	return topic.starts && topic.starts > exam.date ? "Not on the exam; after it" : "Not on the exam";
 }
 
+/** A course page row's status for a topic the exam ahead puts after it,
+ *  its planned day in the row's hint (round 12, 1 m11), in the topic
+ *  page's own short words: an exam topic the plan has no room to start
+ *  before the exam is "Not before the exam", one the exam leaves out "Not
+ *  on the exam" (round 15, M7: on the exam eve Geometric and Variance,
+ *  which the exam needs, and Covariance, which it leaves out, all read
+ *  "After the exam"). */
+export const ARC_ROW_EXAM_WORDS = { noRoom: "Not before the exam", leftOut: "Not on the exam" } as const;
+
 /** What the exam's plan means for a topic it leaves out (`examGaps`), on
- *  the topic's own page, in the engine's reason (`exam.reasons`). */
+ *  the topic's own page, in the engine's reason (`exam.reasons`). A
+ *  review's words follow the final review's name (`finalReviewName`). */
 export const EXAM_GAP_TOPIC_WORDS: {
 	start: Readonly<Record<ExamGapReason | "none", string>>;
 	review: Readonly<Record<ExamGapReason | "none", string>>;
 } = {
 	start: {
-		none: "Not before the exam",
+		none: ARC_ROW_EXAM_WORDS.noRoom,
 		no_study_day: "Not before the exam, no study day is left",
 		not_ready: "Not before the exam, what it needs won’t be solid in time",
 		full: "Not before the exam, every study day is full at your pace",
-		too_late: "Not before the exam",
+		too_late: ARC_ROW_EXAM_WORDS.noRoom,
 	},
+	// The final review has no slot for it, whatever reviews come before
+	// it: "No review before the exam" read false beside "Review Wed 11 Nov"
+	// (round 9, 2 M1). The words match `finalReviewMissWords`.
 	review: {
-		none: "No review before the exam",
-		no_study_day: "No review before the exam, no study day is left in the final review",
-		not_ready: "No review before the exam",
-		full: "No review before the exam, the final review is full at your pace",
-		too_late: "No review before the exam, it starts too close to it",
+		none: "",
+		no_study_day: ", no study day is left in it",
+		not_ready: "",
+		full: " at your pace",
+		too_late: ", it starts too close to the exam",
 	},
 };
 
 /** The words for `topic` when the exam ahead has no room to start it
  *  (`doesNotFit`) or to review it (`unreviewed`); null otherwise. Pure. */
-export function examGapTopicWords(topic: Pick<CourseMapTopic, "handle">, exam: Pick<CourseExam, "daysLeft" | "doesNotFit" | "unreviewed" | "reasons"> | null): string | null {
+export function examGapTopicWords(topic: Pick<CourseMapTopic, "handle">, exam: Pick<CourseExam, "daysLeft" | "doesNotFit" | "unreviewed" | "reasons" | "finalReview"> | null, today: string): string | null {
 	if (!exam || exam.daysLeft < 0) return null;
 	const reason = exam.reasons?.[topic.handle] ?? "none";
 	if (exam.doesNotFit?.includes(topic.handle)) return EXAM_GAP_TOPIC_WORDS.start[reason];
-	if (exam.unreviewed?.includes(topic.handle)) return EXAM_GAP_TOPIC_WORDS.review[reason];
+	if (exam.unreviewed?.includes(topic.handle)) return `No room in ${finalReviewName(exam, today)}${EXAM_GAP_TOPIC_WORDS.review[reason]}`;
 	return null;
 }
 
@@ -470,6 +572,7 @@ function behindHere(arc: ArcHandle, map: StartsMap): boolean {
 export function startsWhyWords(why: StartsWhy, map: StartsMap): string {
 	const titles = (handles: readonly TopicHandle[]) => listWords(handles.map((h) => map.topics.find((t) => t.handle === h)?.title ?? h));
 	const arc = why.arc && (map.arcs?.find((a) => a.handle === why.arc)?.title ?? why.arc);
+	if (why.kind === "begun") return LESSON_BEGUN;
 	if (why.kind === "early") {
 		const early = arc ? `Early, from ${arc}` : "Early, ahead of its place";
 		if (why.exam) return `${early}, to keep pace with the exam`;
@@ -486,8 +589,10 @@ export function startsWhyWords(why: StartsWhy, map: StartsMap): string {
 
 /** Whether a start's reason tells him anything its planned day does not:
  *  every reason but "next" in a course without arcs, which would only say
- *  "Next in Linear Algebra" beside the course's own name. Pure. */
+ *  "Next in Linear Algebra" beside the course's own name, and a lesson he
+ *  began, whose row and Scheduled line already say it goes on. Pure. */
 export function startsWhyTells(why: StartsWhy): boolean {
+	if (why.kind === "begun") return false;
 	if (why.arc !== undefined || why.kind === "early") return true;
 	return why.kind === "after" && (why.needs.length > 0 || why.partners.length > 0);
 }
@@ -506,16 +611,23 @@ export function startsWhyShort(why: StartsWhy, map: StartsMap): string {
 	return arc ? `Back to ${arc}` : startsWhyWords(why, map);
 }
 
-/** How far a day is from the engine's, one form wherever a distance shows
- *  (an exam, a planned review): "Today", "Tomorrow", "In 18 days",
- *  "Yesterday", "3 days ago". Always days, never rounded to weeks, so the
- *  same exam reads the same on the course page and in the calendar. */
-export function distanceWords(day: string, today: string): string {
+/** A day beside the engine's, one form wherever a day shows (an exam, a
+ *  planned review): "Today", "Tomorrow" or "Yesterday", else null, since
+ *  the day itself says when and a count is not his words (round 14, m9:
+ *  "Exam in 11 days", "in 16 days"). */
+export function distanceWords(day: string, today: string): string | null {
 	const days = daysBetween(today, day);
 	if (days === 0) return "Today";
 	if (days === 1) return "Tomorrow";
 	if (days === -1) return "Yesterday";
-	return days > 0 ? `In ${days} days` : `${-days} days ago`;
+	return null;
+}
+
+/** "Thursday 19 November", with "today", "tomorrow" or "yesterday" after
+ *  it when it is one of those: never a count of days. */
+export function dayAndNearWords(day: string, long: string, today: string): string {
+	const near = distanceWords(day, today);
+	return near ? `${long}, ${near.toLowerCase()}` : long;
 }
 
 /** Whole days from `from` to `to`, both "YYYY-MM-DD". */
@@ -539,6 +651,7 @@ export const LESSON_WORDS = {
 	newReply: "New reply",
 	skippedQuestion: "Skipped",
 	stoppedBeforeReply: "The tutor stopped before replying.",
+	couldntReply: "The tutor couldn't reply.",
 	youStoppedReply: "You stopped the tutor before it replied.",
 	youStoppedMidReply: "You stopped the tutor mid-reply.",
 	tryAgain: "Try again",
@@ -546,8 +659,12 @@ export const LESSON_WORDS = {
 	tryAgainPlaceholder: "Press Enter to try again, or write something new.",
 	answeredElsewhere: "Answered in another window. What you typed here is in the box below.",
 	answeredElsewhereOpen: "Answered in another window. Press Esc to see what you typed here.",
-	hintElsewhere: "Another window asked for a hint. What you typed here comes back when the tutor asks the question again.",
+	hintElsewhere: "Another window asked for a hint. What you typed here comes back when the hint is done.",
 	askedElsewhere: "Another window asked the tutor something. What you typed here comes back when the tutor asks the question again.",
+	/** A question or problem opened over words still in the message box
+	 *  (round 11, 4 minor 2: a message kept while the app was down sat
+	 *  hidden there after the restart). */
+	messageKept: "Your unsent message is kept. Press Esc to see it.",
 	doneTonight: "Done for today",
 	leftForTonight: "Left for next time",
 	skippedProblem: "You skipped this problem.",
@@ -565,6 +682,10 @@ export const MARK_WORDS = {
 	result: { correct: "Right", partial: "Partly right", incorrect: "Not right" } satisfies Record<MarkResult, string>,
 	sure: { guess: "Guessing", confident: "Confident" } satisfies Record<NonNullable<MarkRow["sure"]>, string>,
 	disputed: "Disputed",
+	/** After the ruling, whose words are the tutor's reply (round 16, m20:
+	 *  the stamp printed the whole ruling the reply had just said). */
+	markStands: "the mark stands",
+	markChanged: "the mark changed",
 	dispute: "Dispute",
 	disputeTitle: "Dispute this mark",
 	disputeLine: "Say what's wrong, or pick the mark or how it should count. The tutor looks at your answer again.",
@@ -578,9 +699,11 @@ export const MARK_WORDS = {
  *  what he picked, the mark and how it should count, "You think: Right,
  *  On your own". One rule for the lesson's row and practice's bubble
  *  (round 8: practice's stamp dropped a help pick). Pure. */
-export function disputeStampWords(dispute: { proposed?: MarkResult; proposedHow?: MarkHow & ("ownWork" | "withHelp") }): string {
+export function disputeStampWords(dispute: { row?: string; proposed?: MarkResult; proposedHow?: MarkHow & ("ownWork" | "withHelp") }): string {
 	const picked = [dispute.proposed && MARK_WORDS.result[dispute.proposed], dispute.proposedHow && MARK_HOW_WORDS[dispute.proposedHow]].filter(Boolean);
-	return picked.length > 0 ? `${MARK_WORDS.youDisputed} · ${MARK_WORDS.youThink}: ${picked.join(", ")}` : MARK_WORDS.youDisputed;
+	// The try he disputed, on a card of several (round 16, m19).
+	const disputed = dispute.row ? `${MARK_WORDS.youDisputed} · ${dispute.row}` : MARK_WORDS.youDisputed;
+	return picked.length > 0 ? `${disputed} · ${MARK_WORDS.youThink}: ${picked.join(", ")}` : disputed;
 }
 
 /** The lesson's mark for a helper he stopped, one sentence per kind;
@@ -673,18 +796,40 @@ export function moreWords(hidden: number, page: number): string {
 	return hidden <= page ? "Show the rest" : "Show more";
 }
 /** How ready he is for the exam, in the engine's own sorting (its
- *  `standing`): every part solid, not yet, or not all of it fits. "Not
- *  ready yet in" leads the bubbles of the arcs that are not. */
+ *  `standing`): every part solid, not yet, or not all of it fits. */
 export const READY_WORDS = {
 	ready: "Ready for the exam",
 	notYet: "Not ready for the exam yet",
-	notYetIn: "Not ready yet in",
+	/** After the least ready topics, the press that shows them all. */
+	rest: "and the rest",
 } as const;
+
+/** Where he stands for the exam as one fact of a head, a few words (the
+ *  course page's head): the whole answer opens under it. "No exam"
+ *  for a course without one. When the plan cannot fit all of it, the head
+ *  says what it loses in its own words (`ExamReady`'s), never "Not all of
+ *  it fits" (round 15, M7); not ready says for what (round 15, m10: "Not
+ *  ready yet" had no object). */
+export const READY_FACT_WORDS = {
+	ready: "Ready for the exam",
+	notYet: "Not ready for the exam yet",
+	none: "No exam",
+} as const;
+
+/** When an arc's first new topic starts, on the road's line: "Starts 15 Nov". */
+export function arcStartsWords(day: string): string {
+	return `Starts ${shortDay(day)}`;
+}
 
 /** A course without arcs, not ready: the topics not yet solid, else those
  *  still to start. "Not yet solid for the exam: Basis and Rank". */
 export function notReadyWords(kind: "notYet" | "toStart", names: string): string {
-	return kind === "notYet" ? `Not yet solid for the exam: ${names}` : `Still to start before the exam: ${names}`;
+	return `${notReadyHeading(kind)}: ${names}`;
+}
+
+/** The same list's name, heading every topic it means. */
+export function notReadyHeading(kind: "notYet" | "toStart"): string {
+	return kind === "notYet" ? "Not yet solid for the exam" : "Still to start before the exam";
 }
 
 /** The mistakes still open in a course: the list's name, the head's press,

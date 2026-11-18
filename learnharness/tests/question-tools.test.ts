@@ -169,22 +169,22 @@ describe("teachExplainToolFor: the dynamic plan-nodeId validation (position sign
 });
 
 describe("the prober's registry", () => {
-	it("carries the nodeId-less recall, probe_done, the practice handoff, and the learner-filesystem set", () => {
+	it("carries the nodeId-less recall, probe_done and the practice handoff", () => {
 		const chatId = newChat("Prober: registry");
 		const tools = createProberTools({ chatId, chatStore, deliver: () => {}, jobStore, spawn: () => {} });
 		// Fix wave (2026-09-20): the owner ruling adds research + pdf dispatch
 		// to the probe phase's registry (demo/visual stay teach-only).
 		assert.deepEqual(Object.keys(tools).sort(), [
-			"ask_user_question", "find", "grep", "ls", "name_session", "pdf", "practice", "probe_done", "read", "recall", "research",
+			"ask_user_question", "name_session", "pdf", "practice", "probe_done", "recall", "research",
 		]);
 	});
 });
 describe("createTeacherTools: the whole set, always on", () => {
-	it("research, demo, visual and pdf sit beside the question, plan and file tools", () => {
+	it("research, demo, visual and pdf sit beside the question and plan tools", () => {
 		const chatId = newChat("Teacher: full set");
 		const ctx: TeacherToolContext = { chatId, chatStore, jobStore, spawn: () => {}, deliver: () => {} };
 		assert.deepEqual(Object.keys(createTeacherTools(ctx)).sort(), [
-			"ask_user_question", "demo", "explain", "find", "grep", "lesson_progress", "ls", "pdf", "plan_init", "practice", "read", "research", "visual",
+			"ask_user_question", "demo", "explain", "lesson_progress", "pdf", "plan_init", "practice", "research", "visual",
 		]);
 	});
 });

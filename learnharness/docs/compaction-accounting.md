@@ -2,34 +2,8 @@
 
 ## Retention
 
-Claude Code compacts a lesson's session; the app keeps only the trigger and the lesson's instructions. See [sessions and compaction](sessions-and-compaction.md).
+Claude Code compacts a lesson's session at its own point; the app gives it only the lesson's instructions. See [sessions and compaction](sessions-and-compaction.md).
 
-## Conversation meter
+## Usage
 
-The numerator is the latest qualifying completed conversation response's native
-Pi `input + output + cacheRead + cacheWrite`. Reasoning is already inside output;
-`totalTokens` is not an override. Partial stream updates, errors, aborts, invalid
-counts, and all-zero usage do not replace the last measurement. A successful
-compaction marker invalidates earlier measurements: show `? / maximum` until a
-new qualifying response completes.
-
-The denominator follows the selected model's catalog limit, independently of the
-last numeric measurement. Changing models preserves that numerator. No catalog
-limit means no invented denominator; no percentage display is added.
-
-## Spending
-
-`src/server/pricing.ts` uses Pi AI's full, key-independent catalog and public
-`calculateCost` on a new usage object. The browser receives derived costs, not a
-second calculator/rate table. Totals are estimates using the currently shipped
-catalog, not provider invoices; catalog updates can reprice history.
-
-Saved input is Pi-normalized **fresh input**, disjoint from cache buckets. Never
-subtract cached reads from it again or migrate old logs as raw inclusive prompt
-tokens. New captures preserve the one-hour subset of cache writes and individual
-background-job calls. Older write-bearing records with a lost retention split,
-and tier-priced multi-call jobs with only aggregate usage, remain unpriced when
-the lost detail can change the answer. They are not reconstructed from totals.
-Flat-rate historical jobs with sufficient counts remain priceable. Missing models
-or required usage stay unpriced; Claude plan usage remains plan usage, not
-API dollars.
+Each lesson turn and each background job keeps its token counts (`turns` on the chat record, `usage` on the job record). Nothing turns them into a price: the lessons run on Edo's Claude plan.

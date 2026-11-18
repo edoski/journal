@@ -27,7 +27,7 @@ export function arcPassLedgersAt(file: string): ArcPassLedgers {
 	}
 	const write = (all: Record<string, ArcPassLedger>) => {
 		fs.mkdirSync(path.dirname(file), { recursive: true });
-		writeFileAtomicSync(file, JSON.stringify(all, null, "\t"), { allowInPlaceFallback: true });
+		writeFileAtomicSync(file, JSON.stringify(all, null, "\t"));
 	};
 	return {
 		get(workspace) {

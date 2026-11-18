@@ -16,7 +16,7 @@ export function NavSection({
 			<h2
 				id={id}
 				data-slot="nav-section-header"
-				className="flex h-7 items-center gap-2 px-2 text-label font-medium text-muted-foreground"
+				className="flex h-7 items-center gap-2 px-2 text-callout text-muted-foreground"
 			>
 				<span className="min-w-0 flex-1 truncate">{title}</span>
 				{trailing && (

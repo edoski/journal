@@ -5,7 +5,7 @@ import React from "react";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { MarkLine } from "../components/lesson/mark-line.tsx";
 import { AnswerMarksProvider } from "../components/answer-mark.tsx";
@@ -17,7 +17,7 @@ describe("the mark line", () => {
 	const mark: AnswerMark = {
 		rows: [{ id: "r1", result: "correct", grade: "unaided", helped: false, sure: "confident", label: null }],
 		disputed: false,
-		ruling: null,
+		changed: false,
 	} as unknown as AnswerMark;
 	const line = (marks: Record<string, AnswerMark>) =>
 		renderToStaticMarkup(
@@ -29,7 +29,7 @@ describe("the mark line", () => {
 	it("says the result, how it counted and the confidence on one 13px line, with Dispute at its end", () => {
 		const html = line({ a1: mark });
 		assert.match(html, /data-testid="mark-line"/);
-		assert.match(html, /text-row/);
+		assert.match(html, /text-body/);
 		assert.match(html, /Right/);
 		assert.match(html, /Confident/);
 		assert.match(html, /data-testid="dispute-mark"/);
@@ -52,7 +52,7 @@ describe("the mark line", () => {
 				{ id: "r2", result: "correct", grade: "assisted", helped: true, sure: "confident", label: "Then" },
 			],
 			disputed: false,
-			ruling: null,
+			changed: false,
 		} as unknown as AnswerMark;
 		const { document } = parseHTML(line({ a1: tries }));
 		const facts = document.querySelector('[data-slot="mark-facts"]')!;
@@ -60,6 +60,14 @@ describe("the mark line", () => {
 		assert.match(facts.className, /\bitems-end\b/, "each line ends where his words end");
 		const rows = [...document.querySelectorAll('[data-testid="mark-row"]')];
 		assert.deepEqual(rows.map((r) => r.textContent), ["First tryPartly rightOn your ownGuessing", "ThenRightWith helpConfident"]);
+	});
+
+	it("says a dispute was ruled on and whether the mark stood, never the ruling the reply says (round 16, m20)", () => {
+		const stood = parseHTML(line({ a1: { ...mark, disputed: true, changed: false } })).document.querySelector('[data-testid="mark-disputed"]');
+		assert.equal(stood?.textContent, "Disputed · the mark stands");
+		const changed = parseHTML(line({ a1: { ...mark, disputed: true, changed: true } })).document.querySelector('[data-testid="mark-disputed"]');
+		assert.equal(changed?.textContent, "Disputed · the mark changed");
+		assert.doesNotMatch(line({ a1: { ...mark, disputed: true, changed: false, ruling: "The question asked why." } as AnswerMark }), /asked why/);
 	});
 
 	it("draws nothing until the engine holds a mark", () => {

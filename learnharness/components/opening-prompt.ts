@@ -32,8 +32,9 @@ export function readOpeningPromptEntry(id: string): OpeningPrompt | undefined {
 		if (!value) return undefined;
 		try {
 			const entry: unknown = JSON.parse(value);
+			// No words is an opening too: photos alone (kept-drafts' `<chat>:opening`).
 			if (entry && typeof entry === "object" && "text" in entry && typeof entry.text === "string" &&
-				entry.text.length > 0 && "attempted" in entry && typeof entry.attempted === "boolean") {
+				"attempted" in entry && typeof entry.attempted === "boolean") {
 				return { text: entry.text, attempted: entry.attempted };
 			}
 		} catch { /* Old raw-text stashes have no proof that sending never began. */ }

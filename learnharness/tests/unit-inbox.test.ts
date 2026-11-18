@@ -8,6 +8,7 @@ import {
 	monogram,
 	openingFor,
 	sessionTwins,
+	sessionsNow,
 	shelfOf,
 	topicSessions,
 	unitStatus,
@@ -44,7 +45,6 @@ const chat = (id: string, over: Partial<ChatListItem> = {}): ChatListItem => ({
 	pendingQuestion: false,
 	pendingProblem: false,
 	busy: false,
-	compacting: false,
 	course: { workspace: "la", title: "LA" },
 	ownTopics: over.topics ?? [],
 	...over,
@@ -159,13 +159,13 @@ describe("unitStatus", () => {
 		assert.deepEqual(unitStatus(by("chain"), inbox.today), { kind: "slip", words: "Not right last time", slip: "lapsed" });
 		assert.deepEqual(unitStatus(by("kernel"), inbox.today), { kind: "slip", words: "Mistake to fix", slip: "gap" });
 		assert.deepEqual(unitStatus(by("elimination"), inbox.today), { kind: "slip", words: "Mixed up with cramer", slip: "mixed" }, "the method named by its title, as the map says it");
-		assert.deepEqual(unitStatus(by("matmul"), inbox.today), { kind: "slip", words: "Fixed, check again later", slip: "repaired" });
-		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review", words: "2d overdue" });
-		assert.deepEqual(unitStatus(by("basis"), inbox.today), { kind: "review", words: "9d overdue" });
-		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "task", words: "Left off 2d ago" });
-		assert.deepEqual(unitStatus(by("cramer"), inbox.today), { kind: "returns", words: "Back Mon 9 Nov" });
-		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "returns", words: "Back Mon 30 Nov" });
-		assert.deepEqual(unitStatus(by("trace"), inbox.today), { kind: "studied", words: "3d ago" });
+		assert.deepEqual(unitStatus(by("matmul"), inbox.today), { kind: "slip", words: "Check again another day", slip: "repaired" });
+		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review", words: "Due 6 Nov" });
+		assert.deepEqual(unitStatus(by("basis"), inbox.today), { kind: "review", words: "Due 30 Oct" });
+		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "task", words: "Left off 6 Nov" });
+		assert.deepEqual(unitStatus(by("cramer"), inbox.today), { kind: "back", words: "Back Mon 9 Nov" });
+		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "back", words: "Back Mon 30 Nov" });
+		assert.deepEqual(unitStatus(by("trace"), inbox.today), { kind: "studied", words: "5 Nov" });
 	});
 
 	it("says Your turn only on a row whose session waits on him", () => {
@@ -174,6 +174,26 @@ describe("unitStatus", () => {
 			turns.map((u) => u.topic.handle),
 			["eigen"],
 		);
+	});
+});
+
+describe("an open mistake on a topic row (round 9, 2 m1 and 3 m13)", () => {
+	const open = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false, mistake: true };
+	// Eigen after a partly right answer: an open mistake the Mistakes list
+	// shows, though the engine does not call the topic weak.
+	const eigen = { ...topic("eigen", "assisted"), right: "partial" as const, signals: open };
+	// Determinants with an open confident mistake and a question waiting.
+	const det = { ...topic("det", "assisted", null, true), signals: { ...open, confidentErrors: 1 } };
+	const la = course("la", [eigen, det]);
+	const inbox = buildInbox([la], [chat("e", { topics: ["eigen"], ended: "left" } as Partial<ChatListItem>), chat("d", { topics: ["det"], pendingQuestion: true } as Partial<ChatListItem>)], null);
+	const by = (h: string) => inbox.active.find((u) => u.topic.handle === h)!;
+
+	it("names the mistake, never Left for next time, on a topic its Mistakes list holds", () => {
+		assert.deepEqual(unitStatus(by("eigen"), inbox.today), { kind: "slip", words: "Mistake to fix", slip: "gap" });
+	});
+
+	it("names the mistake before Your turn, as the map names it on a topic with no question waiting", () => {
+		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "slip", words: "Sure, but wrong", slip: "confident" });
 	});
 });
 
@@ -209,6 +229,19 @@ describe("the topic page", () => {
 		assert.equal(resumableSession([stopped, newer, running])?.id, "running");
 		assert.equal(resumableSession([newer, stopped])?.id, "stopped");
 		assert.equal(resumableSession([newer]), null);
+	});
+
+	it("drops a session a later one on the topic started after, so the newer lesson is Now and the page and the sidebar agree (round 9, 2 m7)", () => {
+		const preview = chat("preview", { ended: "cut", createdAt: "2026-11-06T21:40:00.000Z", updatedAt: "2026-11-06T21:40:05.000Z" });
+		const lesson = chat("lesson", { ended: "left", createdAt: "2026-11-08T09:00:00.000Z", updatedAt: "2026-11-08T10:00:00.000Z" });
+		assert.equal(resumableSession([lesson, preview])?.id, "lesson", "the stale preview never leads the topic page");
+		assert.equal(sessionsNow([lesson, preview]), "left");
+		const asked = chat("asked", { pendingQuestion: true, createdAt: "2026-11-06T21:40:00.000Z", updatedAt: "2026-11-06T21:41:00.000Z" });
+		const closed = chat("closed", { createdAt: "2026-11-08T09:00:00.000Z", updatedAt: "2026-11-08T10:00:00.000Z" });
+		assert.equal(resumableSession([closed, asked]), null, "a question a later lesson moved past waits on nobody");
+		assert.equal(sessionsNow([closed, asked]), null);
+		const writing = chat("writing", { busy: true, createdAt: "2026-11-06T21:40:00.000Z", updatedAt: "2026-11-06T21:41:00.000Z" });
+		assert.equal(resumableSession([closed, writing])?.id, "writing", "a turn running now is never dropped");
 	});
 
 	it("lists only the sessions the engine's records tie to the topic, never one that only holds a task covering it", () => {

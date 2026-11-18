@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, disputeStampWords, distanceWords, heldWords, lapsedNow, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyShort, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
+import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, disputeStampWords, distanceWords, heldWords, lapsedNow, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, leftOffWords, studiedDaysWords, agoWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyShort, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
 import { ARC_STATES, type ArcHandle } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import { courseMapOf } from "../src/store/course-records.ts";
@@ -35,7 +35,6 @@ describe("where he stands, true to the record", () => {
 		assert.equal(assisted("uncertain"), "Right, not yet confirmed");
 		assert.equal(assisted("helped"), "Right with help");
 		assert.equal(assisted(), "Not right last time", "no right answer since his newest wrong one: never help he did not have (round 8, 2 M1)");
-		assert.equal(standingWords(0.75, { level: "independent" }), "Right with help", "a weak topic he could do on his own keeps its pie's words");
 		assert.equal(standingWords(0.5, { level: "attempted" }), "Tried, not right yet", "no right answer since his newest wrong one");
 	});
 
@@ -62,7 +61,7 @@ describe("where he stands, true to the record", () => {
 
 describe("why a slip needs him", () => {
 	it("says each signal on its own, the signals about a wrong answer only while one is open", () => {
-		assert.equal(slip({ repaired: true }), "Fixed, check again later");
+		assert.equal(slip({ repaired: true }), "Check again another day");
 		assert.equal(slip({ lapsed: true, mistake: true }), "Not right last time");
 		assert.equal(slip({ gap: "Writes det as ad + bc", mistake: true }), "Mistake to fix");
 		assert.equal(slip({ choiceErrors: { cramer: 2 }, mistake: true }), "Mixed up with Cramer's rule");
@@ -72,7 +71,7 @@ describe("why a slip needs him", () => {
 
 	it("says the first signal when several hold: fixed, nothing open to check, missed, a mistake, mixed up, then sure but wrong", () => {
 		const all = { repaired: true, lapsed: true, gap: "sign error", mistake: true, choiceErrors: { cramer: 1 }, confidentErrors: 1 };
-		assert.equal(slip(all), "Fixed, check again later");
+		assert.equal(slip(all), "Check again another day");
 		assert.equal(slip({ ...all, repaired: false, mistake: false }), "Check on your own");
 		assert.equal(slip({ ...all, repaired: false }), "Not right last time");
 		assert.equal(slip({ ...all, repaired: false, lapsed: false }), "Mistake to fix");
@@ -122,8 +121,14 @@ describe("why a slip needs him", () => {
 });
 
 describe("why a review needs him", () => {
-	it("says a due review in days under a week, then whole weeks", () => {
-		assert.deepEqual([0, 1, 3, 6, 7, 13, 14, 30].map(overdueWords), ["Due today", "1d overdue", "3d overdue", "6d overdue", "7d overdue", "13d overdue", "14d overdue", "30d overdue"]);
+	it("says since which day a review is due, never a count of days (round 9, 2 m5)", () => {
+		assert.deepEqual([0, 1, 5, 40].map((days) => overdueWords(days, "2026-11-08")), ["Due today", "Due 7 Nov", "Due 3 Nov", "Due 29 Sept"]);
+	});
+
+	it("says the day work was left and the day he studied, never a count of days (round 9, 2 m5)", () => {
+		assert.deepEqual([0, 1, 2, null].map((days) => leftOffWords(days, "2026-11-08")), ["Left off today", "Left off 7 Nov", "Left off 6 Nov", "Unfinished"]);
+		assert.deepEqual([0, 1, 4].map((days) => studiedDaysWords(days, "2026-11-08")), ["Studied today", "Studied yesterday", "Studied 4 Nov"]);
+		assert.deepEqual([0, 1, 13].map((days) => agoWords(days, "2026-11-08")), ["Today", "Yesterday", "26 Oct"]);
 	});
 
 	it("says the day a dated review comes back, never a count of days (round 8, 2 m4)", () => {
@@ -161,21 +166,32 @@ describe("why a review waits", () => {
 		assert.equal(heldWords(null), null);
 	});
 	it("says since when a held review was due, so weeks late never reads as 'Back in 25d'", () => {
-		assert.equal(reviewWords(late, "2026-11-08"), "Due since 1 Oct, back 3 Dec", "with the day the plan brings it back (round 8: Calculus gave none)");
+		assert.equal(reviewWords(late, "2026-11-08"), "Due 1 Oct, back 3 Dec", "with the day the plan brings it back (round 8: Calculus gave none)");
 		assert.equal(reviewWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), "Back Thu 3 Dec");
 		assert.equal(reviewWords({ ...behind, held: { exam: "Probability", since: "2026-11-13" } }, "2026-11-08"), "Back Fri 20 Nov", "memory's day is still ahead");
-		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "3d overdue");
+		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "Due 5 Nov");
 	});
 	it("says from which told day a review moved and what of his study moved it, ahead of memory's day", () => {
-		const told = { from: "2026-11-10", by: "study" as const, courses: ["Probability"] };
+		const told = { from: "2026-11-10", by: "study" as const, courses: ["Probability"], day: "today" as const };
 		assert.equal(movedWords(behind, "2026-11-08", told), "Moved from 10 Nov after your Probability study today");
 		assert.equal(movedWords({ kind: "scheduled", date: "2026-11-12" }, "2026-11-08", { from: "2026-11-10", by: "missed" }), "Moved from 10 Nov, no study yesterday");
 		assert.equal(movedWords(late, "2026-11-08", { from: "2026-11-09", by: "left" }), "Moved from 9 Nov, yesterday's plan was not finished");
-		assert.equal(movedWords(null, "2026-11-08", { from: "2026-11-10", by: "study", courses: ["Probability", "Calculus"] }), "Moved from 10 Nov after your Probability and Calculus study today", "a start moves too");
+		assert.equal(movedWords(null, "2026-11-08", { from: "2026-11-10", by: "study", courses: ["Probability", "Calculus"], day: "today" as const }), "Moved from 10 Nov after your Probability and Calculus study today", "a start moves too");
+		assert.equal(movedWords(behind, "2026-11-08", { ...told, day: "yesterday" }), "Moved from 10 Nov after your Probability study yesterday", "round 9: today's work moves only what it touched, so the rest moves the next morning and says so");
+		assert.equal(movedWords(null, "2026-11-09", { ...told, waitsOn: ["Random variables and distributions"] }), "Moved from 10 Nov, since Random variables and distributions is not solid yet", "round 14, m3: the topic that slipped, never \"today's day was full\"");
+		assert.equal(movedWords(null, "2026-11-09", { ...told, waitsOn: ["Bases", "Rank"] }), "Moved from 10 Nov, since Bases and Rank are not solid yet");
+		assert.equal(movedWords(behind, "2026-11-09", { from: "2026-11-12", by: "answered" }), "Moved from 12 Nov after your answer today", "round 14, m3: Rank, told Thu 12, moved by more practice, says so");
+	});
+	it("names the last day he studied when the cause is days ago, never a 'yesterday' a week back", () => {
+		// Round 10 (1 M3): after a quiet week a close blamed a review he had done for the move.
+		assert.equal(movedWords({ kind: "scheduled", date: "2026-11-20" }, "2026-11-17", { from: "2026-11-12", by: "missed", on: "2026-11-10" }), "Moved from 12 Nov, no study since 10 Nov");
+		assert.equal(movedWords({ kind: "scheduled", date: "2026-11-20" }, "2026-11-17", { from: "2026-11-18", by: "missed", on: "2026-11-15" }), "Moved from 18 Nov, no study yesterday");
+		assert.equal(movedWords({ kind: "scheduled", date: "2026-11-18" }, "2026-11-16", { from: "2026-11-14", by: "left", on: "2026-11-14" }), "Moved from 14 Nov, the plan of 14 Nov was not finished");
+		assert.equal(movedWords({ kind: "scheduled", date: "2026-11-18" }, "2026-11-16", { from: "2026-11-15", by: "left", on: "2026-11-15" }), "Moved from 15 Nov, yesterday's plan was not finished");
 	});
 	it("says since when a held review was due once memory's day has passed, and names no day he was never told", () => {
 		assert.equal(movedWords(behind, "2026-11-08"), null, "memory's day is still ahead: no 'Moved from' a day he never heard (round 8)");
-		assert.equal(movedWords(late, "2026-11-08"), "Due since 1 Oct");
+		assert.equal(movedWords(late, "2026-11-08"), "Due 1 Oct");
 		assert.equal(movedWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), null);
 		assert.equal(movedWords({ kind: "due", date: "2026-11-08", overdue: 0 }, "2026-11-08"), null);
 	});
@@ -189,10 +205,10 @@ describe("why a review waits", () => {
 		assert.equal(startsAfterWords(["Probability", "Linear Algebra"]), "After Probability's and Linear Algebra's new topics");
 		assert.equal(startsAfterWords(undefined), null);
 	});
-	it("says how far a day is in days, one form for an exam and a review", () => {
+	it("names a near day, one form for an exam and a review, and never counts days (round 14, m9)", () => {
 		assert.deepEqual(
 			["2026-11-08", "2026-11-09", "2026-11-07", "2026-11-26", "2026-11-01"].map((d) => distanceWords(d, "2026-11-08")),
-			["Today", "Tomorrow", "Yesterday", "In 18 days", "7 days ago"],
+			["Today", "Tomorrow", "Yesterday", null, null],
 		);
 	});
 });
@@ -223,11 +239,13 @@ describe("why a topic starts then", () => {
 	const why = (map: CourseMap, handle: string) => startsWhyWords(map.topics.find((t) => t.handle === handle)!.startsWhy!, map);
 	it("names its prerequisites, in a course with arcs or without", () => {
 		assert.equal(why(arcs, "change-basis"), "After Invertible matrices, which it needs");
-		assert.equal(why(plain, "invertibility"), "After Determinants as volume scaling, which it needs");
+		assert.equal(why(plain, "invertibility"), "After Rank and the column space, which it needs");
 	});
 	it("names the arc an early start comes from, or the exam's pace that took it", () => {
-		assert.equal(why(arcs, "inner-product"), "Early, from Orthogonality, to keep pace with the exam");
-		assert.equal(why(plain, "inner-product"), "Early, ahead of its place, while earlier topics wait on Determinants as volume scaling");
+		assert.equal(why(arcs, "inner-product"), "Early, from Orthogonality");
+		assert.equal(startsWhyWords({ kind: "early", arc: "orthogonality" as ArcHandle, waitingOn: [], exam: true }, arcs), "Early, from Orthogonality, to keep pace with the exam");
+		assert.equal(why(plain, "inner-product"), "Early, ahead of its place");
+		assert.equal(startsWhyWords({ kind: "early", waitingOn: ["determinant" as TopicHandle], exam: false }, plain), "Early, ahead of its place, while earlier topics wait on Determinants as volume scaling");
 		const orthogonality = "orthogonality" as ArcHandle;
 		assert.equal(startsWhyWords({ kind: "early", arc: orthogonality, waitingOn: [], exam: false }, arcs), "Early, from Orthogonality");
 	});

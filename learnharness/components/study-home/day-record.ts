@@ -1,4 +1,4 @@
-import { courseLabel, type ChatListItem } from "@/src/core";
+import { courseLabel, type ChatListItem, type StudyCourse } from "@/src/core";
 import { localDay } from "@/components/day-change";
 
 /**
@@ -8,20 +8,38 @@ import { localDay } from "@/components/day-change";
  * rule `useDayChange` rereads Home on), oldest first, whatever it stands at
  * now: one he closed, one he ended with Done for today, one still waiting
  * on him. Round 4 found a 40-minute lesson missing because it ended with
- * Done for today. Each is named as the sidebar names it, by its title;
- * a title another session shares ("Review") carries its course too
- * ("Review in Linear Algebra"), the way the sidebar's row carries its
- * course's mark. Pure.
+ * Done for today. A session he only opened, with no answer and nothing he
+ * wrote after its opening, is not study (`studied`; round 10, 1 m2: a
+ * plan question and Problem sheet 4's opening were listed). Each is named as the sidebar names it, by its title,
+ * or by the title of the open task it holds (`courses`' tasks), and each
+ * name once, so two sessions of one lesson read as one (round 11, 1 N9:
+ * "Eigenvalues and eigenvectors, Eigenvalues lesson: eigenvectors step");
+ * a title a session in another course shares ("Review") carries its
+ * course too ("Review in Linear Algebra"), the way the sidebar's row
+ * carries its course's mark. Pure.
  */
-export function doneToday(chats: readonly ChatListItem[], now: Date): string[] {
+export function doneToday(chats: readonly ChatListItem[], now: Date, courses: readonly StudyCourse[] = []): string[] {
 	const today = localDay(now);
-	const name = (chat: ChatListItem) => chat.title.trim().toLowerCase();
-	const shared = new Map<string, number>();
-	for (const chat of chats) shared.set(name(chat), (shared.get(name(chat)) ?? 0) + 1);
-	return chats
-		.filter((chat) => chat.messageCount > 0 && localDay(new Date(chat.updatedAt)) === today)
+	const title = (chat: ChatListItem) => sessionName(chat, courses.find((c) => c.map.workspace === chat.course?.workspace)?.map.tasks ?? []);
+	const name = (chat: ChatListItem) => title(chat).trim().toLowerCase();
+	const shared = new Map<string, Set<string>>();
+	for (const chat of chats) shared.set(name(chat), (shared.get(name(chat)) ?? new Set()).add(chat.course?.workspace ?? ""));
+	const named = chats
+		.filter((chat) => chat.studied === true && localDay(new Date(chat.updatedAt)) === today)
 		.sort((a, b) => (a.updatedAt < b.updatedAt ? -1 : a.updatedAt > b.updatedAt ? 1 : 0))
-		.map((chat) => (shared.get(name(chat))! > 1 && chat.course ? `${chat.title} in ${courseLabel(chat.course)}` : chat.title));
+		.map((chat) => (shared.get(name(chat))!.size > 1 && chat.course ? `${title(chat)} in ${courseLabel(chat.course)}` : title(chat)));
+	return [...new Set(named)];
+}
+
+/** A session's one name, wherever Home names it (round 14, m29: "Problem
+ *  sheet 4" on its line while it waited, "Problem sheet 4: rank and
+ *  nullity" once left and in Studied today): the title of the open task it
+ *  holds (`tasks`, its course's), so two sessions of one lesson read as one
+ *  (round 11, 1 N9), else the title it gave its task once that task closed,
+ *  so it reads one way all day (round 13, 1 n9), else its own. Pure. */
+export function sessionName(chat: ChatListItem, tasks: ReadonlyArray<{ key: string; title: string }>): string {
+	const held = new Set(chat.tasks ?? []);
+	return tasks.find((t) => held.has(t.key))?.title ?? chat.taskTitle ?? chat.title;
 }
 
 /** The part of the learner's day an hour falls in, in words: "this

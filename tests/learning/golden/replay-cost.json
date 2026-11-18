@@ -1,0 +1,8 @@
+{
+  "about": "What one read of the daily plan costs (agenda.replay, as retrieval.daily reads it) in plans made afresh on the same records (agenda.afresh), counted in Python calls, so the same on any machine; recorded on 18 Nov 2026 on these worlds. after: 64a55b02, L1's replay that reads each day's final review; reached: 5344190c, fix round 12's M1 (memo.py: a read keeps each history it reads once). The check fails once a read costs more than halfway from reached back to after.",
+  "worlds": {
+    "demo-world day-after 2026-11-17": {"after": 22.5, "reached": 15.8},
+    "round12-world d17 2026-11-17": {"after": 21.0, "reached": 15.5},
+    "round12-world d10-end 2026-11-10": {"after": 20.4, "reached": 13.9}
+  }
+}

@@ -2,7 +2,8 @@
  * extraction gate on the cached status synchronously, and may run before
  * any page load or turn has refreshed it. Then finishes the work a quit cut
  * short, watches the course records other hosts write and the folders
- * linked to courses, and listens for the events that build a course's map. */
+ * linked to courses, listens for the events that build a course's map, and
+ * starts the pages' reads. */
 export async function register() {
 	if (process.env.NEXT_RUNTIME !== "nodejs") return;
 	const { refreshClaudeConnections } = await import("./src/agent/claude-connection.ts");
@@ -21,7 +22,11 @@ export async function register() {
 		resumeLessonDigests();
 		resumeCourseMaps();
 	});
-	const [{ watchCourses }, { stores }] = await Promise.all([import("./src/server/course-watch.ts"), import("./src/server/stores.ts")]);
+	const [{ watchCourses }, { stores }, { readAhead }] = await Promise.all([import("./src/server/course-watch.ts"), import("./src/server/stores.ts"), import("./src/server/read-ahead.ts")]);
 	watchCourses({ courseRecords: stores.courseRecords });
+	// Home's read starts with the server, while the window opens, so the
+	// window's own read finds the engine's runs under way or kept, and the
+	// course pages' reads follow it (round 15, P7).
+	void readAhead().catch(() => {});
 	watchCourseFolders();
 }

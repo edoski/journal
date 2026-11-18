@@ -310,7 +310,7 @@ and the `learnharness` scope also run the app's `npm run typecheck`, `npm run li
 and `npm test` in `learnharness/`, after `npm ci` there (Ruff skips the folder); the
 `learning` scope runs the app's tests that use the engine's CLI and tutor references.
 CI (`.github/workflows/ci.yml`) runs the full gate on macOS and the app's standalone
-build and boot smoke on macOS, Windows and Linux.
+build and boot smoke on macOS (Apple Silicon), the only platform the app ships for.
 
 Add `--coverage` when coverage diagnostics are useful. For failure detail, run
 `python -m pytest tests/ -v --tb=short`. These deterministic checks establish code

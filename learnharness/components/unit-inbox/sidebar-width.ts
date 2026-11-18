@@ -73,3 +73,10 @@ export function useSidebarWidth(): number {
 	const server = useContext(ServerSidebarWidth);
 	return useSyncExternalStore(subscribe, readWidth, () => server);
 }
+
+/** The handle's widest width for the window as it is now, for its
+ *  aria-valuemax; unknown (undefined) on the server and while hydrating,
+ *  so the server's HTML and the first client render agree. */
+export function useSidebarMaxWidth(): number | undefined {
+	return useSyncExternalStore(subscribe, () => maxSidebarWidth(window.innerWidth), () => undefined);
+}

@@ -8,7 +8,7 @@ import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
-import { createRoot } from "react-dom/client";
+import { createRoot } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 
 class MemoryStorage {
@@ -59,6 +59,7 @@ function Lesson({ open, submit }: { open: Open; submit: (text: string, confidenc
 				onSaveDraft={noop}
 				onSubmitAnswer={noop}
 				onSubmitThinking={(text, confidence) => submit(text, confidence)}
+				onSteer={async () => true}
 				onRequest={noop}
 				onDraftChange={noop}
 			/>

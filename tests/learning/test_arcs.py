@@ -331,16 +331,17 @@ def test_an_exclusion_an_arc_rule_refuses_is_named_in_the_refusal(
         )
 
 
-def test_leaves_out_holds_topics_of_the_named_arcs_without_emptying_one(
+def test_leaves_out_holds_topics_of_the_named_arcs_or_an_arc_after_them_without_emptying_one(
     workspace: Workspace,
 ) -> None:
     formed(workspace)
-    exam = {"date": "2026-12-20", "arcs": ORDER[:2]}
     refused(
         workspace,
-        {"exam": {**exam, "leaves_out": ["riemann"]}},
-        'exam.leaves_out: "riemann" is not in the exam\'s arcs "limits", "derivatives"',
+        {"exam": {"date": "2026-12-20", "arcs": ORDER[1:], "leaves_out": ["limit"]}},
+        'exam.leaves_out: "limit" is in neither the exam\'s arcs "derivatives", '
+        '"integrals" nor an arc after them',
     )
+    exam = {"date": "2026-12-20", "arcs": ORDER[:2]}
     refused(
         workspace,
         {"exam": {**exam, "leaves_out": ["limit", "continuity"]}},
@@ -352,6 +353,10 @@ def test_leaves_out_holds_topics_of_the_named_arcs_without_emptying_one(
     assert arc_rules.examined(record) == {"limit", "continuity", "derivative"}
     assert records.forget(workspace, ["chain-rule"])["removed"] == ["chain-rule"]
     assert "leaves_out" not in records.load(workspace)["exam"]
+    # A topic it leaves out may sit in an arc after the exam's, so no arc holds
+    # topics both inside and outside its scope (round 15, m11).
+    records.save(workspace, {"exam": {**exam, "leaves_out": ["riemann"]}})
+    assert records.load(workspace)["exam"]["leaves_out"] == ["riemann"]
 
 
 def test_an_exam_over_the_whole_course_may_leave_topics_out(
@@ -1601,6 +1606,59 @@ def test_restore_puts_a_backup_back_after_keeping_what_it_replaces(
     assert kept.read_bytes() == replaced
     with pytest.raises(ValueError, match="holds no course backups"):
         migrate.restore(tmp_path)
+
+
+def test_a_deleted_course_s_kept_record_moves_with_its_folder(
+    tmp_path: Path,
+) -> None:
+    """The record kept of a deleted course still counts toward his pace
+    (``records.history``), which reads only this engine's schema, so a
+    migration moves it, backed up, and ``restore`` puts it back."""
+    workspace = course(tmp_path, "calculus")
+    migrate.migrate(workspace)
+    records.forget(workspace, [], course=True)
+    [kept] = sorted(workspace.forgotten.glob("*.json"))
+    up = kept.read_bytes()
+    assert list(records.history()) == [str(kept)]
+
+    report = migrate.migrate(None, to=6)
+    assert report["courses"] == {str(workspace.directory): "empty"}
+    assert report["forgotten"] == {str(kept): "migrated"}
+    assert json.loads(kept.read_text())["schema"] == 6
+    backup = Path(report["backup"]) / f"{migrate.key(workspace)}-{kept.stem}"
+    assert (backup / "course.json").read_bytes() == up
+    assert json.loads((backup / "origin.json").read_text()) == {"record": str(kept)}
+
+    again = migrate.migrate(None)
+    assert again["forgotten"] == {str(kept): "migrated"}
+    assert kept.read_bytes() == up, "down then up is byte-identical"
+    assert list(records.history()) == [str(kept)], "it counts toward his pace again"
+    assert migrate.migrate(None)["forgotten"] == {str(kept): "current"}
+
+    restored = migrate.restore(Path(report["backup"]))
+    assert restored["restored"] == {str(kept): "restored"}
+    assert kept.read_bytes() == up
+
+
+def test_a_kept_record_that_fails_leaves_the_ones_moved_before_it_reported(
+    tmp_path: Path,
+) -> None:
+    """A migration that stops at one kept record still names the ones it
+    rewrote before it and the backup that holds them, so ``restore`` can
+    find them."""
+    workspace = course(tmp_path, "calculus")
+    migrate.migrate(workspace)
+    records.forget(workspace, [], course=True)
+    records.save(workspace, {"title": "Calculus again"})
+    records.forget(workspace, [], course=True)
+    first, second = sorted(workspace.forgotten.glob("*.json"))
+    second.write_text(json.dumps({**json.loads(second.read_text()), "schema": 99}))
+
+    report = migrate.migrate(None, to=6)
+    assert report["forgotten"] == {str(first): "migrated"}
+    assert str(workspace.directory) in report["failed"]
+    backup = Path(report["backup"]) / f"{migrate.key(workspace)}-{first.stem}"
+    assert (backup / "course.json").is_file()
 
 
 def test_the_cli_migrates_on_purpose_only(

@@ -29,6 +29,21 @@ export interface CourseMapArc {
 	entry: readonly TopicHandle[];
 }
 
+/** An arc as the app names it (components/course-map/arc-label.tsx): its
+ *  place in the course's study order, counted from 1, and its title. */
+export interface NamedArc {
+	number: number;
+	handle: ArcHandle;
+	title: string;
+}
+
+/** The arc `handle` named by its place among `arcs` (the map's, in study
+ *  order); null when they do not list it. Pure. */
+export function namedArc(arcs: readonly CourseMapArc[], handle: ArcHandle): NamedArc | null {
+	const at = arcs.findIndex((a) => a.handle === handle);
+	return at < 0 ? null : { number: at + 1, handle, title: arcs[at]!.title };
+}
+
 /** Where he is: the arc of the topic "You are here" names (`map.current`,
  *  which Home moves to the lesson in progress), else the engine's own
  *  answer. The one definition the course page, Home, the sidebar and the

@@ -1,10 +1,10 @@
 /**
- * COMPACTION. Claude Code compacts a lesson's session itself: the summary
- * replaces the conversation in the model's memory, while the record keeps
- * full history for every page. The app keeps only its policy: once a
- * settled turn's context reaches the trigger, it asks Claude Code to compact
- * with the lesson's instructions (`compactionInstructions`), and it records
- * each compaction as a marker the transcript shows.
+ * COMPACTION. Claude Code compacts a lesson's session itself, at its own
+ * point (its automatic compaction): the summary replaces the conversation in
+ * the model's memory, while the record keeps full history for every page.
+ * The app gives that summary the lesson's instructions
+ * (`compactionInstructions`, through Claude Code's PreCompact hook), and
+ * records each compaction as a marker the transcript shows.
  */
 
 import type { PlanTree } from "./contracts/plan.ts";
@@ -13,26 +13,19 @@ import { COMPACTED_HISTORY_HEADER } from "./contracts/chat.ts";
 import type { LhMessage, LhMarkerMessage } from "./native-messages.ts";
 import { newMessageId } from "./native-messages.ts";
 
-/** The reserve subtracted from the model's contextWindow when the window
- * is the binding constraint. */
-export const COMPACTION_RESERVE_TOKENS = 16_384;
+// ─── the wait ────────────────────────────────────────────────────────────────
 
-/** The trigger's bound (owner ruling: 150k): it caps what each reply of a
- *  long lesson draws, well inside every window. */
-export const DEFAULT_COMPACTION_THRESHOLD_TOKENS = 150_000;
-
-/** Where compaction triggers for a model window: the bound, or the window
- *  less its reserve when that is smaller; the bound alone with no known
- *  window. Pure. */
-export function compactionTriggerTokens(contextWindowTokens: number | undefined | null): number {
-	if (contextWindowTokens == null) return DEFAULT_COMPACTION_THRESHOLD_TOKENS;
-	return Math.min(DEFAULT_COMPACTION_THRESHOLD_TOKENS, Math.max(contextWindowTokens - COMPACTION_RESERVE_TOKENS, 1));
+/** Claude Code started or ended compacting inside the turn (the Agent
+ *  SDK's own `system` / `status: "compacting"` message): a turn event the
+ *  stream carries beside the agent's, so the lesson names the wait instead
+ *  of a bare "Thinking…" (round 10, robustness minor 3: about 105 s). */
+export interface CompactionEvent {
+	type: "compaction";
+	active: boolean;
 }
 
-/** The context one request carried: every input token, cached or not. */
-export function contextTokensOf(usage: { input: number; cacheRead: number; cacheWrite: number }): number {
-	return usage.input + usage.cacheRead + usage.cacheWrite;
-}
+/** The lesson's working line while Claude Code compacts. */
+export const COMPACTING_LINE = "Summarising the lesson so far…";
 
 // ─── the marker ──────────────────────────────────────────────────────────────
 

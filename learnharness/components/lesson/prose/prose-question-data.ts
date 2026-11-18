@@ -11,6 +11,7 @@ import {
 	normalizeQuestionType,
 	parseQuestionInput,
 	QUESTION_TOOLS,
+	sameQuestionKey,
 	toolQuestionKind,
 	type AskToolInput,
 	type Confidence,
@@ -152,7 +153,7 @@ export function reaskedFrom(messages: ReadonlyArray<{ parts: readonly QuestionPa
 			if (part.toolCallId === toolCallId) {
 				if (previous?.toolCallId && leftOpen(previous.output)) return asksAgain(previous, part) ? previous.toolCallId : null;
 				const same = lastOfKind.get(questionKindOf(part));
-				return same?.toolCallId && leftForToday(same.output) && sameStep(same, part) ? same.toolCallId : null;
+				return same?.toolCallId && leftForToday(same.output) && asksAgain(same, part) ? same.toolCallId : null;
 			}
 			previous = part;
 			lastOfKind.set(questionKindOf(part), part);
@@ -179,10 +180,37 @@ function leftForToday(output: unknown): boolean {
 }
 
 /** Whether `next` asks `left` again, in whatever words: the same kind of
- *  question on the same plan step. A question of another form or step
- *  after a hint or a side question is a new one, and draws its words. */
+ *  question on the same plan step, of the same type unless its words are
+ *  the same. A question of another form, step or type after a hint or a
+ *  side question is a new one, and draws its words (round 14, 2 D1: a
+ *  prediction posed on the step of the check he set aside to guess first
+ *  showed only "Your turn, on the question above"). */
 function asksAgain(left: QuestionPart, next: QuestionPart): boolean {
-	return questionKindOf(left) === questionKindOf(next) && sameStep(left, next);
+	return questionKindOf(left) === questionKindOf(next) && sameStep(left, next) && (sameType(left, next) || sameQuestionWords(left, next));
+}
+
+function sameType(a: QuestionPart, b: QuestionPart): boolean {
+	const type = (part: QuestionPart) => normalizeQuestionType((part.input as { type?: unknown } | undefined)?.type) ?? "check";
+	return type(a) === type(b);
+}
+
+function sameQuestionWords(a: QuestionPart, b: QuestionPart): boolean {
+	const words = (part: QuestionPart) => (part.input as { question?: unknown } | undefined)?.question;
+	const x = words(a);
+	const y = words(b);
+	return typeof x === "string" && typeof y === "string" && sameQuestionKey(x) === sameQuestionKey(y);
+}
+
+/** Whether `next` asks again, in the same words, a question he answered:
+ *  his first try at a lesson's check was not right, and after one nudge he
+ *  tries it again (Edo, 18 Nov 2026), or he answered with a question of
+ *  his own, sent in Answer mode by mistake, and the tutor answered it.
+ *  Its words are on screen above already (round 10, 2 m7: printed in full
+ *  a second time). A new question after his answer is drawn in full. */
+function sameWords(left: QuestionPart, next: QuestionPart): boolean {
+	const answer = left.output as Partial<QuestionAnswerData> | undefined;
+	if (!answer || answer.dismissed === true || answer.hintRequested === true) return false;
+	return questionKindOf(left) === questionKindOf(next) && sameQuestionWords(left, next);
 }
 
 function sameStep(a: QuestionPart, b: QuestionPart): boolean {
@@ -207,16 +235,85 @@ export function leftOpenOf(messages: ReadonlyArray<{ parts: readonly QuestionPar
  *  the transcript draws its words once, above the hint or his side
  *  question, so the re-ask draws only the mark that it is his turn again
  *  (round 5: the whole question printed twice after a hint; round 6: after
- *  a side question; round 8: twice again whenever the re-ask was reworded). */
+ *  a side question; round 8: twice again whenever the re-ask was reworded).
+ *  So is one asked again word for word after he sent a question as his
+ *  answer (`sameWords`). */
 export function askedAgain(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
-	const reasked = new Set<string>();
+	return new Set(reasks(messages).map((r) => r.id));
+}
+
+/** The questions Done for today set aside that are asked again further
+ *  down (the app's re-pose when he opens the session, or an older
+ *  record's re-ask under the close): the next question of its kind asks it
+ *  again (`asksAgain`). Its words are drawn once, where he answers it, and
+ *  the set-aside one keeps only "Left for next time" (round 14, M1 and the
+ *  cross-surface check: opened again, the page drew the left question
+ *  twice). */
+export function leftAskedBelow(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
+	const out = new Set<string>();
+	const waiting = new Map<string, QuestionPart>();
+	for (const message of messages) {
+		for (const part of message.parts) {
+			if (!asked(part)) continue;
+			const kind = questionKindOf(part);
+			const left = waiting.get(kind);
+			if (left?.toolCallId && asksAgain(left, part)) out.add(left.toolCallId);
+			waiting.delete(kind);
+			if (part.toolCallId && leftForToday(part.output)) waiting.set(kind, part);
+		}
+	}
+	return out;
+}
+
+/** The question calls whose words already end the tutor's text just above
+ *  them in the same message: the reply asked it in its own words, so the
+ *  question draws only its "Your turn" mark (round 16, m15: after "Yes" in
+ *  the Ask flow the question printed twice, word for word). */
+export function spokenAbove(messages: ReadonlyArray<{ parts: ReadonlyArray<QuestionPart & { text?: string }> }>): ReadonlySet<string> {
+	const out = new Set<string>();
+	for (const message of messages) {
+		let said = "";
+		for (const part of message.parts) {
+			if (part.type === "text") {
+				said = wordsKey(part.text ?? "");
+				continue;
+			}
+			if (asked(part) && part.toolCallId) {
+				const question = (part.input as { question?: unknown } | undefined)?.question;
+				const key = typeof question === "string" ? wordsKey(question) : "";
+				if (key && said.endsWith(key)) out.add(part.toolCallId);
+			}
+			// Only what the reader sees between them breaks the tie: a
+			// tool's card or another question.
+			if (part.type.startsWith("tool-")) said = "";
+		}
+	}
+	return out;
+}
+
+/** Words as the reader compares them: letters and digits only, so markup,
+ *  maths delimiters and spacing never tell two copies apart. */
+function wordsKey(text: string): string {
+	return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+/** The re-asks (`askedAgain`) that follow a hint: the hint may itself end
+ *  in a question, so their mark names the question he pressed Hint on,
+ *  never "the question above" (round 12, 3 D11). */
+export function askedAfterHint(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
+	return new Set(reasks(messages).filter((r) => r.after === "hint").map((r) => r.id));
+}
+
+function reasks(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): Array<{ id: string; after: LeftOpen | null }> {
+	const out: Array<{ id: string; after: LeftOpen | null }> = [];
 	let previous: QuestionPart | null = null;
 	for (const message of messages) {
 		for (const part of message.parts) {
 			if (!asked(part)) continue;
-			if (previous && part.toolCallId && leftOpen(previous.output) !== null && asksAgain(previous, part)) reasked.add(part.toolCallId);
+			const left = previous ? leftOpen(previous.output) : null;
+			if (previous && part.toolCallId && ((left !== null && asksAgain(previous, part)) || sameWords(previous, part))) out.push({ id: part.toolCallId, after: left });
 			previous = part;
 		}
 	}
-	return reasked;
+	return out;
 }

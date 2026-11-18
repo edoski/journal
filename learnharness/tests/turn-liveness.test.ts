@@ -1,8 +1,8 @@
 /**
  * Turn liveness registry unit tests (src/server/turn-liveness.ts): one turn
  * per chat, ever — begin/end round trip, double-begin rejection, restart
- * after end. The 30-minute stale-eviction TTL is not tested (it is a leak
- * guard, not a behavior). The lifecycle-emitter pins ride the same seams:
+ * after end, and no age limit: a long turn holds its chat until it settles.
+ * The lifecycle-emitter pins ride the same seams:
  * turn-started on the accepted begin only, turn-settled on the live end
  * only, and the registry already consistent when the listener runs.
  */
@@ -22,6 +22,21 @@ describe("turn liveness registry", () => {
 		assert.equal(beginTurn(id), true);
 		assert.doesNotMatch(await settledTurnResponse(id).text(), /"type":"error"/);
 		endTurn(id);
+	});
+
+	it("a turn still owns its chat an hour in, until it settles", () => {
+		const realNow = Date.now;
+		const start = realNow();
+		try {
+			assert.equal(beginTurn("chat_long"), true);
+			Date.now = () => start + 60 * 60_000;
+			assert.equal(isTurnRunning("chat_long"), true, "an hour in, the turn is still running");
+			assert.equal(beginTurn("chat_long"), false, "a second turn is refused");
+		} finally {
+			Date.now = realNow;
+			endTurn("chat_long");
+		}
+		assert.equal(isTurnRunning("chat_long"), false, "it ends when it settles");
 	});
 
 	it("begin/end round trip; a second begin is rejected until the turn ends", () => {

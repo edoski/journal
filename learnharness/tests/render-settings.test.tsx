@@ -11,10 +11,11 @@ import { dom } from "./helpers/radix-dom.ts";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
-import { createRoot } from "react-dom/client";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
+import { createRoot } from "./helpers/app-render.tsx";
 import { AppearanceSection } from "../components/settings/appearance-section.tsx";
 import { INK_SWATCHES } from "../components/settings/controls.tsx";
+import { formatBinding } from "../src/core/index.ts";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { Dialog } from "../components/ui/dialog.tsx";
 import { SettingsDialogBody, SettingsDialogProvider } from "../components/settings/settings-dialog.tsx";
@@ -144,19 +145,19 @@ describe("the colour field's swatch panel", () => {
 		assert.equal(grid.getAttribute("aria-label"), "Bold color");
 		const swatches = [...grid.querySelectorAll<HTMLButtonElement>('[data-slot="swatch"]')];
 		assert.deepEqual(swatches.map((s) => s.getAttribute("aria-label")), INK_SWATCHES.map((s) => s.name), "each swatch is named");
-		assert.equal(dom.document.querySelector('input[type="text"], input[type="color"]'), null, "nothing is typed");
+		assert.ok(dom.document.querySelector('input[type="text"], input[type="color"]') === null, "nothing is typed");
 		const columns = Number(grid.getAttribute("data-columns"));
 		swatches[0]!.focus();
 		await keyOn(swatches[0]!, "ArrowRight");
-		assert.equal(dom.document.activeElement, swatches[1], "→ moves along the row");
+		assert.ok(dom.document.activeElement === swatches[1], "→ moves along the row");
 		await keyOn(swatches[1]!, "ArrowDown");
-		assert.equal(dom.document.activeElement, swatches[1 + columns], "↓ moves down a row");
+		assert.ok(dom.document.activeElement === swatches[1 + columns], "↓ moves down a row");
 		await keyOn(swatches[1 + columns]!, "ArrowUp");
-		assert.equal(dom.document.activeElement, swatches[1], "↑ moves back up");
+		assert.ok(dom.document.activeElement === swatches[1], "↑ moves back up");
 		assert.equal(changes.length, 0, "moving never picks");
 		await act(async () => swatches[1]!.click());
 		assert.equal(changes.at(-1)?.mdRendering?.boldColor, INK_SWATCHES[1]!.color, "Enter or a click picks the swatch's ink");
-		assert.equal(dom.document.querySelector('[data-slot="swatch-grid"]'), null, "picking closes the panel");
+		assert.ok(dom.document.querySelector('[data-slot="swatch-grid"]') === null, "picking closes the panel");
 		await act(async () => root.unmount());
 		host.remove();
 	});
@@ -191,10 +192,13 @@ describe("KeyboardSection (thin SSR)", () => {
 		assert.equal(def?.binding, "mod+,");
 	});
 
-	it("displayOnly actions are left to the cheat sheet and never offer Rebind", () => {
+	it("lists the keys a screen owns as fixed, never offering Rebind (round 15, 3 free: no ⌥↑ ⌥↓, no Esc)", () => {
 		const html = renderToStaticMarkup(<KeyboardSection />);
-		assert.ok(!html.includes(`data-testid="kbd-row-question-next-row"`), "a screen's own keys are not listed");
-		assert.ok(!html.includes(`data-testid="kbd-rebind-question-next-row"`), "surface keys stay put");
+		for (const id of ["confidence-up", "confidence-down", "stop-reply", "question-ask-instead"]) {
+			assert.ok(html.includes(`data-testid="kbd-row-${id}"`), `${id} is listed`);
+			assert.ok(!html.includes(`data-testid="kbd-rebind-${id}"`), `${id} stays put`);
+		}
+		for (const binding of ["alt+arrowup", "alt+arrowdown", "escape"]) assert.ok(html.includes(formatBinding(binding)), formatBinding(binding));
 		// The model-menu entries are GONE entirely (owner, 2026-10-10):
 		// obvious in-field navigation, not settings material.
 		assert.ok(!html.includes("Model menu"), "model-menu rows removed");

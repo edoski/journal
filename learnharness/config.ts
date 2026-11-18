@@ -93,12 +93,3 @@ export type ModelRole =
  */
 export const SETTINGS_FILE = path.join(DATA_ROOT, "settings.json");
 
-/**
- * Where older versions kept sign-in files (auth.json, chatgpt-credentials.json):
- * the project directory, or LH_CREDENTIALS_DIR. Nothing reads or writes them
- * now (every agent runs on the user's Claude plan), but a copy may remain,
- * so the agent's file tools refuse them (src/agent/tools/fs-shared.ts).
- */
-export const CREDENTIALS_DIR = process.env.LH_CREDENTIALS_DIR
-	? path.resolve(process.env.LH_CREDENTIALS_DIR)
-	: TEST_SCRATCH ?? ROOT;

@@ -13,6 +13,8 @@
  */
 
 export * from "./contracts.ts";
+// moved-words.ts: why a told day moved, the words every surface says (pure).
+export * from "./moved-words.ts";
 export * from "./ports.ts";
 
 export * from "./question-core.ts";
@@ -23,6 +25,7 @@ export * from "./events.ts";
 export * from "./plan-tree.ts";
 export * from "./lesson-place.ts";
 export * from "./session-opening.ts";
+export { sessionTitleOf } from "./session-naming.ts";
 export * from "./phases.ts";
 export * from "./pending.ts";
 export * from "./prompt-segments.ts";
@@ -43,14 +46,11 @@ export * from "./view.ts";
 export * from "./tool-parts.ts";
 export * from "./answer-presentation.ts";
 export * from "./answer-marks.ts";
-export { closedTonight, doneTonightAtEnd } from "./session-end.ts";
+export { closedTonight, doneTonightAtEnd, leftQuestionRepose, sessionEndOf } from "./session-end.ts";
 export { replyCutOf, replyNeverCame } from "./turn-cut.ts";
 export { sameQuestionKey } from "./shown-help.ts";
-export * from "./prices.ts";
-export * from "./context-usage.ts";
-export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL, CLAUDE_USAGE_URL, CLAUDE_LIMIT_TEXT, CLAUDE_ACCOUNT_SIGNED_OUT, CLAUDE_SIGNED_OUT_STARTS, claudeProviderId, isClaudeProvider, isClaudeLimitFailure, nextClaudeAccount, soonestClaudeReset } from "./contracts/claude.ts";
+export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL, CLAUDE_USAGE_URL, CLAUDE_LIMIT_TEXT, CLAUDE_ACCOUNT_SIGNED_OUT, CLAUDE_SIGNED_OUT_STARTS, CLAUDE_FAILED, NO_KEY, claudeProviderId, isClaudeProvider, isClaudeLimitFailure, nextClaudeAccount, soonestClaudeReset } from "./contracts/claude.ts";
 export type { ClaudeAccount, ClaudeAccountStatus, ClaudeConnection, ClaudeUsage } from "./contracts/claude.ts";
-export * from "./fuzzy.ts";
 // course-context.ts: a course's context sorted from its record (pure).
 export * from "./course-context.ts";
 // settings.ts + settings-resolution.ts (settings-storage wave, 2026-09-19):
@@ -67,3 +67,5 @@ export * from "./spatial-nav.ts";
 // session-markdown.ts: the session→markdown formatter behind the export.
 // Pure, browser-safe.
 export * from "./session-markdown.ts";
+// demo-frame.ts: the base every demo runs on, and its controls' contrast check (pure).
+export * from "./demo-frame.ts";

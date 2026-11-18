@@ -64,7 +64,7 @@ describe("a session started from Check it", () => {
 		assert.deepEqual(record.topics, READY.topics);
 		const brief = await fetchCourseBrief(record);
 		assert.ok(brief, "the session has a brief");
-		assert.match(brief.text, /^Arc check: he pressed Check it on Vector spaces \(spaces\)/m);
+		assert.match(brief.text, /^Arc check: he pressed Test this arc on Vector spaces \(spaces\)/m);
 		assert.match(brief.text, /^ {2}question: What can combinations of vectors reach\?$/m);
 		assert.match(brief.text, /^ {2}one unaided item per topic, in mixed order: vectors, span, independence$/m);
 		assert.match(brief.text, /^ {2}one choose-the-method item per pair: span or independence$/m);

@@ -33,7 +33,7 @@ export function SettingsSection({
 	// The left list names the section, so the pane repeats no title.
 	return (
 		<section data-testid={testid} aria-label={title} data-slot="settings-section" className="flex flex-col gap-6 px-6 pb-8 pt-6">
-			{hint && <p className="-mb-2 px-1 text-label text-muted-foreground">{hint}</p>}
+			{hint && <p className="-mb-2 px-1 text-callout text-muted-foreground">{hint}</p>}
 			{children}
 		</section>
 	);
@@ -47,7 +47,8 @@ export function SettingsGroup({
 	children,
 	testid,
 }: {
-	label: string;
+	/** None where the row inside already names the group (the sign-in dialog). */
+	label?: string;
 	/** One quiet line under the header. */
 	description?: string;
 	children: React.ReactNode;
@@ -55,8 +56,8 @@ export function SettingsGroup({
 }) {
 	return (
 		<div data-testid={testid} data-slot="settings-group" className="flex flex-col gap-2">
-			<h3 className="px-1 text-label font-medium text-muted-foreground">{label}</h3>
-			{description && <p className="-mt-1 px-1 text-label text-muted-foreground">{description}</p>}
+			{label && <h3 className="px-1 text-callout text-muted-foreground">{label}</h3>}
+			{description && <p className="-mt-1 px-1 text-callout text-muted-foreground">{description}</p>}
 			<div className="flex flex-col divide-y rounded-lg border">{children}</div>
 		</div>
 	);
@@ -86,8 +87,8 @@ export function SettingsRow({
 			className={cn("flex min-h-12 items-center justify-between gap-4 px-4 py-2", dimmed && "opacity-50")}
 		>
 			<span className="min-w-0">
-				<span className="block text-row text-foreground">{label}</span>
-				{hint && <span className="block text-label text-muted-foreground">{hint}</span>}
+				<span className="block text-body text-foreground">{label}</span>
+				{hint && <span className="block text-callout text-muted-foreground">{hint}</span>}
 			</span>
 			{children}
 		</div>
@@ -212,7 +213,7 @@ export function ColorField({
 				disabled={value === null}
 				onClick={() => onCommit(null)}
 				aria-label={`${label}: back to default`}
-				className="px-2 text-row font-normal"
+				className="px-2 text-body font-normal"
 			>
 				Default
 			</Button>

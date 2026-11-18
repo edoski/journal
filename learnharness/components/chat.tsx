@@ -2,7 +2,7 @@
 
 import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChatSession } from "@/components/session";
-import { STREAM_DROPPED, visibleQueuedSteers } from "@/components/session-core";
+import { droppedError, visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,7 @@ import {
 	ConversationEmptyState,
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
-import { LiveToolCard } from "@/components/artifacts/live-tool-card";
-import { AnswerMarksProvider, DisputeDialog, type DisputeDraft } from "@/components/answer-mark";
+import { AnswerMarksProvider, DisputeDialog, disputedRows, type DisputeDraft, type DisputeTarget } from "@/components/answer-mark";
 import { useAnswerMarks } from "@/components/answer-marks-fetch";
 import { MalformedQuestion } from "@/components/malformed-question";
 import { artifactRenderers } from "@/components/artifacts";
@@ -30,6 +29,7 @@ import { QueuedSteersBody, type QueuedSteerLine } from "@/components/queued-stee
 import { useFieldCycle } from "@/components/field-cycle";
 import { JobsContext } from "@/components/jobs-context";
 import { useServerEvent, useServerResync } from "@/components/server-events";
+import { useSessionBusy } from "@/components/lesson/session-busy";
 import {
 	firstSourceTextParts,
 	messageAnchorId,
@@ -48,7 +48,7 @@ import { GraphContextCard, type GraphContextData } from "@/components/graph-cont
 import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
 import type { ArtifactPartProps, Confidence, Photo, JobRecord, LessonPlace, PracticeRequest, PracticeRequestDetails, QuestionAnswerData } from "@/src/core";
-import type { AnswerMark, CourseLink, DisputeDetails, LhViewMessage, SessionMode } from "@/src/core";
+import type { CourseLink, DisputeDetails, LhViewMessage, MarkRow, SessionMode } from "@/src/core";
 import {
 	activeProblemOf,
 	pendingQuestionOf,
@@ -58,42 +58,50 @@ import {
 	failedResponseAtEnd,
 	findPendingToolCall,
 	isClaudeLimitFailure,
-	derivePlanStatuses,
 	toolQuestionKind,
 	closedTonight,
 	doneTonightAtEnd,
+	firstProblemTopicsOf,
+	sessionEndOf,
 	replyCutOf,
 	latestMarkedAnswer,
+	appOpeningAt,
+	COMPACTING_LINE,
+	streamingToolActivity,
+	workingLine,
+	taskTurnOwed,
 } from "@/src/core";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
 import { ActiveProblemContext } from "@/components/lesson/active-problem";
 import { LessonTopBar, topicCrumbShown } from "@/components/lesson/lesson-top-bar";
 import { courseHref, unitHref } from "@/components/unit-inbox/unit-href";
 import { LessonRoadmap } from "@/components/lesson/lesson-roadmap";
-import { partKey, roadmapSteps, stepAnchors } from "@/components/lesson/roadmap-facts";
+import { lessonRoadmapSteps, partKey, stepAnchors } from "@/components/lesson/roadmap-facts";
 import { scrollSessionTarget } from "@/components/session-navigation";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
-import { isCourseDeletedRefusal, parseProviderKeyRefusal, refusalWatch, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
+import { isCourseDeletedRefusal, isSignedOutLine, parseProviderKeyRefusal, refusalWatch, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
+import { pausePlaceholder, practicePause } from "@/components/lesson/practice-pause";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
-import { waitingLine } from "@/components/lesson/working-sign";
-import { boxAfterClose, forgetRescue, keepRescue, overtakenDraft, rescuedBox, type LeftOpen } from "@/components/lesson/stranded-draft";
-import { sendHoldingDraft } from "@/components/lesson/sent-draft";
+import { showsWorking } from "@/components/lesson/working-sign";
+import { boxAfterClose, boxLine, forgetRescue, keepRescue, overtakenDraft, rescuedBox, typedAfterSend, type LeftOpen } from "@/components/lesson/stranded-draft";
+import { sendKeepingWords } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
-import { carryBox, carryWords, forgetClosedBoxes, keepForNewLesson, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
+import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, leftDraftAt, leftDraftOf, takeCarry, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
-import { DoneTonightButton, DoneTonightLine, doneTonightGone } from "@/components/lesson/done-tonight";
-import { CourseGoneLine } from "@/components/lesson/course-gone";
+import { DoneTonightButton, DoneTonightLine, doneTonightGone, focusAfterDone } from "@/components/lesson/done-tonight";
+import { marksBeforeDone } from "@/components/lesson/marks-before-done";
+import { courseDeletedBy, CourseGoneLine } from "@/components/lesson/course-gone";
 import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
 import { ProseAnswerProvider, useProseAnswer } from "@/components/lesson/prose/prose-answer";
 import { ProseQuestion } from "@/components/lesson/prose/prose-question";
-import { askedAgain, leftOpenOf, reaskedFrom } from "@/components/lesson/prose/prose-question-data";
+import { askedAfterHint, askedAgain, leftAskedBelow, leftOpenOf, reaskedFrom, spokenAbove } from "@/components/lesson/prose/prose-question-data";
 import { DisputeBubble, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 import { focusWhereHeTypes } from "@/components/ui/overlay";
@@ -149,9 +157,12 @@ function isSubagentSteer(m: LhViewMessage): boolean {
  *
  * The bottom blob is ONE persistent shell whose contents swap (chat composer ↔
  * question dock ↔ collapsed bar). The shell is sticky INSIDE the scroller —
- * never overlapping the transcript at rest, never covering the scrollbar —
+ * never overlapping the transcript at rest —
  * and DockOverlay animates its height on variant changes.
  */
+/** A session started on no topics. */
+const NO_TOPICS: readonly string[] = [];
+
 export function Chat({
 	chatId,
 	title,
@@ -159,11 +170,13 @@ export function Chat({
 	initialError,
 	initialPrompt,
 	initiallyInFlight,
-	initiallyCompacting = false,
 	startedIn,
+	topics = NO_TOPICS,
+	appOpening = false,
 	course,
 	place,
 	initiallyCourseDeleted = false,
+	continueTask = false,
 }: {
 	chatId: string;
 	title: string;
@@ -182,15 +195,19 @@ export function Chat({
 	 *  over the transcript from it: practice renders a Practice tag in
 	 *  place of the phase chip. */
 	startedIn?: SessionMode;
+	/** The topics the session was started on (the record's `topics`). */
+	topics?: readonly string[];
+	/** Started by a press on its topics: its first message is the app's
+	 *  opening, not his words, and draws no bubble (`appOpeningAt`). */
+	appOpening?: boolean;
 	initialPrompt?: string;
+	/** Opened by Continue on an open task it holds (`continueHref`): with
+	 *  nothing in it waiting on him, the tutor carries on at the task's
+	 *  step at once (round 13, 2 M1). */
+	continueTask?: boolean;
 	/** A teacher turn is running server-side but attached to no client
 	 * (navigated away mid-turn, returned while in flight). */
 	initiallyInFlight?: boolean;
-	/** A compaction holds the chat's model gate at mount (navigated away
-	 * mid-compaction — the registry is live server state, the
-	 * compaction-changed event already fired). The transcript spinner
-	 * and send gates key on it. */
-	initiallyCompacting?: boolean;
 }) {
 	// Reattach plumbing (background-turn runner wave): the hook holds the
 	// settled terminal's callback — a stable ref assigned below, once
@@ -204,7 +221,7 @@ export function Chat({
 	// (core/view.ts projectView); sends are ONE explicit input event each
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
-	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, recoverDroppedStream, resumeStream, setReattachSettled } =
+	const { messages, nativeMessages, hasConfirmedConversation, compacting, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, stopReply, clearError, outlivedFailure, recoverDroppedStream, resumeStream, setReattachSettled } =
 		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
 
 	// The question is the tutor's words and the one composer answers it
@@ -214,6 +231,8 @@ export function Chat({
 	const column = LESSON_COLUMN;
 	const sessionFindScopeRef = useRef<HTMLDivElement | null>(null);
 	const scrollContextRef = useRef<StickToBottomContext | null>(null);
+	// While he reads up the conversation the composer rests compact, one row (T3 Code's; Edo, 17 Nov 2026).
+	const [readingUp, setReadingUp] = useState(false);
 
 	/* THE SCROLL MODEL (components/lesson/reading-position.ts): every action
 	 * of his that starts a turn passes here, so the lesson goes to its end
@@ -227,6 +246,9 @@ export function Chat({
 	// What another window did to the question he was typing in, while the
 	// line about his words still applies (stranded-draft.ts).
 	const [overtaken, setOvertaken] = useState<"answered" | LeftOpen | null>(null);
+	// Words of his in the message box that an open question or problem
+	// hides behind Esc, until he sees them or they go (stranded-draft.ts).
+	const [messageHidden, setMessageHidden] = useState(false);
 	// The dock this window last sent from: its question leaving is his doing.
 	const dockKeyRef = useRef<string | null>(null);
 	const sentFromDockRef = useRef<string | null>(null);
@@ -277,6 +299,19 @@ export function Chat({
 	// the composer, shows the pre-first-chunk shimmer, and drives the 1500ms
 	// record poll that adopts at settle if the stream can't attach.
 	const [turnInFlight, setTurnInFlight] = useState(initiallyInFlight ?? false);
+	// THE SESSION'S BUSY FACT (round 14, 3 M2; session-busy.ts): the
+	// server's own, the one the sidebar's "Tutor writing" reads, with a
+	// turn it sets up itself and his stop. The lesson's line, Stop and box
+	// all follow it, so a handoff between agents never looks finished.
+	const attachIfRunningRef = useRef<() => void>(() => {});
+	const { busy, serverTurnRef, stopAskedRef, askStop, stopSpent, noTurnRunning } = useSessionBusy({
+		chatId,
+		status,
+		attached: turnInFlight,
+		initiallyInFlight: initiallyInFlight ?? false,
+		attachIfRunning: () => attachIfRunningRef.current(),
+		dropped: status === "error" && droppedError(error),
+	});
 
 	// Session title: click-to-rename (owner, 2026-09-17). Clicking the header
 	// title opens edit mode with everything selected — typing replaces, arrows
@@ -367,6 +402,26 @@ export function Chat({
 		// 409 not_running is the benign raced-settle: the stream's finish
 			// already settled the view (or the poll fallback adopts) — nothing owed.
 	}, [chatId, stop]);
+	// His Stop of the reply itself: it reads as stopped from the press.
+	const syncFromServerRef = useRef<() => Promise<unknown>>(async () => undefined);
+	const stopTheReply = useCallback(() => {
+		askStop();
+		setTurnInFlight(false);
+		stopReply();
+		void fetch("/api/activity/abort", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ kind: "turn", id: chatId }),
+		}).then((res) => {
+			// Nothing ran to stop (it settled first): the record decides.
+			if (res.status === 409) {
+				stopSpent();
+				void syncFromServerRef.current();
+			}
+		}).catch(() => {
+			/* transient — the turn settles on its own and its settle syncs */
+		});
+	}, [chatId, stopReply, askStop, stopSpent]);
 	// ESC-abort guard (owner, 2026-10-02): the abort chain opens a confirm
 	// popup EVERYWHERE (streams and pending questions alike). Both window
 	// listeners fire per Esc, so the state gate here — not stopPropagation
@@ -400,9 +455,10 @@ export function Chat({
 				setupOpen: setupOpenRef.current,
 				pending: pendingRef.current !== null,
 				problem: activeProblemRef.current !== null,
+				askToggle: proseToggleRef.current !== null,
 				busy: busyRef.current,
 			});
-			if ((target === "question" || target === "problem") && proseToggleRef.current) proseToggleRef.current();
+			if (target === "ask") proseToggleRef.current?.();
 			else if (target === "question") setAbortAsk("question");
 			else if (target === "problem") setAbortAsk("problem");
 			else if (target === "turn") setAbortAsk("turn");
@@ -417,7 +473,7 @@ export function Chat({
 		(mode: AbortMode) => {
 			setAbortAsk(null);
 			if (mode === "turn") {
-				abortInFlightTurn();
+				stopTheReply();
 				return;
 			}
 			// From a pending question the dismiss is silent (A2, 2026-10-03):
@@ -445,7 +501,7 @@ export function Chat({
 				if (busyRef.current) abortInFlightTurn();
 			}
 		},
-		[abortInFlightTurn, dismissQuestion, dismissProblem],
+		[abortInFlightTurn, stopTheReply, dismissQuestion, dismissProblem],
 	);
 	// Mount continuation: if the stored transcript ends with a fulfilled tool
 	// (a job result landed while no client was open), resume the lesson — the
@@ -461,6 +517,17 @@ export function Chat({
 		if (!turnInFlight) continueIfOwed(initialMessages);
 		// mount-only by design (turnInFlight read at initial value)
 	}, []);
+	// Continue on the task this session holds: the link's ask is spent
+	// once, so a reload never asks again (round 13, 2 M1: Continue Problem
+	// sheet 4 opened the finished chat with an empty box and no turn).
+	const continuedTask = useRef(false);
+	useEffect(() => {
+		if (!continueTask || continuedTask.current) return;
+		continuedTask.current = true;
+		window.history.replaceState(window.history.state, "", `/chat/${chatId}`);
+		if (!turnInFlight && taskTurnOwed(initialMessages)) void send({ type: "task" });
+		// mount-only by design, as the continuation above
+	}, []);
 
 	const pending = findPendingToolCall(messages, pendingQuestionOf(nativeMessages));
 	const malformedQuestions = malformedQuestionsOf(nativeMessages);
@@ -471,6 +538,8 @@ export function Chat({
 	// The question this one asks again after a hint or a side question:
 	// his carried work fills it, whatever its words (kept-drafts.ts).
 	const reaskOf = useMemo(() => (pending ? reaskedFrom(messages, pending.toolCallId) : null), [messages, pending?.toolCallId]);
+	// What he had typed when Done for today set the question this one asks again aside (round 15, 3 m1).
+	const leftDraft = useMemo(() => (reaskOf ? leftDraftAt(messages, reaskOf) : null), [messages, reaskOf]);
 
 	// THE ACTIVE PRACTICE PROBLEM (practice sessions, 2026-10-04): the
 	// same dock-ownership rule as a pending question — an active problem
@@ -496,14 +565,39 @@ export function Chat({
 	// The Prose composer swaps between the message field and the answer
 	// field: focus follows to where he types next (focus-home.ts).
 	const proseFocusKey = `${proseOpenKey(proseOpen)}:${proseAnswer.mode}`;
+	// Esc showed him the message box: its words are no longer hidden.
+	useEffect(() => {
+		if (proseAnswer.mode === "ask") setMessageHidden(false);
+	}, [proseAnswer.mode]);
 	useEffect(() => {
 		setFocusEpoch((n) => n + 1);
 	}, [proseFocusKey]);
 
 	const localStream = status === "submitted" || status === "streaming";
-	const busy = localStream || turnInFlight;
 	const busyRef = useRef(busy);
 	busyRef.current = busy;
+	// The next answer's Claude Code process starts while he thinks, and ends
+	// when he leaves the lesson (src/server/prestart.ts). His answer never
+	// releases it: its turn takes it.
+	const waitsOnHim = proseOpen !== null && !busy;
+	useEffect(() => {
+		if (waitsOnHim) void fetch(`/api/chats/${chatId}/prestart`, { method: "POST" }).catch(() => undefined);
+	}, [chatId, waitsOnHim]);
+	// A release waits for the next task, so the effect's own remount (React's
+	// development check) takes it back: only leaving the lesson ends it.
+	const leaving = useRef<{ chatId: string; timer: number } | null>(null);
+	useEffect(() => {
+		if (leaving.current?.chatId === chatId) {
+			window.clearTimeout(leaving.current.timer);
+			leaving.current = null;
+		}
+		const release = () => void fetch(`/api/chats/${chatId}/prestart`, { method: "POST", body: JSON.stringify({ release: true }), keepalive: true }).catch(() => undefined);
+		window.addEventListener("pagehide", release);
+		return () => {
+			window.removeEventListener("pagehide", release);
+			leaving.current = { chatId, timer: window.setTimeout(release, 0) };
+		};
+	}, [chatId]);
 	// The attach handoff (stream-reattach wave): the moment a resumed
 	// stream takes over the rendering — the SDK left "ready", so
 	// submitted/streaming means chunks are flowing — localStream covers
@@ -526,6 +620,23 @@ export function Chat({
 		setTurnInFlight(true);
 		void resumeStream();
 	}, [resumeStream]);
+	// Our stream ended with the server's busy fact still up: attach if a
+	// turn still runs, or let the fact go (a settle this view missed). A
+	// turn this read finds settled is the cheap terminal's to adopt.
+	const attachIfRunning = useCallback(async () => {
+		try {
+			const res = await fetch(`/api/chats/${chatId}`);
+			if (!res.ok) return;
+			const record = (await res.json()) as { turnInFlight?: boolean };
+			if (record.turnInFlight === true) {
+				// The turn he stopped is aborting, not one to read (round 15, m21).
+				if (!localStreamRef.current && !turnInFlightRef.current && !stopAskedRef.current) attachToRunningTurn();
+			} else noTurnRunning();
+		} catch {
+			/* unreachable: the resync asks again */
+		}
+	}, [chatId, attachToRunningTurn, noTurnRunning]);
+	attachIfRunningRef.current = () => void attachIfRunning();
 
 	// The practice dock's send (ONE lane, owner 2026-10-05): POSTs the
 	// thinking against the ACTIVE problem — whether it claims an answer is
@@ -573,19 +684,25 @@ export function Chat({
 	const applyText = useCallback((v: string) => {
 		textRef.current = v;
 		keepWords(composerScope, { text: v });
+		if (!v.trim()) setMessageHidden(false);
 		setComposerDraftRevision((revision) => revision + 1);
 	}, [composerScope]);
 	const recordComposerText = useCallback((v: string) => {
 		textRef.current = v;
 		keepWords(composerScope, { text: v });
+		// He is in the message box, so nothing in it is hidden from him.
+		setMessageHidden(false);
 		// An emptied box no longer holds the words another window overtook.
 		if (!v.trim()) setOvertaken((was) => (was === "answered" ? null : was));
 	}, [composerScope]);
 	// What he typed before a reload comes back after mount, so the server's
-	// page and the first client render agree.
+	// page and the first client render agree; behind an open question it
+	// gets its line (round 11, 4 minor 2).
 	useEffect(() => {
 		const kept = keptWords(composerScope)?.text;
-		if (kept && !textRef.current) applyText(kept);
+		if (!kept || textRef.current) return;
+		applyText(kept);
+		if (kept.trim() && dockKeyRef.current !== null) setMessageHidden(true);
 	}, [composerScope, applyText]);
 
 	// OVERTAKEN IN ANOTHER WINDOW (stranded-draft.ts): the open question or
@@ -620,19 +737,29 @@ export function Chat({
 		liveDraftRef.current = null;
 		if (dockKey !== null) setOvertaken((was) => (was === "answered" ? was : null));
 		const why = before.callId ? leftOpenOf(viewRef.current, before.callId) : null;
-		const moved = before.key === sentFromDockRef.current ? null : overtakenDraft(before.key, dockKey, live, why);
-		if (moved === null) return;
-		if (moved.to === "carry") {
-			if (carryScope && before.callId) carryWords(carryScope, { question: before.question, from: before.callId }, { text: moved.words }, []);
-			if (dockKey === null) setOvertaken(moved.why);
-			return;
+		if (before.key === sentFromDockRef.current) {
+			// What he typed there after sending from it is his next message
+			// (round 11, 4 major 1: it was erased with the closed problem).
+			const own = typedAfterSend(before.key, dockKey, live);
+			if (own !== null) applyText(joinAsTyped([textRef.current, own]));
+		} else {
+			const moved = overtakenDraft(before.key, dockKey, live, why);
+			if (moved?.to === "carry") {
+				if (carryScope && before.callId) carryWords(carryScope, { question: before.question, from: before.callId }, { text: moved.words }, []);
+				if (dockKey === null) setOvertaken(moved.why);
+			} else if (moved) {
+				applyText(rescuedBox(chatId, textRef.current, moved.words));
+				keepRescue(chatId, moved.words, before.key);
+				setOvertaken("answered");
+			}
 		}
-		applyText(rescuedBox(chatId, textRef.current, moved.words));
-		keepRescue(chatId, moved.words, before.key);
-		setOvertaken("answered");
+		// A question or problem opening over words in the message box hides
+		// them behind Esc, so one line says they are kept (round 11, 4
+		// minor 2: a message kept while the app was down, after the restart).
+		setMessageHidden(dockKey !== null && textRef.current.trim() !== "");
 		// `dock` is derived from the render that changed dockKey.
 	}, [chatId, dockKey, applyText, carryScope]);
-	const { unconnected, status: modelStatus } = useModelSetup();
+	const { unconnected, status: modelStatus, read: statusRead, refresh: refreshStatus } = useModelSetup(busy);
 	const [setupOpen, setSetupOpen] = useState(false);
 	/** The explicitly-sent draft (composer send) until the server accepts
 	 *  it (sent-draft.ts): the
@@ -662,16 +789,23 @@ export function Chat({
 		draftRef.current = prompt; // The existing 503 flow must restore it too.
 		applyText("");
 		// Photos from the New lesson box go with the first message.
-		void takeKeptPhotos(`${chatId}:opening`).then((photos) => send({ type: "text", text: prompt, ...(photos.length ? { photos } : {}) }, () => {
-			clearOpeningPrompt(chatId);
-			openingDraftRef.current = null;
-			if (draftRef.current === prompt) draftRef.current = null;
-		}).then(accepted => {
-			if (!accepted && photos.length) restoreComposerPhotos(photos.map((photo, i) => ({ id: `opening_${i}`, photo })));
-			if (!accepted && openingMountedRef.current && openingDraftRef.current === prompt && !textRef.current) {
-				applyText(prompt);
+		void takeKeptPhotos(`${chatId}:opening`).then((photos) => {
+			// An opening of photos alone whose photos are gone has nothing to send.
+			if (!prompt && !photos.length) {
+				clearOpeningPrompt(chatId);
+				return;
 			}
-		}));
+			return send({ type: "text", text: prompt, ...(photos.length ? { photos } : {}) }, () => {
+				clearOpeningPrompt(chatId);
+				openingDraftRef.current = null;
+				if (draftRef.current === prompt) draftRef.current = null;
+			}).then(accepted => {
+				if (!accepted && photos.length) restoreComposerPhotos(photos.map((photo, i) => ({ id: `opening_${i}`, photo })));
+				if (!accepted && openingMountedRef.current && openingDraftRef.current === prompt && !textRef.current) {
+					applyText(prompt);
+				}
+			});
+		});
 	}, [chatId, send, applyText, restoreComposerPhotos]);
 
 	const sentInitial = useRef(false);
@@ -713,9 +847,14 @@ export function Chat({
 	// goes HOME: refetch the record, drop the orphan, put the draft back in
 	// the composer, open the dialog. The draft stays in the composer until
 	// the learner re-sends it (owner ruling 2026-10-09).
+	// Whether the refused send carried words he typed (the opening's draft,
+	// or what stays in the box until a send is accepted): only then does the
+	// line say they are still in the box (round 11, 4 minor 3).
+	const [refusedWords, setRefusedWords] = useState(false);
 	useEffect(() => {
 		if (!error) return;
 		if (!parseProviderKeyRefusal(error.message)) return; // a real error keeps the honest banner
+		setRefusedWords(Boolean(draftRef.current?.trim() || textRef.current.trim()));
 		// The draft restore and the dialog open land together after the
 		// record refetch (the honest truth minus the refused send).
 		let cancelled = false;
@@ -738,18 +877,33 @@ export function Chat({
 		// (setMessages is stable per useChat instance — the dep pair
 		//  [error, chatId] is what the flow actually keys on.)
 	}, [error, chatId]);
-	// The signed-out line leaves with its cause (round 8): once the account
-	// reads connected again after reading signed out, the line clears and
-	// his next key goes to the box (turn-error-text.ts refusalWatch).
-	const signedOutSeenRef = useRef(false);
+	// The signed-out line leaves with its cause (round 8): once a reading
+	// taken after the refusal says connected (the dialog re-checks as it
+	// opens, round 10), the line clears and his next key goes to the box
+	// (turn-error-text.ts refusalWatch). A turn that failed for it keeps
+	// Retry alone: the pill above the box is the one sign-in (round 15, M2:
+	// the line stayed, and its Sign in crashed the page once Claude was back).
+	const refusalSinceRef = useRef<number | null>(null);
+	// The line asks Claude again as it appears, and each time he comes back
+	// to the window, where he signs in elsewhere (round 16, m2: with Claude
+	// back, nothing read the status again, and the line stood 30 s and more).
+	const signedOutLine = isSignedOutLine(error?.message);
 	useEffect(() => {
-		const watch = refusalWatch(signedOutSeenRef.current, !!error && parseProviderKeyRefusal(error.message), modelStatus?.connected);
-		signedOutSeenRef.current = watch.seenSignedOut;
+		if (!signedOutLine) return;
+		const ask = () => refreshStatus(true);
+		ask();
+		window.addEventListener("focus", ask);
+		return () => window.removeEventListener("focus", ask);
+	}, [signedOutLine, refreshStatus]);
+	useEffect(() => {
+		const watch = refusalWatch(refusalSinceRef.current, isSignedOutLine(error?.message), modelStatus?.connected, statusRead);
+		refusalSinceRef.current = watch.since;
 		if (!watch.clear) return;
 		clearError();
+		outlivedFailure();
 		focusWhereHeTypes(document, false);
-		// clearError is stable per session.
-	}, [error, modelStatus?.connected]);
+		// clearError and outlivedFailure are stable per session.
+	}, [error, modelStatus?.connected, statusRead]);
 	// A DELETED COURSE (course-gone.tsx): the lesson is history and has no
 	// box, so what he wrote there, sent and refused or still in the box,
 	// goes to the New lesson box, and the line says so. A send refused
@@ -758,10 +912,9 @@ export function Chat({
 	const [courseGoneKept, setCourseGoneKept] = useState(false);
 	useEffect(() => {
 		if (!courseGone) return;
-		const words = [draftRef.current, textRef.current].map((w) => w?.trim() ?? "").filter((w, i, all) => w && all.indexOf(w) === i);
+		const kept = keepForNewLesson(draftRef.current, textRef.current);
 		draftRef.current = null;
-		if (words.length === 0) return;
-		keepForNewLesson(words.join("\n\n"));
+		if (!kept) return;
 		applyText("");
 		setCourseGoneKept(true);
 	}, [courseGone, applyText]);
@@ -790,12 +943,10 @@ export function Chat({
 	// a pending question still owns the interaction (the dock replaces the
 	// composer, and there is no live turn to steer anyway — questions end
 	// turns).
-	// Compaction (owner round 14): the RUNNING state, flipped by
-	// compaction-changed. Nothing gates on it: the server holds any turn
-	// until the compaction ends, so his Enter goes through and the line
-	// below the transcript says why the reply waits (round 6).
-	const [compacting, setCompacting] = useState(initiallyCompacting);
-	const waiting = waitingLine(messages, { busy, compacting });
+	// A turn the server is setting up itself (turn-waking) is busy too
+	// (useSessionBusy): the line shows from the start of its setup.
+	const thinking = showsWorking(messages, busy, compacting);
+	const idleLine = workingLine(messages);
 	// A failed model response (issue #110): Retry keeps the saved input
 	// and completed work, without another learner message. Offered from
 	// "error" too: a dropped stream leaves the model there, and send()
@@ -812,7 +963,7 @@ export function Chat({
 	// or anywhere outside one, runs the same retry as the button.
 	// A question or problem still open owns Enter (its own resend).
 	// A dropped connection: Try again asks the app what became of the reply.
-	const dropped = status === "error" && error?.message === STREAM_DROPPED;
+	const dropped = status === "error" && droppedError(error);
 	const [healFailed, setHealFailed] = useState(false);
 	useEffect(() => setHealFailed(false), [error]);
 	const tryAgain = pending || activeProblem || gone || courseGone ? undefined : replyCut ? () => void send({ type: "continue" }) : dropped ? () => healDroppedStreamRef.current().then((healed) => setHealFailed(!healed)) : retryable && !claudeLimit ? retryFailedTurn : undefined;
@@ -827,17 +978,27 @@ export function Chat({
 	// Stopped for today, by him or by the tutor's close, until he writes
 	// again: the top bar says so, and has nothing left to stop.
 	const closedForToday = closedTonight(nativeMessages);
+	// A question or problem open now, as the one he left is when he is back.
+	const workOpen = !!pending || !!activeProblem;
 	// Done for today wins over the tutor at work (round 7): the server stops
 	// the running turn, its partial saved, then closes the lesson; this
 	// window lets go of the reply it was reading first.
 	const sendTonight = useCallback(() => {
-		if (doneTonight) return;
+		if (doneTonight && !workOpen) return;
 		if (localStreamRef.current) stop();
-		// His half-typed answer waits for the same question next time
-		// (kept-drafts.ts); the answer itself stays hidden.
+		// His half-typed answer waits for the same question next time: kept
+		// with the lesson, on the question it was left on (round 15, 3 m1),
+		// its photos in this Mac's carry (kept-drafts.ts). The answer itself
+		// stays hidden.
 		if (pending && carryScope) carryBox(`${chatId}:q:${pending.key}`, carryScope, { question: (pending.input as { question?: string } | null)?.question ?? "", from: pending.toolCallId });
-		void send({ type: "tonight" });
-	}, [doneTonight, send, pending, carryScope, chatId, stop]);
+		const draft = pending ? leftDraftOf(keptWords(`${chatId}:q:${pending.key}`)) : null;
+		void send(draft ? { type: "tonight", draft: { toolCallId: pending!.toolCallId, ...draft } } : { type: "tonight" });
+	}, [doneTonight, workOpen, send, pending, carryScope, chatId, stop]);
+	// Once the close has settled, his keys go back to the box (round 12, 1 m9).
+	useEffect(() => {
+		const frame = requestAnimationFrame(() => focusAfterDone(document, doneTonight, !busy));
+		return () => cancelAnimationFrame(frame);
+	}, [doneTonight, busy]);
 	const sendTonightRef = useRef(sendTonight);
 	sendTonightRef.current = sendTonight;
 	useEffect(() => {
@@ -849,18 +1010,23 @@ export function Chat({
 	// Each answer's mark, as the engine recorded it (answer-mark.tsx): read
 	// again whenever a turn settles, since a save or a re-mark may have
 	// landed. ⌘⇧M disputes the newest one.
-	const marks = useAnswerMarks(chatId, busy ? null : nativeMessages.length);
-	const [disputing, setDisputing] = useState<string | null>(null);
+	const marks = useAnswerMarks(chatId, course?.workspace, busy ? null : nativeMessages.length);
+	const [disputing, setDisputing] = useState<DisputeTarget | null>(null);
 	const canDispute = !!course && !busy;
-	const disputeMark = marks[disputing ?? ""];
-	const sendDispute = (answerId: string, mark: AnswerMark, draft: DisputeDraft) => {
+	const disputeMark = disputing ? marks[disputing.answerId] : undefined;
+	// The try he disputes (round 16, m19): one row when he pressed Dispute
+	// beside it, else the answer's every row. Memoised: the dialog holds it.
+	const disputeRows = useMemo(() => (disputing && disputeMark ? disputedRows(disputeMark, disputing) : null), [disputing, disputeMark]);
+	const sendDispute = (answerId: string, rows: readonly MarkRow[], draft: DisputeDraft) => {
 		setDisputing(null);
-		void send({ type: "dispute", answerId, observations: mark.rows.map((row) => row.id), ...draft });
+		const row = rows.length === 1 ? rows[0]!.label : null;
+		void send({ type: "dispute", answerId, observations: rows.map((r) => r.id), ...(row ? { row } : {}), ...draft });
 	};
 	const disputeLatestRef = useRef(() => {});
 	disputeLatestRef.current = () => {
 		const latest = canDispute ? latestMarkedAnswer(nativeMessages, marks) : null;
-		if (latest) setDisputing(latest);
+		// ⌘⇧M on a card of several tries disputes the one that stands last.
+		if (latest) setDisputing({ answerId: latest, rowId: marks[latest]?.rows.at(-1)?.id });
 	};
 	useEffect(() => {
 		const onDispute = () => disputeLatestRef.current();
@@ -868,19 +1034,20 @@ export function Chat({
 		return () => window.removeEventListener(kbdEventForChat("dispute-mark"), onDispute);
 	}, []);
 
-	const nextReady =
-		!doneTonight &&
-		mode === "practice" &&
-		!pending &&
-		!activeProblem &&
-		!busy &&
-		nativeMessages.some(
+	const nextReady = practicePause({
+		practice: mode === "practice",
+		closed: doneTonight,
+		open: !!pending || !!activeProblem,
+		busy,
+		posed: nativeMessages.some(
 			(m) => (m as { role?: string }).role === "assistant" &&
 				Array.isArray((m as { content?: unknown[] }).content) &&
 				(m as { content: Array<{ type?: string; name?: string }> }).content.some(
 					(b) => b.type === "toolCall" && b.name === "problem",
 				),
-		);
+		),
+		retry: !!tryAgain,
+	});
 	const sendNext = useCallback(() => {
 		if (!nextReady) return;
 		void send({ type: "next" });
@@ -922,6 +1089,7 @@ export function Chat({
 		setTurnInFlight(false);
 		void syncFromServer();
 	};
+	syncFromServerRef.current = syncFromServer;
 
 	// ── Append-only record adoption (owner ground rules, 2026-09-15) ──
 	// Content delivered into the record server-side — sub-agent
@@ -977,11 +1145,21 @@ export function Chat({
 	// The session's live plan: its steps, where he is on them and where each
 	// was first taught, for the top bar's roadmap (lesson-roadmap.md).
 	const planTree = useMemo(() => latestTree(messages), [messages]);
+	// The tutor ended the session (a review that closed itself): nothing waits, so nothing to stop (round 14, m32).
+	const ownTopics = useMemo(() => (topics.length > 0 ? topics : mode === "practice" ? firstProblemTopicsOf(nativeMessages) : []), [topics, mode, nativeMessages]);
+	const sessionFinished = useMemo(() => !busy && sessionEndOf(nativeMessages, planTree ?? undefined, startedIn, ownTopics) === "closed", [busy, nativeMessages, planTree, startedIn, ownTopics]);
 	const anchors = useMemo(() => (planTree ? stepAnchors(messages, new Set(planTree.nodes.map((n) => n.id))) : new Map<string, string>()), [planTree, messages]);
+	// A problem's close that marks his answer from before Done for today is
+	// drawn above its line, beside the answer (marks-before-done.ts).
+	const doneMarks = useMemo(() => marksBeforeDone(messages), [messages]);
 	const reasked = useMemo(() => askedAgain(messages), [messages]);
+	const reaskedAfterHint = useMemo(() => askedAfterHint(messages), [messages]);
+	const leftBelow = useMemo(() => leftAskedBelow(messages), [messages]);
+	const spoken = useMemo(() => spokenAbove(messages), [messages]);
+	const openingAt = useMemo(() => appOpeningAt(messages, appOpening), [messages, appOpening]);
 	const steps = useMemo(() => {
 		if (!planTree) return [];
-		return roadmapSteps(planTree, derivePlanStatuses(planTree, messages as Parameters<typeof derivePlanStatuses>[1]), new Set(anchors.values()));
+		return lessonRoadmapSteps(planTree, messages as Parameters<typeof lessonRoadmapSteps>[1], new Set(anchors.values()));
 	}, [planTree, messages, anchors]);
 	// A step's place in the transcript: scroll to where it was first taught
 	// and mark it as a passage link lands (session-navigation.tsx).
@@ -1162,10 +1340,13 @@ export function Chat({
 	// Reconnect catch-up: events missed while the channel was down.
 	useServerResync(() => {
 		fetchJobsRef.current();
+		// Turn events missed while the channel was down: the record says
+		// whether a turn still runs.
+		if (serverTurnRef.current && !localStreamRef.current) void attachIfRunning();
 		// The channel came back after the app restarted: a turn the restart
 		// cut never settles, so the dropped stream's line would stand
 		// forever. Ask the record what is true now.
-		if (statusRef.current === "error" && errorMessageRef.current === STREAM_DROPPED) void healDroppedStreamRef.current();
+		if (statusRef.current === "error" && droppedError(errorRef.current)) void healDroppedStreamRef.current();
 	});
 	useEffect(
 		() => () => {
@@ -1183,8 +1364,8 @@ export function Chat({
 	// between renders, and a ref holds the live value at event time.
 	const statusRef = useRef(status);
 	statusRef.current = status;
-	const errorMessageRef = useRef(error?.message);
-	errorMessageRef.current = error?.message;
+	const errorRef = useRef(error);
+	errorRef.current = error;
 	// Also Try again on the dropped line (round 7: after a restart the line
 	// sat ~26 s with nothing to press): false while the app can't be reached.
 	const healDroppedStreamRef = useRef(async (): Promise<boolean> => false);
@@ -1218,8 +1399,11 @@ export function Chat({
 		// gets a settled response — unwinnable by a network round-trip,
 		// self-healing via the eventual turn-settled. Do not engineer around.
 		if (p.chatId !== chatId) return;
-		if (localStreamRef.current) return; // our OWN turn — the 409-race guard
+		// Our own turn, or one that began as ours closes (a handoff's next
+		// agent): the end of our stream attaches to it (useSessionBusy).
+		if (localStreamRef.current) return; // the 409-race guard
 		if (turnInFlightRef.current) return; // already attached
+		if (stopAskedRef.current) return; // the turn he stopped (round 15, m21)
 		attachToRunningTurn();
 	});
 	useServerEvent("turn-settled", (p) => {
@@ -1251,14 +1435,6 @@ export function Chat({
 		// Fully idle — a turn we never saw (every window missed): adopt now.
 		void syncFromServer();
 	});
-	useServerEvent("compaction-changed", (p) => {
-		// The settle-kick's background summary: while it runs, sends gate
-		// (the next turn's server-side ensureCompacted awaits it anyway —
-		// this only keeps the affordance honest). On finish, record-changed
-		// (emitted by the compaction write itself) carries the marker in.
-		if (p.chatId !== chatId) return;
-		setCompacting(p.running);
-	});
 	useServerEvent("chats-changed", (p) => {
 		// The first plan named this session (ChatStore.nameSession): the
 		// header takes the name the list now shows.
@@ -1286,7 +1462,10 @@ export function Chat({
 			.catch(() => {});
 	};
 	useEffect(() => checkCourseRef.current(), []);
-	useServerEvent("courses-changed", () => checkCourseRef.current());
+	useServerEvent("courses-changed", (p) => {
+		if (courseDeletedBy(p, course?.workspace)) setCourseGone(true);
+		else checkCourseRef.current();
+	});
 	useServerEvent("record-changed", (p) => {
 		// A turn-less write (the silent dismissal, A2 2026-10-03), or a wake
 		// turn's markers landing at its write-ahead. Idle: adopt the record
@@ -1315,16 +1494,19 @@ export function Chat({
 		if (pending) return;
 		doSteerOrSend();
 	};
-	// A refused send puts its photos back, as the refusal flow keeps the text.
-	const sendWithPhotos = (go: (photos: Photo[] | undefined) => Promise<boolean>) => {
+	// A send that fails puts what he typed and his photos back (sent-draft.ts).
+	const sendWithPhotos = (typed: string, go: (text: string, photos: Photo[] | undefined, onAccepted: () => void) => Promise<boolean>) => {
 		const taken: PendingPhoto[] = composerPhotos.take();
-		void go(sentPhotos(taken)).then((accepted) => {
+		const photos = sentPhotos(taken);
+		void sendKeepingWords(draftRef, typed, (text, onAccepted) => go(text, photos, onAccepted), () => textRef.current).then(({ accepted, back }) => {
 			if (!accepted) composerPhotos.restore(taken);
+			if (back !== null) applyText(back);
 		});
 	};
 	const doSend = () => {
 		if (busy || pending) return;
-		const t = textRef.current.trim();
+		const typed = textRef.current;
+		const t = typed.trim();
 		const withPhotos = composerPhotos.photos.length > 0;
 		if (!t && !withPhotos) return;
 		if (unconnected) {
@@ -1336,7 +1518,7 @@ export function Chat({
 			return;
 		}
 		applyText("");
-		sendWithPhotos((photos) => sendHoldingDraft(draftRef, t, (onAccepted) => send({ type: "text", text: t, ...(photos ? { photos } : {}) }, onAccepted)));
+		sendWithPhotos(typed, (text, photos, onAccepted) => send({ type: "text", text, ...(photos ? { photos } : {}) }, onAccepted));
 	};
 
 	/* STEER VS SEND (owner arc 2026-10-03): a send while a turn runs steers
@@ -1350,11 +1532,11 @@ export function Chat({
 	 * plain send; a raced settle 409s and falls back to exactly that. */
 	const doSteerOrSend = () => {
 		if (pending) return;
-		const t = textRef.current.trim();
-		if (!t && composerPhotos.photos.length === 0) return;
+		const typed = textRef.current;
+		if (!typed.trim() && composerPhotos.photos.length === 0) return;
 		if (busy) {
 			applyText("");
-			sendWithPhotos((photos) => steer(t, photos));
+			sendWithPhotos(typed, (text, photos, onAccepted) => steer(text, photos, onAccepted));
 			return;
 		}
 		doSend();
@@ -1367,7 +1549,8 @@ export function Chat({
 	 * again as it was, and his answer so far waits for it in the carry. A
 	 * problem stays open and his message reaches the tutor beside it. */
 	const askInstead = async () => {
-		const t = textRef.current.trim();
+		const typed = textRef.current;
+		const t = typed.trim();
 		if (!t && composerPhotos.photos.length === 0) return;
 		if (unconnected) {
 			setSetupOpen(true);
@@ -1380,13 +1563,13 @@ export function Chat({
 			const question = (p.input as { question?: string } | null)?.question ?? "";
 			if (carryScope) carryBox(`${chatId}:q:${p.key}`, carryScope, { question, from: p.toolCallId });
 			if (!(await dismissQuestion(p.toolCallId, dismissedAnswer(toolQuestionKind(p.tool), question, "asked"), p.key))) return;
-		} else if (busyRef.current) {
-			applyText("");
-			sendWithPhotos((photos) => steer(t, photos));
-			return;
 		}
 		applyText("");
-		sendWithPhotos((photos) => sendHoldingDraft(draftRef, t, (onAccepted) => send({ type: "text", text: t, asked: true, ...(photos ? { photos } : {}) }, onAccepted)));
+		if (!p && busyRef.current) {
+			sendWithPhotos(typed, (text, photos, onAccepted) => steer(text, photos, onAccepted));
+			return;
+		}
+		sendWithPhotos(typed, (text, photos, onAccepted) => send({ type: "text", text, asked: true, ...(photos ? { photos } : {}) }, onAccepted));
 	};
 
 	// THE ANSWER IS THE QUESTION CALL'S TOOL RESULT (fork 1, owner
@@ -1435,7 +1618,7 @@ export function Chat({
 		>
 		<JobsContext.Provider value={jobs}>
 		<ActiveProblemContext.Provider value={activeProblemCallId}>
-		<AnswerMarksProvider value={{ marks, onDispute: setDisputing, canDispute }}>
+		<AnswerMarksProvider value={{ marks, onDispute: (answerId, rowId) => setDisputing({ answerId, rowId }), canDispute }}>
 		<ProseAnswerProvider value={proseAnswer}>
 		{/* The session surface: the transcript column (header + scroller) and
 		    the plan-tree panel as full-height SIBLINGS — the panel spans top to
@@ -1488,7 +1671,7 @@ export function Chat({
 									onBlur={() => void commitRename(titleDraft)}
 									spellCheck={false}
 									aria-label="Session title"
-									className="lh-no-drag -mx-1.5 h-auto w-auto min-w-[8ch] max-w-full shrink-0 bg-fill-hover px-1.5 text-control font-medium text-inherit caret-current focus-visible:ring-0 [field-sizing:content]"
+									className="lh-no-drag -mx-1.5 h-auto w-auto min-w-[8ch] max-w-full shrink-0 bg-fill-hover px-1.5 text-headline text-inherit caret-current focus-visible:ring-0 [field-sizing:content]"
 								/>
 							) : topicCrumb && !topicCrumbShown(topicCrumb.title, titleText) ? null : (
 								<Hint label="Rename session" action="rename-session" side="bottom">
@@ -1498,7 +1681,7 @@ export function Chat({
 											setTitleDraft(titleText);
 											setRenaming(true);
 										}}
-										className="lh-no-drag -mx-1.5 block h-auto min-w-4 shrink cursor-text truncate px-1.5 text-left text-control font-medium text-inherit hover:text-inherit"
+										className="lh-no-drag -mx-1.5 block h-auto min-w-4 shrink cursor-text truncate px-1.5 text-left text-headline text-inherit hover:text-inherit"
 									>
 										{titleText}
 									</Button>
@@ -1519,7 +1702,7 @@ export function Chat({
 								onJump={jumpToStep}
 							/>
 						}
-						tonight={<DoneTonightButton onDone={sendTonight} gone={doneTonightGone({ closedForToday, courseGone, lessonGone: gone })} disabled={doneTonight} />}
+						tonight={<DoneTonightButton onDone={sendTonight} gone={doneTonightGone({ closedForToday, open: workOpen, finished: sessionFinished, courseGone, lessonGone: gone })} disabled={doneTonight && !workOpen} />}
 					/>
 				</TopBar>
 
@@ -1527,7 +1710,8 @@ export function Chat({
 				<div ref={sessionFindScopeRef} className="relative flex min-h-0 flex-1">
 				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef} targetScrollTop={followTargetScrollTop}>
 					<SessionMessageNavigation />
-					<ConversationContent className="min-h-full gap-0 p-0" scrollClassName="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+					<ReadingUp onChange={setReadingUp} />
+					<ConversationContent className="min-h-full gap-0 p-0">
 						<div data-session-find-root="" data-transcript-column="" className={`${column} flex flex-1 flex-col gap-4 pt-6`}>
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
@@ -1544,7 +1728,12 @@ export function Chat({
 									// PROTOCOL" §4). Key fallback: legacy transcripts (pre id-hygiene)
 									// can still hold empty ids — the index keeps keys unique for them.
 									<SubagentSteerCard key={m.id || `m-${mi}`} message={m} figures="inline" />
-								) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume" || p.type === "data-probe-handoff" || p.type === "data-mode-handoff") ? (
+								) : mi === openingAt ? (
+								// The app's opening words for a pressed start (Start,
+								// Review, a topic's name) are its instruction to the
+								// tutor, not his message: no bubble (round 9).
+								null
+							) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume" || p.type === "data-task-continue" || p.type === "data-probe-handoff" || p.type === "data-mode-handoff") ? (
 								// The seams between the opening questions, planning, teaching
 								// and practice draw nothing: the lesson names no phase (Edo,
 								// 14 Nov 2026), and where he is in the plan is the top bar's
@@ -1571,7 +1760,15 @@ export function Chat({
 												// The learner's move-on signal (owner round 16).
 												return <SectionBreak key={pi} testId="practice-next-line" label="Next problem" />;
 											case "data-done-tonight":
-												return <DoneTonightLine key={pi} />;
+												return (
+													<Fragment key={pi}>
+														{doneMarks.before.get(mi)?.map(({ message, part: at }) => {
+															const conclude = messages[message]!.parts[at]!;
+															return <ProseConclude key={`${message}:${at}`} toolCallId={conclude.toolCallId!} input={conclude.input} output={conclude.output} reveal={conclude.reveal} />;
+														})}
+														<DoneTonightLine />
+													</Fragment>
+												);
 											case "data-dispute":
 												return <DisputeBubble key={pi} data={part.data as DisputeDetails} />;
 											// Compaction (the moment and the cut) is the tutor's
@@ -1661,23 +1858,26 @@ export function Chat({
 																open={pending?.toolCallId === part.toolCallId && part.state !== "output-available"}
 																stepAnchor={stepAnchor}
 																repeat={reasked.has(part.toolCallId!)}
+																afterHint={reaskedAfterHint.has(part.toolCallId!)}
+																askedBelow={leftBelow.has(part.toolCallId!)}
+																spoken={spoken.has(part.toolCallId!)}
 															/>
 														);
 													}
 													default: {
 														// A tool call being WRITTEN (owner, streaming round 2026-10-01):
-														// input-streaming spans the whole execution, and the live line
-														// says what the tutor is doing. On settling, the registry's card
-														// takes over below.
-														if (part.type.startsWith("tool-") && part.state === "input-streaming") {
-															return <LiveToolCard key={pi} part={part as ArtifactPartProps["part"]} />;
-														}
+														// input-streaming spans the whole execution, and the turn's one
+														// working line below says what the tutor is doing (round 16, m1:
+														// a line per running tool stacked). On settling, the registry's
+														// card takes over below.
+														if (part.type.startsWith("tool-") && part.state === "input-streaming") return null;
 														// A problem is the tutor's words, its end a mark and a
 														// disclosure (prose-practice.tsx).
 														if (part.type === "tool-problem") {
 															return <ProseProblem key={pi} input={part.input} active={part.toolCallId === activeProblemCallId} />;
 														}
 														if (part.type === "tool-conclude") {
+															if (doneMarks.moved.has(partKey(mi, pi))) return null;
 															return <ProseConclude key={pi} toolCallId={part.toolCallId!} input={part.input} output={part.output} reveal={part.reveal} />;
 														}
 														// Artifact extension point (contracts.ts): job
@@ -1712,19 +1912,16 @@ export function Chat({
 							    provider-connect gap. turnInFlight: the same state
 							    entered by external discovery (wake) / the poll
 							    fallback. Never collapsible itself. */}
-							{/* Compaction (owner round 15): the same register as the
-						    thinking placeholder, a visible session-wide state while
-						    the summarizer holds the model gate. It stands in for
-						    Thinking while his sent input waits on it (round 6). */}
-							{waiting === "compacting" && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
-							{waiting === "thinking" && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
+							{thinking && <ActivityLine testId="thinking-placeholder" label={compacting ? COMPACTING_LINE : (streamingToolActivity(messages) ?? idleLine)} />}
 							{replyCut && !courseGone && !gone && <ReplyCut cut={replyCut} onRetry={() => void send({ type: "continue" })} />}
-							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
+							{/* A failed turn whose cause is gone (signed in again): Retry alone. */}
+							{!error && retryable && !claudeLimit && !courseGone && !gone && <ReplyCut cut="failed" onRetry={retryFailedTurn} />}
+							{openingError && <p role="alert" className="text-body text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && (
-								<TurnError message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={unconnected ? undefined : () => setSetupOpen(true)}>
+								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} kept={refusedWords} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
 							)}
@@ -1748,7 +1945,7 @@ export function Chat({
 					busy={busy}
 					replyingToDock={busy && sentFromDockRef.current !== null}
 					focusEpoch={focusEpoch}
-					overtakenLine={overtakenLine(overtaken, proseOpen !== null)}
+					overtakenLine={boxLine(overtaken, proseOpen !== null, messageHidden && proseAnswer.mode === "answer" && !busy)}
 					replyAnchorRef={replyAnchorRef}
 					onJumpToLatest={jumpToLatest}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
@@ -1771,8 +1968,9 @@ export function Chat({
 								nextProblem: nextReady,
 								onNext: sendNext,
 								onEmptyEnter: tryAgain,
-								placeholder: nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined,
+								placeholder: pausePlaceholder(nextReady, !!tryAgain),
 								photos: composerPhotos,
+								compact: readingUp,
 							}}
 							onAskInstead={() => void askInstead()}
 							toggleRef={proseToggleRef}
@@ -1780,10 +1978,12 @@ export function Chat({
 							chatId={chatId}
 							carryScope={carryScope}
 							reaskOf={reaskOf}
+							leftDraft={leftDraft}
 							initialDraft={pending ? questionDraft(pending.key)?.form : undefined}
 							onSaveDraft={(form) => { if (pending) saveQuestionDraft(pending.key, { form }); }}
 							onSubmitAnswer={submitPendingAnswer}
 							onSubmitThinking={submitThinking}
+							onSteer={(text, photos) => steer(text, photos)}
 							onRequest={sendPracticeRequest}
 							onDraftChange={recordDockDraft}
 						/>
@@ -1807,9 +2007,7 @@ export function Chat({
 					/>
 				)}
 				<AbortTurnDialog mode={abortAsk} onClose={() => setAbortAsk(null)} onConfirm={confirmAbort} busy={busy} />
-				{disputing && disputeMark && (
-					<DisputeDialog key={disputing} mark={disputeMark} onClose={() => setDisputing(null)} onSend={(draft) => sendDispute(disputing, disputeMark, draft)} />
-				)}
+				<DisputeDialog rows={disputeRows} onClose={() => setDisputing(null)} onSend={(draft) => disputing && disputeRows && sendDispute(disputing.answerId, disputeRows, draft)} />
 				</div>
 			</div>
 		</div>
@@ -1836,7 +2034,7 @@ export function Chat({
  *  then the session overlays (mermaid paints above plan — later in DOM),
  *  then setup (self-closing — the gate only must not fire), then the
  *  2026-10-02 abort chain proper (question before turn). */
-export type EscAbortTarget = "mermaid" | "plan" | "setup" | "question" | "problem" | "turn" | null;
+export type EscAbortTarget = "mermaid" | "plan" | "setup" | "ask" | "question" | "problem" | "turn" | null;
 
 /**
  * Does the opening topic still owe its first send? The topic is the
@@ -1848,7 +2046,7 @@ export type EscAbortTarget = "mermaid" | "plan" | "setup" | "question" | "proble
  * `length === 0` check saw the marker and refused to fire).
  */
 export function initialPromptOwed(messages: readonly { role: string }[], prompt: string | undefined): boolean {
-	if (!prompt) return false;
+	if (prompt === undefined) return false;
 	return !messages.some((m) => m.role === "user" || m.role === "assistant");
 }
 
@@ -1864,24 +2062,20 @@ export function escAbortTarget(s: {
 	 *  abort (a live turn can be running BEHIND an idle problem only in
 	 *  teaching sessions — practice problems end their pose turns). */
 	problem: boolean;
+	/** The answer box's Answer or Ask switch is there: Esc switches it while
+	 *  the tutor waits on him, and stops the tutor while it replies
+	 *  (round 9: Esc mid-reply switched to Ask and nothing stopped it). */
+	askToggle: boolean;
 	busy: boolean;
 }): EscAbortTarget {
 	if (s.abortAsk) return null; // the popup's own Esc — claimed by the dialog
 	if (s.mermaidFocus) return "mermaid";
 	if (s.planOpen) return "plan";
 	if (s.setupOpen) return "setup";
+	if (s.askToggle) return s.busy ? "turn" : "ask";
 	if (s.pending) return "question";
 	if (s.problem) return "problem";
 	if (s.busy) return "turn";
-	return null;
-}
-
-/** The line under the transcript about his overtaken words: where they
- *  are, given whether a question or problem now holds the box. */
-function overtakenLine(overtaken: "answered" | LeftOpen | null, open: boolean): string | null {
-	if (overtaken === "answered") return open ? LESSON_WORDS.answeredElsewhereOpen : LESSON_WORDS.answeredElsewhere;
-	if (overtaken === "hint" && !open) return LESSON_WORDS.hintElsewhere;
-	if (overtaken === "asked" && !open) return LESSON_WORDS.askedElsewhere;
 	return null;
 }
 
@@ -1934,9 +2128,8 @@ function DockOverlay({
 }) {
 	const { scrollRef } = useStickToBottomContext();
 	const blockRef = useRef<HTMLDivElement>(null);
-	const [sbInset, setSbInset] = useState(0);
 	const reportHeight = useCallback((h: number) => onReserve(h + GRADIENT_H), [onReserve]);
-	useDockReserve({ scrollRef, blockRef, onHeight: reportHeight, onScrollbarInset: setSbInset });
+	useDockReserve({ scrollRef, blockRef, onHeight: reportHeight });
 
 	// Wheel over the composer still scrolls the transcript (owner, scroll
 	// round 2): the overlay is a SIBLING of the scroller, so the browser's
@@ -1980,7 +2173,7 @@ function DockOverlay({
 	}, [scrollRef, replyAnchorRef]);
 
 	return (
-		<div className="pointer-events-none absolute inset-x-0 bottom-0" style={{ right: sbInset }}>
+		<div className="pointer-events-none absolute inset-x-0 bottom-0">
 			<div className="h-24 bg-gradient-to-t from-background via-background/85 to-transparent" />
 			<div ref={blockRef} className="relative bg-background pb-5">
 				<div className={column}>
@@ -1991,7 +2184,7 @@ function DockOverlay({
 						    lands (visibleQueuedSteers). */}
 						<QueuedSteersBody steers={queuedSteers} />
 						{overtakenLine && (
-							<p data-testid="answered-elsewhere" className="px-4 pb-2 text-row text-muted-foreground">{overtakenLine}</p>
+							<p data-testid="answered-elsewhere" className="px-4 pb-2 text-body text-muted-foreground">{overtakenLine}</p>
 						)}
 						{/* No clip around it: the composer draws its own 16px outline,
 						    and a wrapper's larger rounded clip cut its corners. */}
@@ -2002,4 +2195,13 @@ function DockOverlay({
 			</div>
 		</div>
 	);
+}
+
+/** Tells the lesson whether he is reading up the conversation, away from its
+ *  newest reply, so its composer can rest compact. Inside the conversation,
+ *  where the scroll's state lives. */
+function ReadingUp({ onChange }: { onChange: (up: boolean) => void }) {
+	const { isAtBottom } = useStickToBottomContext();
+	useEffect(() => onChange(!isAtBottom), [isAtBottom, onChange]);
+	return null;
 }

@@ -1,0 +1,4237 @@
+{
+ "about": "Round 16, 1 M1: lens 1's four records at the end of 17 Nov 2026, two days before the Probability exam. o23 is a right Random variables answer marked Guessing; before the fix it pushed Expectation's start that day and Poisson's next day past the exam.",
+ "calculus": {
+  "arc_log": [
+   {
+    "asked": "Edo, 16 Nov 2026: every demo course shows its arcs on the course map.",
+    "day": "2026-11-08",
+    "kind": "formed",
+    "reason": "Demo arcs from the calibration run r13."
+   }
+  ],
+  "arcs": {
+   "applications-of-derivatives": {
+    "purpose": "Use derivatives to answer questions about how functions change and behave.",
+    "question": "What do derivatives tell us about how a function changes?",
+    "refs": [
+     {
+      "locator": "Volume 1, chapter 4, Applications of Derivatives (4.1 to 4.8)",
+      "source": "openstax-v1"
+     }
+    ],
+    "title": "Applications of derivatives"
+   },
+   "derivatives": {
+    "purpose": "Find the derivative of any function built from familiar pieces, even one given implicitly.",
+    "question": "How do we find the slope of a curve at any point?",
+    "refs": [
+     {
+      "locator": "Volume 1, chapter 3, Derivatives",
+      "source": "openstax-v1"
+     }
+    ],
+    "title": "Derivatives"
+   },
+   "integration": {
+    "purpose": "Use integrals to find areas bounded by curves and functions from their derivatives.",
+    "question": "What can an integral compute?",
+    "refs": [
+     {
+      "locator": "Volume 1, chapter 5, Integration (5.1 to 5.3), with 4.10 and 6.1",
+      "source": "openstax-v1"
+     }
+    ],
+    "title": "Integration"
+   },
+   "limits-continuity": {
+    "purpose": "Decide what value a function approaches near a point, and what follows when its graph has no breaks.",
+    "question": "How do a function's values behave as its input moves toward a point?",
+    "refs": [
+     {
+      "locator": "Volume 1, chapter 2, Limits",
+      "source": "openstax-v1"
+     }
+    ],
+    "title": "Limits and continuity"
+   },
+   "techniques-of-integration": {
+    "purpose": "Evaluate integrals that the basic antiderivative rules do not handle.",
+    "question": "How do we evaluate integrals the basic rules cannot reach?",
+    "refs": [
+     {
+      "locator": "Volume 2, chapter 3, Techniques of Integration",
+      "source": "openstax-v2"
+     },
+     {
+      "locator": "Volume 1, section 5.5",
+      "source": "openstax-v1"
+     }
+    ],
+    "title": "Techniques of integration"
+   }
+  },
+  "goal": "Keep first-year calculus sharp for Real Analysis",
+  "knowledge": {},
+  "next_observation": 110,
+  "observations": {
+   "o1": {
+    "date": "2026-08-20",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-08-20T05:08:51.985026+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Limits problem",
+    "topics": [
+     "limits"
+    ]
+   },
+   "o10": {
+    "date": "2026-08-26",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-08-26T05:08:53.041058+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style The derivative problem",
+    "topics": [
+     "the-derivative"
+    ]
+   },
+   "o100": {
+    "date": "2026-09-29",
+    "due_topics": [
+     "riemann-sums"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-29T05:09:22.183513+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Riemann sums problem",
+    "topics": [
+     "riemann-sums"
+    ]
+   },
+   "o101": {
+    "date": "2026-10-04",
+    "due_topics": [
+     "antiderivatives"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-04T05:09:23.581961+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Antiderivatives problem",
+    "topics": [
+     "antiderivatives"
+    ]
+   },
+   "o102": {
+    "date": "2026-10-04",
+    "due_topics": [
+     "improper-integrals"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-04T05:09:23.581961+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Improper integrals problem",
+    "topics": [
+     "improper-integrals"
+    ]
+   },
+   "o103": {
+    "date": "2026-10-06",
+    "due_topics": [
+     "area-between-curves"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-06T05:09:24.681760+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Area between curves problem",
+    "topics": [
+     "area-between-curves"
+    ]
+   },
+   "o104": {
+    "date": "2026-10-11",
+    "due_topics": [
+     "fundamental-theorem"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-11T05:09:26.267743+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Fundamental theorem problem",
+    "topics": [
+     "fundamental-theorem"
+    ]
+   },
+   "o105": {
+    "date": "2026-10-11",
+    "due_topics": [
+     "integration-by-parts"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-11T05:09:26.267743+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Integration by parts problem",
+    "topics": [
+     "integration-by-parts"
+    ]
+   },
+   "o106": {
+    "date": "2026-10-18",
+    "due_topics": [
+     "substitution"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-18T05:09:28.936228+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Substitution problem",
+    "topics": [
+     "substitution"
+    ]
+   },
+   "o107": {
+    "date": "2026-10-18",
+    "due_topics": [
+     "partial-fractions"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-18T05:09:28.936228+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Partial fractions problem",
+    "topics": [
+     "partial-fractions"
+    ]
+   },
+   "o108": {
+    "date": "2026-11-01",
+    "due_topics": [
+     "riemann-sums"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-01T06:09:39.383210+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Riemann sums problem",
+    "topics": [
+     "riemann-sums"
+    ]
+   },
+   "o109": {
+    "date": "2026-11-05",
+    "due_topics": [
+     "chain-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-05T06:09:45.996487+00:00",
+    "response": "$\\cos(x^2)$",
+    "result": "incorrect",
+    "sure": "confident",
+    "text": "Differentiated $\\sin(x^2)$ as $\\cos(x^2)$",
+    "topics": [
+     "chain-rule"
+    ]
+   },
+   "o11": {
+    "date": "2026-08-27",
+    "due_topics": [
+     "one-sided-limits"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-27T05:08:53.445086+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style One-sided limits problem",
+    "topics": [
+     "one-sided-limits"
+    ]
+   },
+   "o12": {
+    "date": "2026-08-27",
+    "due_topics": [
+     "continuity"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-27T05:08:53.445086+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Continuity problem",
+    "topics": [
+     "continuity"
+    ]
+   },
+   "o13": {
+    "date": "2026-08-27",
+    "due_topics": [
+     "the-derivative"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-27T05:08:53.445086+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style The derivative problem",
+    "topics": [
+     "the-derivative"
+    ]
+   },
+   "o14": {
+    "date": "2026-08-27",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-08-27T05:08:53.445086+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Basic differentiation rules: power, constant multiple and sum problem",
+    "topics": [
+     "basic-rules"
+    ]
+   },
+   "o15": {
+    "date": "2026-08-28",
+    "due_topics": [
+     "intermediate-value-theorem"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-28T05:08:53.932285+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Intermediate value theorem problem",
+    "topics": [
+     "intermediate-value-theorem"
+    ]
+   },
+   "o16": {
+    "date": "2026-08-28",
+    "due_topics": [
+     "basic-rules"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-28T05:08:53.932285+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Basic differentiation rules: power, constant multiple and sum problem",
+    "topics": [
+     "basic-rules"
+    ]
+   },
+   "o17": {
+    "date": "2026-08-29",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-08-29T05:08:54.326875+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Product rule problem",
+    "topics": [
+     "product-rule"
+    ]
+   },
+   "o18": {
+    "date": "2026-08-30",
+    "due_topics": [
+     "the-derivative"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-30T05:08:54.798975+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style The derivative problem",
+    "topics": [
+     "the-derivative"
+    ]
+   },
+   "o19": {
+    "date": "2026-08-30",
+    "due_topics": [
+     "product-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-30T05:08:54.798975+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Product rule problem",
+    "topics": [
+     "product-rule"
+    ]
+   },
+   "o2": {
+    "date": "2026-08-21",
+    "due_topics": [
+     "limits"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-21T05:08:52.081341+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Limits problem",
+    "topics": [
+     "limits"
+    ]
+   },
+   "o20": {
+    "date": "2026-08-30",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-08-30T05:08:54.798975+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Quotient rule problem",
+    "topics": [
+     "quotient-rule"
+    ]
+   },
+   "o21": {
+    "date": "2026-08-31",
+    "due_topics": [
+     "limits"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-31T05:08:55.556637+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Limits problem",
+    "topics": [
+     "limits"
+    ]
+   },
+   "o22": {
+    "date": "2026-08-31",
+    "due_topics": [
+     "basic-rules"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-31T05:08:55.556637+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Basic differentiation rules: power, constant multiple and sum problem",
+    "topics": [
+     "basic-rules"
+    ]
+   },
+   "o23": {
+    "date": "2026-08-31",
+    "due_topics": [
+     "quotient-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-31T05:08:55.556637+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Quotient rule problem",
+    "topics": [
+     "quotient-rule"
+    ]
+   },
+   "o24": {
+    "date": "2026-09-01",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-01T05:08:56.146617+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Chain rule problem",
+    "topics": [
+     "chain-rule"
+    ]
+   },
+   "o25": {
+    "date": "2026-09-02",
+    "due_topics": [
+     "product-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-02T05:08:57.110927+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Product rule problem",
+    "topics": [
+     "product-rule"
+    ]
+   },
+   "o26": {
+    "date": "2026-09-02",
+    "due_topics": [
+     "chain-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-02T05:08:57.110927+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Chain rule problem",
+    "topics": [
+     "chain-rule"
+    ]
+   },
+   "o27": {
+    "date": "2026-09-02",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-02T05:08:57.110927+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Implicit differentiation problem",
+    "topics": [
+     "implicit-differentiation"
+    ]
+   },
+   "o28": {
+    "date": "2026-09-03",
+    "due_topics": [
+     "one-sided-limits"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-03T05:08:58.171416+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style One-sided limits problem",
+    "topics": [
+     "one-sided-limits"
+    ]
+   },
+   "o29": {
+    "date": "2026-09-03",
+    "due_topics": [
+     "continuity"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-03T05:08:58.171416+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Continuity problem",
+    "topics": [
+     "continuity"
+    ]
+   },
+   "o3": {
+    "date": "2026-08-21",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-08-21T05:08:52.081341+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style One-sided limits problem",
+    "topics": [
+     "one-sided-limits"
+    ]
+   },
+   "o30": {
+    "date": "2026-09-03",
+    "due_topics": [
+     "quotient-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-03T05:08:58.171416+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Quotient rule problem",
+    "topics": [
+     "quotient-rule"
+    ]
+   },
+   "o31": {
+    "date": "2026-09-03",
+    "due_topics": [
+     "implicit-differentiation"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-03T05:08:58.171416+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Implicit differentiation problem",
+    "topics": [
+     "implicit-differentiation"
+    ]
+   },
+   "o32": {
+    "date": "2026-09-04",
+    "due_topics": [
+     "intermediate-value-theorem"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-04T05:08:58.963299+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Intermediate value theorem problem",
+    "topics": [
+     "intermediate-value-theorem"
+    ]
+   },
+   "o33": {
+    "date": "2026-09-04",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-04T05:08:58.963299+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Related rates problem",
+    "topics": [
+     "related-rates"
+    ]
+   },
+   "o34": {
+    "date": "2026-09-05",
+    "due_topics": [
+     "chain-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-05T05:09:00.238852+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Chain rule problem",
+    "topics": [
+     "chain-rule"
+    ]
+   },
+   "o35": {
+    "date": "2026-09-05",
+    "due_topics": [
+     "related-rates"
+    ],
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-05T05:09:00.238852+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Related rates problem",
+    "topics": [
+     "related-rates"
+    ]
+   },
+   "o36": {
+    "date": "2026-09-05",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-05T05:09:00.238852+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Mean value theorem problem",
+    "topics": [
+     "mean-value-theorem"
+    ]
+   },
+   "o37": {
+    "date": "2026-09-06",
+    "due_topics": [
+     "the-derivative"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-06T05:09:01.142250+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style The derivative problem",
+    "topics": [
+     "the-derivative"
+    ]
+   },
+   "o38": {
+    "date": "2026-09-06",
+    "due_topics": [
+     "implicit-differentiation"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-06T05:09:01.142250+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Implicit differentiation problem",
+    "topics": [
+     "implicit-differentiation"
+    ]
+   },
+   "o39": {
+    "date": "2026-09-06",
+    "due_topics": [
+     "mean-value-theorem"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-06T05:09:01.142250+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Mean value theorem problem",
+    "topics": [
+     "mean-value-theorem"
+    ]
+   },
+   "o4": {
+    "date": "2026-08-23",
+    "due_topics": [
+     "one-sided-limits"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-23T05:08:52.297248+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style One-sided limits problem",
+    "topics": [
+     "one-sided-limits"
+    ]
+   },
+   "o40": {
+    "date": "2026-09-07",
+    "due_topics": [
+     "basic-rules"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-07T05:09:02.107387+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Basic differentiation rules: power, constant multiple and sum problem",
+    "topics": [
+     "basic-rules"
+    ]
+   },
+   "o41": {
+    "date": "2026-09-07",
+    "due_topics": [
+     "related-rates"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-07T05:09:02.107387+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Related rates problem",
+    "topics": [
+     "related-rates"
+    ]
+   },
+   "o42": {
+    "date": "2026-09-07",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-07T05:09:02.107387+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Monotonicity problem",
+    "topics": [
+     "monotonicity"
+    ]
+   },
+   "o43": {
+    "date": "2026-09-08",
+    "due_topics": [
+     "monotonicity"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-08T05:09:03.630519+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Monotonicity problem",
+    "topics": [
+     "monotonicity"
+    ]
+   },
+   "o44": {
+    "date": "2026-09-08",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-08T05:09:03.630519+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Concavity problem",
+    "topics": [
+     "concavity"
+    ]
+   },
+   "o45": {
+    "date": "2026-09-09",
+    "due_topics": [
+     "mean-value-theorem"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-09T05:09:05.240780+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Mean value theorem problem",
+    "topics": [
+     "mean-value-theorem"
+    ]
+   },
+   "o46": {
+    "date": "2026-09-09",
+    "due_topics": [
+     "concavity"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-09T05:09:05.240780+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Concavity problem",
+    "topics": [
+     "concavity"
+    ]
+   },
+   "o47": {
+    "date": "2026-09-10",
+    "due_topics": [
+     "product-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-10T05:09:06.390834+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Product rule problem",
+    "topics": [
+     "product-rule"
+    ]
+   },
+   "o48": {
+    "date": "2026-09-10",
+    "due_topics": [
+     "quotient-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-10T05:09:06.390834+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Quotient rule problem",
+    "topics": [
+     "quotient-rule"
+    ]
+   },
+   "o49": {
+    "date": "2026-09-10",
+    "due_topics": [
+     "related-rates"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-10T05:09:06.390834+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Related rates problem",
+    "topics": [
+     "related-rates"
+    ]
+   },
+   "o5": {
+    "date": "2026-08-23",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-08-23T05:08:52.297248+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Continuity problem",
+    "topics": [
+     "continuity"
+    ]
+   },
+   "o50": {
+    "date": "2026-09-10",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-10T05:09:06.390834+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Curve sketching problem",
+    "topics": [
+     "curve-sketching"
+    ]
+   },
+   "o51": {
+    "date": "2026-09-11",
+    "due_topics": [
+     "monotonicity"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-11T05:09:08.227456+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Monotonicity problem",
+    "topics": [
+     "monotonicity"
+    ]
+   },
+   "o52": {
+    "date": "2026-09-11",
+    "due_topics": [
+     "curve-sketching"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-11T05:09:08.227456+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Curve sketching problem",
+    "topics": [
+     "curve-sketching"
+    ]
+   },
+   "o53": {
+    "date": "2026-09-11",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-11T05:09:08.227456+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Optimisation problem",
+    "topics": [
+     "optimisation"
+    ]
+   },
+   "o54": {
+    "date": "2026-09-13",
+    "due_topics": [
+     "optimisation"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-13T05:09:10.165832+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Optimisation problem",
+    "topics": [
+     "optimisation"
+    ]
+   },
+   "o55": {
+    "date": "2026-09-13",
+    "due_topics": [
+     "concavity"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-13T05:09:10.165832+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Concavity problem",
+    "topics": [
+     "concavity"
+    ]
+   },
+   "o56": {
+    "date": "2026-09-13",
+    "due_topics": [
+     "chain-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-13T05:09:10.165832+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Chain rule problem",
+    "topics": [
+     "chain-rule"
+    ]
+   },
+   "o57": {
+    "date": "2026-09-13",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-13T05:09:10.165832+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style L'Hopital's rule problem",
+    "topics": [
+     "lhopitals-rule"
+    ]
+   },
+   "o58": {
+    "date": "2026-09-14",
+    "due_topics": [
+     "implicit-differentiation"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-14T05:09:11.635097+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Implicit differentiation problem",
+    "topics": [
+     "implicit-differentiation"
+    ]
+   },
+   "o59": {
+    "date": "2026-09-14",
+    "due_topics": [
+     "curve-sketching"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-14T05:09:11.635097+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Curve sketching problem",
+    "topics": [
+     "curve-sketching"
+    ]
+   },
+   "o6": {
+    "date": "2026-08-24",
+    "due_topics": [
+     "limits"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-24T05:08:52.575205+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Limits problem",
+    "topics": [
+     "limits"
+    ]
+   },
+   "o60": {
+    "date": "2026-09-14",
+    "due_topics": [
+     "lhopitals-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-14T05:09:11.635097+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style L'Hopital's rule problem",
+    "topics": [
+     "lhopitals-rule"
+    ]
+   },
+   "o61": {
+    "date": "2026-09-14",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-14T05:09:11.635097+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Antiderivatives problem",
+    "topics": [
+     "antiderivatives"
+    ]
+   },
+   "o62": {
+    "date": "2026-09-15",
+    "due_topics": [
+     "antiderivatives"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-15T05:09:11.932964+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Antiderivatives problem",
+    "topics": [
+     "antiderivatives"
+    ]
+   },
+   "o63": {
+    "date": "2026-09-16",
+    "due_topics": [
+     "limits"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-16T05:09:12.197906+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Limits problem",
+    "topics": [
+     "limits"
+    ]
+   },
+   "o64": {
+    "date": "2026-09-16",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-16T05:09:12.197906+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Riemann sums problem",
+    "topics": [
+     "riemann-sums"
+    ]
+   },
+   "o65": {
+    "date": "2026-09-17",
+    "due_topics": [
+     "mean-value-theorem"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-17T05:09:12.654631+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Mean value theorem problem",
+    "topics": [
+     "mean-value-theorem"
+    ]
+   },
+   "o66": {
+    "date": "2026-09-17",
+    "due_topics": [
+     "related-rates"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-17T05:09:12.654631+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Related rates problem",
+    "topics": [
+     "related-rates"
+    ]
+   },
+   "o67": {
+    "date": "2026-09-17",
+    "due_topics": [
+     "optimisation"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-17T05:09:12.654631+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Optimisation problem",
+    "topics": [
+     "optimisation"
+    ]
+   },
+   "o68": {
+    "date": "2026-09-17",
+    "due_topics": [
+     "lhopitals-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-17T05:09:12.654631+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style L'Hopital's rule problem",
+    "topics": [
+     "lhopitals-rule"
+    ]
+   },
+   "o69": {
+    "date": "2026-09-17",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-17T05:09:12.654631+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Fundamental theorem problem",
+    "topics": [
+     "fundamental-theorem"
+    ]
+   },
+   "o7": {
+    "date": "2026-08-24",
+    "due_topics": [
+     "continuity"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-24T05:08:52.575205+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Continuity problem",
+    "topics": [
+     "continuity"
+    ]
+   },
+   "o70": {
+    "date": "2026-09-17",
+    "due_topics": [
+     "riemann-sums"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-17T05:09:13.015908+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Riemann sums problem",
+    "topics": [
+     "riemann-sums"
+    ]
+   },
+   "o71": {
+    "date": "2026-09-18",
+    "due_topics": [
+     "monotonicity"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-18T05:09:13.407290+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Monotonicity problem",
+    "topics": [
+     "monotonicity"
+    ]
+   },
+   "o72": {
+    "date": "2026-09-18",
+    "due_topics": [
+     "antiderivatives"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-18T05:09:13.407290+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Antiderivatives problem",
+    "topics": [
+     "antiderivatives"
+    ]
+   },
+   "o73": {
+    "date": "2026-09-18",
+    "due_topics": [
+     "fundamental-theorem"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-18T05:09:13.407290+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Fundamental theorem problem",
+    "topics": [
+     "fundamental-theorem"
+    ]
+   },
+   "o74": {
+    "date": "2026-09-19",
+    "due_topics": [
+     "one-sided-limits"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-19T05:09:13.867448+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style One-sided limits problem",
+    "topics": [
+     "one-sided-limits"
+    ]
+   },
+   "o75": {
+    "date": "2026-09-19",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-19T05:09:13.867448+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Substitution problem",
+    "topics": [
+     "substitution"
+    ]
+   },
+   "o76": {
+    "date": "2026-09-20",
+    "due_topics": [
+     "continuity"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-20T05:09:14.407411+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Continuity problem",
+    "topics": [
+     "continuity"
+    ]
+   },
+   "o77": {
+    "date": "2026-09-20",
+    "due_topics": [
+     "intermediate-value-theorem"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-20T05:09:14.407411+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Intermediate value theorem problem",
+    "topics": [
+     "intermediate-value-theorem"
+    ]
+   },
+   "o78": {
+    "date": "2026-09-20",
+    "due_topics": [
+     "substitution"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-20T05:09:14.407411+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Substitution problem",
+    "topics": [
+     "substitution"
+    ]
+   },
+   "o79": {
+    "date": "2026-09-20",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-20T05:09:14.407411+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Integration by parts problem",
+    "topics": [
+     "integration-by-parts"
+    ]
+   },
+   "o8": {
+    "date": "2026-08-24",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-08-24T05:08:52.575205+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Intermediate value theorem problem",
+    "topics": [
+     "intermediate-value-theorem"
+    ]
+   },
+   "o80": {
+    "date": "2026-09-21",
+    "due_topics": [
+     "riemann-sums"
+    ],
+    "help": "A reminder of the definition",
+    "kind": "attempt",
+    "recorded": "2026-09-21T05:09:15.320572+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Riemann sums problem",
+    "topics": [
+     "riemann-sums"
+    ]
+   },
+   "o81": {
+    "date": "2026-09-21",
+    "due_topics": [
+     "concavity"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-21T05:09:15.320572+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Concavity problem",
+    "topics": [
+     "concavity"
+    ]
+   },
+   "o82": {
+    "date": "2026-09-21",
+    "due_topics": [
+     "integration-by-parts"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-21T05:09:15.320572+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Integration by parts problem",
+    "topics": [
+     "integration-by-parts"
+    ]
+   },
+   "o83": {
+    "date": "2026-09-22",
+    "due_topics": [
+     "fundamental-theorem"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-22T05:09:16.013558+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Fundamental theorem problem",
+    "topics": [
+     "fundamental-theorem"
+    ]
+   },
+   "o84": {
+    "date": "2026-09-22",
+    "due_topics": [
+     "curve-sketching"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-22T05:09:16.013558+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Curve sketching problem",
+    "topics": [
+     "curve-sketching"
+    ]
+   },
+   "o85": {
+    "date": "2026-09-22",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-22T05:09:16.013558+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Partial fractions problem",
+    "topics": [
+     "partial-fractions"
+    ]
+   },
+   "o86": {
+    "date": "2026-09-23",
+    "due_topics": [
+     "the-derivative"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-23T05:09:17.160955+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style The derivative problem",
+    "topics": [
+     "the-derivative"
+    ]
+   },
+   "o87": {
+    "date": "2026-09-23",
+    "due_topics": [
+     "partial-fractions"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-23T05:09:17.160955+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Partial fractions problem",
+    "topics": [
+     "partial-fractions"
+    ]
+   },
+   "o88": {
+    "date": "2026-09-23",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-23T05:09:17.160955+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Improper integrals problem",
+    "topics": [
+     "improper-integrals"
+    ]
+   },
+   "o89": {
+    "date": "2026-09-24",
+    "due_topics": [
+     "riemann-sums"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-24T05:09:18.442426+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Riemann sums problem",
+    "topics": [
+     "riemann-sums"
+    ]
+   },
+   "o9": {
+    "date": "2026-08-25",
+    "due_topics": [
+     "intermediate-value-theorem"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-08-25T05:08:52.819062+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Intermediate value theorem problem",
+    "topics": [
+     "intermediate-value-theorem"
+    ]
+   },
+   "o90": {
+    "date": "2026-09-24",
+    "due_topics": [
+     "substitution"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-24T05:09:18.442426+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Substitution problem",
+    "topics": [
+     "substitution"
+    ]
+   },
+   "o91": {
+    "date": "2026-09-24",
+    "due_topics": [
+     "integration-by-parts"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-24T05:09:18.442426+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Integration by parts problem",
+    "topics": [
+     "integration-by-parts"
+    ]
+   },
+   "o92": {
+    "date": "2026-09-24",
+    "due_topics": [
+     "improper-integrals"
+    ],
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-24T05:09:18.442426+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Improper integrals problem",
+    "topics": [
+     "improper-integrals"
+    ]
+   },
+   "o93": {
+    "date": "2026-09-25",
+    "due_topics": [
+     "optimisation"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-25T05:09:19.382903+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Optimisation problem",
+    "topics": [
+     "optimisation"
+    ]
+   },
+   "o94": {
+    "date": "2026-09-25",
+    "due_topics": [
+     "lhopitals-rule"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-25T05:09:19.382903+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style L'Hopital's rule problem",
+    "topics": [
+     "lhopitals-rule"
+    ]
+   },
+   "o95": {
+    "date": "2026-09-25",
+    "due_topics": [
+     "basic-rules"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-25T05:09:19.382903+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Basic differentiation rules: power, constant multiple and sum problem",
+    "topics": [
+     "basic-rules"
+    ]
+   },
+   "o96": {
+    "date": "2026-09-25",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-25T05:09:19.382903+00:00",
+    "result": "correct",
+    "text": "Worked an exam-style Area between curves problem",
+    "topics": [
+     "area-between-curves"
+    ]
+   },
+   "o97": {
+    "date": "2026-09-27",
+    "due_topics": [
+     "area-between-curves"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-27T05:09:20.892304+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Worked an exam-style Area between curves problem",
+    "topics": [
+     "area-between-curves"
+    ]
+   },
+   "o98": {
+    "date": "2026-09-27",
+    "due_topics": [
+     "improper-integrals"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-27T05:09:20.892304+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Improper integrals problem",
+    "topics": [
+     "improper-integrals"
+    ]
+   },
+   "o99": {
+    "date": "2026-09-27",
+    "due_topics": [
+     "partial-fractions"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-27T05:09:20.892304+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Worked an exam-style Partial fractions problem",
+    "topics": [
+     "partial-fractions"
+    ]
+   }
+  },
+  "path": {
+   "arcs": [
+    "limits-continuity",
+    "derivatives",
+    "applications-of-derivatives",
+    "integration",
+    "techniques-of-integration"
+   ],
+   "basis": "OpenStax Volume 1 chapters 2 to 6 and Volume 2 chapter 3; true prerequisites",
+   "current": "area-between-curves",
+   "order": [
+    "limits",
+    "one-sided-limits",
+    "continuity",
+    "intermediate-value-theorem",
+    "the-derivative",
+    "basic-rules",
+    "product-rule",
+    "quotient-rule",
+    "chain-rule",
+    "implicit-differentiation",
+    "related-rates",
+    "mean-value-theorem",
+    "monotonicity",
+    "concavity",
+    "curve-sketching",
+    "optimisation",
+    "lhopitals-rule",
+    "antiderivatives",
+    "riemann-sums",
+    "fundamental-theorem",
+    "substitution",
+    "integration-by-parts",
+    "partial-fractions",
+    "improper-integrals",
+    "area-between-curves"
+   ]
+  },
+  "preferences": {},
+  "revision": 46,
+  "schema": 7,
+  "sources": {
+   "openstax-v1": {
+    "path": "material/openstax-calculus-v1-contents.md",
+    "title": "OpenStax Calculus Volume 1"
+   },
+   "openstax-v2": {
+    "path": "material/openstax-calculus-v2-contents.md",
+    "title": "OpenStax Calculus Volume 2"
+   }
+  },
+  "tasks": {},
+  "title": "Calculus I",
+  "topics": {
+   "antiderivatives": {
+    "arc": "integration",
+    "introduced": "2026-09-14",
+    "needs": [
+     "the-derivative"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 4.10",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-29"
+    },
+    "title": "Antiderivatives"
+   },
+   "area-between-curves": {
+    "arc": "integration",
+    "introduced": "2026-09-25",
+    "needs": [
+     "fundamental-theorem"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 6.1",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-18"
+    },
+    "title": "Area between curves"
+   },
+   "basic-rules": {
+    "arc": "derivatives",
+    "introduced": "2026-08-27",
+    "needs": [
+     "the-derivative"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 3.3",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-01"
+    },
+    "title": "Basic differentiation rules: power, constant multiple and sum"
+   },
+   "chain-rule": {
+    "arc": "derivatives",
+    "introduced": "2026-09-01",
+    "needs": [
+     "the-derivative"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 3.6",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-06"
+    },
+    "title": "Chain rule"
+   },
+   "concavity": {
+    "arc": "applications-of-derivatives",
+    "introduced": "2026-09-08",
+    "needs": [
+     "the-derivative"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 4.5",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-07"
+    },
+    "title": "Concavity"
+   },
+   "continuity": {
+    "arc": "limits-continuity",
+    "introduced": "2026-08-23",
+    "needs": [
+     "limits",
+     "one-sided-limits"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 2.4",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-26"
+    },
+    "title": "Continuity"
+   },
+   "curve-sketching": {
+    "arc": "applications-of-derivatives",
+    "introduced": "2026-09-10",
+    "needs": [
+     "monotonicity",
+     "concavity"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 4.6",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-09"
+    },
+    "title": "Curve sketching"
+   },
+   "fundamental-theorem": {
+    "arc": "integration",
+    "introduced": "2026-09-17",
+    "needs": [
+     "antiderivatives",
+     "riemann-sums",
+     "continuity"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 5.3",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-07"
+    },
+    "title": "Fundamental theorem"
+   },
+   "implicit-differentiation": {
+    "arc": "derivatives",
+    "introduced": "2026-09-02",
+    "needs": [
+     "chain-rule"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 3.8",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-01"
+    },
+    "title": "Implicit differentiation"
+   },
+   "improper-integrals": {
+    "arc": "techniques-of-integration",
+    "introduced": "2026-09-23",
+    "needs": [
+     "fundamental-theorem",
+     "limits"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 2, section 3.7",
+      "source": "openstax-v2"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-14"
+    },
+    "title": "Improper integrals"
+   },
+   "integration-by-parts": {
+    "arc": "techniques-of-integration",
+    "contrasts": [
+     "substitution"
+    ],
+    "introduced": "2026-09-20",
+    "needs": [
+     "fundamental-theorem",
+     "product-rule"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 2, section 3.1",
+      "source": "openstax-v2"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-06"
+    },
+    "title": "Integration by parts"
+   },
+   "intermediate-value-theorem": {
+    "arc": "limits-continuity",
+    "introduced": "2026-08-24",
+    "needs": [
+     "continuity"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 2.4",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-25"
+    },
+    "title": "Intermediate value theorem"
+   },
+   "lhopitals-rule": {
+    "arc": "applications-of-derivatives",
+    "introduced": "2026-09-13",
+    "needs": [
+     "the-derivative",
+     "limits"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 4.8",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-12"
+    },
+    "title": "L'Hopital's rule"
+   },
+   "limits": {
+    "arc": "limits-continuity",
+    "introduced": "2026-08-20",
+    "refs": [
+     {
+      "locator": "Volume 1, sections 2.2 and 2.3",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-21"
+    },
+    "title": "Limits"
+   },
+   "mean-value-theorem": {
+    "arc": "applications-of-derivatives",
+    "introduced": "2026-09-05",
+    "needs": [
+     "the-derivative",
+     "continuity"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 4.4",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-04"
+    },
+    "title": "Mean value theorem"
+   },
+   "monotonicity": {
+    "arc": "applications-of-derivatives",
+    "introduced": "2026-09-07",
+    "needs": [
+     "mean-value-theorem"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 4.5",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-04"
+    },
+    "title": "Monotonicity"
+   },
+   "one-sided-limits": {
+    "arc": "limits-continuity",
+    "introduced": "2026-08-21",
+    "needs": [
+     "limits"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 2.2",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-24"
+    },
+    "title": "One-sided limits"
+   },
+   "optimisation": {
+    "arc": "applications-of-derivatives",
+    "introduced": "2026-09-11",
+    "needs": [
+     "the-derivative",
+     "monotonicity"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, sections 4.3 and 4.7",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-12"
+    },
+    "title": "Optimisation"
+   },
+   "partial-fractions": {
+    "arc": "techniques-of-integration",
+    "contrasts": [
+     "substitution"
+    ],
+    "introduced": "2026-09-22",
+    "needs": [
+     "fundamental-theorem"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 2, section 3.4",
+      "source": "openstax-v2"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-16"
+    },
+    "title": "Partial fractions"
+   },
+   "product-rule": {
+    "arc": "derivatives",
+    "introduced": "2026-08-29",
+    "needs": [
+     "basic-rules"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 3.3",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-09-27"
+    },
+    "title": "Product rule"
+   },
+   "quotient-rule": {
+    "arc": "derivatives",
+    "contrasts": [
+     "product-rule"
+    ],
+    "introduced": "2026-08-30",
+    "needs": [
+     "basic-rules"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 3.3",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-09-26"
+    },
+    "title": "Quotient rule"
+   },
+   "related-rates": {
+    "arc": "applications-of-derivatives",
+    "introduced": "2026-09-04",
+    "needs": [
+     "implicit-differentiation"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 4.1",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-03"
+    },
+    "title": "Related rates"
+   },
+   "riemann-sums": {
+    "arc": "integration",
+    "introduced": "2026-09-16",
+    "needs": [
+     "limits"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, sections 5.1 and 5.2",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-12-12"
+    },
+    "title": "Riemann sums"
+   },
+   "substitution": {
+    "arc": "techniques-of-integration",
+    "introduced": "2026-09-19",
+    "needs": [
+     "fundamental-theorem",
+     "chain-rule"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, section 5.5",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-19"
+    },
+    "title": "Substitution"
+   },
+   "the-derivative": {
+    "arc": "derivatives",
+    "introduced": "2026-08-26",
+    "needs": [
+     "limits"
+    ],
+    "refs": [
+     {
+      "locator": "Volume 1, sections 3.1 and 3.2",
+      "source": "openstax-v1"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-29"
+    },
+    "title": "The derivative"
+   }
+  },
+  "updated_at": "2026-11-08T06:09:56+00:00"
+ },
+ "linear-algebra": {
+  "arc_log": [
+   {
+    "asked": "Edo, 16 Nov 2026: every demo course shows its arcs on the course map.",
+    "day": "2026-11-08",
+    "kind": "formed",
+    "reason": "Demo arcs from the calibration run r13."
+   }
+  ],
+  "arcs": {
+   "determinants-invertibility": {
+    "purpose": "Use determinants to decide whether a matrix is invertible and to solve its systems.",
+    "question": "When can a square matrix be inverted?",
+    "refs": [
+     {
+      "locator": "Chapter 5",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 5",
+      "source": "sheets"
+     }
+    ],
+    "title": "Determinants and invertibility"
+   },
+   "eigenvalues-diagonalization": {
+    "purpose": "Diagonalize a matrix by a change of basis to its eigenvectors.",
+    "question": "Is there a basis in which a matrix acts as a diagonal matrix?",
+    "refs": [
+     {
+      "locator": "Chapter 6",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 6",
+      "source": "sheets"
+     }
+    ],
+    "title": "Diagonalization by change of basis"
+   },
+   "independence-bases": {
+    "purpose": "Decide whether vectors are a basis of a space and find its dimension.",
+    "question": "When does a set of vectors describe a space with no redundant vector?",
+    "refs": [
+     {
+      "locator": "Chapter 2",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 2",
+      "source": "sheets"
+     }
+    ],
+    "title": "Independence and bases"
+   },
+   "linear-maps-matrices": {
+    "purpose": "Compute with linear maps through their matrices, composition included.",
+    "question": "How does a matrix represent a linear map?",
+    "refs": [
+     {
+      "locator": "Chapter 3",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 3",
+      "source": "sheets"
+     }
+    ],
+    "title": "Linear maps and matrices"
+   },
+   "linear-systems": {
+    "purpose": "Solve a linear system by Gaussian elimination and read off its rank and kernel.",
+    "question": "What does elimination tell us about the solutions of a linear system?",
+    "refs": [
+     {
+      "locator": "Chapter 4",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 4",
+      "source": "sheets"
+     }
+    ],
+    "title": "Linear systems and rank"
+   },
+   "orthogonality": {
+    "purpose": "Use inner products to test orthogonality and compute orthogonal projections.",
+    "question": "How do inner products let us find the closest vector in a subspace?",
+    "refs": [
+     {
+      "locator": "Chapter 7",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 7",
+      "source": "sheets"
+     }
+    ],
+    "title": "Orthogonality"
+   },
+   "vectors-span": {
+    "purpose": "Describe the span of given vectors as the set of their linear combinations.",
+    "question": "Which vectors can we reach by combining a given set of vectors?",
+    "refs": [
+     {
+      "locator": "Chapter 1",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 1",
+      "source": "sheets"
+     }
+    ],
+    "title": "Vectors and span"
+   }
+  },
+  "exam": {
+   "coverage": "Chapters 1-7 of the lecture notes",
+   "date": "2026-12-03",
+   "format": "Written, 3 hours, 6 problems"
+  },
+  "focus": "sheet-4",
+  "goal": "Pass the written exam: prove and compute with spaces, maps and spectra",
+  "knowledge": {
+   "notation": {
+    "pinned": true,
+    "text": "The notes write vectors as columns and use $A^T$ for the transpose; ker and im, never null space",
+    "updated": "2026-09-28"
+   },
+   "p-2-means-the-polynomials-of-degree-at-most-2-in-df345c": {
+    "text": "$P_2$ means the polynomials of degree at most $2$. In a formula such as $T(p) = p' + p(0)$, the number $p(0)$ is read as a constant polynomial.",
+    "topics": [
+     "linear-maps"
+    ],
+    "updated": "2026-11-09"
+   }
+  },
+  "next_observation": 53,
+  "observations": {
+   "o1": {
+    "date": "2026-09-28",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-28T05:09:21.554681+00:00",
+    "result": "correct",
+    "text": "Wrote $(3,1)$ as a combination of $(1,0)$ and $(1,1)$",
+    "topics": [
+     "vectors"
+    ]
+   },
+   "o10": {
+    "date": "2026-10-08",
+    "due_topics": [
+     "independence"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-08T05:09:25.637857+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Said why four vectors in $\\mathbb{R}^3$ are always dependent",
+    "topics": [
+     "independence"
+    ]
+   },
+   "o11": {
+    "date": "2026-10-08",
+    "due_topics": [
+     "basis"
+    ],
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-10-08T05:09:25.637857+00:00",
+    "result": "correct",
+    "text": "Gave a basis for the plane $x + y + z = 0$",
+    "topics": [
+     "basis"
+    ]
+   },
+   "o12": {
+    "date": "2026-10-08",
+    "due_topics": [
+     "basis"
+    ],
+    "help": "Pointed out the second vector was not in the plane",
+    "kind": "attempt",
+    "recorded": "2026-10-08T05:09:25.637857+00:00",
+    "result": "partial",
+    "text": "Gave a basis for the plane $x + y + z = 0$ with one vector off the plane",
+    "topics": [
+     "basis"
+    ]
+   },
+   "o13": {
+    "date": "2026-10-12",
+    "due_topics": [
+     "basis"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-12T05:09:26.765976+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Found the dimension of a homogeneous system's solutions",
+    "topics": [
+     "basis"
+    ]
+   },
+   "o14": {
+    "date": "2026-10-12",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-10-12T05:09:26.765976+00:00",
+    "result": "correct",
+    "text": "Composed a rotation and a shear and read off the columns",
+    "topics": [
+     "matmul"
+    ]
+   },
+   "o15": {
+    "date": "2026-10-14",
+    "due_topics": [
+     "independence"
+    ],
+    "help": "Suggested drawing it first",
+    "kind": "attempt",
+    "recorded": "2026-10-14T05:09:27.126836+00:00",
+    "result": "correct",
+    "text": "Checked independence of three vectors in $\\mathbb{R}^3$ by row reduction",
+    "topics": [
+     "independence"
+    ]
+   },
+   "o16": {
+    "date": "2026-10-14",
+    "due_topics": [
+     "matmul"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-14T05:09:27.126836+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Composed a rotation and a shear and read off the columns",
+    "topics": [
+     "matmul"
+    ]
+   },
+   "o17": {
+    "date": "2026-10-15",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-10-15T05:09:27.692625+00:00",
+    "result": "correct",
+    "text": "Row-reduced a $3 \\times 3$ system to echelon form",
+    "topics": [
+     "elimination"
+    ]
+   },
+   "o18": {
+    "date": "2026-10-16",
+    "due_topics": [
+     "elimination"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-16T05:09:28.017004+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Row-reduced a $3 \\times 3$ system to echelon form",
+    "topics": [
+     "elimination"
+    ]
+   },
+   "o19": {
+    "date": "2026-10-22",
+    "due_topics": [
+     "independence"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-22T05:09:32.066773+00:00",
+    "response": "Independent",
+    "result": "incorrect",
+    "sure": "confident",
+    "text": "Claimed $(1,0,1)$, $(0,1,1)$, $(1,1,2)$ are independent because no two are parallel",
+    "topics": [
+     "independence"
+    ]
+   },
+   "o2": {
+    "date": "2026-09-29",
+    "due_topics": [
+     "vectors"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-09-29T05:09:21.844222+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Wrote $(3,1)$ as a combination of $(1,0)$ and $(1,1)$",
+    "topics": [
+     "vectors"
+    ]
+   },
+   "o20": {
+    "date": "2026-10-22",
+    "due_topics": [
+     "basis"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-22T05:09:33.005020+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Gave a basis for the plane $x + y + z = 0$",
+    "topics": [
+     "basis"
+    ]
+   },
+   "o21": {
+    "date": "2026-10-26",
+    "due_topics": [
+     "independence"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-26T06:09:36.156761+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Said why four vectors in $\\mathbb{R}^3$ are always dependent",
+    "topics": [
+     "independence"
+    ]
+   },
+   "o22": {
+    "date": "2026-10-30",
+    "due_topics": [
+     "matmul"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-30T06:09:38.548853+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Explained why AB and BA differ for two shears",
+    "topics": [
+     "matmul"
+    ]
+   },
+   "o23": {
+    "date": "2026-10-30",
+    "help": "A reminder to count pivots, not nonzero rows",
+    "kind": "attempt",
+    "recorded": "2026-10-30T06:09:38.548853+00:00",
+    "result": "partial",
+    "text": "Found the rank of a $3 \\times 3$ matrix by elimination",
+    "topics": [
+     "rank"
+    ]
+   },
+   "o24": {
+    "date": "2026-11-02",
+    "due_topics": [
+     "rank"
+    ],
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-11-02T06:09:40.245893+00:00",
+    "result": "correct",
+    "text": "Found the rank of a $3 \\times 3$ matrix by counting pivots",
+    "topics": [
+     "rank"
+    ]
+   },
+   "o25": {
+    "date": "2026-11-03",
+    "help": "Walked through the echelon form",
+    "kind": "attempt",
+    "recorded": "2026-11-03T06:09:40.786711+00:00",
+    "result": "partial",
+    "text": "Counted nonzero entries instead of pivots on a $3 \\times 4$ matrix",
+    "topics": [
+     "rank"
+    ]
+   },
+   "o26": {
+    "date": "2026-11-04",
+    "due_topics": [
+     "elimination"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-04T06:09:41.748999+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Solved a $3 \\times 4$ system by elimination",
+    "topics": [
+     "elimination"
+    ]
+   },
+   "o27": {
+    "date": "2026-11-04",
+    "due_topics": [
+     "rank"
+    ],
+    "help": "A reminder of the definition",
+    "kind": "attempt",
+    "recorded": "2026-11-04T06:09:41.748999+00:00",
+    "result": "correct",
+    "text": "Found the rank of a $3 \\times 3$ matrix by counting pivots",
+    "topics": [
+     "rank"
+    ]
+   },
+   "o28": {
+    "date": "2026-11-04",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-11-04T06:09:41.748999+00:00",
+    "result": "correct",
+    "text": "Read a negative determinant as a flipped, doubled area",
+    "topics": [
+     "determinant"
+    ]
+   },
+   "o29": {
+    "date": "2026-11-05",
+    "due_topics": [
+     "determinant"
+    ],
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-11-05T06:09:45.010214+00:00",
+    "result": "correct",
+    "text": "Read a negative determinant as a flipped, doubled area",
+    "topics": [
+     "determinant"
+    ]
+   },
+   "o3": {
+    "date": "2026-09-30",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-09-30T05:09:22.570052+00:00",
+    "result": "correct",
+    "text": "Described the span of two parallel vectors as a line",
+    "topics": [
+     "span"
+    ]
+   },
+   "o30": {
+    "chose": "cramer",
+    "date": "2026-11-05",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-05T06:09:45.010214+00:00",
+    "response": "Started expanding four $4 \\times 4$ determinants",
+    "result": "incorrect",
+    "text": "Reached for Cramer's rule on a $4 \\times 4$ system and stalled on the determinants",
+    "topics": [
+     "elimination"
+    ]
+   },
+   "o31": {
+    "date": "2026-11-05",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-05T06:09:45.010214+00:00",
+    "response": "A $3 \\times 3$ matrix",
+    "result": "incorrect",
+    "sure": "neutral",
+    "text": "Multiplied a $2 \\times 3$ by a $3 \\times 2$ matrix and gave a $3 \\times 3$ result",
+    "topics": [
+     "matmul"
+    ]
+   },
+   "o32": {
+    "date": "2026-11-06",
+    "due_topics": [
+     "vectors"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-06T06:09:48.118722+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Wrote $(3,1)$ as a combination of $(1,0)$ and $(1,1)$",
+    "topics": [
+     "vectors"
+    ]
+   },
+   "o33": {
+    "date": "2026-11-06",
+    "due_topics": [
+     "rank"
+    ],
+    "help": "Suggested drawing it first",
+    "kind": "attempt",
+    "recorded": "2026-11-06T06:09:48.118722+00:00",
+    "result": "correct",
+    "text": "Found the rank of a $3 \\times 3$ matrix by counting pivots",
+    "topics": [
+     "rank"
+    ]
+   },
+   "o34": {
+    "date": "2026-11-06",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-06T06:09:48.118722+00:00",
+    "response": "3",
+    "result": "incorrect",
+    "sure": "confident",
+    "text": "Gave $\\dim \\ker A = 3$ for a $3 \\times 5$ matrix of rank $3$",
+    "topics": [
+     "kernel"
+    ]
+   },
+   "o35": {
+    "date": "2026-11-07",
+    "due_topics": [
+     "determinant"
+    ],
+    "help": "Hinted at the unit square",
+    "kind": "attempt",
+    "recorded": "2026-11-07T06:09:49.884216+00:00",
+    "result": "correct",
+    "text": "Read $\\det$ as the area scale of the unit square under a $2 \\times 2$ map",
+    "topics": [
+     "determinant"
+    ]
+   },
+   "o36": {
+    "date": "2026-11-08",
+    "due_topics": [
+     "kernel"
+    ],
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-11-08T06:09:51.193312+00:00",
+    "result": "correct",
+    "text": "Used rank-nullity on a $3 \\times 5$ matrix",
+    "topics": [
+     "kernel"
+    ]
+   },
+   "o37": {
+    "date": "2026-11-08",
+    "help": "Prompted to name the scaling factor",
+    "kind": "attempt",
+    "recorded": "2026-11-08T06:09:53.230880+00:00",
+    "result": "partial",
+    "text": "Explained why an eigenvector stays on its own line under $A$",
+    "topics": [
+     "eigen"
+    ]
+   },
+   "o38": {
+    "date": "2026-11-08",
+    "help": "none",
+    "kind": "attempt",
+    "predicted": true,
+    "recorded": "2026-11-08T06:14:33.274666+00:00",
+    "response": "The $x$ and $y$ axes, each stretched by $2$",
+    "result": "incorrect",
+    "sure": "guess",
+    "text": "Guessed the axes, each stretched by $2$; $A$ sends $(1,0)$ to $(2,1)$, so the kept lines are along $(1,1)$ and $(1,-1)$",
+    "topics": [
+     "eigen"
+    ]
+   },
+   "o39": {
+    "date": "2026-11-08",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-08T06:15:06.231530+00:00",
+    "response": "$\\operatorname{tr} = 3$, $\\det = -4$, $\\lambda^2 - 3\\lambda - 4 = (\\lambda - 4)(\\lambda + 1)$, so $4$ and $-1$",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Found the eigenvalues $4$ and $-1$ of a $2 \\times 2$ matrix from its trace and determinant",
+    "topics": [
+     "eigen"
+    ]
+   },
+   "o4": {
+    "date": "2026-10-01",
+    "due_topics": [
+     "span"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-01T05:09:23.028872+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Described the span of two parallel vectors as a line",
+    "topics": [
+     "span"
+    ]
+   },
+   "o40": {
+    "date": "2026-11-08",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-08T06:15:36.317666+00:00",
+    "response": "$C - 4I$ has rows giving $-3x + 2y = 0$, so the nonzero multiples of $(3,2)$",
+    "result": "partial",
+    "sure": "confident",
+    "text": "Read $-3x + 2y = 0$ as the multiples of $(3,2)$, which gives $-5$, not $0$; the eigenvectors for $\\lambda = 4$ are the multiples of $(2,3)$",
+    "topics": [
+     "eigen"
+    ]
+   },
+   "o41": {
+    "date": "2026-11-08",
+    "help": "Nudge: $(3,2)$ gives $-5$ in $-3x + 2y$; hint: the second entry is $\\frac{3}{2}$ times the first",
+    "kind": "attempt",
+    "recorded": "2026-11-08T06:20:23.162574+00:00",
+    "response": "$y = \\frac{3}{2}x$, so the nonzero multiples of $(2,3)$; check $-6 + 6 = 0$",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Found the eigenvectors of a $2 \\times 2$ matrix for $\\lambda = 4$ as the nonzero multiples of $(2,3)$, from $\\ker(C - 4I)$",
+    "topics": [
+     "eigen"
+    ]
+   },
+   "o42": {
+    "date": "2026-11-08",
+    "help": "none",
+    "kind": "attempt",
+    "predicted": true,
+    "recorded": "2026-11-08T06:20:54.324011+00:00",
+    "response": "Diagonal with $4$ and $-1$, because $C$ stretches each basis vector by its eigenvalue without mixing",
+    "result": "correct",
+    "text": "Predicted the matrix of $C$ in its eigenbasis is diagonal with $4$ and $-1$, since each eigenvector is only stretched",
+    "topics": [
+     "eigen"
+    ]
+   },
+   "o43": {
+    "date": "2026-11-08",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-08T06:21:18.731210+00:00",
+    "response": "$(6,5)$: the $(1,1)$ part stretched by $3$, the $(1,-1)$ part by $1$",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Found the eigenbasis coordinates $(6,5)$ of $Au$ by stretching each coordinate by its eigenvalue",
+    "topics": [
+     "eigen"
+    ]
+   },
+   "o44": {
+    "date": "2026-11-09",
+    "due_topics": [
+     "eigen"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-09T06:23:48.336313+00:00",
+    "response": "$\\operatorname{tr} = 1$, $\\det = -6$, $\\lambda^2 - \\lambda - 6 = (\\lambda - 3)(\\lambda + 2)$, so $3$ and $-2$, since they are the roots of $\\det(E - \\lambda I) = 0$",
+    "result": "partial",
+    "sure": "confident",
+    "text": "Gave no reason why eigenvalues solve $\\det(E - \\lambda I) = 0$; the values $3$ and $-2$ from trace and determinant were right",
+    "topics": [
+     "eigen"
+    ]
+   },
+   "o45": {
+    "date": "2026-11-09",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-09T06:24:14.243380+00:00",
+    "response": "$A - 5I$ invertible, so $(A - 5I)v = 0$ only for $v = 0$; $Av = 5v$ is the same equation, so no nonzero eigenvector",
+    "result": "correct",
+    "text": "Showed that $\\det(A - 5I) \\neq 0$ rules out $5$ as an eigenvalue: $A - 5I$ invertible, so $(A - 5I)v = 0$ forces $v = 0$",
+    "topics": [
+     "eigen"
+    ]
+   },
+   "o46": {
+    "date": "2026-11-09",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-09T06:26:59.986452+00:00",
+    "response": "$e_1, e_2$ as half sums and differences, matrix $\\begin{pmatrix}2&1\\\\0&1\\end{pmatrix}$",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Found the standard matrix of $T$ from the images of $(1,1)^T$ and $(1,-1)^T$ by writing $e_1, e_2$ in that basis",
+    "topics": [
+     "linear-maps"
+    ]
+   },
+   "o47": {
+    "date": "2026-11-09",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-09T06:28:33.148466+00:00",
+    "response": "No, adding $p(0)$ is like adding a constant",
+    "result": "incorrect",
+    "sure": "guess",
+    "text": "Called $T(p) = p' + p(0)$ not linear, reading $p(0)$ as a fixed added constant; it scales and adds with $p$, so $T$ is linear",
+    "topics": [
+     "linear-maps"
+    ]
+   },
+   "o48": {
+    "date": "2026-11-09",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-09T06:29:02.267760+00:00",
+    "response": "$S(2,2) = (4,4)$ but $2S(1,1) = (4,2)$",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Showed $S(x,y) = (x+y, xy)$ is not linear with the counterexample $S(2,2) \\neq 2S(1,1)$",
+    "topics": [
+     "linear-maps"
+    ]
+   },
+   "o49": {
+    "date": "2026-11-10",
+    "due_topics": [
+     "linear-maps"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-10T06:33:09.019217+00:00",
+    "response": "Not linear, because it multiplies two things together",
+    "result": "partial",
+    "text": "Called $T(p) = p(0)\\,p(1)$ not linear because the formula multiplies two things, without testing either condition on a polynomial",
+    "topics": [
+     "linear-maps"
+    ]
+   },
+   "o5": {
+    "date": "2026-10-05",
+    "due_topics": [
+     "vectors"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-05T05:09:24.014151+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Combined two vectors to hit a target",
+    "topics": [
+     "vectors"
+    ]
+   },
+   "o50": {
+    "date": "2026-11-10",
+    "help": "Nudge: a product in the formula is no proof, $p \\mapsto x p'$ is linear; the verdict needs a specific polynomial and scalar where an equation fails",
+    "kind": "attempt",
+    "recorded": "2026-11-10T06:33:37.694453+00:00",
+    "response": "$p = 1$: $T(2\\cdot 1) = 4$, not $2T(1) = 2$",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Disproved linearity of $T(p) = p(0)\\,p(1)$ with $p = 1$: $T(2) = 4 \\neq 2T(1) = 2$",
+    "topics": [
+     "linear-maps"
+    ]
+   },
+   "o51": {
+    "date": "2026-11-10",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-10T06:35:29.039163+00:00",
+    "response": "$T(0) = T(0\\cdot u) = 0\\cdot T(u) = 0$",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Derived that a linear map sends $0$ to $0$ from $T(0 \\cdot u) = 0 \\cdot T(u)$",
+    "topics": [
+     "linear-maps"
+    ]
+   },
+   "o52": {
+    "date": "2026-11-10",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-10T06:35:57.224171+00:00",
+    "response": "Expanded $T(p+q)$ and $T(cp)$ using that evaluation at $1$ adds and scales",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Proved $T(p) = p - p(1)$ on $P_2$ is linear by checking both conditions for arbitrary $p, q, c$",
+    "topics": [
+     "linear-maps"
+    ]
+   },
+   "o6": {
+    "date": "2026-10-05",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-10-05T05:09:24.014151+00:00",
+    "result": "correct",
+    "text": "Checked independence of three vectors in $\\mathbb{R}^3$ by row reduction",
+    "topics": [
+     "independence"
+    ]
+   },
+   "o7": {
+    "date": "2026-10-06",
+    "due_topics": [
+     "independence"
+    ],
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-10-06T05:09:24.312376+00:00",
+    "result": "correct",
+    "text": "Checked independence of three vectors in $\\mathbb{R}^3$ by row reduction",
+    "topics": [
+     "independence"
+    ]
+   },
+   "o8": {
+    "date": "2026-10-07",
+    "due_topics": [
+     "span"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-07T05:09:25.117455+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Explained why a vector in the span adds nothing",
+    "topics": [
+     "span"
+    ]
+   },
+   "o9": {
+    "date": "2026-10-07",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-10-07T05:09:25.117455+00:00",
+    "result": "correct",
+    "text": "Gave a basis for the plane $x + y + z = 0$",
+    "topics": [
+     "basis"
+    ]
+   }
+  },
+  "path": {
+   "arcs": [
+    "vectors-span",
+    "independence-bases",
+    "linear-maps-matrices",
+    "linear-systems",
+    "determinants-invertibility",
+    "eigenvalues-diagonalization",
+    "orthogonality"
+   ],
+   "basis": "Lecture order, weeks 1-7 examinable",
+   "current": "diagonalization",
+   "order": [
+    "vectors",
+    "span",
+    "independence",
+    "basis",
+    "linear-maps",
+    "matmul",
+    "elimination",
+    "rank",
+    "kernel",
+    "determinant",
+    "cramer",
+    "invertibility",
+    "change-basis",
+    "eigen",
+    "diagonalization",
+    "inner-product",
+    "projection"
+   ]
+  },
+  "preferences": {
+   "explanation_depth": "Geometric picture first, then the algebra"
+  },
+  "revision": 47,
+  "schema": 7,
+  "sources": {
+   "notes": {
+    "path": "material/la-lecture-notes-contents.md",
+    "title": "Lecture notes"
+   },
+   "sheets": {
+    "path": "material/la-problem-sheets-contents.md",
+    "title": "Problem sheets"
+   }
+  },
+  "tasks": {
+   "linear-maps-lesson": {
+    "created": "2026-11-09",
+    "goal": "Find and use the matrix of a linear map between two bases, including maps on $P_2$, and prove linearity from the two conditions",
+    "help": "Probe: corrected the reading of $p(0)$ as a fixed constant. Taught the definition of linearity, the zero test, and proving linearity on $P_2$ (all checked). Taught that values on a basis decide the map. Plan nodes left: basis-fixes check, coords, matrix-bases, matrix-action, two-matrices.",
+    "note": "Ask the basis-fixes check again as it was ($T(1), T(x), T(x^2)$ given, find $T(3 - x + 2x^2)$), then go on with coords.",
+    "step": "Answer the open question on a linear map from $P_2$ to $\\mathbb{R}^2$ given by its values on a basis",
+    "title": "Linear maps and their matrices lesson",
+    "topics": [
+     "linear-maps"
+    ],
+    "updated": "2026-11-10"
+   },
+   "sheet-4": {
+    "created": "2026-11-06",
+    "goal": "Solve all five parts with justification",
+    "help": "A reminder of rank-nullity in part (b)",
+    "refs": [
+     {
+      "locator": "Sheet 4",
+      "source": "sheets"
+     }
+    ],
+    "step": "Part (c): show $\\dim \\ker A = 2$ for the $3 \\times 5$ matrix $A$",
+    "title": "Problem sheet 4: rank and nullity",
+    "topics": [
+     "rank",
+     "basis",
+     "kernel"
+    ],
+    "updated": "2026-11-06"
+   }
+  },
+  "title": "Linear Algebra",
+  "topics": {
+   "basis": {
+    "arc": "independence-bases",
+    "introduced": "2026-10-07",
+    "needs": [
+     "independence"
+    ],
+    "refs": [
+     {
+      "locator": "Section 2.2",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 2",
+      "source": "sheets"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-29"
+    },
+    "title": "Basis and dimension"
+   },
+   "change-basis": {
+    "arc": "eigenvalues-diagonalization",
+    "needs": [
+     "basis",
+     "matmul",
+     "invertibility"
+    ],
+    "refs": [
+     {
+      "locator": "Section 6.1",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 6",
+      "source": "sheets"
+     }
+    ],
+    "title": "Change of basis"
+   },
+   "cramer": {
+    "arc": "determinants-invertibility",
+    "contrasts": [
+     "elimination"
+    ],
+    "introduced": "2026-11-05",
+    "needs": [
+     "determinant"
+    ],
+    "refs": [
+     {
+      "locator": "Section 5.2",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 5",
+      "source": "sheets"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-06"
+    },
+    "title": "Cramer's rule"
+   },
+   "determinant": {
+    "arc": "determinants-invertibility",
+    "contrasts": [
+     "rank"
+    ],
+    "introduced": "2026-11-04",
+    "needs": [
+     "matmul"
+    ],
+    "refs": [
+     {
+      "locator": "Section 5.1",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 5",
+      "source": "sheets"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-09"
+    },
+    "title": "Determinants as volume scaling"
+   },
+   "diagonalization": {
+    "arc": "eigenvalues-diagonalization",
+    "judged": "2026-11-08",
+    "needs": [
+     "eigen",
+     "basis",
+     "change-basis"
+    ],
+    "note": "You have seen the core idea: in coordinates along a basis of eigenvectors, the matrix becomes diagonal with the eigenvalues on the diagonal, and each coordinate is simply stretched by its eigenvalue. You have not yet met the formula $A = PDP^{-1}$ or the condition for a matrix to have an eigenbasis.",
+    "refs": [
+     {
+      "locator": "Section 6.3",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 6",
+      "source": "sheets"
+     }
+    ],
+    "title": "Diagonalization"
+   },
+   "eigen": {
+    "arc": "eigenvalues-diagonalization",
+    "gap": "Check that you give the reason unprompted when finding eigenvalues: $Av = \\lambda v$ with $v \\neq 0$ puts $v$ in $\\ker(A - \\lambda I)$, so $\\det(A - \\lambda I) = 0$.",
+    "introduced": "2026-11-08",
+    "judged": "2026-11-09",
+    "needs": [
+     "determinant",
+     "rank",
+     "invertibility",
+     "kernel"
+    ],
+    "note": "You once read $-3x + 2y = 0$ as the multiples of $(3,2)$; substitute the vector back to check it.",
+    "refs": [
+     {
+      "locator": "Section 6.2",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 6",
+      "source": "sheets"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-11",
+     "points": [
+      "$Av = \\lambda v$ with $v \\neq 0$ means $v \\in \\ker(A - \\lambda I)$, so $A - \\lambda I$ is not invertible and $\\det(A - \\lambda I) = 0$",
+      "For $2 \\times 2$: $\\lambda^2 - (\\operatorname{tr} D)\\lambda + \\det D = \\lambda^2 - 5\\lambda + 4$, roots $1$ and $4$",
+      "Eigenvectors are the nonzero vectors of $\\ker(D - \\lambda I)$: $(1,-2)$ for $1$, $(1,1)$ for $4$",
+      "Check a found vector by substituting it back into the row equation"
+     ],
+     "prompt": "For $D = \\begin{pmatrix} 3 & 1 \\\\ 2 & 2 \\end{pmatrix}$, find the eigenvalues and one eigenvector for each, and say why the eigenvalues are the roots of $\\det(D - \\lambda I)$."
+    },
+    "title": "Eigenvalues and eigenvectors"
+   },
+   "elimination": {
+    "arc": "linear-systems",
+    "introduced": "2026-10-15",
+    "refs": [
+     {
+      "locator": "Section 4.1",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 4",
+      "source": "sheets"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-06"
+    },
+    "title": "Gaussian elimination"
+   },
+   "independence": {
+    "arc": "independence-bases",
+    "gap": "You treat pairwise non-parallel vectors as independent and miss a third vector in their span",
+    "introduced": "2026-10-05",
+    "judged": "2026-10-22",
+    "needs": [
+     "span"
+    ],
+    "refs": [
+     {
+      "locator": "Section 2.1",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 2",
+      "source": "sheets"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-29"
+    },
+    "title": "Linear independence"
+   },
+   "inner-product": {
+    "arc": "orthogonality",
+    "needs": [
+     "vectors"
+    ],
+    "refs": [
+     {
+      "locator": "Section 7.1",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 7",
+      "source": "sheets"
+     }
+    ],
+    "title": "Inner products and orthogonality"
+   },
+   "invertibility": {
+    "arc": "determinants-invertibility",
+    "needs": [
+     "rank",
+     "determinant"
+    ],
+    "refs": [
+     {
+      "locator": "Section 5.3",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 5",
+      "source": "sheets"
+     }
+    ],
+    "title": "Invertible matrices"
+   },
+   "kernel": {
+    "arc": "linear-systems",
+    "introduced": "2026-11-06",
+    "needs": [
+     "rank"
+    ],
+    "refs": [
+     {
+      "locator": "Section 4.3",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 4",
+      "source": "sheets"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-10"
+    },
+    "title": "Kernel and rank-nullity"
+   },
+   "linear-maps": {
+    "arc": "linear-maps-matrices",
+    "gap": "Check on a later day that you decide linearity of a map on a function or polynomial space by testing $T(p+q) = T(p)+T(q)$ and $T(cp) = cT(p)$, not by the look of the formula",
+    "introduced": "2026-11-09",
+    "judged": "2026-11-10",
+    "needs": [
+     "vectors",
+     "basis"
+    ],
+    "refs": [
+     {
+      "locator": "Section 3.1",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 3",
+      "source": "sheets"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-12",
+     "points": [
+      "The columns of the matrix are $T(e_1)$ and $T(e_2)$",
+      "Write $e_1$ (and $e_2$) as combinations of the given vectors",
+      "Use linearity to get $T(e_1)$ from the given images",
+      "Check the result on a given vector"
+     ],
+     "prompt": "A linear map $T:\\mathbb{R}^2\\to\\mathbb{R}^2$ sends $(1,2)^T \\mapsto (1,0)^T$ and $(0,1)^T \\mapsto (2,3)^T$. Find its standard matrix and justify each step."
+    },
+    "title": "Linear maps and their matrices"
+   },
+   "matmul": {
+    "arc": "linear-maps-matrices",
+    "introduced": "2026-10-12",
+    "needs": [
+     "linear-maps"
+    ],
+    "refs": [
+     {
+      "locator": "Section 3.2",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 3",
+      "source": "sheets"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-06"
+    },
+    "title": "Matrix multiplication as composition"
+   },
+   "projection": {
+    "arc": "orthogonality",
+    "needs": [
+     "inner-product",
+     "basis"
+    ],
+    "refs": [
+     {
+      "locator": "Section 7.2",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 7",
+      "source": "sheets"
+     }
+    ],
+    "title": "Orthogonal projection"
+   },
+   "rank": {
+    "arc": "linear-systems",
+    "gap": "You count nonzero entries instead of pivots, and mix up rank with the number of rows",
+    "introduced": "2026-11-03",
+    "judged": "2026-10-30",
+    "needs": [
+     "basis",
+     "elimination"
+    ],
+    "refs": [
+     {
+      "locator": "Section 4.2",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 4",
+      "source": "sheets"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-08"
+    },
+    "title": "Rank and the column space"
+   },
+   "span": {
+    "arc": "vectors-span",
+    "introduced": "2026-09-30",
+    "needs": [
+     "vectors"
+    ],
+    "refs": [
+     {
+      "locator": "Section 1.2",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 1",
+      "source": "sheets"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-14"
+    },
+    "title": "Span"
+   },
+   "vectors": {
+    "aliases": [
+     "vettori"
+    ],
+    "arc": "vectors-span",
+    "introduced": "2026-09-28",
+    "refs": [
+     {
+      "locator": "Section 1.1",
+      "source": "notes"
+     },
+     {
+      "locator": "Sheet 1",
+      "source": "sheets"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-22"
+    },
+    "title": "Vectors and linear combinations"
+   }
+  },
+  "updated_at": "2026-11-10T06:36:21+00:00"
+ },
+ "probability": {
+  "arc_log": [
+   {
+    "asked": "Edo, 16 Nov 2026: every demo course shows its arcs on the course map.",
+    "day": "2026-11-08",
+    "kind": "formed",
+    "reason": "Demo arcs from the calibration run r13."
+   }
+  ],
+  "arcs": {
+   "conditional-probability": {
+    "purpose": "Update probabilities when new information arrives.",
+    "question": "How does knowing that one event happened change the probability of another?",
+    "refs": [
+     {
+      "locator": "Chapter 2, Conditional Probability",
+      "source": "bh-contents"
+     }
+    ],
+    "title": "Conditional probability"
+   },
+   "covariance-correlation": {
+    "purpose": "Measure how two random variables move together.",
+    "question": "How do two random quantities vary together?",
+    "refs": [
+     {
+      "locator": "Section 7.3, Covariance and correlation",
+      "source": "bh-contents"
+     }
+    ],
+    "title": "Covariance and correlation"
+   },
+   "expectation-named-distributions": {
+    "purpose": "Use expectation to compute the averages and variation of random variables.",
+    "question": "How does expectation summarize the behaviour of random variables?",
+    "refs": [
+     {
+      "locator": "Chapter 4, Expectation (4.1-4.7)",
+      "source": "bh-contents"
+     }
+    ],
+    "title": "Expectation of named distributions"
+   },
+   "random-variables-binomial": {
+    "purpose": "Write down the distribution of a random quantity, such as a count of successes.",
+    "question": "How do we describe a random quantity by the probabilities of its values?",
+    "refs": [
+     {
+      "locator": "Chapter 3, Random Variables and Their Distributions (3.1-3.3)",
+      "source": "bh-contents"
+     }
+    ],
+    "title": "Random variables and the Binomial"
+   }
+  },
+  "exam": {
+   "coverage": "Chapters 2-4",
+   "date": "2026-11-19",
+   "final_review": "2026-11-17",
+   "format": "Written, 2 hours",
+   "leaves_out": [
+    "covariance"
+   ]
+  },
+  "goal": "Be fluent with conditional probability and expectation",
+  "knowledge": {},
+  "next_observation": 24,
+  "observations": {
+   "o1": {
+    "date": "2026-10-19",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-10-19T05:09:29.491419+00:00",
+    "result": "correct",
+    "text": "Computed $P(A \\mid B)$ from a two-way table",
+    "topics": [
+     "conditional"
+    ]
+   },
+   "o10": {
+    "date": "2026-11-05",
+    "due_topics": [
+     "independence"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-05T06:09:44.088121+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Checked independence of two dice events by the product rule",
+    "topics": [
+     "independence"
+    ]
+   },
+   "o11": {
+    "date": "2026-11-05",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-11-05T06:09:44.088121+00:00",
+    "result": "correct",
+    "text": "Wrote the distribution of the number of heads in three tosses",
+    "topics": [
+     "random-variables"
+    ]
+   },
+   "o12": {
+    "date": "2026-11-05",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-11-05T06:09:44.088121+00:00",
+    "result": "correct",
+    "text": "Set up a binomial probability for exactly seven successes",
+    "topics": [
+     "binomial"
+    ]
+   },
+   "o13": {
+    "date": "2026-11-06",
+    "due_topics": [
+     "random-variables"
+    ],
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-11-06T06:09:47.036004+00:00",
+    "result": "correct",
+    "text": "Wrote the distribution of the number of heads in three tosses",
+    "topics": [
+     "random-variables"
+    ]
+   },
+   "o14": {
+    "date": "2026-11-06",
+    "due_topics": [
+     "conditional"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-06T06:09:47.036004+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Conditioned on the right event in a two-dice problem",
+    "topics": [
+     "conditional"
+    ]
+   },
+   "o15": {
+    "date": "2026-11-06",
+    "due_topics": [
+     "total-probability"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-06T06:09:47.036004+00:00",
+    "response": "0.9",
+    "result": "incorrect",
+    "sure": "confident",
+    "text": "Summed the conditional probabilities without weighting by $P(B_i)$",
+    "topics": [
+     "total-probability"
+    ]
+   },
+   "o16": {
+    "date": "2026-11-08",
+    "due_topics": [
+     "binomial"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-08T06:17:47.209428+00:00",
+    "response": "$1 - (5/6)^{10} \\approx 0.838$",
+    "result": "partial",
+    "sure": "guess",
+    "text": "Took the complement of at least two sixes as no sixes, leaving out $P(X=1)$; probability of at least two sixes in $10$ rolls",
+    "topics": [
+     "binomial"
+    ]
+   },
+   "o17": {
+    "date": "2026-11-08",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-08T06:18:16.562836+00:00",
+    "response": "$1 - (3/4)^{12} - 12\\cdot\\frac{1}{4}(3/4)^{11} \\approx 0.842$",
+    "result": "correct",
+    "text": "Probability of at least two right out of $12$ random guesses with $4$ options each, by the complement with both the $0$ and $1$ terms",
+    "topics": [
+     "binomial"
+    ]
+   },
+   "o18": {
+    "date": "2026-11-09",
+    "due_topics": [
+     "random-variables"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-09T06:25:21.127768+00:00",
+    "response": "Both dice at most 4, so $16/36 = 4/9$",
+    "result": "incorrect",
+    "sure": "guess",
+    "text": "Found $P(X \\le 4) = \\frac{16}{36}$ instead of $P(X = 4)$ for the larger of two dice; the event $X = 4$ also needs at least one die to show 4",
+    "topics": [
+     "random-variables"
+    ]
+   },
+   "o19": {
+    "date": "2026-11-09",
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-09T06:25:43.736925+00:00",
+    "response": "$(25-16)/36 = 9/36 = 1/4$",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Found $P(Y = 2)$ for the smaller of two dice as $P(Y \\ge 2) - P(Y \\ge 3) = \\frac{9}{36}$",
+    "topics": [
+     "random-variables"
+    ]
+   },
+   "o2": {
+    "date": "2026-10-20",
+    "due_topics": [
+     "conditional"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-20T05:09:30.127774+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Computed $P(A \\mid B)$ from a two-way table",
+    "topics": [
+     "conditional"
+    ]
+   },
+   "o20": {
+    "date": "2026-11-10",
+    "due_topics": [
+     "random-variables"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-10T06:34:29.646206+00:00",
+    "response": "Both at least 4 is 9 pairs, both at least 5 is 4, so $5/36$",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Found $P(Y = 4)$ for the smaller of two dice as $P(Y \\ge 4) - P(Y \\ge 5) = \\frac{5}{36}$",
+    "topics": [
+     "random-variables"
+    ]
+   },
+   "o21": {
+    "date": "2026-11-10",
+    "due_topics": [
+     "binomial"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-10T06:34:52.767042+00:00",
+    "response": "$1 - 0.9^{15} - 15\\cdot 0.1\\cdot 0.9^{14} - 105\\cdot 0.01\\cdot 0.9^{13} \\approx 0.184$",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Probability of at least $3$ defective items in a box of $15$ with defect probability $0.1$, by the complement with the $0$, $1$ and $2$ terms",
+    "topics": [
+     "binomial"
+    ]
+   },
+   "o22": {
+    "date": "2026-11-17",
+    "due_topics": [
+     "independence"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-17T06:40:58.867819+00:00",
+    "response": "No. Disjoint means $P(A \\cap B) = 0$, but independence needs $P(A \\cap B) = P(A)P(B) = 0.12$",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Showed that disjoint events with positive probabilities are not independent, since $P(A \\cap B) = 0 \\neq P(A)P(B)$",
+    "topics": [
+     "independence"
+    ]
+   },
+   "o23": {
+    "date": "2026-11-17",
+    "due_topics": [
+     "random-variables"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-17T06:41:27.410479+00:00",
+    "response": "Both at most 5 is 25 pairs, both at most 4 is 16, so $9/36 = 1/4$",
+    "result": "correct",
+    "sure": "guess",
+    "text": "Found $P(X = 5) = \\frac{9}{36}$ for the larger of two dice as $P(X \\le 5) - P(X \\le 4)$",
+    "topics": [
+     "random-variables"
+    ]
+   },
+   "o3": {
+    "date": "2026-10-25",
+    "help": "Showed the tree diagram",
+    "kind": "attempt",
+    "recorded": "2026-10-25T06:09:34.022510+00:00",
+    "result": "incorrect",
+    "text": "Split $P(A)$ over a two-case partition",
+    "topics": [
+     "total-probability"
+    ]
+   },
+   "o4": {
+    "date": "2026-10-26",
+    "due_topics": [
+     "total-probability"
+    ],
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-10-26T06:09:35.812837+00:00",
+    "result": "correct",
+    "text": "Weighted each case by its probability over a three-way split",
+    "topics": [
+     "total-probability"
+    ]
+   },
+   "o5": {
+    "date": "2026-10-27",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-10-27T06:09:36.567392+00:00",
+    "result": "correct",
+    "text": "Inverted a conditional with the base rate",
+    "topics": [
+     "bayes"
+    ]
+   },
+   "o6": {
+    "date": "2026-10-28",
+    "due_topics": [
+     "total-probability"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-28T06:09:37.315172+00:00",
+    "result": "correct",
+    "sure": "confident",
+    "text": "Weighted each case by its probability over a three-way split",
+    "topics": [
+     "total-probability"
+    ]
+   },
+   "o7": {
+    "date": "2026-10-28",
+    "due_topics": [
+     "bayes"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-28T06:09:37.315172+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Inverted a conditional with the base rate",
+    "topics": [
+     "bayes"
+    ]
+   },
+   "o8": {
+    "date": "2026-11-02",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-11-02T06:09:39.774465+00:00",
+    "result": "correct",
+    "text": "Checked independence of two dice events by the product rule",
+    "topics": [
+     "independence"
+    ]
+   },
+   "o9": {
+    "date": "2026-11-04",
+    "due_topics": [
+     "bayes"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-04T06:09:42.485353+00:00",
+    "result": "correct",
+    "text": "Inverted $P(\\text{test} \\mid \\text{disease})$ with the base rate",
+    "topics": [
+     "bayes"
+    ]
+   }
+  },
+  "path": {
+   "arcs": [
+    "conditional-probability",
+    "random-variables-binomial",
+    "expectation-named-distributions",
+    "covariance-correlation"
+   ],
+   "basis": "Blitzstein and Hwang, chapters 2-4, then section 7.3 after the exam",
+   "current": "random-variables",
+   "order": [
+    "conditional",
+    "total-probability",
+    "bayes",
+    "independence",
+    "random-variables",
+    "binomial",
+    "poisson",
+    "geometric",
+    "expectation",
+    "variance",
+    "covariance"
+   ]
+  },
+  "preferences": {},
+  "revision": 20,
+  "schema": 7,
+  "sources": {
+   "bh-contents": {
+    "path": "material/blitzstein-hwang-contents.md",
+    "title": "Blitzstein and Hwang"
+   }
+  },
+  "tasks": {},
+  "title": "Probability",
+  "topics": {
+   "bayes": {
+    "arc": "conditional-probability",
+    "introduced": "2026-10-27",
+    "needs": [
+     "conditional",
+     "total-probability"
+    ],
+    "refs": [
+     {
+      "locator": "Section 2.3",
+      "source": "bh-contents"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-11"
+    },
+    "title": "Bayes' rule"
+   },
+   "binomial": {
+    "arc": "random-variables-binomial",
+    "introduced": "2026-11-05",
+    "needs": [
+     "random-variables",
+     "independence"
+    ],
+    "refs": [
+     {
+      "locator": "Section 3.3",
+      "source": "bh-contents"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-13",
+     "points": [
+      "Justify the binomial model: fixed $n$, independent trials, constant $p$",
+      "Use the complement $1 - P(X=0) - P(X=1)$, with both terms",
+      "Include the factor $\\binom{n}{1} = n$ in $P(X=1)$",
+      "Reach the right value or exact expression"
+     ],
+     "prompt": "$X \\sim \\text{Bin}(n, p)$ with concrete numbers: find $P(X \\ge 2)$ and say why the model is binomial."
+    },
+    "title": "Binomial distribution"
+   },
+   "conditional": {
+    "arc": "conditional-probability",
+    "introduced": "2026-10-19",
+    "refs": [
+     {
+      "locator": "Section 2.2",
+      "source": "bh-contents"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-13"
+    },
+    "title": "Conditional probability"
+   },
+   "covariance": {
+    "arc": "covariance-correlation",
+    "needs": [
+     "variance"
+    ],
+    "refs": [
+     {
+      "locator": "Section 7.3",
+      "source": "bh-contents"
+     }
+    ],
+    "title": "Covariance and correlation"
+   },
+   "expectation": {
+    "arc": "expectation-named-distributions",
+    "needs": [
+     "random-variables"
+    ],
+    "refs": [
+     {
+      "locator": "Sections 4.1 and 4.2",
+      "source": "bh-contents"
+     }
+    ],
+    "title": "Expectation and linearity"
+   },
+   "geometric": {
+    "arc": "expectation-named-distributions",
+    "contrasts": [
+     "binomial"
+    ],
+    "needs": [
+     "random-variables",
+     "independence"
+    ],
+    "refs": [
+     {
+      "locator": "Section 4.3",
+      "source": "bh-contents"
+     }
+    ],
+    "title": "Geometric distribution"
+   },
+   "independence": {
+    "arc": "conditional-probability",
+    "introduced": "2026-11-02",
+    "refs": [
+     {
+      "locator": "Section 2.5",
+      "source": "bh-contents"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-24"
+    },
+    "title": "Independent events"
+   },
+   "poisson": {
+    "arc": "expectation-named-distributions",
+    "contrasts": [
+     "binomial"
+    ],
+    "needs": [
+     "random-variables"
+    ],
+    "refs": [
+     {
+      "locator": "Section 4.7",
+      "source": "bh-contents"
+     }
+    ],
+    "title": "Poisson distribution"
+   },
+   "random-variables": {
+    "arc": "random-variables-binomial",
+    "introduced": "2026-11-05",
+    "refs": [
+     {
+      "locator": "Sections 3.1 and 3.2",
+      "source": "bh-contents"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-20",
+     "points": [
+      "$X$ is a function on the 36 equally likely ordered pairs",
+      "The event $\\{X = k\\}$ is the set of pairs mapped to $k$, not $\\{X \\le k\\}$",
+      "Count it without double-counting the pair $(k,k)$, or use $P(X \\le k) - P(X \\le k-1)$"
+     ],
+     "prompt": "Two fair dice are rolled and $X$ is the larger (or smaller) of the two numbers. Find $P(X = k)$ for a given $k$, and say which outcomes make up the event $\\{X = k\\}$."
+    },
+    "title": "Random variables and distributions"
+   },
+   "total-probability": {
+    "arc": "conditional-probability",
+    "gap": "You forget to weight each case by its probability",
+    "introduced": "2026-10-25",
+    "judged": "2026-11-06",
+    "needs": [
+     "conditional"
+    ],
+    "refs": [
+     {
+      "locator": "Section 2.3",
+      "source": "bh-contents"
+     }
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-07"
+    },
+    "title": "Law of total probability"
+   },
+   "variance": {
+    "arc": "expectation-named-distributions",
+    "needs": [
+     "expectation"
+    ],
+    "refs": [
+     {
+      "locator": "Section 4.6",
+      "source": "bh-contents"
+     }
+    ],
+    "title": "Variance"
+   }
+  },
+  "updated_at": "2026-11-17T06:41:27+00:00"
+ },
+ "real-analysis": {
+  "arc_log": [
+   {
+    "asked": "Edo, 16 Nov 2026: every demo course shows its arcs on the course map.",
+    "day": "2026-11-08",
+    "kind": "formed",
+    "reason": "Demo arcs from the calibration run r13."
+   }
+  ],
+  "arcs": {
+   "continuous-functions": {
+    "purpose": "Prove whether a function is continuous, or uniformly continuous.",
+    "question": "How do we prove that a function keeps close inputs close in output?",
+    "title": "Continuous functions"
+   },
+   "sequences-series": {
+    "purpose": "Prove whether a sequence or series converges.",
+    "question": "When does an infinite process of numbers settle on a limit?",
+    "title": "Sequences and series"
+   }
+  },
+  "goal": "Write rigorous epsilon-delta proofs before next term's course",
+  "knowledge": {},
+  "next_observation": 7,
+  "observations": {
+   "o1": {
+    "date": "2026-10-18",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-10-18T05:09:28.438821+00:00",
+    "result": "correct",
+    "text": "Proved 1/n converges to 0 with an explicit N",
+    "topics": [
+     "sequences"
+    ]
+   },
+   "o2": {
+    "date": "2026-10-21",
+    "due_topics": [
+     "sequences"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-10-21T05:09:31.198854+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Proved 1/n converges to 0 with an explicit N",
+    "topics": [
+     "sequences"
+    ]
+   },
+   "o3": {
+    "date": "2026-10-25",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-10-25T06:09:35.110201+00:00",
+    "result": "correct",
+    "text": "Showed a convergent sequence is Cauchy",
+    "topics": [
+     "cauchy"
+    ]
+   },
+   "o4": {
+    "date": "2026-10-28",
+    "due_topics": [
+     "cauchy"
+    ],
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-10-28T06:09:37.897298+00:00",
+    "result": "correct",
+    "text": "Showed a convergent sequence is Cauchy",
+    "topics": [
+     "cauchy"
+    ]
+   },
+   "o5": {
+    "date": "2026-11-01",
+    "help": "Pointed at the first step",
+    "kind": "attempt",
+    "recorded": "2026-11-01T06:09:39.068871+00:00",
+    "result": "correct",
+    "text": "Chose a comparison test for a p-series",
+    "topics": [
+     "series"
+    ]
+   },
+   "o6": {
+    "date": "2026-11-04",
+    "due_topics": [
+     "series"
+    ],
+    "help": "none",
+    "kind": "attempt",
+    "recorded": "2026-11-04T06:09:43.253750+00:00",
+    "result": "correct",
+    "sure": "neutral",
+    "text": "Chose a comparison test for a p-series",
+    "topics": [
+     "series"
+    ]
+   }
+  },
+  "path": {
+   "arcs": [
+    "sequences-series",
+    "continuous-functions"
+   ],
+   "basis": "Abbott, chapters 2-4",
+   "current": "series",
+   "order": [
+    "sequences",
+    "cauchy",
+    "series",
+    "continuity",
+    "uniform"
+   ]
+  },
+  "preferences": {},
+  "revision": 8,
+  "schema": 7,
+  "sources": {},
+  "tasks": {},
+  "title": "Real Analysis",
+  "topics": {
+   "cauchy": {
+    "arc": "sequences-series",
+    "introduced": "2026-10-25",
+    "needs": [
+     "sequences"
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-10-30"
+    },
+    "title": "Cauchy sequences"
+   },
+   "continuity": {
+    "arc": "continuous-functions",
+    "needs": [
+     "sequences"
+    ],
+    "title": "Continuity"
+   },
+   "sequences": {
+    "arc": "sequences-series",
+    "introduced": "2026-10-18",
+    "review": {
+     "by": "engine",
+     "due": "2026-10-26"
+    },
+    "title": "Convergent sequences"
+   },
+   "series": {
+    "arc": "sequences-series",
+    "introduced": "2026-11-01",
+    "needs": [
+     "sequences"
+    ],
+    "review": {
+     "by": "engine",
+     "due": "2026-11-09"
+    },
+    "title": "Series and convergence tests"
+   },
+   "uniform": {
+    "arc": "continuous-functions",
+    "needs": [
+     "continuity"
+    ],
+    "title": "Uniform continuity"
+   }
+  },
+  "updated_at": "2026-11-08T06:09:55+00:00"
+ }
+}

@@ -20,6 +20,7 @@ import {
 	type Confidence,
 	type DockSelection,
 	type KeyAction,
+	type LeftDraft,
 	type Photo,
 	type PracticeRequest,
 	type QuestionAnswerData,
@@ -62,10 +63,17 @@ export interface ProseComposerProps {
 	/** The question call the open question asks again, left open by a hint
 	 *  or a side question just before it: its carried work fills this one. */
 	reaskOf?: string | null;
+	/** What he had typed when Done for today set aside the question this one
+	 *  asks again, kept with the lesson (`leftDraftAt`): the box opens with
+	 *  it when this window kept nothing of its own. */
+	leftDraft?: LeftDraft | null;
 	initialDraft?: QuestionFormDraft;
 	onSaveDraft: (draft: QuestionFormDraft) => void;
 	onSubmitAnswer: (output: QuestionAnswerData, photos?: Photo[]) => void;
 	onSubmitThinking: (text: string, confidence: Confidence, photos?: Photo[]) => Promise<boolean>;
+	/** Sends his words to the running turn, as the lesson box does while
+	 *  the tutor replies; false when the app refused them. */
+	onSteer: (text: string, photos?: Photo[]) => Promise<boolean>;
 	onRequest: (request: PracticeRequest, text: string) => void;
 	onDraftChange: (key: string, text: string) => void;
 }
@@ -92,7 +100,7 @@ export function ProseComposer(props: ProseComposerProps) {
 	toggleRef.current = open ? toggle : null;
 
 	if (!open || asking) {
-		const back = open && <ModeToggle mode="ask" kind={open.kind} onToggle={toggle} />;
+		const back = open && <ModeToggle mode="ask" kind={open.kind} onToggle={toggle} busy={props.busy} />;
 		return (
 			<LessonSessionComposer
 				{...message}
@@ -120,10 +128,12 @@ function AnswerComposer({
 	busy,
 	carryScope,
 	reaskOf,
+	leftDraft,
 	initialDraft,
 	onSaveDraft,
 	onSubmitAnswer,
 	onSubmitThinking,
+	onSteer,
 	onRequest,
 	onDraftChange,
 	message,
@@ -152,13 +162,18 @@ function AnswerComposer({
 			const keptText = kept?.form ? kept.form.text || kept.form.other || kept.form.thinking : kept?.text;
 			const carry = !keptText && spec && carryScope ? takeCarry(carryScope, spec.data.question, reaskOf) : undefined;
 			const carried = carry ? carriedForm(carry.words, true) : undefined;
+			// Else the half answer the lesson kept when Done for today set this
+			// question aside, on every way back and in any window (round 15, 3 m1).
+			const left = !kept && !carried && leftDraft ? leftDraft : null;
 			if (keptText) setText(keptText);
 			else if (carried) setText(carried.text);
+			else if (left) setText(left.text);
 			// How sure he was comes back with his words (round 8: a reload
 			// and a refused send reset the meter to Neutral).
 			const keptSure = kept?.form?.confidence ?? kept?.confidence;
 			if (keptText && keptSure) setConfidence(keptSure);
 			else if (carried) setConfidence(carried.confidence);
+			else if (left?.confidence) setConfidence(left.confidence);
 			void carry?.photos.then((list) => {
 				if (textMode) restorePhotos(list.map((photo, i) => ({ id: `carried_${i}_${Date.now()}`, photo })));
 			});
@@ -190,25 +205,35 @@ function AnswerComposer({
 		void keepPhotos(box, []);
 	};
 
-	const ready = !waiting && (problem ? text.trim().length > 0 || photos.photos.length > 0 : spec ? proseAnswerReady(spec, selection, text, photos.photos.length) : false);
+	const written = text.trim().length > 0 || photos.photos.length > 0;
+	// While the tutor replies to his work, what he writes here goes to that
+	// reply as the lesson box's words do (round 11, 4 major 1: Enter here
+	// sent nothing, and the words were erased when the problem closed).
+	const steering = waiting && written;
+	const ready = !waiting && (problem ? written : spec ? proseAnswerReady(spec, selection, text, photos.photos.length) : false);
+
+	// What he sent, emptied from the box: a send refused at once gives it
+	// back, words and photos, unless he has started writing again.
+	const sendOut = (go: (words: string, sent: Photo[] | undefined) => Promise<boolean>, after?: () => void) => {
+		const typed = text;
+		setText("");
+		const taken = photos.take();
+		void go(typed.trim(), sentPhotos(taken)).then((accepted) => {
+			if (accepted) return;
+			restorePhotos(taken);
+			if (textRef.current.trim()) return;
+			setText(typed);
+			after?.();
+		});
+	};
 
 	const submit = () => {
+		if (steering) return sendOut(onSteer);
 		if (!ready) return;
 		if (problem) {
-			const words = text.trim();
-			setText("");
-			setConfidence(DEFAULT_CONFIDENCE);
-			const taken = photos.take();
-			// A send refused at once gives his work back, words and photos,
-			// unless he has started writing again.
 			const sure = confidence;
-			void onSubmitThinking(words, sure, sentPhotos(taken)).then((accepted) => {
-				if (accepted) return;
-				restorePhotos(taken);
-				if (textRef.current.trim()) return;
-				setText(words);
-				setConfidence(sure);
-			});
+			setConfidence(DEFAULT_CONFIDENCE);
+			sendOut((words, sent) => onSubmitThinking(words, sure, sent), () => setConfidence(sure));
 			return;
 		}
 		if (!spec) return;
@@ -322,7 +347,7 @@ function AnswerComposer({
 	const toolbar = (
 		<>
 			{takesConfidence && <ConfidenceIcon value={confidence} onChange={setConfidence} />}
-			<ModeToggle mode="answer" kind={open.kind} onToggle={onAsk} />
+			<ModeToggle mode="answer" kind={open.kind} onToggle={onAsk} busy={busy} />
 		</>
 	);
 	const placeholder = problem ? "Work here, think out loud." : spec ? prosePlaceholder(spec, open.kind === "question" ? open.input : null, selection.selected.size > 0) : undefined;
@@ -334,15 +359,16 @@ function AnswerComposer({
 				onChange={setText}
 				onSend={submit}
 				onStop={message.onStop}
-				canSend={ready}
+				canSend={ready || steering}
 				placeholder={placeholder}
 				leading={leading}
 				toolbar={toolbar}
-				answer={{ onSubmit: submit, ready, label: problem ? "Submit your work" : "Submit answer" }}
+				answer={{ onSubmit: submit, ready: ready || steering, label: steering ? "Send" : problem ? "Submit your work" : "Submit answer" }}
 				head={<OpenQuote open={open} spec={spec} selected={selection.selected} onPick={(i) => pick(i, multi)} />}
 				photos={textMode ? photos : undefined}
+				compact={message.compact}
 			/>
-			{confirmShow && typeof document !== "undefined" && <ShowMeConfirm what={confirmShow} onClose={() => setConfirmShow(null)} onConfirm={shown} />}
+			{typeof document !== "undefined" && <ShowMeConfirm what={confirmShow} onClose={() => setConfirmShow(null)} onConfirm={shown} />}
 		</>
 	);
 }
@@ -361,9 +387,11 @@ function RequestIcon({ icon: Icon, label, hint, action, testId, disabled, onClic
 
 /** Answering or asking, as one two-state control beside Send (spec:
  *  prose.md): the pen while his words answer, the question bubble while
- *  they go to the tutor as a message. A click or Esc switches; ← → move
+ *  they go to the tutor as a message. A click or Esc switches, Esc only
+ *  while the tutor isn't replying (then it stops the reply); ← → move
  *  between the two when it has focus. */
-export function ModeToggle({ mode, kind, onToggle }: { mode: "answer" | "ask"; kind: ProseOpen["kind"]; onToggle: () => void }) {
+export function ModeToggle({ mode, kind, onToggle, busy }: { mode: "answer" | "ask"; kind: ProseOpen["kind"]; onToggle: () => void; busy: boolean }) {
+	const esc = busy ? undefined : "escape";
 	const answerWords = kind === "question" ? "Answer the question" : "Work on the problem";
 	const askWords = `Ask the tutor instead. The ${kind} stays open`;
 	return (
@@ -379,12 +407,12 @@ export function ModeToggle({ mode, kind, onToggle }: { mode: "answer" | "ask"; k
 			data-testid="prose-mode"
 			data-mode={mode}
 		>
-			<Hint label={answerWords} binding="escape">
+			<Hint label={answerWords} binding={esc}>
 				<ToggleGroupItem value="answer" aria-label={answerWords} data-testid="prose-answer-mode" className="h-[26px] px-2">
 					<PenLineIcon />
 				</ToggleGroupItem>
 			</Hint>
-			<Hint label={askWords} binding="escape">
+			<Hint label={askWords} binding={esc}>
 				<ToggleGroupItem value="ask" aria-label="Ask the tutor instead" data-testid="prose-ask" className="h-[26px] px-2">
 					<MessageCircleQuestionIcon />
 				</ToggleGroupItem>
@@ -393,15 +421,17 @@ export function ModeToggle({ mode, kind, onToggle }: { mode: "answer" | "ask"; k
 	);
 }
 
-/** How sure he is as a meter of three rising bars, drawn on lucide's 24px
- *  grid and 2px stroke so it sits with the toolbar's icons: Guessing lights
- *  one, Neutral two, Confident three; the rest stay at 30%. */
+/** How sure he is as a meter of three rising bars on lucide's 24px grid:
+ *  Guessing lights one, Neutral two, Confident three; the rest stay at 30%.
+ *  The bars are wider than the icons' 2px stroke, with rounder ends (Edo,
+ *  15 Nov 2026: thin bars read sharp and narrow). */
+const METER_BAR_WIDTH = 3.5;
 const LIT: Record<Confidence, number> = { guessing: 1, neutral: 2, confident: 3 };
 
 function ConfidenceMeter({ value }: { value: Confidence }) {
 	const lit = LIT[value] ?? 2;
 	return (
-		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden data-lit={lit}>
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={METER_BAR_WIDTH} strokeLinecap="round" aria-hidden data-lit={lit}>
 			{[
 				{ x: 6, top: 14 },
 				{ x: 12, top: 9 },
@@ -484,7 +514,7 @@ function OpenQuote({ open, spec, selected, onPick }: { open: ProseOpen; spec: Pr
 		<div
 			data-testid="prose-quote"
 			data-slot="composer-quote"
-			className="max-h-[min(40dvh,20rem)] overflow-y-auto border-b border-white/5 px-4 pt-3 pb-2.5 text-muted-foreground [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+			className="max-h-[min(40dvh,20rem)] overflow-y-auto border-b border-white/5 px-4 pt-3 pb-2.5 text-muted-foreground"
 		>
 			{open.kind === "problem" ? (
 				<ToolContentResponse className="[--lh-prose-leading:calc(20/14)] [--lh-prose-size:14px]">{open.statement}</ToolContentResponse>

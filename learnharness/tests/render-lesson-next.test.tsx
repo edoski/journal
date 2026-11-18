@@ -11,9 +11,8 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { partKey, roadmapLabel, roadmapSteps, stepAnchors } from "../components/lesson/roadmap-facts.ts";
-import { derivePlanStatuses } from "../src/core/index.ts";
+import { derivePlanStatuses, streamingToolActivity } from "../src/core/index.ts";
 import { rowDot, rowWord, stripDot } from "../components/lesson/lesson-roadmap.tsx";
-import { LiveToolCard } from "../components/artifacts/live-tool-card.tsx";
 import { artifactRenderers } from "../components/artifacts/index.ts";
 import { ProseConclude, ProseProblem, ThinkingBubble } from "../components/lesson/prose/prose-practice.tsx";
 import { ProseQuestion } from "../components/lesson/prose/prose-question.tsx";
@@ -92,7 +91,7 @@ describe("the lesson's roadmap", () => {
 
 describe("agent chrome out of the lesson", () => {
 	it("a settled tool call leaves no row in the column: no renderer draws the agent's own tools", () => {
-		for (const tool of ["read", "ls", "find", "grep", "list_sessions", "list_propositions", "course_resume", "course_show", "course_search", "course_save"]) {
+		for (const tool of ["Read", "Grep", "Glob", "list_sessions", "list_propositions", "course_resume", "course_show", "course_search", "course_save"]) {
 			assert.equal(artifactRenderers[tool], undefined, tool);
 		}
 	});
@@ -101,11 +100,9 @@ describe("agent chrome out of the lesson", () => {
 		assert.equal(artifactRenderers.probe_done, undefined);
 	});
 
-	it("a running tool is one muted activity line with no arguments", () => {
-		const document = documentFor(<LiveToolCard part={part({ type: "tool-read", state: "input-streaming", toolCallId: "t", input: { path: "secret/notes.md" } })} />);
-		const line = document.querySelector('[data-slot="activity-line"]')!;
-		assert.equal(line.textContent, "Reading a file…");
-		assert.doesNotMatch(document.body.textContent!, /secret\/notes\.md/);
+	it("a running tool names nothing of its arguments: the turn's line reads Thinking…", () => {
+		const running = [{ id: "a", role: "assistant", parts: [part({ type: "tool-Read", state: "input-streaming", toolCallId: "t", input: { file_path: "secret/notes.md" } })] }] as never;
+		assert.equal(streamingToolActivity(running), "Thinking…");
 	});
 
 });

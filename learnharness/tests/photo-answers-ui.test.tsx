@@ -8,7 +8,7 @@
 import React from "react";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { StickToBottom } from "use-stick-to-bottom";
 import { ProseComposer, type ProseComposerProps } from "../components/lesson/prose/prose-composer.tsx";
@@ -40,6 +40,7 @@ const composer = (open: ProseComposerProps["open"], initialDraft?: QuestionFormD
 			onSaveDraft={noop}
 			onSubmitAnswer={noop}
 			onSubmitThinking={async () => true}
+			onSteer={async () => true}
 			onRequest={noop}
 			onDraftChange={noop}
 		/>
@@ -62,7 +63,7 @@ describe("photo answers in the composer and the transcript", () => {
 	it("a multiple-choice question offers no photo", () => {
 		const d = composer({ kind: "question", key: "k", tool: "ask_user_question", toolCallId: "a1", input: { question: "Pick one", options: [{ label: "A" }, { label: "B" }] } });
 		assert.ok(send(d), "the composer is drawn");
-		assert.equal(d.querySelector('[data-testid="photo-attach"]'), null);
+		assert.ok(d.querySelector('[data-testid="photo-attach"]') === null);
 	});
 
 	it("his answer and his work show the sent photo, which opens large in a lesson", () => {

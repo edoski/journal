@@ -83,8 +83,11 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 	// component. Enough leaked views starved every NEW request (navigation
 	// RSC fetches included) — the multi-session navigation freeze. Aborting
 	// costs nothing: navigating back replays the compacted log + live tail.
+	// Not in flight: one record read, because Back mounts the page as the
+	// router cached it (round 9: an empty session after Done for today).
 	useEffect(() => {
 		if (initiallyInFlight) void model.resumeStream(false);
+		else void model.refreshFromRecord();
 		return () => {
 			model.stop();
 		};
@@ -121,7 +124,7 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 
 	const send = useCallback((input: ChatInput, onAccepted?: () => void) => model.send(input, onAccepted), [model]);
 	const continueIfOwed = useCallback((record: readonly LhMessage[]) => void model.continueIfOwed(record), [model]);
-	const steer = useCallback((text: string, photos?: Photo[]) => model.steer(text, photos), [model]);
+	const steer = useCallback((text: string, photos?: Photo[], onAccepted?: () => void) => model.steer(text, photos, onAccepted), [model]);
 	const submitAnswer = useCallback(
 		(tool: string, toolCallId: string, output: QuestionAnswerData, questionKey?: string, photos?: Photo[]) =>
 			void model.submitAnswer(tool, toolCallId, output, questionKey, photos),
@@ -140,7 +143,9 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 	const setMessages = useCallback((record: LhMessage[], turnError?: string) => model.setMessages(record, turnError), [model]);
 	const adoptRecord = useCallback((record: LhMessage[]) => model.adoptRecord(record), [model]);
 	const stop = useCallback(() => model.stop(), [model]);
+	const stopReply = useCallback(() => model.stopReply(), [model]);
 	const clearError = useCallback(() => model.clearError(), [model]);
+	const outlivedFailure = useCallback(() => model.outlivedFailure(), [model]);
 	const recoverDroppedStream = useCallback(() => model.recoverDroppedStream(), [model]);
 	const resumeStream = useCallback(() => void model.resumeStream(), [model]);
 
@@ -148,10 +153,10 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 		messages: state.messages,
 		nativeMessages: state.nativeMessages,
 		hasConfirmedConversation: state.hasConfirmedConversation,
-		contextTokens: state.contextTokens,
 		status: state.status,
 		error: state.error,
 		steerQueue: state.steerQueue,
+		compacting: state.compacting,
 		send,
 		continueIfOwed,
 		steer,
@@ -163,7 +168,9 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 		setMessages,
 		adoptRecord,
 		stop,
+		stopReply,
 		clearError,
+		outlivedFailure,
 		recoverDroppedStream,
 		resumeStream,
 		setReattachSettled,

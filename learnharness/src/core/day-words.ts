@@ -23,13 +23,14 @@ export function shortDay(day: string): string {
 }
 
 /** A planned day against the study day: "today", "tomorrow, Monday 9
- *  November", "Thursday 12 November, in 4 days", "Sunday 22 November, in 14
- *  days". Always days, as the app counts every distance. */
+ *  November", "Thursday 12 November", "Wednesday 4 November, yesterday".
+ *  The day itself, never a count of days (round 14, m9: a close said "on
+ *  Tuesday 10 November, in 2 days"). */
 export function plannedDayWords(day: string, today: string): string {
 	const days = Math.round((at(day).getTime() - at(today).getTime()) / 86_400_000);
-	if (days <= 0) return days === 0 ? "today" : `${longDay(day)}, ${-days === 1 ? "yesterday" : `${-days} days ago`}`;
+	if (days === 0) return "today";
 	if (days === 1) return `tomorrow, ${longDay(day)}`;
-	return `${longDay(day)}, in ${days} days`;
+	return days === -1 ? `${longDay(day)}, yesterday` : longDay(day);
 }
 
 /** The engine's study day, as its clock reads it (`learning/clock.py`):
@@ -55,7 +56,11 @@ export function studyNow(env: Record<string, string | undefined> = process.env, 
 /** The engine's JSON with `planned_words` beside every `planned` day and
  *  `starts_words` beside every `starts` day, relative to the output's own
  *  `today` when it has one, else `today`, and `from_words` beside the day a
- *  `moved` day was told for. */
+ *  `moved` day was told for. The start of a lesson he began (`starts_why`
+ *  `begun`) is the day it continues, so its words are `continues_words`,
+ *  as the app says "Lesson continues". */
+const begunStart = (topic: object): boolean => ((topic as { starts_why?: { kind?: unknown } }).starts_why)?.kind === "begun";
+
 export function withDayWords(json: unknown, today: string): unknown {
 	const own = typeof json === "object" && json !== null && typeof (json as { today?: unknown }).today === "string" ? (json as { today: string }).today : today;
 	const walk = (value: unknown): unknown => {
@@ -64,7 +69,7 @@ export function withDayWords(json: unknown, today: string): unknown {
 		const out: Record<string, unknown> = {};
 		for (const [key, inner] of Object.entries(value)) {
 			out[key] = walk(inner);
-			if ((key === "planned" || key === "starts") && typeof inner === "string" && DAY.test(inner)) out[`${key}_words`] = plannedDayWords(inner, own);
+			if ((key === "planned" || key === "starts") && typeof inner === "string" && DAY.test(inner)) out[`${key === "starts" && begunStart(value) ? "continues" : key}_words`] = plannedDayWords(inner, own);
 			if (key === "moved" && typeof inner === "object" && inner !== null && typeof (inner as { from?: unknown }).from === "string") out.moved = { ...(inner as object), from_words: longDay((inner as { from: string }).from) };
 		}
 		return out;

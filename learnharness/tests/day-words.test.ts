@@ -13,26 +13,28 @@ import { plannedDayWords, studyDay, withDayWords } from "../src/core/day-words.t
 import { RIGHT_WORDS, STANDING_WORDS } from "../components/study-words.ts";
 
 describe("a planned day in words", () => {
-	it("says today, tomorrow, or any later day with its date and its distance in days, as the app counts it", () => {
+	it("says today, tomorrow, or any other day by its date, never a count of days (round 14, m9)", () => {
 		assert.equal(plannedDayWords("2026-11-08", "2026-11-08"), "today");
 		assert.equal(plannedDayWords("2026-11-09", "2026-11-08"), "tomorrow, Monday 9 November");
-		assert.equal(plannedDayWords("2026-11-12", "2026-11-08"), "Thursday 12 November, in 4 days");
-		assert.equal(plannedDayWords("2026-11-22", "2026-11-08"), "Sunday 22 November, in 14 days");
-		assert.equal(plannedDayWords("2026-12-03", "2026-11-08"), "Thursday 3 December, in 25 days");
+		assert.equal(plannedDayWords("2026-11-12", "2026-11-08"), "Thursday 12 November");
+		assert.equal(plannedDayWords("2026-11-22", "2026-11-08"), "Sunday 22 November");
+		assert.equal(plannedDayWords("2026-12-03", "2026-11-08"), "Thursday 3 December");
+		assert.equal(plannedDayWords("2026-11-07", "2026-11-08"), "Saturday 7 November, yesterday");
+		assert.equal(plannedDayWords("2026-11-01", "2026-11-08"), "Sunday 1 November");
 	});
 
 	it("puts words beside every planned day and start the course tools return, from the output's own today", () => {
 		const show = { items: { eigen: { review: { due: "2026-11-09", by: "engine", planned: "2026-11-12" } } } };
 		assert.deepEqual(withDayWords(show, "2026-11-08"), {
-			items: { eigen: { review: { due: "2026-11-09", by: "engine", planned: "2026-11-12", planned_words: "Thursday 12 November, in 4 days" } } },
+			items: { eigen: { review: { due: "2026-11-09", by: "engine", planned: "2026-11-12", planned_words: "Thursday 12 November" } } },
 		});
 		const resume = withDayWords({ today: "2026-11-10", due_later: [{ topic: "rank", planned: "2026-11-11" }] }, "2026-11-08") as { due_later: { planned_words: string }[] };
 		assert.equal(resume.due_later[0]!.planned_words, "tomorrow, Wednesday 11 November");
-		assert.equal((withDayWords({ items: { t: { starts: "2026-11-15" } } }, "2026-11-08") as { items: { t: { starts_words: string } } }).items.t.starts_words, "Sunday 15 November, in 7 days");
+		assert.equal((withDayWords({ items: { t: { starts: "2026-11-15" } } }, "2026-11-08") as { items: { t: { starts_words: string } } }).items.t.starts_words, "Sunday 15 November");
 	});
 
 	it("names the day a moved day was told for, so the tutor says it moved without counting", () => {
-		const moved = { from: "2026-11-10", by: "study", courses: ["Probability"] };
+		const moved = { from: "2026-11-10", by: "study", courses: ["Probability"], day: "today" as const };
 		const show = withDayWords({ items: { eigen: { review: { planned: "2026-11-11" }, moved } } }, "2026-11-09") as { items: { eigen: { moved: Record<string, unknown> } } };
 		assert.deepEqual(show.items.eigen.moved, { ...moved, from_words: "Tuesday 10 November" });
 	});

@@ -81,53 +81,73 @@ export function findPendingToolCall(messages: UIMessage[], authority: PendingQue
 	return null;
 }
 
-// ─── Turn activity label (2026-09-19, the “Writing a question…” fix) ──────
+// ─── The working line (round 11, 3 n9) ────────────────────────────────────
 
 /**
- * The transcript's turn-activity shimmer text: what the teacher is
- * doing RIGHT NOW. A tool part sits in `input-streaming` for its whole
- * execution (the bridge defers `tool-input-available` to
- * tool_execution_end — the invalid-input gate for the question dock), so
- * keying the old “Writing a question…” shimmer on ANY streaming tool
- * part mislabeled minutes-long local greps as question-writing. The label
- * now names the actual activity; chat.tsx gates it on `!pending` and
- * renders it as the quiet transcript shimmer.
+ * The lesson's working line says what he waits for, or nothing more than
+ * "Thinking…" (round 11, lesson reading n9: "Searching file contents…",
+ * "Moving to teaching…" and "Moving to practice…" named the tutor's
+ * machinery). It is one line per turn, its words replaced as the turn
+ * moves on (round 16, m1: a line per running tool stacked two or three
+ * "Thinking…" lines, and two "Planning the lesson…" at each hand-off).
+ * A tool part sits in `input-streaming` for its whole execution (the
+ * bridge defers `tool-input-available` to tool_execution_end), so the
+ * line names a running tool by `streamingToolActivity`.
  */
-const ACTIVITY_LABELS: Record<string, string> = {
-	read: "Reading a file…",
-	ls: "Listing a directory…",
-	find: "Finding files…",
-	grep: "Searching file contents…",
-	research: "Dispatching research…",
+export const THINKING_LINE = "Thinking…";
+/** From the probe's end until the lesson's first step reaches him: the
+ *  assessment, the hand-off, the plan's reasoning and its map. */
+export const PLANNING_LINE = "Planning the lesson…";
+
+/** Tools whose work is itself what he waits for: he will see it. */
+const WAIT_LINES: Record<string, string> = {
+	probe_done: PLANNING_LINE,
+	plan_init: PLANNING_LINE,
 	demo: "Building a demo…",
 	visual: "Making a visual…",
-	pdf: "Reading a PDF…",
-	plan_init: "Drawing up the plan…",
-	lesson_progress: "Marking your progress…",
-	probe_done: "Concluding the assessment…",
-	practice: "Moving to practice…",
-	teach: "Moving to teaching…",
 };
 
-/** The activity label for ONE running tool (owner, streaming round
- *  2026-10-01): the live tool-input card carries it inline — spinner +
- *  shimmered label on the card itself, replacing the retired transcript
- *  bottom line. Question tools are excluded here: their input-streaming
- *  part renders in the dock, never a live card. */
-export function toolActivityLabel(tool: string): string {
-	if ((QUESTION_TOOLS as readonly string[]).includes(tool)) return "Writing a question…";
-	return ACTIVITY_LABELS[tool] ?? "Working…";
-}
-
-export function streamingToolActivity(messages: UIMessage[]): string | null {
-	const last = messages.at(-1);
-	if (!last || last.role !== "assistant") return null;
-	for (const part of last.parts) {
-		if (isToolUIPart(part) && part.state === "input-streaming") {
-			return toolActivityLabel(part.type.slice("tool-".length));
+/** Whether the probe is ending or has ended and the lesson's first step
+ *  has not yet reached him: no words of the tutor's and no question after
+ *  a `probe_done` that was not refused (one still settling counts, so the
+ *  line does not blink to Thinking… as the probe's turn closes). A refused
+ *  question never reached him (round 11 integration: the question sent
+ *  beside a refused plan blinked the line to Thinking… twice). Pure. */
+export function planningLesson(messages: readonly UIMessage[]): boolean {
+	for (let m = messages.length - 1; m >= 0; m--) {
+		const parts = messages[m]!.parts;
+		for (let p = parts.length - 1; p >= 0; p--) {
+			const part = parts[p]!;
+			if (part.type === "tool-probe_done") return part.state !== "output-error";
+			if (part.type === "text" && typeof part.text === "string" && part.text.trim()) return false;
+			if (isToolUIPart(part) && part.state !== "output-error" && (QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) return false;
 		}
 	}
-	return null;
+	return false;
 }
 
+/** The line while nothing he will see is being written. Pure. */
+export function workingLine(messages: readonly UIMessage[]): string {
+	return planningLesson(messages) ? PLANNING_LINE : THINKING_LINE;
+}
 
+/** The line for ONE running tool. A question being written is what he
+ *  waits for; a tool whose work he will see names it; every other tool
+ *  shows the turn's own line (`idle`, `workingLine`). */
+export function toolActivityLabel(tool: string, idle: string = THINKING_LINE): string {
+	if ((QUESTION_TOOLS as readonly string[]).includes(tool)) return "Writing a question…";
+	return WAIT_LINES[tool] ?? idle;
+}
+
+/** The turn's line while its reply's tools run: the first of them that
+ *  names what he waits for (the plan, a demo, a visual, a question), else
+ *  the turn's own line; null when none runs. Pure. */
+export function streamingToolActivity(messages: readonly UIMessage[]): string | null {
+	const last = messages.at(-1);
+	if (!last || last.role !== "assistant") return null;
+	const idle = workingLine(messages);
+	const running = last.parts.filter((part) => isToolUIPart(part) && part.state === "input-streaming");
+	if (running.length === 0) return null;
+	const named = running.map((part) => toolActivityLabel(part.type.slice("tool-".length), idle)).find((line) => line !== idle);
+	return named ?? idle;
+}

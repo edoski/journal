@@ -89,7 +89,7 @@ describe("DispatchCard — the refusal tone", () => {
 		);
 		assert.ok(html.includes('data-testid="dispatch-refused"'));
 		assert.ok(html.includes("needs a sign-in"));
-		assert.ok(html.includes(">Sign in<"));
+		assert.ok(html.includes(">Sign in to Claude<"), "one label for the sign-in, as the line and the pill say it (round 10, 4 minor 7)");
 		assert.ok(html.includes('data-testid="dispatch-setup-link"'));
 		assert.ok(!html.includes("failed"));
 		assert.ok(!html.includes("text-red-500"));

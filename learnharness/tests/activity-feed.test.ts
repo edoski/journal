@@ -89,13 +89,10 @@ test("activityFeed: contextLimit is the server's live-catalog join (owner amendm
 		assert.equal(knownJob.contextLimit, 1_000_000, "the signed-in model's window, joined server-side onto the feed");
 		const legacyJob = feed.jobs.find((j) => j.id === legacy.id)!;
 		assert.equal(legacyJob.contextLimit, null, "an older API-key record is not in the live catalog");
-		assert.ok(legacyJob.costUsd !== null && Math.abs(legacyJob.costUsd - 0.0002) < 1e-12, "its price is still projected from Pi's catalog");
 		const unknownJob = feed.jobs.find((j) => j.id === unknown.id)!;
 		assert.equal(unknownJob.contextLimit, null, "missing from the live catalog → null, never a guessed window");
-		assert.equal(unknownJob.costUsd, null);
 		const bareJob = feed.jobs.find((j) => j.id === bare.id)!;
 		assert.equal(bareJob.contextLimit, null, "no usage yet → no context line");
-		assert.equal(bareJob.costUsd, null);
 	} finally {
 		fs.unlinkSync(`${PATHS.chats}/${chat.id}.json`);
 		const jobsDir = path.join(PATHS.data, "jobs");

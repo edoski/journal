@@ -25,7 +25,7 @@ function install(rounds: ClaudeAccountStatus[][]) {
 		const path = String(input), method = init?.method ?? "GET";
 		calls.push({ path, method, ...(init?.body ? { body: JSON.parse(String(init.body)) } : {}) });
 		if (path.startsWith("/api/subscriptions/claude")) return Response.json({ accounts: rounds.length > 1 ? rounds.shift() : rounds[0] });
-		if (path === "/api/models") return Response.json(status(current));
+		if (path.startsWith("/api/models")) return Response.json(status(current));
 		if (path === "/api/settings/claude" && method === "PUT") { current = (JSON.parse(String(init!.body)) as { account: string }).account; return Response.json({ settings: { version: 1, claude: { account: current } } }); }
 		return new Response("not found", { status: 404 });
 	};
@@ -48,6 +48,7 @@ test("each non-connected state says what to do, with one Refresh and no sign-in 
 	const cases: [ClaudeAccountStatus, RegExp][] = [
 		[account("claude-subscription", "Claude Code", { state: "missing" }, null, null, "default"), /Claude Code is not installed/],
 		[account("claude-subscription", "Claude Code", { state: "signed-out" }, null, null, "default"), /Run `claude` in a terminal and sign in with your Claude account, then press Refresh/],
+		[{ ...account("claude-subscription", "Claude Code", { state: "signed-out" }, null, "me@example.com", "default"), account: { providerId: "claude-subscription", label: "Claude Code", email: "me@example.com", auth: "default", notInT3: true } }, /^LearnHarness can't find your Claude accounts in T3 Code\. Open T3 Code, check them, then press Refresh\.$/],
 		[account("claude-subscription-work", "Work", { state: "signed-out" }), /This account isn't signed in\. Sign in to it again in T3 Code, then press Refresh/],
 		[account("claude-subscription", "Claude Code", { state: "not-subscription", authMethod: "api_key" }, null, null, "default"), /signed in with an API key, which would not use your Claude plan\. Run `claude`, then `\/login`/],
 		[account("claude-subscription", "Claude Code", { state: "error", message: "Claude Code could not report its sign-in status." }, null, null, "default"), /could not report its sign-in status/],
@@ -55,7 +56,7 @@ test("each non-connected state says what to do, with one Refresh and no sign-in 
 	for (const [status, sentence] of cases) {
 		install([[status]]);
 		await mount();
-		assert.match(text(rows()[0], "claude-connection-state")!, sentence);
+		assert.match(document.querySelector('[data-testid="claude-connection-state"]')?.textContent ?? "", sentence);
 		assert(document.body.textContent!.includes(CLAUDE_LABEL));
 		assert(document.body.textContent!.includes(CLAUDE_NOTICE));
 		assert.deepEqual([...document.querySelectorAll("button")].map((b) => b.textContent), ["Refresh"], `${status.connection.state}: only Refresh`);
@@ -78,8 +79,8 @@ test("one row per account with its email and weekly usage; Use this account swit
 	assert.doesNotMatch(document.body.textContent!, /%|\d+ left/, "no percentages or counts");
 	assert.equal(text(row("claude-subscription-spare"), "claude-usage"), null);
 	assert.equal(text(row("claude-subscription"), "claude-in-use"), "In use");
-	assert.equal(row("claude-subscription").querySelector('[data-testid="claude-use-account"]'), null, "the account in use offers no switch");
-	assert.equal(row("claude-subscription-spare").querySelector('[data-testid="claude-use-account"]'), null, "a signed-out account offers no switch");
+	assert.ok(row("claude-subscription").querySelector('[data-testid="claude-use-account"]') === null, "the account in use offers no switch");
+	assert.ok(row("claude-subscription-spare").querySelector('[data-testid="claude-use-account"]') === null, "a signed-out account offers no switch");
 
 	await click(row("claude-subscription-work").querySelector('[data-testid="claude-use-account"]'));
 	const put = calls.find((c) => c.method === "PUT");
@@ -115,6 +116,29 @@ test("Refresh forces a fresh check of every account and tells readers the connec
 	assert(signals.includes("keys"));
 });
 
+test("Refresh redraws every row as being checked until the fresh reading lands, and tells readers even once the dialog has closed (round 10, 4 minor 1)", async () => {
+	let land!: () => void;
+	const landed = new Promise<void>((done) => { land = done; });
+	const { calls, signals } = install([
+		[account("claude-subscription", "Claude Code", { state: "signed-out" }, null, null, "default")],
+		[account("claude-subscription", "Claude Code", connected, null, null, "default")],
+	]);
+	const served = globalThis.fetch;
+	globalThis.fetch = async (input, init) => {
+		if (String(input) === "/api/subscriptions/claude?refresh=1") await landed;
+		return served(input, init);
+	};
+	await mount();
+	assert.equal(text(rows()[0], "claude-connection-state"), "Run `claude` in a terminal and sign in with your Claude account, then press Refresh.");
+	await click(document.querySelector('[data-testid="claude-refresh"]'));
+	assert.equal(text(rows()[0], "claude-connection-state"), "Checking Claude Code…", "no row goes on saying it isn't signed in while the check runs (53)");
+	assert(calls.some((c) => c.path === "/api/models?refresh=1"), "the sign-in itself is re-checked at once, apart from the usage probes");
+	await act(async () => root?.unmount());
+	root = undefined;
+	await act(async () => { land(); await new Promise((r) => setTimeout(r, 0)); });
+	assert(signals.includes("keys"), "every reader hears the fresh reading, the pill and the line included");
+});
+
 test("usage reads in words from plenty to nothing, with the day it resets", async () => {
 	const usage = (percentLeft: number) => ({ percentLeft, resetsAt: RESET, limited: false, checkedAt: 1 });
 	install([[
@@ -147,4 +171,44 @@ test("the note about the plan is a row of its own after the last account", async
 	const parts = [...host!.children];
 	assert.deepEqual(parts.map((el) => el.getAttribute("data-testid")), ["claude-connection", "claude-account", "claude-notice"], "the header, each account and the note are sibling rows the group parts with hairlines");
 	assert.equal(parts.at(-1)!.textContent, CLAUDE_NOTICE);
+});
+
+/** Round 14, 4 minor 7: with the token folder moved aside, the sign-in
+ *  dialog read "This account isn't signed in…" under each of four
+ *  accounts, and "can't find your Claude accounts" still listed the plain
+ *  `claude` standing in for them. */
+test("every account failing alike says it once, above the names; none found in T3 Code lists none", async () => {
+	const out = (id: string, email: string) => account(id, id, { state: "signed-out" }, null, email);
+	install([[out("claude-subscription-a", "a@example.com"), out("claude-subscription-b", "b@example.com"), out("claude-subscription-c", "c@example.com"), out("claude-subscription-d", "d@example.com")]]);
+	await mount();
+	const said = [...document.querySelectorAll('[data-testid="claude-connection-state"]')].map((p) => p.textContent);
+	assert.deepEqual(said, ["This account isn't signed in. Sign in to it again in T3 Code, then press Refresh."], "said once");
+	assert.deepEqual(rows().map((r) => text(r, "claude-account-name")), ["a@example.com", "b@example.com", "c@example.com", "d@example.com"], "every account still named");
+	await act(async () => root?.unmount()); host?.remove(); stopSignals?.();
+
+	install([[{ ...account("claude-subscription", "Claude Code", { state: "signed-out" }, null, "edoxtreme@example.com", "default"), account: { providerId: "claude-subscription", label: "Claude Code", email: "edoxtreme@example.com", auth: "default", notInT3: true } }]]);
+	await mount();
+	assert.equal(rows().length, 0, "no account listed when none is found");
+	assert.match(document.body.textContent!, /can't find your Claude accounts in T3 Code/);
+	assert.doesNotMatch(document.body.textContent!, /edoxtreme/);
+});
+
+/** Round 15, m23: the one line, "This account isn't signed in…", sat
+ *  above four accounts and named none. It now sits on the account in use. */
+test("every account failing alike says it once, on the row of the account in use", async () => {
+	const out = (id: string, email: string) => account(id, id, { state: "signed-out" }, null, email);
+	install([[out("claude-subscription-a", "a@example.com"), out("claude-subscription", "main@example.com"), out("claude-subscription-c", "c@example.com"), out("claude-subscription-d", "d@example.com")]]);
+	await mount();
+	await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+	const said = [...document.querySelectorAll('[data-testid="claude-connection-state"]')];
+	assert.equal(said.length, 1, "said once");
+	assert.equal(said[0]!.textContent, "This account isn't signed in. Sign in to it again in T3 Code, then press Refresh.");
+	assert.ok(said[0]!.closest('[data-testid="claude-account"]') === row("claude-subscription"), "on the row of the account in use, the one it names");
+	assert.equal(text(row("claude-subscription"), "claude-in-use"), "In use");
+});
+
+test("accounts that fail differently, or a mix with one signed in, keep a line under each", async () => {
+	install([[account("claude-subscription", "Main", connected, null, "main@example.com", "default"), account("claude-subscription-work", "Work", { state: "signed-out" }, null, "work@example.com")]]);
+	await mount();
+	assert.equal(document.querySelectorAll('[data-testid="claude-connection-state"]').length, 2);
 });

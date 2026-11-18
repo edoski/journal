@@ -21,7 +21,7 @@
  */
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import { absorbed, pendingCallTool, SessionModel } from "../components/session-core.ts";
+import { absorbed, droppedError, pendingCallTool, SessionModel } from "../components/session-core.ts";
 import type { ChatInput } from "../src/core/input-events.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import { newUserMessage, newAnswerResult, newThinkingMessage, needsContinuation, endsInDismissal, pendingQuestionOf } from "../src/core/native-messages.ts";
@@ -961,6 +961,30 @@ describe("automatic continuation after recovery failure", () => {
 		m.setMessages(answered);
 		await m.continueIfOwed(answered);
 		assert.equal(JSON.parse(bodies.at(-1)!).input.type, "continue");
+	});
+
+	it("a message he sends while the app is down after a dropped reply keeps the drop, so the reply still comes back (round 10, 4 major 1)", async () => {
+		const bodies: string[] = [];
+		const restarted = droppedByRestart(bodies);
+		let down = false;
+		const up = restarted.fetch;
+		restarted.fetch = async (url, init) => {
+			if (down) throw new TypeError("Failed to fetch");
+			return up(url, init);
+		};
+		await restarted.send({ type: "answer", toolCallId: "q1", answer } as ChatInput);
+		assert.equal(restarted.getState().error?.message, "The connection dropped before the tutor finished replying.");
+		down = true;
+		assert.equal(await restarted.send({ type: "text", text: "hello? did that go through?" }, () => {}), false);
+		assert.equal(restarted.getState().error?.message, "Failed to fetch", "the line says the app can't be reached");
+		assert.ok(droppedError(restarted.getState().error), "the dropped reply is still owed");
+		assert.ok(!restarted.getState().nativeMessages.some((m) => m.role === "user"), "the refused message leaves no bubble");
+		down = false;
+		restarted.recoverDroppedStream();
+		assert.equal(restarted.getState().error, null);
+		restarted.setMessages(answered);
+		await restarted.continueIfOwed(answered);
+		assert.equal(JSON.parse(bodies.at(-1)!).input.type, "continue", "the dropped reply comes back once the app is");
 	});
 
 	it("only a dropped stream recovers so: a failed reply still waits for him", async () => {
@@ -1960,4 +1984,40 @@ describe("absorbed — the custom role (the doubled thinking card)", () => {
 		assert.equal(customs.length, 1, "the server copy replaced the optimistic one — no doubling");
 		assert.equal((customs[0] as { id?: string }).id, "srv_1");
 	});
+});
+
+describe("a lesson mounted from an old page (round 9, 2 m11: Back after Done showed an empty \"New session\" page until reload)", () => {
+	const said = newUserMessage("Teach me the binomial distribution.");
+	const reply = { role: "assistant", content: [{ type: "text", text: "Every sequence with k successes has the same probability." }], stopReason: "stop", id: "a_1", timestamp: 1 } as unknown as LhMessage;
+
+	it("takes the record as it stands now when it moved since the page was rendered", async () => {
+		const model = new SessionModel({
+			chatId: "chat_x",
+			initialMessages: [],
+			fetch: (async () => Response.json({ messages: [said, reply], turnInFlight: false })) as typeof globalThis.fetch,
+		});
+		await model.refreshFromRecord();
+		assert.deepEqual(model.getState().nativeMessages.map((m) => m.id), [said.id, "a_1"], "the session he closed, not an empty page");
+	});
+
+	it("keeps what he did meanwhile: a send under way is never replaced by the read", async () => {
+		let release!: () => void;
+		const held = new Promise<void>((done) => { release = done; });
+		const model = new SessionModel({
+			chatId: "chat_x",
+			initialMessages: [said, reply],
+			fetch: (async () => { await held; return Response.json({ messages: [said], turnInFlight: false }); }) as typeof globalThis.fetch,
+		});
+		const read = model.refreshFromRecord();
+		model.setMessages([said, reply, newUserMessage("And for k = 2?")]);
+		release();
+		await read;
+		assert.equal(model.getState().nativeMessages.length, 3);
+	});
+});
+
+it("the lesson's mount reads the record whenever no turn was in flight when the page was rendered", async () => {
+	const { readFileSync } = await import("node:fs");
+	const hook = readFileSync(new URL("../components/session.ts", import.meta.url), "utf8");
+	assert.match(hook, /if \(initiallyInFlight\) void model\.resumeStream\(false\);\s*else void model\.refreshFromRecord\(\);/);
 });

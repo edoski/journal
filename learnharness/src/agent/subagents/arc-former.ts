@@ -204,7 +204,7 @@ const arcSchema = Type.Object({
 	),
 	titles: Type.Optional(Type.Array(Type.Object({ topic: Type.String(), title: Type.String() }), { description: "Only for topics listed with no title." })),
 	examArcs: Type.Optional(Type.Array(Type.String(), { description: "Only when the material states the next exam's scope: its arcs." })),
-	leavesOut: Type.Optional(Type.Array(Type.String(), { description: "Topics of those arcs the stated exam leaves out." })),
+	leavesOut: Type.Optional(Type.Array(Type.String(), { description: "Topics the stated exam leaves out, each in an arc after examArcs." })),
 	doubts: Type.Optional(
 		Type.Array(Type.Object({ topic: Type.String(), need: Type.String(), reason: Type.String() }), { description: "Stored prerequisites you think false: kept, and recorded with your reason." }),
 	),
@@ -272,7 +272,7 @@ How this differs from the text below:
 - An arc of one topic carries single, saying why it stands alone. Two arcs citing the same unit of the material each carry shares, saying why.
 - Every arc cites in refs the unit of the material it follows, when the course has registered material.
 - Before you submit, run the name sort that rule 8 describes, and check each focus question is one question, not two joined by "and".
-- examArcs and leavesOut only when the material states the next exam's scope.
+- examArcs and leavesOut only when the material states the next exam's scope. A topic the exam leaves out goes in an arc after the exam's arcs, never in one with topics it examines: list it in leavesOut.
 - When the course should get no arcs, send none with the reason and an empty arcs list.
 
 `;
@@ -519,6 +519,12 @@ export type TranscriptEntry =
 
 export interface ArcPassOptions {
 	edges: EdgeMode;
+	/** In propose mode, the edges the cut must hold: every proposal
+	 *  (default), so any he accepts keeps the cut valid; or only the stored
+	 *  ones, so a proposal he has not accepted cannot reorder the material
+	 *  (a copy run of his course; an add the cut contradicts is then not
+	 *  accepted at --apply). */
+	cutOn?: "proposed" | "stored";
 	/** His words, or the copy run's statement, for a course he has studied
 	 *  (G5): `arc_change.asked`. */
 	asked?: string;
@@ -756,7 +762,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 
 		const settled = async () => {
 			const read = await viewNow(workspace);
-			return options.edges === "propose" ? { ...read, view: withProposed(read.view, diffs) } : read;
+			return options.edges === "propose" && options.cutOn !== "stored" ? { ...read, view: withProposed(read.view, diffs) } : read;
 		};
 		const cut = await settled();
 		const edgesEntry = edges.applied.length > 0 ? lastEdgesEntry(cut.record) : undefined;

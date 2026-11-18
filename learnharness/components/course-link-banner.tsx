@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CourseControl, CoursesUnavailable, useCourseChoice, type CourseChoice } from "@/components/course-picker";
 import { Button } from "@/components/ui/button";
-import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
+import { COMPOSER_SURFACE } from "@/components/lesson/lesson-composer";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 
-/** The banner's pure body (the render-test seam): one line on the dock
- *  surface, the course chooser and one Link action at its end. */
+/** The banner's pure body (the render-test seam): one line on the
+ *  composer's surface (lesson-composer.md), the course chooser and one
+ *  Link action at its end. */
 export function CourseLinkBody({ choice, busy, error, onLink }: {
 	choice: CourseChoice;
 	busy: boolean;
@@ -16,9 +17,9 @@ export function CourseLinkBody({ choice, busy, error, onLink }: {
 	onLink: () => void;
 }) {
 	return (
-		<div data-testid="course-link-banner" data-slot="dock-surface" className={`pointer-events-auto p-2 pl-4 ${DOCK_SURFACE}`}>
+		<div data-testid="course-link-banner" className={`pointer-events-auto p-2 pl-4 ${COMPOSER_SURFACE}`}>
 			<div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-				<p className="min-w-0 flex-1 text-row text-muted-foreground">Link this session to a course to continue.</p>
+				<p className="min-w-0 flex-1 text-body text-muted-foreground">Link this session to a course to continue.</p>
 				{choice.state.status === "unavailable" ? (
 					<CoursesUnavailable reason={choice.state.reason} />
 				) : (
@@ -37,7 +38,7 @@ export function CourseLinkBody({ choice, busy, error, onLink }: {
 					</Button>
 				)}
 			</div>
-			{error && <p role="alert" className="px-0 pb-1 pt-2 text-row text-danger">{error}</p>}
+			{error && <p role="alert" className="px-0 pb-1 pt-2 text-body text-danger">{error}</p>}
 		</div>
 	);
 }

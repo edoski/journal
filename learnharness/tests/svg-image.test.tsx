@@ -1,10 +1,11 @@
 import React, { act, useState } from "react";
 (globalThis as Record<string, unknown>).React = React;
 
+import { dom as radixDom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
-import { createRoot } from "react-dom/client";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
+import { createRoot } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { VisualOutputCard } from "../components/artifacts/visual-card.tsx";
 import { svgImageSource } from "../components/artifacts/svg-image.tsx";
@@ -20,8 +21,7 @@ function assertImageBoundary(holder: Element, source: string) {
 	const image = holder.querySelector("img");
 	assert.ok(image, "figure is an image");
 	assert.equal(holder.children.length, 1, "no figure markup alongside the image");
-	assert.equal(holder.querySelector("svg, style, script, foreignObject, a, [onload], [onclick]"), null,
-		"generated elements and CSS never enter the app document");
+	assert.ok(holder.querySelector("svg, style, script, foreignObject, a, [onload], [onclick]") === null, "generated elements and CSS never enter the app document");
 	assert.equal(image.getAttribute("alt"), "Figure");
 	assert.equal(image.getAttribute("draggable"), "false", "native image dragging must not interfere with panning");
 	const src = image.getAttribute("src")!;
@@ -133,18 +133,8 @@ describe("generated SVG image boundary", () => {
 it("the fullscreen button opens the same SVG image and inversion; download keeps original bytes", async () => {
 	const originalSvg = FIGURE.replace(' xmlns="http://www.w3.org/2000/svg"', '').replace("θ &amp; φ", "θ&nbsp;&amp; φ");
 	const displaySvg = FIGURE.replace("θ &amp; φ", "θ&#160;&amp; φ");
-	const dom = parseHTML("<html><body></body></html>");
-	const names = ["window", "document", "Element", "HTMLElement", "HTMLFormElement", "IS_REACT_ACT_ENVIRONMENT"] as const;
-	const originals = names.map((name) => Object.getOwnPropertyDescriptor(globalThis, name));
-	Object.assign(globalThis, {
-		window: dom.window,
-		document: dom.document,
-		Element: dom.window.Element,
-		HTMLElement: dom.window.HTMLElement,
-		// The invert switch is Radix's, which asks whether it sits in a form.
-		HTMLFormElement: dom.window.HTMLFormElement ?? class {},
-		IS_REACT_ACT_ENVIRONMENT: true,
-	});
+	// The large view is a Radix Dialog: the shared DOM has what its focus trap reads.
+	const dom = radixDom;
 	const host = dom.document.createElement("div");
 	dom.document.body.append(host);
 	const root = createRoot(host);
@@ -200,10 +190,6 @@ it("the fullscreen button opens the same SVG image and inversion; download keeps
 			URL.revokeObjectURL = originalRevokeUrl;
 			dom.document.createElement = originalCreateElement;
 			host.remove();
-			for (const [i, name] of names.entries()) {
-				if (originals[i]) Object.defineProperty(globalThis, name, originals[i]!);
-				else Reflect.deleteProperty(globalThis, name);
-			}
 		}
 	}
 });

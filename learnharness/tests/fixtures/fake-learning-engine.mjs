@@ -1,13 +1,14 @@
 // A stand-in for `python -m learning`: the same argv shape, the same JSON
 // on stdout and error JSON on stderr. Every call is appended to
 // FAKE_ENGINE_LOG as {args, stdin}. FAKE_ENGINE_PLAN is the `plan --all`
-// stdout, FAKE_ENGINE_MAP the `map` stdout, FAKE_ENGINE_RESUME the `resume` stdout, FAKE_ENGINE_SHOW the `show` stdout. With FAKE_ENGINE_PLAN_FILE instead, the plan is that file, `init`
+// stdout, FAKE_ENGINE_MAP the `map` stdout, FAKE_ENGINE_RESUME the `resume` stdout, FAKE_ENGINE_SHOW the `show` stdout, FAKE_ENGINE_STANDING the `standing` stdout. With FAKE_ENGINE_PLAN_FILE instead, the plan is that file, `init`
 // registers its workspace there and a save's `title` renames the entry, as
 // the real registry does. FAKE_ENGINE_FAIL names a verb that fails with an
 // io error. Topic "unknown" in a save is refused like the real engine
 // refuses an unknown topic; handle "slow" hangs; handle "garbled" prints
 // non-JSON. `sources --add` names each file; `forget --course` drops the
-// course from the plan file, as the real engine's listing does.
+// course from the plan file, as the real engine's listing does. With
+// FAKE_ENGINE_REGISTRY the registry at that path follows the plan file.
 import fs from "node:fs";
 
 const args = process.argv.slice(2);
@@ -36,6 +37,16 @@ function readPlan() {
 }
 function writePlan(plan) {
 	fs.writeFileSync(planFile, JSON.stringify(plan));
+	writeRegistry(plan.courses);
+}
+/** FAKE_ENGINE_REGISTRY: the registry a test's own HOME holds, kept to the
+ *  listing's courses as the real engine's registry is (the app keys its kept
+ *  reads on it). */
+function writeRegistry(courses) {
+	const registry = process.env.FAKE_ENGINE_REGISTRY;
+	if (!registry) return;
+	fs.mkdirSync(registry.slice(0, registry.lastIndexOf("/")), { recursive: true });
+	fs.writeFileSync(registry, JSON.stringify({ schema: 2, workspaces: Object.fromEntries(courses.map((c) => [c.workspace, {}])) }));
 }
 
 if (process.env.FAKE_ENGINE_FAIL === verb) fail(`${verb} could not write the record`, "io");
@@ -66,6 +77,9 @@ switch (verb) {
 		break;
 	case "map":
 		process.stdout.write(process.env.FAKE_ENGINE_MAP ?? JSON.stringify({ today: "2026-11-07", revision: 0, topics: [] }));
+		break;
+	case "standing":
+		process.stdout.write(process.env.FAKE_ENGINE_STANDING ?? JSON.stringify({ readiness: null, mistakes: [] }));
 		break;
 	case "search":
 		process.stdout.write(JSON.stringify({ query: operands.join(" "), results: [] }));

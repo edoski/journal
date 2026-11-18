@@ -1,10 +1,10 @@
-import { markHow, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
-import { cardLine, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, examGapTopicWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_SAID_BY, SLIP_WORDS, slipMark, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { isReviewSession, markHow, namedArc, topicOpening, type ArcHandle, type NamedArc, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
+import { slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
+import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, lessonBegun, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyShort, startsWhyTells, startsWhyWords, studiedDaysWords, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { courseProgress } from "@/components/study-home/agenda-rows/row-facts";
+import { continueWords } from "@/components/study-home/study-facts";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
@@ -22,6 +22,7 @@ export type TopicAction =
 	| { kind: "resume" | "open"; chat: ChatListItem }
 	| { kind: "continue"; chat: ChatListItem; task: CourseMapTask | null }
 	| { kind: "review" | "start" | "study"; opening: string }
+	| { kind: "review"; opening: string; chat: ChatListItem }
 	| { kind: "continue"; opening: string; task: CourseMapTask | null; from?: string };
 
 /** What a press on an open task does: open the session Continue picks up,
@@ -34,13 +35,19 @@ export function pressOf(move: ContinueMove | null, opening: string): Press {
 	return move ? { opening, from: move.from.id } : { opening };
 }
 
+/** A review he closed with Done for today on an open question: it rides
+ *  with the topic's next review rather than leading the page as a session
+ *  to resume (round 10, 1 m7: Eigen's page read "Now · Resume · Left off
+ *  today" on the review that had just dated the next one). Pure. */
+export function closedReview(chat: ChatListItem): boolean {
+	return isReviewSession(chat) && sessionState(chat) === "left";
+}
+
 /** Continue on a task or a topic, as the page's action. */
 function continueAction(sessions: readonly ChatListItem[], opening: string, task: CourseMapTask | null): TopicAction {
 	const press = pressOf(continueMove(sessions), opening);
 	return "open" in press ? { kind: "continue", chat: press.open, task } : { kind: "continue", ...press, task };
 }
-
-export const ACTION_WORDS: Record<TopicAction["kind"], string> = { resume: "Resume", open: "Open", review: "Review", continue: "Continue", start: "Start", study: "Study" };
 
 /** A place to pick the topic back up: the session that waits or is being
  *  written, or an open task that holds the topic. */
@@ -56,7 +63,7 @@ export interface SessionEntry {
 	state: SessionState;
 	/** The day of its last message, YYYY-MM-DD. */
 	day: string;
-	/** "Today", "3d ago". */
+	/** "Today", "6 Nov". */
 	when: string;
 	/** Its plan, when its tutor authored one. */
 	plan: SessionPlan | null;
@@ -77,9 +84,10 @@ export interface HeadMark {
 export interface BuildsOn {
 	topic: CourseMapTopic;
 	standing: Standing;
-	/** What its card on the map says (`cardLine`), else where he stands:
-	 *  one word for one topic on the page (round 8: Rank read "Partly
-	 *  right" here and "Your turn" on its card). */
+	/** Where he stands on it, its pie's words: how ready it is, never a
+	 *  session's status (round 14, m38: "Basis and dimension · Your turn"
+	 *  said nothing of how ready it was). The card beside keeps the
+	 *  sidebar's fact under the same pie. */
 	words: string;
 	href: string;
 }
@@ -89,14 +97,15 @@ export interface BuildsOn {
 export interface StartsReason {
 	kind: StartsWhy["kind"];
 	words: string;
+	/** The same cut to fit a line ("After Binomial distribution", `startsWhyShort`). */
+	short: string;
 }
 
 export interface TopicFacts {
 	course: { workspace: string; title: string };
-	/** The arc the topic lies in, with its ring's share (the topics of it
-	 *  he can do on his own, as Home's ring counts a course); null in a
-	 *  course without arcs. */
-	arc: { handle: ArcHandle; title: string; share: number | null } | null;
+	/** The arc the topic lies in, named with its place in study order
+	 *  (`namedArc`); null in a course without arcs. */
+	arc: NamedArc | null;
 	topic: CourseMapTopic;
 	/** The engine's study day. */
 	today: string;
@@ -106,18 +115,24 @@ export interface TopicFacts {
 	standing: Standing | null;
 	/** What the head says beside the pie; empty when the line is silent. */
 	marks: readonly HeadMark[];
-	/** "Studied 3 days ago"; null when nothing dates it or the line is silent. */
-	studied: string | null;
 	/** The engine's diagnosed mistake, else the last attempt of a topic it
 	 *  calls weak when that attempt was not right, in the tutor's words. */
 	mistake: string | null;
 	/** Why its next review waits past the day memory asks for it
-	 *  (`heldWords`); null when nothing holds it back. */
+	 *  (`waitsWords`); null when nothing holds it back. */
 	waits: string | null;
 	/** A topic not started that the engine's plan starts later: the day of
 	 *  its first lesson and, when it waits behind other courses' new
 	 *  topics, which (`startsAfterWords`); null otherwise. */
 	starts: { day: string; waits: string | null } | null;
+	/** A lesson he began: the day the engine's daily plan first reviews the
+	 *  topic, after the lesson goes on (the topic read's `firstReview`);
+	 *  null otherwise or when the plan reviews it on none. */
+	firstReview: string | null;
+	/** For a topic not started, what the exam ahead means for it
+	 *  (`examWords`): it leaves it out, or its plan has no room to start
+	 *  it; null otherwise. */
+	exam: string | null;
 	/** Why the plan starts a topic not started then ("After Expectation
 	 *  and linearity, which it needs", "Early, ahead of its place, while
 	 *  earlier topics wait on Change of basis"), or for a topic the exam leaves out ("Not on
@@ -125,6 +140,9 @@ export interface TopicFacts {
 	startsWhy: StartsReason | null;
 	action: TopicAction;
 	pickups: readonly Pickup[];
+	/** The open tasks that hold the topic (`heldTasks`), by which a
+	 *  session holding one is named. */
+	tasks: readonly CourseMapTask[];
 	/** Every session tied to the topic, newest first: its own and those
 	 *  that only touched it (`SessionEntry.own`). */
 	sessions: readonly SessionEntry[];
@@ -171,36 +189,36 @@ export function buildsMapOf(topic: CourseMapTopic, map: CourseMap): CourseMap | 
 
 /** The topics a topic builds on, from the course map's `needs` edges, in
  *  the engine's path order, each with where he stands on it. */
-export function buildsOn(topic: CourseMapTopic, map: CourseMap, said?: ReadonlyMap<TopicHandle, Said>): BuildsOn[] {
+export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
 	const needs = new Set(map.edges.flatMap((edge) => (edge.kind === "needs" && edge.topic === topic.handle ? [edge.prerequisite] : [])));
 	return map.topics
 		.filter((t) => needs.has(t.handle))
 		.map((t) => {
 			const standing = standingOf(t);
-			return { topic: t, standing, words: cardLine(said?.get(t.handle))?.words ?? standing.words, href: unitHref(map.workspace, t.handle) };
+			return { topic: t, standing, words: standing.words, href: unitHref(map.workspace, t.handle) };
 		});
 }
 
 /** Why the review waits past the day memory asked for it, after from
- *  when (`movedWords`): "Due since 1 Oct, earlier days are full", "Moved
- *  from 9 Nov, earlier days are full". */
+ *  when (`movedWords`): "Due 1 Oct, waits for your Probability exam",
+ *  "Due 1 Oct"; an exam is the only why it names (`heldExamWords`). */
 /** What the exam ahead means for the topic: it leaves it out, or its plan
  *  has no room to start or review it; null otherwise. */
-const examWords = (topic: CourseMapTopic, map: CourseMap) => leftOutWords(topic, map.exam) ?? examGapTopicWords(topic, map.exam);
+const examWords = (topic: CourseMapTopic, map: CourseMap) => leftOutWords(topic, map.exam) ?? examGapTopicWords(topic, map.exam, map.today);
 
 /** `TopicFacts.startsWhy`: the exam first, since a topic it leaves out, or
  *  has no room for, waits for the exam whatever else it waits on. */
 function startsReason(topic: CourseMapTopic, map: CourseMap): StartsReason | null {
 	const exam = examWords(topic, map);
-	if (exam) return { kind: "after", words: exam };
-	return topic.startsWhy && startsWhyTells(topic.startsWhy) ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null;
+	if (exam) return { kind: "after", words: exam, short: exam };
+	return topic.startsWhy && startsWhyTells(topic.startsWhy) ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map), short: startsWhyShort(topic.startsWhy, map) } : null;
 }
 
 function waitsWords(topic: CourseMapTopic, today: string): string | null {
 	if (topic.moved && topic.review) return movedWords(topic.review, today, topic.moved);
-	const why = heldWords(topic.review);
+	const why = heldExamWords(topic.review);
 	const moved = movedWords(topic.review, today);
-	return why && moved ? `${moved}, ${why.charAt(0).toLowerCase()}${why.slice(1)}` : why;
+	return why && moved ? `${moved}, ${why.charAt(0).toLowerCase()}${why.slice(1)}` : (why ?? moved);
 }
 
 /** The open tasks that hold the topic: the focused one first, then the
@@ -217,22 +235,28 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
  * (a new review session, never an old lesson), continue the open task that
  * holds it, start a topic not started, continue one being learned that has
  * no review set, else study (the engine has set the next review in the
- * future, so nothing needs him). Continue picks up the lesson that holds
+ * future, so nothing needs him; when the plan holds a review memory asked
+ * for already, Study opens that review, `topicOpening`). Continue picks up the lesson that holds
  * the task, or the topic's newest lesson, as the session model says
  * (`continueMove`). `chats` are every session; the topic's are those that
  * belong to it (`ownsTopic`), never one that only touched it on the way
- * (round 7: Kernel's page resumed the Eigen lesson).
+ * (round 7: Kernel's page resumed the Eigen lesson). A review he closed
+ * with Done for today is no session to resume (`closedReview`): it waits
+ * for the topic's next review, whose press opens it (round 10, 1 m7).
  */
 export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): TopicAction {
 	const sessions = topicSessions(chats, map.workspace, topic.handle).filter((chat) => ownsTopic(chat, topic.handle));
-	const active = resumableSession(sessions);
+	const active = resumableSession(sessions.filter((chat) => !closedReview(chat)), chats);
 	if (active) return { kind: sessionState(active) === "working" ? "open" : "resume", chat: active };
-	if (topic.review?.kind === "due") return { kind: "review", opening: `Review ${topic.title}` };
+	if (topic.review?.kind === "due") {
+		const left = sessions.find(closedReview);
+		return { kind: "review", opening: `Review ${topic.title}`, ...(left ? { chat: left } : {}) };
+	}
 	const [task] = heldTasks(topic, map);
-	if (task) return continueAction(taskSessions(chats, map.workspace, task.key), `Continue ${task.title}`, task);
+	if (task) return continueAction(taskSessions(chats, map.workspace, task.key), continueWords(task.title), task);
 	if (topic.level === "new") return { kind: "start", opening: topic.title };
 	if (shelfOf(topic, null) === "learning" && !topic.review) return continueAction(sessions, `Continue ${topic.title}`, null);
-	return { kind: "study", opening: topic.title };
+	return { kind: "study", opening: topicOpening(topic, map.today) };
 }
 
 const DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
@@ -254,29 +278,20 @@ export { agoWords, studiedDaysWords as studiedWords };
 /**
  * What the head says beside the pie, in the app's words (study-words.ts),
  * each drawn as an icon and a few words: why the engine calls the topic
- * weak, unless the standing beside it already says so (`SLIP_SAID_BY`;
- * the sidebar keeps it as the row's reason), then its review, due ("3d overdue"), held past memory's day ("Due
- * since 1 Oct") or dated ("Back in 5d"), as the map, Home and the sidebar
+ * weak (the sidebar keeps it as the row's reason), then its review, due ("Due 5 Nov"), held past memory's day ("Due
+ * 1 Oct") or dated ("Back in 5d"), as the map, Home and the sidebar
  * say it (`reviewWords`). `today` is the engine's study day.
  */
 export function headMarks(topic: CourseMapTopic, titleOf: (handle: string) => string, today: string): HeadMark[] {
-	const found = topic.weak ? slipMark(topic.signals, titleOf) : null;
-	const slip = found && SLIP_SAID_BY[found.key] !== standingOf(topic).words ? found : null;
+	const slip = slipBeside(topic, titleOf);
 	const review = topic.review ? reviewWords(topic.review, today) : null;
 	return [...(slip ? [{ kind: "slip" as const, words: slip.words, slip: slip.key }] : []), ...(review ? [{ kind: "review" as const, words: review }] : [])];
-}
-
-/** The latest day anything says he studied the topic: its newest attempt,
- *  its newest session's last message, the day it was first taught. */
-export function lastStudiedDay(topic: CourseMapTopic, sessions: readonly SessionEntry[], attempts: readonly TopicAttempt[]): string | null {
-	const days = [attempts[0]?.date, sessions[0]?.day, topic.introduced].filter((day): day is string => Boolean(day));
-	return days.length > 0 ? days.reduce((latest, day) => (day > latest ? day : latest)) : null;
 }
 
 /** What went wrong, when the engine can say: the mistake it diagnosed,
  *  else, for a topic it calls weak, the newest attempt that counts (never
  *  a prediction) in the tutor's words when it was not right. Nothing once
- *  he has fixed it on his own: the head says "Fixed, check again later",
+ *  he has fixed it on his own: the head says "Check again another day",
  *  and the mistake under it read as one still open (round 5). */
 export function mistakeOf(topic: CourseMapTopic, attempts: readonly TopicAttempt[]): string | null {
 	const { gap, repaired, repairedWithHelp } = topic.signals;
@@ -301,13 +316,9 @@ export function sessionEntries(sessions: readonly ChatListItem[], plans: readonl
 	return sessions.map((chat) => {
 		const local = localDay(chat.updatedAt);
 		const day = local > today ? today : local;
-		return { chat, own: ownsTopic(chat, handle), state: sessionState(chat), day, when: agoWords(daysBetween(day, today)), plan: plans.find((plan) => plan.id === chat.id) ?? null };
+		return { chat, own: ownsTopic(chat, handle), state: sessionState(chat), day, when: agoWords(daysBetween(day, today), today), plan: plans.find((plan) => plan.id === chat.id) ?? null };
 	});
 }
-
-/** What the pick-up row says while the tutor writes and no step is known. */
-export const WRITING = "The tutor is writing";
-
 
 /** Where a session stands: the step its newest tagged question is about;
  *  else, while the tutor writes, that it writes; else that it stopped
@@ -316,7 +327,7 @@ export const WRITING = "The tutor is writing";
 function whereOf(entry: SessionEntry): string {
 	const step = entry.plan?.tree.nodes.find((node) => node.id === entry.plan?.current);
 	if (step) return step.title;
-	if (entry.state === "working") return WRITING;
+	if (entry.state === "working") return TUTOR_WRITING;
 	if (entry.state === "paused") return pausedWords(entry.chat);
 	if (entry.state === "left") return LESSON_WORDS.leftForTonight;
 	return entry.chat.pendingProblem ? "Problem waiting" : "Question waiting";
@@ -329,15 +340,15 @@ function whereOf(entry: SessionEntry): string {
  * that session holds. A task's press continues the lesson that holds it.
  */
 export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readonly SessionEntry[], chats: readonly ChatListItem[], record: TopicRecord | null, today: string): Pickup[] {
-	const active = resumableSession(entries.filter((entry) => entry.own).map((entry) => entry.chat));
+	const active = resumableSession(entries.filter((entry) => entry.own && !closedReview(entry.chat)).map((entry) => entry.chat), chats);
 	const entry = entries.find((e) => e.chat === active);
 	const session: Pickup[] = entry ? [{ kind: "session", chat: entry.chat, waits: entry.state !== "working", title: entry.chat.title, where: whereOf(entry), when: entry.when }] : [];
 	const tasks = heldTasks(topic, map)
 		.filter((task) => !active?.tasks?.includes(task.key))
 		.map((task): Pickup => {
 			const updated = record?.tasks.find((t) => t.key === task.key)?.updated;
-			const press = pressOf(continueMove(taskSessions(chats, map.workspace, task.key)), `Continue ${task.title}`);
-			return { kind: "task", task, title: task.title, where: task.step ?? "Unfinished", when: updated ? agoWords(daysBetween(updated, today)) : null, press };
+			const press = pressOf(continueMove(taskSessions(chats, map.workspace, task.key)), continueWords(task.title));
+			return { kind: "task", task, title: task.title, where: task.step ?? "Unfinished", when: updated ? agoWords(daysBetween(updated, today), today) : null, press };
 		});
 	return [...session, ...tasks];
 }
@@ -352,21 +363,18 @@ export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => 
 	const how = markHow({ ...attempt, helped: !attempt.unaided });
 	if (how === "predicted" || how === "gaveUp") return { result, words: MARK_HOW_WORDS[how] };
 	if (attempt.chose) return { result, words: `Mixed up with ${titleOf(attempt.chose)}` };
-	if (attempt.result === "incorrect") return { result, words: attempt.sure === "confident" ? SLIP_WORDS.confident : null };
+	if (attempt.result === "incorrect") return { result, words: attempt.sure === "confident" ? SLIP_WORDS.confident : ATTEMPT_WORDS.wrong };
 	// How a right or partly right answer counted, in the answer card's words;
-	// his own work says nothing, so the ones that differ stand out.
-	return { result, words: how === "ownWork" ? null : MARK_HOW_WORDS[how] };
+	// a right one on his own says nothing, so the ones that differ stand out,
+	// and a partly right one says so (round 12, 1 m12: its icon alone).
+	if (how !== "ownWork") return { result, words: MARK_HOW_WORDS[how] };
+	return { result, words: result === "partly" ? ATTEMPT_WORDS.partly : null };
 }
 
-/** The arc a topic lies in, by handle and title, with the share of its
- *  live topics he can do on his own (`courseProgress` over them); null in
- *  a course without arcs or for a topic the arc list does not hold. Pure. */
+/** The arc a topic lies in, by handle and title; null in a course without
+ *  arcs or for a topic the arc list does not hold. Pure. */
 function arcOf(course: StudyCourse, topic: CourseMapTopic): TopicFacts["arc"] {
-	const arc = topic.arc && course.map.arcs?.find((a) => a.handle === topic.arc);
-	if (!arc) return null;
-	const live = course.map.topics.filter((t) => t.arc === arc.handle && t.excluded === undefined);
-	const progress = courseProgress({ ...course, map: { ...course.map, topics: live } });
-	return { handle: arc.handle, title: arc.title, share: progress ? progress.solid / progress.of : null };
+	return topic.arc && course.map.arcs ? namedArc(course.map.arcs, topic.arc) : null;
 }
 
 /** Everything the page draws, from the course, every course (Today
@@ -392,8 +400,9 @@ export function topicFacts({
 	const entries = sessionEntries(sessions, read?.plans ?? [], map.today, topic.handle);
 	const pickups = pickupsOf(topic, map, entries, chats, read?.record ?? null, map.today);
 	const picked = new Set(pickups.flatMap((pickup) => (pickup.kind === "session" ? [pickup.chat.id] : [])));
-	const silent = topic.level === "new" && sessions.length > 0;
-	const studied = lastStudiedDay(topic, entries, attempts);
+	// A lesson he began says "Lesson in progress" (`standingWords`), never "Not started" (round 14, m36: the begun
+	// Poisson page left an empty band under its title); only a topic not started that a session merely touched is silent.
+	const silent = topic.level === "new" && sessions.length > 0 && !lessonBegun(topic);
 	const said = sidebarSays(courses, chats, map.workspace);
 	return {
 		course: { workspace: map.workspace, title: map.title },
@@ -402,17 +411,19 @@ export function topicFacts({
 		today: map.today,
 		standing: silent ? null : standingOf(topic),
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
-		studied: !silent && studied ? studiedDaysWords(daysBetween(studied, map.today)) : null,
 		mistake: mistakeOf(topic, attempts),
-		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam) : null) ?? waitsWords(topic, map.today),
+		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam, map.today) : null) ?? waitsWords(topic, map.today),
 		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : topic.moved ? movedWords(null, map.today, topic.moved) : startsAfterWords(topic.startsAfter) } : null,
+		firstReview: lessonBegun(topic) ? (read?.firstReview ?? null) : null,
 		startsWhy: topic.level === "new" ? startsReason(topic, map) : null,
+		exam: topic.level === "new" ? examWords(topic, map) : null,
 		action: topicAction(topic, map, chats),
 		pickups,
+		tasks: heldTasks(topic, map),
 		sessions: entries,
 		listed: entries.filter((entry) => !picked.has(entry.chat.id)),
 		attempts,
-		builds: buildsOn(topic, map, said),
+		builds: buildsOn(topic, map),
 		buildsMap: buildsMapOf(topic, map),
 		said,
 		refs: read?.record?.refs ?? [],

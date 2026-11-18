@@ -13,7 +13,7 @@ export function MalformedQuestion({ onRetry, disabled, reason }: {
 	reason?: string;
 }) {
 	return (
-		<LessonCard data-testid="malformed-question" className="text-row text-muted-foreground">
+		<LessonCard data-testid="malformed-question" className="text-body text-muted-foreground">
 			<p>This question could not be displayed.{onRetry ? " Retry it or send a message to continue." : ""}</p>
 			{reason && <p className="mt-1">{reason}</p>}
 			{onRetry && (

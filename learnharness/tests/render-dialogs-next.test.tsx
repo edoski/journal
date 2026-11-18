@@ -40,15 +40,13 @@ describe("Settings › Appearance", () => {
 });
 
 describe("Settings › Keyboard", () => {
-	it("lists every shortcut, each changeable, in the app's words", () => {
+	it("lists every shortcut, the changeable ones with Change, in the app's words", () => {
 		const doc = documentFor(<KeyboardSection />);
 		for (const def of KEYBOARD_ACTIONS) {
 			const row = doc.querySelector(`[data-testid="kbd-row-${def.id}"]`);
-			const listed = !def.displayOnly;
-			assert.equal(Boolean(row), listed, `${def.id} ${listed ? "listed" : "left to the cheat sheet"}`);
-			if (!row) continue;
+			assert.ok(row, `${def.id} listed`);
 			assert.equal(row.querySelector('[data-slot="kbd"]')?.textContent, formatBinding(bindingForAction(def.id)));
-			assert.ok(row.querySelector(`[data-testid="kbd-rebind-${def.id}"]`), `${def.id} changeable`);
+			assert.equal(Boolean(row.querySelector(`[data-testid="kbd-rebind-${def.id}"]`)), !def.displayOnly, `${def.id} ${def.displayOnly ? "fixed" : "changeable"}`);
 		}
 		const text = doc.body.textContent ?? "";
 		for (const retired of ["Graph", "Model selector", "Cycle thinking", "session", "Global", "Chat"]) assert.ok(!text.includes(retired), retired);
@@ -92,7 +90,6 @@ describe("background agents", () => {
 				updatedAt: new Date(NOW).toISOString(),
 				title: "Eigenvalues and eigenvectors",
 				contextLimit: null,
-				costUsd: 0.04,
 			},
 		],
 		runs: [],
@@ -107,7 +104,7 @@ describe("background agents", () => {
 		assert.doesNotMatch(row?.textContent ?? "", /\d/, "no timer");
 		assert.equal(row?.getAttribute("aria-expanded"), "false");
 		assert.equal(doc.querySelector('[data-testid="activity-abort"]')?.getAttribute("aria-label"), "Stop: Looking things up for Eigenvalues and eigenvectors");
-		assert.equal(doc.querySelector('[data-testid="activity-blob-cost"]'), null, "no cost on the row's face");
-		assert.equal(doc.querySelector('[data-testid="activity-total-cost"]'), null, "no running total in the header");
+		assert.ok(doc.querySelector('[data-testid="activity-blob-cost"]') === null, "no cost on the row's face");
+		assert.ok(doc.querySelector('[data-testid="activity-total-cost"]') === null, "no running total in the header");
 	});
 });

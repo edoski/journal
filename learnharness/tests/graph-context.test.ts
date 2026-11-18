@@ -82,6 +82,10 @@ describe("initialPromptOwed", () => {
 	it("no prompt → nothing owed (the empty-draft case)", () => {
 		assert.equal(initialPromptOwed([], undefined), false);
 	});
+
+	it("an opening of photos alone, with no words, is still owed (audit 17 Nov 2026, finding 1)", () => {
+		assert.equal(initialPromptOwed([], ""), true);
+	});
 });
 
 describe("POST /api/chats", () => {

@@ -1,4 +1,5 @@
 import type { AgentEvent, AgentMessage } from "@earendil-works/pi-agent-core";
+import type { CompactionEvent } from "../../core/compaction.ts";
 
 /**
  * THE NATIVE WIRE (Wave D, owner-approved 2026-09-26): one agent turn, streamed
@@ -61,13 +62,14 @@ import type { AgentEvent, AgentMessage } from "@earendil-works/pi-agent-core";
  * WIRE DIET note above), or one of the two app events. */
 export type TurnWireEvent =
 	| AgentEvent
+	| CompactionEvent
 	| { type: "message_update"; message: AgentMessage }
 	| { type: "error"; errorText: string };
 
 /** What the runner drives: one turn's agent (sdk/agent.ts in production). */
 export interface TurnAgent {
 	readonly state: { messages: AgentMessage[] };
-	subscribe(listener: (event: AgentEvent) => void): unknown;
+	subscribe(listener: (event: AgentEvent | CompactionEvent) => void): unknown;
 	continue(): Promise<void>;
 	abort(): void;
 }
@@ -231,7 +233,7 @@ export function runPiTurn(spec: PiTurnSpec): PiTurnHandle {
 		}
 	};
 
-	const handle = (event: AgentEvent) => {
+	const handle = (event: AgentEvent | CompactionEvent) => {
 		if (settled) return;
 		// WIRE DIET: slim the one event that carries the partial twice — our
 		// views read `message`, never `assistantMessageEvent`.

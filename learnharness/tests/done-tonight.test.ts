@@ -19,7 +19,6 @@ import { signInTestClaude } from "./claude-fixture.ts";
 assert.equal(process.env.NODE_ENV, "test", "Run with NODE_ENV=test; these tests must not invoke real providers.");
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-done-tonight-"));
 process.env.LH_DATA_DIR = path.join(scratch, "data");
-process.env.LH_CREDENTIALS_DIR = scratch;
 await signInTestClaude();
 
 const { createTeacherAgent } = await import("../src/agent/teacher-agent.ts");
@@ -27,7 +26,7 @@ const { handleChatRequest } = await import("../src/server/chat-handler.ts");
 const { runningTurn } = await import("../src/server/turn-runs.ts");
 const { chatStore } = await import("../src/store/chats.ts");
 const { inputAppends, parseChatInput } = await import("../src/core/input-events.ts");
-const { activeProblemOf, newProblemDismissedMarker, newUserMessage, pendingQuestionOf, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL } = await import("../src/core/native-messages.ts");
+const { activeProblemOf, newProblemDismissedMarker, newThinkingMessage, newUserMessage, pendingQuestionOf, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL } = await import("../src/core/native-messages.ts");
 const { closedTonight, doneTonightAtEnd, sessionEndOf } = await import("../src/core/session-end.ts");
 const { projectView } = await import("../src/core/view.ts");
 const { DONE_TONIGHT_TEXT } = await import("../src/core/contracts/chat.ts");
@@ -107,6 +106,35 @@ describe("the tonight input", () => {
 			[[PRACTICE_CONCLUDE_TOOL, { outcome: "dismissed" }]], "the synthesized conclude records nothing");
 		assert.equal(last(appends).content, DONE_TONIGHT_TEXT.practice);
 		assert.equal(activeProblemOf([...record.messages, ...appends]), null);
+	});
+
+	it("closes practice on what the record keeps, never on the problem it dropped (round 9, 3 m7: \"You still have the kernel problem you closed … to pick up\")", () => {
+		assert.match(DONE_TONIGHT_TEXT.practice, /name it only as set aside, never as something he picks up or still has/);
+		assert.match(DONE_TONIGHT_TEXT.practice, /only what his record keeps/);
+		assert.doesNotMatch(DONE_TONIGHT_TEXT.practice, /the kernel problem/, "no dropped problem offered as the example of what he picks up");
+	});
+
+	it("names only this session's open work, never another session's (round 12, 3 D7: Rank practice closed on \"Part (c) of Problem sheet 4 is still open\")", () => {
+		assert.match(DONE_TONIGHT_TEXT.practice, /only what his record keeps for next time from this session, an open task this session worked on at its place/);
+		assert.match(DONE_TONIGHT_TEXT.practice, /never another session's open work/);
+	});
+
+	it("keeps a problem whose answer was still being graded open for the closing turn to grade (round 13, 4 M2: ⌘⇧D 2.5 s after a right answer printed Left for next time under it while the record saved it)", () => {
+		const sent = newThinkingMessage("call_p1", "the rank is 1", "guessing");
+		const stopped = assistant("a_cut", [], "aborted");
+		for (const messages of [[...problemPose(), sent], [...problemPose(), sent, stopped]]) {
+			const record = { messages, kind: "practice" as const };
+			const appends = inputAppends(record, { type: "tonight" });
+			assert.deepEqual(appends.map((m) => m.role === "custom" ? m.customType : m.role), ["ungraded-answer", "done-tonight"], "nothing drops the problem");
+			assert.match(String((appends[0] as { content: string }).content), /conclude/);
+			assert.equal(activeProblemOf([...messages, ...appends])?.toolCallId, "call_p1", "the closing turn concludes it with its result");
+			assert.equal(projectView([...messages, ...appends]).some((m) => m.parts.some((p) => p.type === "text" && /UNGRADED/.test((p as { text: string }).text))), false, "the note is the tutor's alone");
+		}
+	});
+
+	it("still drops a problem whose last answer the tutor already answered", () => {
+		const record = { messages: [...problemPose(), newThinkingMessage("call_p1", "the rank is 2"), assistant("a_fb", [{ type: "text", text: "Look at row 2 again." }], "stop")], kind: "practice" as const };
+		assert.equal(inputAppends(record, { type: "tonight" })[0]?.role === "custom" && (inputAppends(record, { type: "tonight" })[0] as { customType: string }).customType, "problem-dismissed");
 	});
 
 	it("carries the conclude pair a discard left waiting", () => {
@@ -206,7 +234,7 @@ describe("Done for today on the server", () => {
 		assert.equal(withheld[0]!.details.reason, "tonight");
 		assert.equal(withheld[0]!.details.committed, undefined, "the answer stays hidden in the record");
 		assert.ok(saved.some((m) => m.role === "custom" && m.customType === "done-tonight"), "the marker is saved");
-		assert.match(JSON.stringify(saved.at(-3)), /Good place to stop/, "the closing turn ran");
+		assert.match(JSON.stringify(saved.at(-3)), /Good place to stop/, "the closing turn ran, and nothing is asked under it (round 14, M1)");
 		assert.equal(histories.length, 3, "the check, then the closing words and the request after their send_to_user");
 		assert.match(histories[1]!, /stopped for today/, "the model reads the check as left, not answered");
 		assert.match(histories[1]!, /DONE FOR TODAY/);
@@ -245,5 +273,14 @@ describe("Done for today while the tutor is working", () => {
 		assert.equal(saved.find((m) => m.role === "assistant")?.stopReason, "aborted", "the tutor's turn was stopped, its partial saved");
 		assert.equal(closedTonight(saved), true, "the lesson is closed for today");
 		runningTurn(chat.id)?.abort();
+	});
+});
+
+describe("the practice close names the problem he left open (round 14, m31)", () => {
+	it("as set aside, by what it is on, never as something he picks up", () => {
+		const text = DONE_TONIGHT_TEXT.practice;
+		assert.match(text, /a problem he left open, named once by what it is on \(the 4 × 6 system\), as set aside/);
+		assert.match(text, /never as something he picks up/);
+		assert.doesNotMatch(text, /never name it/);
 	});
 });

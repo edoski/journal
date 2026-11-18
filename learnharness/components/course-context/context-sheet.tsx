@@ -46,9 +46,9 @@ function ContextBody({ workspace }: { workspace: string }) {
 	const api = useCourseContext(workspace);
 	const { read } = api;
 	return (
-		<div data-slot="context-body" className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 pb-6 [scrollbar-width:none]">
-			{read.status === "loading" && <p className="text-row text-muted-foreground">Reading the course…</p>}
-			{read.status === "failed" && <p className="text-row text-danger">The course’s context could not be read. Close and open it again.</p>}
+		<div data-slot="context-body" className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 pb-6">
+			{read.status === "loading" && <p className="text-body text-muted-foreground">Reading the course…</p>}
+			{read.status === "failed" && <p className="text-body text-danger">The course’s context could not be read. Close and open it again.</p>}
 			{read.status === "ready" && (
 				<>
 					<Description key={read.context.description} context={read.context} api={api} />
@@ -66,10 +66,10 @@ function Section({ title, hint, action, children, slot }: { title: string; hint?
 	return (
 		<section data-slot={slot} className="flex flex-col gap-2">
 			<div className="flex min-h-6 items-center justify-between gap-2">
-				<h3 className="text-label font-medium text-muted-foreground">{title}</h3>
+				<h3 className="text-callout text-muted-foreground">{title}</h3>
 				{action}
 			</div>
-			{hint && <p className="text-label text-muted-foreground">{hint}</p>}
+			{hint && <p className="text-callout text-muted-foreground">{hint}</p>}
 			{children}
 		</section>
 	);
@@ -77,7 +77,7 @@ function Section({ title, hint, action, children, slot }: { title: string; hint?
 
 function Problem({ error }: { error: string | null }) {
 	return error ? (
-		<p role="alert" className="text-label text-danger">
+		<p role="alert" className="text-callout text-danger">
 			{error}
 		</p>
 	) : null;
@@ -96,7 +96,7 @@ function Description({ context, api }: { context: CourseContext; api: CourseCont
 		setState(failure ? "idle" : "saved");
 	};
 	return (
-		<Section slot="context-description" title="About this course" action={state !== "idle" && <span className="text-label text-muted-foreground">{state === "saving" ? "Saving…" : "Saved"}</span>}>
+		<Section slot="context-description" title="About this course" action={state !== "idle" && <span className="text-callout text-muted-foreground">{state === "saving" ? "Saving…" : "Saved"}</span>}>
 			<Textarea
 				value={text}
 				onChange={(e) => {
@@ -122,8 +122,8 @@ function Row({ icon, title, where, href, onOpen, onRemove, slot }: { icon: React
 	const face = (
 		<>
 			{icon}
-			<span className="min-w-0 truncate text-row text-foreground">{title}</span>
-			<span className="min-w-0 flex-1 truncate text-label text-muted-foreground">{where}</span>
+			<span className="min-w-0 truncate text-body text-foreground">{title}</span>
+			<span className="min-w-0 flex-1 truncate text-callout text-muted-foreground">{where}</span>
 		</>
 	);
 	const press = "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left outline-none hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring";
@@ -294,7 +294,7 @@ function MapLine({ workspace }: { workspace: string }) {
 	if (!status || (status.state !== "building" && status.state !== "failed" && !shown)) return null;
 	const words = mapStatusWords(status);
 	return (
-		<p role="status" data-slot="context-map" className={cn("flex items-start gap-2 text-label", status.state === "failed" ? "text-danger" : "text-muted-foreground")}>
+		<p role="status" data-slot="context-map" className={cn("flex items-start gap-2 text-callout", status.state === "failed" ? "text-danger" : "text-muted-foreground")}>
 			{status.state === "building" && <LoaderCircleIcon aria-hidden className="mt-0.5 size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />}
 			<span>
 				{words.text}

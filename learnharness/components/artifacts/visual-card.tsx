@@ -40,7 +40,7 @@ export function svgNaturalWidth(svg: string): number | null {
 
 export function VisualCard({ part }: ArtifactPartProps) {
 	if (part.state !== "output-available") return null;
-	return <DispatchCard toolCallId={part.toolCallId} kind="visual" />;
+	return <DispatchCard toolCallId={part.toolCallId} kind="visual" artifact={part.artifact} />;
 }
 
 /** The figure itself — exported: the steer card renders the delivered artifact. */
@@ -76,7 +76,7 @@ export function VisualOutputCard({
 	const natural = result && typeof result.svg === "string" ? svgNaturalWidth(result.svg) : null;
 	if (!result || typeof result.svg !== "string") {
 		return (
-			<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+			<div className="rounded-xl border bg-card p-4 text-body text-muted-foreground">
 				Figure completed, but the result could not be displayed.
 			</div>
 		);
@@ -85,11 +85,11 @@ export function VisualOutputCard({
 	if (failed) {
 		return (
 			<div className="rounded-xl border bg-card p-4 text-card-foreground" data-testid="visual-card-failed">
-				<div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+				<div className="flex items-center gap-2 text-subheadline uppercase tracking-wide text-muted-foreground">
 					Figure
 					<span className="rounded bg-red-500/15 px-1.5 py-0.5 text-red-500">failed</span>
 				</div>
-				<p className="mt-2 text-sm text-muted-foreground">{result.notes ?? "The figure could not be drawn."}</p>
+				<p className="mt-2 text-body text-muted-foreground">{result.notes ?? "The figure could not be drawn."}</p>
 			</div>
 		);
 	}
@@ -129,7 +129,7 @@ export function VisualOutputCard({
 				/>
 			</div>
 			<div className="mt-2 flex items-center justify-between gap-2">
-				<div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Figure</div>
+				<div className="text-subheadline uppercase tracking-wide text-muted-foreground">Figure</div>
 				<div className="flex items-center gap-1.5">
 					{/* The invert affordance (owner round, 2026-10-07): the disc IS
 					    the half-filled contrast circle; the tooltip names it. */}

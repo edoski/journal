@@ -10,18 +10,18 @@ import React from "react";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseFacts, courseGroups, courseNext, courseRead, GROUP_IDS, type CourseGroup as Group } from "../components/course-page/course-model.ts";
-import { CourseHeaderSkeleton } from "../components/course-page/course-header-skeleton.tsx";
 import { CourseTopicRow } from "../components/course-page/course-topic-row.tsx";
+import { standingOf } from "../components/course-map/topic-map/topic-standing.ts";
 import { CourseGroup } from "../components/course-page/course-group.tsx";
 import { TopicMap } from "../components/course-map/topic-map/topic-map.tsx";
 import { courseHref, unitHref, workspaceOf } from "../components/unit-inbox/unit-href.ts";
 import { buildInbox, unitStatus, type Unit } from "../components/unit-inbox/units.ts";
-import { nowFor, plannedKeys, restShelves, shelfStatus } from "../components/unit-inbox/now-inbox.ts";
+import { nowFor, plannedKeys, restTopics, shelfStatus } from "../components/unit-inbox/now-inbox.ts";
 import { claimedKeys, todayTop } from "../components/unit-inbox/today/today-top.ts";
 import { cardLine } from "../components/course-map/topic-map/topic-standing.ts";
 import { sidebarSays } from "../components/unit-inbox/sidebar-says.ts";
@@ -89,7 +89,6 @@ const chat = (id: string, over: Partial<ChatListItem> = {}): ChatListItem => ({
 	pendingQuestion: false,
 	pendingProblem: false,
 	busy: false,
-	compacting: false,
 	course: { workspace: WS, title: "Linear Algebra" },
 	ownTopics: over.topics ?? [],
 	...over,
@@ -114,7 +113,7 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		const top = todayTop(nowFor([c], chats, null, c.map.today), inbox, chats);
 		const said = new Map<string, string>();
 		for (const item of top) for (const key of claimedKeys(item)) if (!said.has(key)) said.set(key, `Today: ${item.line.slot}`);
-		const shelves = restShelves(inbox, new Set(said.keys()));
+		const shelves = restTopics(inbox, new Set(said.keys()));
 		const words = (u: Unit) => {
 			const status = shelfStatus(u, c.map.today, plannedKeys([c]));
 			return status.kind === "your-turn" ? "Your turn" : status.kind === "working" ? "Working" : "words" in status ? status.words : "";
@@ -157,7 +156,7 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 
 	it("puts what Home's Today takes up in Needs you, with Today's reason", () => {
 		assert.deepEqual(handles(groupOf(groups, "needs-you")), ["span"]);
-		assert.deepEqual(groupOf(groups, "needs-you").topics[0]!.fact, { kind: "review", words: "10d overdue" });
+		assert.deepEqual(groupOf(groups, "needs-you").topics[0]!.fact, { kind: "review", words: "Due 29 Oct" });
 	});
 
 	it("keeps a weak topic Today does not take up in Learning, as the sidebar's Learning shelf does, saying why it is weak", () => {
@@ -171,23 +170,23 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		const fact = (handle: string) => groups.flatMap((g) => g.topics).find((t) => t.topic.handle === handle)!.fact;
 		assert.deepEqual(fact("cramer"), { kind: "here", words: "You are here" });
 		const elsewhere = courseGroups(course({ current: h("rank") }));
-		assert.deepEqual(elsewhere.flatMap((g) => g.topics).find((t) => t.topic.handle === "rank")!.fact, { kind: "task", words: "Left off 7d ago" });
+		assert.deepEqual(elsewhere.flatMap((g) => g.topics).find((t) => t.topic.handle === "rank")!.fact, { kind: "task", words: "Left off 1 Nov" });
 	});
 
-	it("puts unfinished work before a review the plan dates later, on the page, the sidebar and the map alike", () => {
+	it("puts unfinished work before a review the plan dates later, on the page and the sidebar; the map's card keeps the topic's standing (round 15, m8)", () => {
 		const held = { kind: "scheduled" as const, date: "2026-12-08", held: { exam: null, since: "2026-10-21" } };
 		const map = course({ topics: TOPICS.map((t) => (t.handle === "basis" ? { ...t, review: held, tasks: ["sheet-4"] } : t)) });
 		const row = groupOf(courseGroups(map), "on-your-own").topics.find((t) => t.topic.handle === "basis")!;
-		assert.deepEqual(row.fact, { kind: "task", words: "Left off 7d ago" });
-		assert.equal(sidebar(map).get(`${WS}#basis`), "On your own: Left off 7d ago");
-		assert.equal(cardLine(sidebarSays([map], [], WS).get(h("basis")))?.words, "Left off 7d ago");
+		assert.deepEqual(row.fact, { kind: "task", words: "Left off 1 Nov" });
+		assert.equal(sidebar(map).get(`${WS}#basis`), "On your own: Left off 1 Nov");
+		assert.equal(cardLine(sidebarSays([map], [], WS).get(h("basis"))), null);
 	});
 
 	it("says since when a review held past its day was due, in the words the sidebar and the topic page use", () => {
 		const held = { kind: "scheduled" as const, date: "2026-12-08", held: { exam: null, since: "2026-10-21" } };
 		const map = course({ topics: TOPICS.map((t) => (t.handle === "basis" ? { ...t, review: held } : t)) });
 		const row = groupOf(courseGroups(map), "on-your-own").topics.find((t) => t.topic.handle === "basis")!;
-		assert.deepEqual(row.fact, { kind: "review", words: "Due since 21 Oct, back 8 Dec" }, "a late review needs him, so the map's card says it too, with the day it comes back (round 8)");
+		assert.deepEqual(row.fact, { kind: "review", words: "Due 21 Oct, back 8 Dec" }, "a late review needs him, so the map's card says it too, with the day it comes back (round 8)");
 		const unit = buildInbox([map], [], WS).known.find((u) => u.topic.handle === "basis")!;
 		assert.deepEqual(unitStatus(unit, "2026-11-08"), { kind: "review", words: row.fact!.words }, "the sidebar's row says the same");
 		assert.deepEqual(
@@ -201,8 +200,8 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		const waiting = chat("c1", { pendingQuestion: true, topics: [h("determinant")], updatedAt: "2026-11-08T08:00:00.000Z" });
 		const withChat = courseGroups(course(), [waiting]);
 		const needs = groupOf(withChat, "needs-you");
-		assert.equal(needs.topics[0]!.topic.handle, "determinant");
-		assert.deepEqual(needs.topics[0]!.fact, { kind: "your-turn", words: "Your turn" });
+		const det = needs.topics.find((t) => t.topic.handle === "determinant");
+		assert.deepEqual(det?.fact, { kind: "your-turn", words: "Your turn" });
 		assert.equal(sidebar(course(), [waiting]).get(`${WS}#determinant`), "Today: Your turn");
 	});
 
@@ -223,7 +222,7 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 
 describe("the header's facts and next lesson", () => {
 	it("counts what Home's pie counts, names the exam once and when he last studied", () => {
-		assert.deepEqual(courseFacts(course()), { progress: "Some topics on your own", exam: "Exam in 21 days", studied: "Studied 2 days ago", lastSession: null });
+		assert.deepEqual(courseFacts(course()), { progress: "Some topics on your own", exam: "Exam 29 Nov", studied: "Studied 6 Nov", lastSession: null });
 	});
 
 	it("leaves out an exam that is not set and a count for a course with no topics", () => {
@@ -237,7 +236,7 @@ describe("the header's facts and next lesson", () => {
 		assert.equal(courseFacts(odes).studied, "First lesson Thu 19 Nov, after Probability's and Linear Algebra's new topics");
 		const today = course({ exam: null, current: null, focus: null, tasks: [], topics: [topic("ode-intro", { starts: "2026-11-08" })], edges: [] }, { lastActiveDaysAgo: null, due: [] });
 		assert.equal(courseFacts(today).studied, "First lesson today");
-		assert.equal(courseNext(today, []).action, "Start");
+		assert.equal(courseNext(today, []).lesson.action, "Start");
 	});
 
 	it("gives each topic not started the day the plan starts it, not the group's own words", () => {
@@ -248,17 +247,18 @@ describe("the header's facts and next lesson", () => {
 
 	it("takes up Home's next step for the course: today's reviews first, in Today's words", () => {
 		const next = courseNext(course(), []);
-		assert.equal(next.action, "Review");
+		assert.equal(next.lesson.action, "Review");
 		assert.equal(next.lesson.title, "Review Span");
 		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
-		assert.equal(next.why?.short, "10d overdue");
+		assert.equal(next.why?.short, "Due 29 Oct");
 	});
 
-	it("resumes a session in this course that has waited on him since yesterday, and ignores one in another course", () => {
+	it("resumes a session in this course that has waited on him since yesterday, once nothing is planned before it, and ignores one in another course", () => {
 		const mine = chat("c1", { title: "Rank practice", pendingQuestion: true, updatedAt: "2026-11-08T08:00:00.000Z" });
 		const other = chat("c2", { pendingQuestion: true, course: { workspace: "/study/prob", title: "Probability" }, updatedAt: "2026-11-08T09:00:00.000Z" });
-		const next = courseNext(course(), [other, mine]);
-		assert.equal(next.action, "Resume");
+		assert.equal(courseNext(course(), [other, mine]).lesson.action, "Review", "today's review comes first, as on Home (round 10, 1 m2)");
+		const next = courseNext(course({}, { due: [] }), [other, mine]);
+		assert.equal(next.lesson.action, "Resume");
 		assert.equal(next.lesson.title, "Rank practice");
 		assert.deepEqual(next.lesson.open, { kind: "session", href: "/chat/c1" });
 	});
@@ -266,7 +266,7 @@ describe("the header's facts and next lesson", () => {
 	it("still takes up the course's next step once he ended today's lesson on it with Done for today, which Home leaves off Today", () => {
 		const left = chat("c1", { title: "Review Span", topics: [h("span")], ended: "left", updatedAt: "2026-11-08T12:00:00.000Z" });
 		const next = courseNext(course({ tasks: [], focus: null }), [left]);
-		assert.equal(next.action, "Review");
+		assert.equal(next.lesson.action, "Review");
 		assert.equal(next.lesson.title, "Review Span");
 		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
 		assert.equal(courseNext(course(), [left]).lesson.title, `Continue ${course().map.tasks[0]!.title}`, "with an open task, the line Home still has for the course");
@@ -274,7 +274,7 @@ describe("the header's facts and next lesson", () => {
 
 	it("starts a lesson in a course with nothing to review, no task and no current topic", () => {
 		const next = courseNext(course({ topics: [], tasks: [], current: null, focus: null }, { due: [] }), []);
-		assert.equal(next.action, "Start");
+		assert.equal(next.lesson.action, "Start");
 		assert.equal(next.lesson.title, "Start a lesson");
 	});
 });
@@ -312,14 +312,6 @@ function viewOf(c: StudyCourse) {
 	return (read as Extract<typeof read, { status: "ready" }>).view;
 }
 
-describe("the course header", () => {
-	it("its skeleton keeps the head's three rows", () => {
-		const skeleton = render(<CourseHeaderSkeleton />);
-		assert.equal(skeleton.querySelector('[role="status"]')!.children.length, 3);
-	});
-
-});
-
 describe("the course topic row and group", () => {
 	const groups = courseGroups(course());
 
@@ -333,11 +325,11 @@ describe("the course topic row and group", () => {
 		assert.equal(document.querySelector('[data-slot="course-topic-fact"]')!.textContent, "Sure, but wrong");
 	});
 
-	it("keeps a compact row's words for a screen reader and marks where he is", () => {
+	it("shows a compact row's words and marks where he is (round 11, 1 N8)", () => {
 		const cramer = groupOf(groups, "learning").topics.find((t) => t.topic.handle === "cramer")!;
 		const document = render(<ul><CourseTopicRow row={cramer} compact /></ul>);
 		assert.equal(document.querySelector('[data-slot="course-topic-row"]')!.getAttribute("aria-current"), "location");
-		assert.equal(document.querySelector('[data-slot="course-topic-fact"] .sr-only')!.textContent, "You are here");
+		assert.equal(document.querySelector('[data-slot="course-topic-fact"] [data-slot="status-words"]')!.textContent, "You are here");
 	});
 
 	it("heads a group with its name and no count, folds it, and shows the first rows then Show the rest", () => {
@@ -357,7 +349,7 @@ describe("the course topic row and group", () => {
 describe("the topic map's highlight", () => {
 	const map = course().map;
 	const dimmed = (document: Document) =>
-		[...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => /opacity:\s*0?\.\d/.test(n.parentElement!.getAttribute("style") ?? "")).map((n) => n.getAttribute("data-testid"));
+		[...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => /opacity:\s*0?\.\d/.test(n.parentElement!.parentElement!.getAttribute("style") ?? "")).map((n) => n.getAttribute("data-testid"));
 
 	it("dims nothing by default, as Home draws it", () => {
 		assert.deepEqual(dimmed(render(<TopicMap map={map} said={new Map()} />) as unknown as Document), []);
@@ -399,5 +391,43 @@ describe("the sidebar's search", () => {
 		const [eigen] = searchInbox(inbox, [], "eigen", [course()]).units;
 		assert.equal(eigen!.topic.level, "new");
 		assert.deepEqual(unitStatus(eigen!, "2026-11-08"), { kind: "none", words: "Not started" });
+	});
+});
+
+describe("a topic row's status in words, whole (round 11, 1 N8 and 2 n9)", () => {
+	// Shots 42, 61b: rows showed a bare arrow, bookmark or check-circle beside rows with words, and "Cramer's rule · Due 6 Nov" read as overdue while the map said "back 20 Nov".
+	const held = topic("matmul", { title: "Matrix multiplication as composition", level: "assisted", introduced: "2026-10-01", review: { kind: "scheduled", date: "2026-11-20", held: { exam: null, since: "2026-11-06" } } });
+	const rowOf = (handle: string, c: StudyCourse) => courseGroups(c).flatMap((g) => g.topics).find((t) => t.topic.handle === handle)!;
+
+	it("cuts the title before the status, whose words always show", () => {
+		const row = rowOf("matmul", course({ topics: [...TOPICS, held] }));
+		const document = render(<ul><CourseTopicRow row={row} className="h-8" /></ul>);
+		const title = document.querySelector('[data-slot="course-topic-title"]')!.parentElement!;
+		const fact = document.querySelector('[data-slot="course-topic-fact"]')!;
+		const words = fact.querySelector('[data-slot="status-words"]')!;
+		assert.match(title.className, /\bmin-w-0\b/);
+		assert.match(title.className, /\bflex-1\b/, "the title takes what the status leaves");
+		assert.doesNotMatch(title.className, /\bshrink-0\b/);
+		assert.match(fact.className, /\bshrink-0\b/, "the status keeps its width");
+		assert.doesNotMatch(fact.className, /\b(flex-wrap|overflow-hidden)\b/, "no slot hides its words");
+		assert.doesNotMatch(words.className, /\b(sr-only|truncate)\b/);
+		assert.match(words.className, /\bwhitespace-nowrap\b/);
+		assert.equal(fact.getAttribute("data-state"), "closed", "the slot is the trigger of its hint, which says the whole sentence");
+	});
+
+	it("says a review in the sidebar's and the map card's words, and a planned start by its date (round 15, m10)", () => {
+		const row = rowOf("matmul", course({ topics: [...TOPICS, held] }));
+		assert.deepEqual(row.fact, { kind: "review", words: "Due 6 Nov, back 20 Nov" });
+		assert.equal(row.factWords, "Due 6 Nov, back 20 Nov");
+		const span = rowOf("span", course());
+		assert.deepEqual([span.fact?.words, span.factWords], ["Due 29 Oct", "Due 29 Oct"]);
+		const fresh = rowOf("eigen", course({ topics: TOPICS.map((t) => (t.handle === "eigen" ? { ...t, starts: "2026-11-18" } : t)) }));
+		assert.equal(fresh.factWords, "Planned 18 Nov");
+	});
+
+	it("shows the words on every row, the compact one included", () => {
+		const row = rowOf("matmul", course({ topics: [...TOPICS, held] }));
+		const document = render(<ul><CourseTopicRow row={row} compact /></ul>);
+		assert.doesNotMatch(document.querySelector('[data-slot="course-topic-fact"] [data-slot="status-words"]')!.className, /\bsr-only\b/);
 	});
 });

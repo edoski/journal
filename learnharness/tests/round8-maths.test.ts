@@ -11,7 +11,7 @@ import { transformMathDelimiters } from "../src/core/math-delims.ts";
 describe("maths on the screen (m6)", () => {
 	it("sets a display's fractions at full size", () => {
 		assert.equal(transformMathDelimiters("$$\nX \\sim \\text{Bin}(n, \\tfrac{4}{n})\n$$"), "$$\nX \\sim \\text{Bin}(n, \\frac{4}{n})\n$$");
-		assert.equal(transformMathDelimiters("inline $\\tfrac12$ stays"), "inline $\\tfrac12$ stays");
+		assert.equal(transformMathDelimiters("$$\n\\frac{4}{n}\n$$"), "$$\n\\frac{4}{n}\n$$", "a display keeps its fraction");
 	});
 
 	it("stands a matrix in a display of its own, out of the line, but not inside a list item", () => {

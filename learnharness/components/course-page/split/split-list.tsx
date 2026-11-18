@@ -1,22 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import type { TopicHandle } from "@/src/core";
 import { CourseGroup } from "@/components/course-page/course-group";
-import { CourseArc } from "@/components/course-page/course-arc";
-import type { CourseArcSection, CourseGroup as Group, CourseTopic } from "@/components/course-page/course-model";
+import { offersCheck, type CourseArcSection, type CourseGroup as Group, type CourseTopic } from "@/components/course-page/course-model";
+import type { ArcLineProps } from "@/components/course-page/road/road-arc";
 import { CourseTopicRow } from "@/components/course-page/course-topic-row";
 import { cn } from "@/lib/utils";
-import { scrollToShow, stopKey, walkStops, walkTo, type ListSection, type Stop } from "@/components/course-page/split/split-tie";
+import { stopKey, walkStops, type ListSection, type Stop } from "@/components/course-page/split/split-tie";
+import type { PointBy } from "@/components/course-map/use-map-tie";
 
-/** What the page asks of the list: focus a topic's row, or its first. */
+/** What the page asks of the list: focus a topic's row, and its walk's stops top to bottom. */
 export interface SplitListHandle {
 	focus: (handle: TopicHandle) => void;
-	focusFirst: () => void;
+	stops: () => HTMLElement[];
 }
-
-/** Room kept clear above and below a row brought into view: its focus ring. */
-const RING_ROOM = 4;
 
 function reducedMotion(): boolean {
 	return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -25,21 +23,19 @@ function reducedMotion(): boolean {
 /**
  * The split page's left pane (spec: split-course.md): the course's topics
  * in their groups, each a 32px row ending in its reason's icon and words,
- * flush right so they line up down the list (the title truncates first);
+ * flush right so they line up down the list (the title wraps first);
  * in a course with arcs (`arcs`), its arcs in study order instead, each a
- * folded line (`CourseArc`) that opens on its topics, a ready one with
- * Check it (`onCheck`). Which sections are open is the page's (`open`,
+ * folded line (`arcLine`, the road's) that opens on its topics, a ready one
+ * with Check it (`onCheck`). Which sections are open is the page's (`open`,
  * `onOpenChange`), held for the visit only. Pointing at or focusing a row tells the page (`onPoint`); `marked`
  * is the topic he points at on the map, whose row holds the hover fill and
  * is brought into view. The pane scrolls with no bar showing; while more
  * is below (or above) its edge fades, so a cut list reads as one that
  * goes on.
  *
- * Keyboard, for an app where Tab is dead: the arrows walk each group's
- * header and the rows of the open groups (`walkStops`). With nothing
- * focused, Down or Home steps onto the first stop and Up or End onto the
- * last; Up, Down, Home and End walk, Up on the first leaves for the
- * page head's button (`onExitTop`), and Escape leaves the walk. On a
+ * Keyboard, for an app where Tab is dead: the page's list walk
+ * (`useListWalk`, list-walk.md, `onWalkKey`) walks each group's header and
+ * the rows of the open groups (`walkStops`, read through `stops`). On a
  * header, Enter or Space opens or folds the group, Right opens it and Left
  * folds it; on a row, Right steps onto its topic on the map
  * (`onEnterMap`) and Enter or Space opens it. A topic the map hands back
@@ -55,7 +51,9 @@ export function SplitList({
 	marked,
 	onPoint,
 	onEnterMap,
-	onExitTop,
+	onWalkKey,
+	arcLine: ArcLine,
+	after,
 	ref,
 }: {
 	groups: readonly Group[];
@@ -69,16 +67,21 @@ export function SplitList({
 	/** The arc whose check is starting. */
 	checking?: string | null;
 	marked: TopicHandle | null;
-	onPoint: (handle: TopicHandle | null) => void;
+	onPoint: (handle: TopicHandle | null, by: PointBy) => void;
 	onEnterMap: (handle: TopicHandle) => void;
-	onExitTop?: () => void;
+	/** The page's list walk (`useListWalk`'s `onKeyDown`). */
+	onWalkKey: (e: KeyboardEvent<HTMLElement>) => void;
+	/** How an arc's line is drawn: the road's (`RoadLine`). */
+	arcLine: ComponentType<ArcLineProps>;
+	/** What closes the list, after its last section. */
+	after?: ReactNode;
 	ref?: Ref<SplitListHandle>;
 }) {
 	const viewport = useRef<HTMLDivElement>(null);
 	/** Each stop's element: a header's button, a row's link. */
 	const stopsEl = useRef(new Map<string, HTMLElement>());
 	const sections = useMemo<ListSection[]>(
-		() => (arcs ? arcs.map((a) => ({ id: a.arc.handle, topics: a.topics, checkable: a.arc.state === "ready" && onCheck !== undefined })) : [...groups]),
+		() => (arcs ? arcs.map((a) => ({ id: a.arc.handle, topics: a.topics, checkable: offersCheck(a) && onCheck !== undefined })) : [...groups]),
 		[arcs, groups, onCheck],
 	);
 	const stops = useMemo(() => walkStops(sections, open), [sections, open]);
@@ -86,7 +89,6 @@ export function SplitList({
 	/** A topic the map handed back while its group was folded: focused once the group opens. */
 	const pending = useRef<TopicHandle | null>(null);
 
-	const focusStop = (stop: Stop | undefined) => (stop ? stopsEl.current.get(stopKey(stop))?.focus() : undefined);
 	const openGroup = (id: string, to: boolean) => {
 		if (Boolean(open[id]) !== to) onOpenChange(id, to);
 	};
@@ -106,7 +108,7 @@ export function SplitList({
 				pending.current = handle;
 				onOpenChange(section.id, true);
 			},
-			focusFirst: () => focusStop(stops[0]),
+			stops: () => stops.flatMap((stop) => stopsEl.current.get(stopKey(stop)) ?? []),
 		}),
 		[sections, stops, onOpenChange],
 	);
@@ -140,55 +142,16 @@ export function SplitList({
 	// The row of the topic he points at on the map comes into view, moving the pane as little as it can.
 	useEffect(() => {
 		const row = marked ? stopsEl.current.get(stopKey({ kind: "row", handle: marked })) : null;
-		const view = viewport.current;
-		if (!row || !view) return;
-		const top = row.getBoundingClientRect().top - view.getBoundingClientRect().top + view.scrollTop;
-		const to = scrollToShow({ top, height: row.offsetHeight }, { scrollTop: view.scrollTop, height: view.clientHeight }, RING_ROOM);
-		if (to !== null) view.scrollTo({ top: to, behavior: reducedMotion() ? "auto" : "smooth" });
+		// Its scroll padding keeps room for the row's focus ring.
+		row?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth", container: "nearest" } as ScrollIntoViewOptions);
 	}, [marked]);
-
-	// With nothing focused, an arrow steps into the list.
-	useEffect(() => {
-		const onKeyDown = (e: globalThis.KeyboardEvent) => {
-			if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-			if (document.activeElement && document.activeElement !== document.body) return;
-			const to = walkTo(e.key, null, stops.length);
-			if (to === null) return;
-			e.preventDefault();
-			stopsEl.current.get(stopKey(stops[to]!))?.focus();
-		};
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [stops]);
-
-	/** The keys every stop shares: Up, Down, Home and End walk, Up on the first leaves the list, Escape leaves the walk. */
-	const walk = (stop: Stop, e: KeyboardEvent<HTMLElement>) => {
-		if (e.key === "Escape") {
-			e.preventDefault();
-			e.stopPropagation();
-			e.currentTarget.blur();
-			return;
-		}
-		const at = stops.findIndex((s) => stopKey(s) === stopKey(stop));
-		if (e.key === "ArrowUp" && at === 0 && onExitTop) {
-			e.preventDefault();
-			onExitTop();
-			return;
-		}
-		const to = walkTo(e.key, at, stops.length);
-		if (to === null) return;
-		e.preventDefault();
-		focusStop(stops[to]);
-	};
 
 	const onHeaderKeyDown = (id: string, e: KeyboardEvent<HTMLButtonElement>) => {
 		if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
 		if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
 			e.preventDefault();
 			openGroup(id, e.key === "ArrowRight");
-			return;
 		}
-		walk({ kind: "group", id }, e);
 	};
 
 	const onRowKeyDown = (row: CourseTopic, e: KeyboardEvent<HTMLAnchorElement>) => {
@@ -202,29 +165,28 @@ export function SplitList({
 		if (e.key === " ") {
 			e.preventDefault();
 			e.currentTarget.click();
-			return;
 		}
-		walk({ kind: "row", handle }, e);
 	};
 
 	const row = (row: CourseTopic) => (
 		<CourseTopicRow
 			key={row.topic.handle}
 			row={row}
-			// The compact row's 32px with the reason's words showing, so the fullest demo course fits at 1440x900.
-			className="h-8"
+			// The compact row's 32px with the reason's words showing, so the fullest demo course fits at 1440x900; a long
+			// title wraps onto a second line rather than being cut (round 15, 1 m8).
+			compact
 			highlighted={marked === row.topic.handle}
 			ref={register({ kind: "row", handle: row.topic.handle })}
-			onMouseEnter={() => onPoint(row.topic.handle)}
-			onMouseLeave={() => onPoint(null)}
-			onFocus={() => onPoint(row.topic.handle)}
-			onBlur={() => onPoint(null)}
+			onMouseEnter={() => onPoint(row.topic.handle, "pointer")}
+			onMouseLeave={() => onPoint(null, "pointer")}
+			onFocus={() => onPoint(row.topic.handle, "focus")}
+			onBlur={() => onPoint(null, "focus")}
 			onKeyDown={(e) => onRowKeyDown(row, e)}
 		/>
 	);
 
 	return (
-		<section aria-label="Topics" data-slot="course-split-list" className="flex min-h-0 flex-1 flex-col">
+		<section aria-label="Topics" data-slot="course-split-list" onKeyDown={onWalkKey} className="flex min-h-0 flex-1 flex-col">
 			{/* The rows' hover fill and focus ring reach 12px past the column; the pane makes room for them. */}
 			<div
 				ref={viewport}
@@ -233,7 +195,7 @@ export function SplitList({
 				data-more-above={more.above || undefined}
 				data-more-below={more.below || undefined}
 				className={cn(
-					"-mx-3.5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+					"-mx-3.5 min-h-0 flex-1 scroll-py-1 overflow-y-auto overscroll-contain px-3.5 pb-1",
 					more.below && "mask-b-from-[calc(100%-2.5rem)]",
 					more.above && "mask-t-from-[calc(100%-2.5rem)]",
 				)}
@@ -241,7 +203,7 @@ export function SplitList({
 				<div className={cn("flex flex-col", arcs ? "gap-0.5" : "gap-4")}>
 					{arcs
 						? arcs.map((section) => (
-								<CourseArc
+								<ArcLine
 									key={section.arc.handle}
 									section={section}
 									items={section.topics}
@@ -252,9 +214,6 @@ export function SplitList({
 									headerRef={register({ kind: "group", id: section.arc.handle })}
 									checkRef={register({ kind: "check", id: section.arc.handle })}
 									onHeaderKeyDown={(e) => onHeaderKeyDown(section.arc.handle, e)}
-									onCheckKeyDown={(e) => {
-										if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) walk({ kind: "check", id: section.arc.handle }, e);
-									}}
 									renderItem={row}
 								/>
 							))
@@ -272,6 +231,7 @@ export function SplitList({
 									renderItem={row}
 								/>
 							))}
+					{after}
 				</div>
 			</div>
 		</section>

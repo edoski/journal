@@ -25,10 +25,10 @@ describe("needsYouNow", () => {
 		for (const line of needs.lines) assert.deepEqual(line.why, whyOf(line.row));
 	});
 
-	it("gives every session to pick up since yesterday its own line, the newest first, before every course; a course keeps its line when no session shown works on its step", () => {
+	it("gives every session to pick up since yesterday its own line, the newest first, after the plan's reviews (round 10, 1 m2); a course keeps its line when no session shown works on its step", () => {
 		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
-		assert.deepEqual(lines.map((l) => label(l.row)), ["session chat_eigen", "session chat_rank", "Probability", "Linear Algebra"]);
-		assert.deepEqual(also.map((l) => label(l.row)), ["Real Analysis", "Calculus I"]);
+		assert.deepEqual(lines.map((l) => label(l.row)), ["Probability", "Linear Algebra", "Real Analysis", "Calculus I", "session chat_eigen"]);
+		assert.deepEqual(also.map((l) => label(l.row)), ["session chat_rank"], "the lesson he is in today keeps a line (round 11, 3 n5)");
 		assert.ok(!lines.some((l) => l.key === "chat_old"), "a session waiting from before yesterday gets no line");
 	});
 
@@ -38,18 +38,19 @@ describe("needsYouNow", () => {
 		const today = needsYouNow(COURSES, [left("2026-11-08T09:20:00")], TODAY).rows.map(label);
 		assert.ok(!today.includes("session chat_left"), "the lesson he ended today waits for tomorrow");
 		const tomorrow = needsYouNow(COURSES, [left("2026-11-08T09:20:00")], "2026-11-09").rows.map(label);
-		assert.equal(tomorrow[0], "session chat_left", "the next day it heads Today as Left for next time");
+		assert.ok(tomorrow.includes("session chat_left"), "the next day it is back as Left for next time");
+		assert.ok(tomorrow.indexOf("session chat_left") > tomorrow.indexOf("Probability"), "after the plan, which leads (round 9, 1 D1)");
 		const earlier = needsYouNow(COURSES, [left("2026-10-30T09:20:00")], TODAY).rows.map(label);
-		assert.equal(earlier[0], "session chat_left", "one left on an earlier day keeps its line however long ago");
+		assert.ok(earlier.includes("session chat_left"), "one left on an earlier day keeps its line however long ago");
 	});
 
 	it("gives a lesson whose course was deleted no line: it is history", () => {
 		const gone = chat("chat_gone", { title: "Series tests", course: { workspace: "/s/graphs", title: "Graph Algorithms" }, ended: "left", courseDeleted: true, updatedAt: "2026-11-07T09:00:00" });
 		assert.ok(!needsYouNow(COURSES, [gone], TODAY).rows.some((r) => r.kind === "session"));
-		assert.equal(needsYouNow(COURSES, [{ ...gone, courseDeleted: false }], TODAY).rows[0]?.kind, "session", "the same lesson in a course still there keeps its line");
+		assert.ok(needsYouNow(COURSES, [{ ...gone, courseDeleted: false }], TODAY).rows.some((r) => r.kind === "session"), "the same lesson in a course still there keeps its line");
 	});
 
-	it("orders the courses after the sessions by urgency: the exam run-up, the nearest exam, then the most recent study", () => {
+	it("orders the courses by urgency: the exam run-up, the nearest exam, then the most recent study", () => {
 		const { lines } = needsYouNow([CALCULUS, ANALYSIS, PROB], [], TODAY);
 		assert.deepEqual(lines.map((l) => label(l.row)), ["Probability", "Real Analysis", "Calculus I"]);
 	});
@@ -58,7 +59,7 @@ describe("needsYouNow", () => {
 		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
 		assert.deepEqual(
 			[...lines, ...also].map((l) => l.lead?.title),
-			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Linear independence", "Convergent sequences", "Chain rule"],
+			["Random variables and distributions", "Linear independence", "Convergent sequences", "Chain rule", "Eigenvalues and eigenvectors", "Rank and the column space"],
 		);
 		const empty: StudyCourse = { ...PROB, due: [], map: { ...PROB.map, current: null, topics: [] } };
 		assert.deepEqual(needsYouNow([empty], [], TODAY).lines, [], "a course with nothing to take up has no line");
@@ -68,7 +69,7 @@ describe("needsYouNow", () => {
 		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
 		assert.deepEqual(
 			[...lines, ...also].map((l) => l.slot),
-			["Your turn", "Your turn", "3d overdue", "4d overdue", "7d overdue", "Not right last time"],
+			["Due 5 Nov", "Due 4 Nov", "Due 1 Nov", "Not right last time", "Your turn", "Your turn"],
 		);
 		const task: StudyCourse = {
 			...LINALG,
@@ -76,8 +77,8 @@ describe("needsYouNow", () => {
 			map: { ...LINALG.map, focus: "sheet", tasks: [{ key: "sheet", title: "Problem sheet 4", step: "At first, the owed rank retest: he needs the matrix", updated: "2026-11-07" }] },
 		};
 		const [taskLine] = needsYouNow([task], [], TODAY).lines;
-		assert.equal(taskLine!.why?.short, "Left off yesterday");
-		assert.equal(taskLine!.slot, "Left off yesterday");
+		assert.equal(taskLine!.why?.short, "Left off 7 Nov");
+		assert.equal(taskLine!.slot, "Left off 7 Nov");
 		const today: StudyCourse = { ...ANALYSIS, map: { ...ANALYSIS.map, topics: [topic("conv", "Convergent sequences", "independent", { review: due(0) })] }, due: ["conv"] as TopicHandle[] };
 		assert.equal(needsYouNow([today], [], TODAY).lines[0]!.slot, "Due today");
 		assert.equal(slotWords(null, null), null);

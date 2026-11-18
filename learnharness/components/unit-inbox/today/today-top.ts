@@ -17,23 +17,41 @@ export type NowItem =
 	| { kind: "course"; line: NowLine; workspace: string }
 	| { kind: "session"; line: NowLine; chat: ChatListItem };
 
-/** The key an item holds in `restShelves`' `onTop`, and the keyboard walk's
+/** The key an item holds in `restTopics`' `onTop`, and the keyboard walk's
  *  row name: the unit's key, `course:<workspace>`, or `chat:<id>`. Pure. */
 export function itemKey(item: NowItem): string {
 	if (item.kind === "topic") return item.unit.key;
 	return item.kind === "course" ? courseKey(item.workspace) : sessionKey(item.chat.id);
 }
 
-/** The keys an item takes off the shelves: its own, and every topic a
- *  session's card stands for (`NowLine.topics`: its own topics and those
- *  it worked on, on its course's map), so one session is one card, never
- *  a second row under Working or Learning for a review's other topic or
- *  the lesson's own. Pure. */
+/** The keys an item takes up: its own, and every topic a session's card
+ *  stands for (`NowLine.topics`: its own topics and those it worked on, on
+ *  its course's map), so one session is one card and its topics count as
+ *  on Today (`restTopics`, the course page's Needs you). Pure. */
 export function claimedKeys(item: NowItem): string[] {
 	const { row, topics } = item.line;
 	if (item.kind !== "session" || !row.course) return [itemKey(item)];
 	const { workspace } = row.course.map;
 	return [itemKey(item), ...topics.map((t) => unitKey(workspace, t.handle))];
+}
+
+/** The topics an item's line asks of him: a session's own topics (the
+ *  lesson's, a review's), never one its lesson only touched on the way
+ *  (round 14, m28: the course page's Needs you listed Random variables
+ *  beside the Poisson lesson that reviewed it, which no Today line asks);
+ *  every topic a course's review or start names (round 16, m5: "Review
+ *  Independent events, Random variables" left Random variables' arc
+ *  without its "Needs you"); any other line's own key. Pure. */
+export function askedKeys(item: NowItem): string[] {
+	const { row, topics } = item.line;
+	if (row.kind === "course" && (row.step.kind === "review" || row.step.kind === "topic")) {
+		const { workspace } = row.course.map;
+		return [itemKey(item), ...topics.map((t) => unitKey(workspace, t.handle))];
+	}
+	if (item.kind !== "session" || !row.course) return [itemKey(item)];
+	const { workspace } = row.course.map;
+	const own = new Set<string>(item.chat.ownTopics ?? []);
+	return [itemKey(item), ...topics.filter((t) => own.has(t.handle) || t === item.line.lead).map((t) => unitKey(workspace, t.handle))];
 }
 
 /**

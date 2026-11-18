@@ -2,21 +2,71 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { fuzzyScore, type ChatListItem } from "@/src/core";
+import type { ChatListItem } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { focusWhereHeTypes } from "@/components/ui/overlay";
 
-/** The search over the list (owner round 8, 2026-10-05): a fuzzy
- *  subsequence match ranked by fuzzyScore — prefix beats word-boundary
- *  beats scattered. An empty query keeps the list's own order. */
-export function filterSessions(list: ChatListItem[], query: string): ChatListItem[] {
-	const q = query.trim();
-	if (!q) return list;
-	return list
-		.map((c) => ({ c, score: fuzzyScore(q, c.title) }))
-		.filter((r): r is { c: ChatListItem; score: number } => r.score !== null)
+/** The sidebar's snapshot as a turn starts or settles in this window: a
+ *  start marks the session busy at once; a settle leaves the snapshot as
+ *  it is until the server's fresh one lands, since the one it holds was
+ *  read mid-turn and reads the reply as cut off (round 10, 2 m5: "Reply
+ *  cut off" flashed on the card at the end of the opener, then "Your
+ *  turn"). Pure. */
+export function turnStatePatch(chats: ChatListItem[] | null, id: string, running: boolean): ChatListItem[] | null {
+	if (!running || !chats) return chats;
+	return chats.map((c) => (c.id === id ? { ...c, busy: true } : c));
+}
+
+/** A turn settled in this window: the server's fresh snapshot replaces
+ *  the one the start patched (turnStatePatch). When the app cannot be
+ *  reached it never lands, and no turn runs there that the card could
+ *  show: the card stops saying the tutor writes, and the server's own
+ *  state replaces it once the app is back (round 12, 4 minor 4: offline,
+ *  "Still can't reach the app…" in the lesson and "Tutor writing" on its
+ *  card; after the server died mid-turn, the same until the restart). */
+export async function settleSnapshot(
+	refresh: () => Promise<boolean>,
+	setChats: (patch: (chats: ChatListItem[] | null) => ChatListItem[] | null) => void,
+	id: string,
+): Promise<void> {
+	if (await refresh()) return;
+	setChats((chats) => chats?.map((c) => (c.id === id && c.busy ? { ...c, busy: false } : c)) ?? chats);
+}
+
+/** A title's words as search reads them: lowercase letters and digits,
+ *  maths markup set aside. */
+function titleWords(text: string): string[] {
+	return text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+/** How well a title matches the query, by its words: 0 unless every word
+ *  of the query starts a word of the title (round 16, m29: cmdk's
+ *  scattered-letter match listed "Matrix multiplication as composition"
+ *  for "Poisson"); 3 for the title itself, 2 for a title that starts with
+ *  the query, 1 for one that holds it further in. */
+export function titleScore(title: string, query: string): number {
+	const words = titleWords(title);
+	const asked = titleWords(query);
+	if (asked.length === 0 || !asked.every((q) => words.some((w) => w.startsWith(q)))) return 0;
+	const whole = words.join(" ");
+	const said = asked.join(" ");
+	return whole === said ? 3 : whole.startsWith(said) ? 2 : 1;
+}
+
+/** The items whose title matches the query (`titleScore`), best first,
+ *  ties in the list's own order. An empty query keeps the list's order. */
+export function rankByTitle<T>(items: readonly T[], query: string, title: (item: T) => string): T[] {
+	if (!query.trim()) return [...items];
+	return items
+		.map((item) => ({ item, score: titleScore(title(item), query) }))
+		.filter((r) => r.score > 0)
 		.sort((a, b) => b.score - a.score)
-		.map((r) => r.c);
+		.map((r) => r.item);
+}
+
+/** The search over the sessions (owner round 8, 2026-10-05), by title. */
+export function filterSessions(list: ChatListItem[], query: string): ChatListItem[] {
+	return rankByTitle(list, query, (c) => c.title);
 }
 
 /**
@@ -35,29 +85,45 @@ export function leaveSearch(field: { blur(): void }, changeQuery: (next: string)
 	focusWhereHeTypes(doc, false);
 }
 
+/** Whether a click in the search results opens one (a course, an arc, a
+ *  topic or a session row): the search then empties, so the sidebar shows
+ *  its agenda again on the page he opened (round 9: the filter stayed and
+ *  hid Today until ✕). */
+export function opensSearchResult(target: EventTarget | null): boolean {
+	const el = target as Element | null;
+	return typeof el?.closest === "function" && el.closest("[data-sidebar-row]") !== null;
+}
+
 export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: () => void }) {
 	const [chats, setChats] = useState<ChatListItem[] | null>(null);
 	const [query, setQuery] = useState("");
 	const pathname = usePathname();
 	const router = useRouter();
 
-	const refreshInFlightRef = useRef(false);
-	const refresh = useCallback(async () => {
+	// Whether the server's snapshot landed (settleSnapshot reads it).
+	const refreshInFlightRef = useRef<Promise<boolean> | null>(null);
+	const refresh = useCallback((): Promise<boolean> => {
 		// In-flight coalesce (S6): event bursts may land several refresh
 		// calls at once — one fetch serves them all; anything newer arrives
 		// with the next event's fetch.
-		if (refreshInFlightRef.current) return;
-		refreshInFlightRef.current = true;
-		try {
-			const res = await fetch("/api/chats", { cache: "no-store" });
-			const d = (await res.json()) as { chats: ChatListItem[] };
-			setChats(d.chats);
-		} catch {
-			// a transient failure keeps the last snapshot
-			setChats((prev) => prev ?? []);
-		} finally {
-			refreshInFlightRef.current = false;
-		}
+		if (refreshInFlightRef.current) return refreshInFlightRef.current;
+		const reading = (async () => {
+			try {
+				const res = await fetch("/api/chats", { cache: "no-store" });
+				if (!res.ok) throw new Error(`the sessions list failed: ${res.status}`);
+				const d = (await res.json()) as { chats: ChatListItem[] };
+				setChats(d.chats);
+				return true;
+			} catch {
+				// a transient failure keeps the last snapshot
+				setChats((prev) => prev ?? []);
+				return false;
+			} finally {
+				refreshInFlightRef.current = null;
+			}
+		})();
+		refreshInFlightRef.current = reading;
+		return reading;
 	}, []);
 
 	/* Instant rename propagation (2026-09-17): the chat header's rename
@@ -87,16 +153,13 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 	useEffect(() => {
 		const onTurnState = (e: Event) => {
 			const { id, running } = (e as CustomEvent<{ id: string; running: boolean }>).detail;
-			if (running) {
-				if (chatsRef.current?.some((c) => c.id === id)) {
-					setChats((prev) => (prev ? prev.map((c) => (c.id === id ? { ...c, busy: true } : c)) : prev));
-				} else {
-					void refresh(); // the brand-new session: it isn't in the snapshot yet
-				}
+			if (running && !chatsRef.current?.some((c) => c.id === id)) {
+				void refresh(); // the brand-new session: it isn't in the snapshot yet
 				return;
 			}
-			setChats((prev) => (prev ? prev.map((c) => (c.id === id ? { ...c, busy: false } : c)) : prev));
-			void refresh(); // settle: the server snapshot is now truthful — land it now
+			setChats((prev) => turnStatePatch(prev, id, running));
+			// Settle: the server snapshot is now truthful — land it now.
+			if (!running) void settleSnapshot(refresh, setChats, id);
 		};
 		window.addEventListener("lh:turn-state", onTurnState);
 		return () => window.removeEventListener("lh:turn-state", onTurnState);
@@ -127,7 +190,6 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 	useServerEvent("turn-started", scheduleEventRefresh);
 	useServerEvent("turn-settled", scheduleEventRefresh);
 	useServerEvent("record-changed", scheduleEventRefresh);
-	useServerEvent("compaction-changed", scheduleEventRefresh);
 	useServerResync(() => void refreshRef.current());
 	useEffect(
 		() => () => {
@@ -161,10 +223,11 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 	// cycle's successor): ↑/↓ cycle the filtered rows (wrap), Enter opens
 	// the walked row — or the FIRST match when nothing is walked (the
 	// quick-open pattern) — then blurs (focus returns to the app per the
-	// Enter law; the query stays for re-searching). Esc leaves the search
+	// Enter law; opening a result empties the search, opensSearchResult).
+	// Esc leaves the search
 	// (owner, keyboard wave): blur back to normal, and claim the key so the
 	// window Esc chain (abort) doesn't also fire.
-	const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, shown: readonly ChatListItem[] | null) => {
+	const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, shown: readonly ChatListItem[] | null, top: string | null = null) => {
 		if (e.key === "Escape") {
 			e.stopPropagation();
 			leaveSearch(e.currentTarget, changeQuery, document);
@@ -187,11 +250,13 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 			return;
 		}
 		if (e.key === "Enter") {
-			// The quick-open: the first result shown.
+			// The quick-open: the best match shown, whatever its section, else
+			// the first (round 16, m29: Enter opened the first section's row,
+			// never the topic named exactly).
 			e.preventDefault();
 			setKbdIndex(null);
 			e.currentTarget.blur();
-			rows[0]!.click();
+			(rows.find((row) => row.dataset.sidebarRow === top) ?? rows[0]!).click();
 		}
 	};
 

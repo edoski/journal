@@ -33,8 +33,8 @@ import { after, describe, it } from "node:test";
 import { createCanvas } from "@napi-rs/canvas";
 import { Value } from "typebox/value";
 import { createFauxCore, fauxAssistantMessage, fauxToolCall, type FauxResponseStep, type ToolCall } from "@earendil-works/pi-ai";
-import { renderToStaticMarkup } from "react-dom/server";
-import { createRoot } from "react-dom/client";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
+import { createRoot } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { PATHS } from "../config.ts";
 import {
@@ -313,7 +313,7 @@ describe("dispatch card rendering (the tool-call ack box)", () => {
 	it("marks a failed job with one plain failure line", () => {
 		const doc = inJobs([mkJob("error")], <JobCard part={ackPart as never} />);
 		assert.equal(doc.querySelector('[data-testid="dispatch-settled"]')?.textContent, "The sources couldn't be checked");
-		assert.equal(doc.querySelector('[data-testid="dispatch-card"]'), null, "no working line once it failed");
+		assert.ok(doc.querySelector('[data-testid="dispatch-card"]') === null, "no working line once it failed");
 	});
 
 	it("renders nothing for a still-streaming tool input", () => {
@@ -647,6 +647,24 @@ describe("demo builder (fake model + fake headless)", () => {
 		const result = await runDemoBuilder({ title: "T", brief: "b" }, { engine: model, headless: noChromeHeadless() });
 		assert.equal(result.html, "");
 		assert.match(result.notes ?? "", /^FAILED: .*Chrome/);
+	});
+
+	// Round 12 (2 M2, 3 D10): the Eigen demo's presets and Pause read as empty boxes.
+	const EIGEN_DEMO = `<!doctype html><html><head><style>button { background:#fff; border:1px solid #cbd5e1; }</style></head><body><button id="pause">❚❚ Pause</button></body></html>`;
+	it("fail the builder's test run when a control does not read, naming it, and the builder runs the demo on the base", async () => {
+		const runs: string[] = [];
+		const unreadable: DemoRunResult = { consoleErrors: [], pageErrors: [], failedRequests: [], unreadable: ["❚❚ Pause: 1.0:1"], ok: false };
+		const headless = { available: () => true, unavailableReason: () => null, runDemo: async (html: string) => (runs.push(html), unreadable), renderSvg: async () => Buffer.alloc(0), renderPdfPages: async () => [] } as unknown as HeadlessApi;
+		const model = scriptedModel([
+			{ toolCalls: [{ toolCallId: "w1", toolName: "write_demo", input: { html: EIGEN_DEMO } }] },
+			{ toolCalls: [{ toolCallId: "r1", toolName: "run_demo", input: {} }] },
+			{ text: "Press a preset." },
+		]);
+		const result = await runDemoBuilder({ title: "Eigen", brief: "Presets and Pause." }, { engine: model, headless });
+		assert.equal(result.html, "", "never delivered");
+		assert.match(result.notes ?? "", /unreadable control/);
+		assert.match(result.notes ?? "", /Pause: 1\.0:1/);
+		assert.ok(runs.length > 0 && runs.every((html) => html.includes("data-demo-base")), "tested as his app shows it");
 	});
 
 	it("fails when the model never writes a demo", async () => {
@@ -1018,7 +1036,7 @@ describe("tool + renderer registry wiring", () => {
 		// sources v0 — pdf maps to its dispatch card (the live-smoke gap)
 		assert.equal(artifactRenderers.pdf, PdfJobCard);
 		// The agent's own tools render nothing in the lesson column (agent chrome out).
-		for (const t of ["read", "ls", "find", "grep", "list_sessions", "list_propositions"]) {
+		for (const t of ["Read", "Grep", "Glob", "list_sessions", "list_propositions"]) {
 			assert.equal(artifactRenderers[t], undefined, `${t} has no transcript card`);
 		}
 	});

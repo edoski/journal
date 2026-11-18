@@ -35,9 +35,8 @@
 import { useEffect, useRef } from "react";
 import { isTypingSurface } from "@/src/core";
 
-/** Overlay roots whose buttons keep native Enter (hand-rolled menus mark
- *  themselves data-lh-menu; Radix poppers/dialogs carry their own attrs). */
-const OVERLAY_ROOTS = '[data-lh-menu], [data-radix-popper-content-wrapper], [role="menu"], [role="dialog"]';
+/** Overlay roots whose buttons keep native Enter: Radix's poppers and dialogs. */
+const OVERLAY_ROOTS = '[data-radix-popper-content-wrapper], [role="menu"], [role="dialog"]';
 
 /** Pure decision, exported for pins: does a focused BUTTON keep native
  *  Enter (true) or does Enter belong to submit (false)? */
@@ -55,20 +54,29 @@ export function buttonKeepsNativeEnter(el: HTMLElement): boolean {
 	return !!el.closest(OVERLAY_ROOTS);
 }
 
+/** Pure decision, exported for pins: does this Enter belong to the
+ *  mounted submit? Not when a surface took it already, a modifier is held,
+ *  a field has focus, or a button or link keeps native Enter: a link
+ *  walked to with the arrows (a search result, a sidebar row) opens on
+ *  Enter (round 10, 4 minor 4: in a lesson ↓ then Enter on a result opened
+ *  nothing, because this took every Enter on a link). */
+export function claimsEnter(e: KeyboardEvent): boolean {
+	if (e.key !== "Enter" || e.defaultPrevented) return false;
+	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
+	if (isTypingSurface(e)) return false;
+	const target = e.target as HTMLElement | null;
+	return !((target?.tagName === "BUTTON" || target?.tagName === "A") && buttonKeepsNativeEnter(target));
+}
+
 /** Mount-scoped: while the dock is mounted (a problem/question is active),
- *  plain Enter anywhere outside a typing surface or button submits it. */
+ *  plain Enter anywhere outside a typing surface, or a button or link that
+ *  keeps native Enter, submits it. */
 export function useEnterSubmits(submit: () => void): void {
 	const submitRef = useRef(submit);
 	submitRef.current = submit;
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (e.key !== "Enter") return;
-			// A surface already acted on this Enter (the dock's row machine).
-			if (e.defaultPrevented) return;
-			if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-			if (isTypingSurface(e)) return;
-			const target = e.target as HTMLElement | null;
-			if (target?.tagName === "BUTTON" && buttonKeepsNativeEnter(target)) return;
+			if (!claimsEnter(e)) return;
 			e.preventDefault();
 			submitRef.current();
 		};

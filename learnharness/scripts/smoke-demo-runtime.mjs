@@ -22,10 +22,9 @@ export function probeEnv(env, home) {
 		!["NODE_OPTIONS", "NODE_PATH", "LH_DEV_URL", "ELECTRON_RUN_AS_NODE"].includes(key)));
 	return {
 		...clean,
-		HOME: home, USERPROFILE: home,
-		APPDATA: path.join(home, "config"), LOCALAPPDATA: path.join(home, "local"),
+		HOME: home,
 		XDG_CONFIG_HOME: path.join(home, "config"), XDG_CACHE_HOME: path.join(home, "cache"),
-		LH_DATA_DIR: path.join(home, "data"), LH_CREDENTIALS_DIR: home,
+		LH_DATA_DIR: path.join(home, "data"),
 		NODE_ENV: "production",
 	};
 }
@@ -146,30 +145,27 @@ async function browserProbe(puppeteer) {
 	const helper = spawn(process.execPath, [
 		"--browser-service", `--user-data-dir=${path.join(home, "browser-profile")}`,
 		"--disable-background-networking", "--disable-component-update", "--no-proxy-server",
-		// Hosted Linux runners disallow Chromium's unprivileged sandbox.
-		...(process.platform === "linux" ? ["--no-sandbox"] : []),
 	], { cwd: home, env, stdio: ["ignore", "pipe", "pipe", "ipc"] });
 	let output = "";
 	let errors = "";
+	helper.stdout.on("data", (chunk) => { output = (output + chunk).slice(-16_000); });
 	helper.stderr.on("data", (chunk) => { errors = (errors + chunk).slice(-16_000); });
 	let browser;
 	let failed = false;
 	try {
-		const port = await new Promise((resolve, reject) => {
-			const timer = setTimeout(() => reject(new Error("browser-service handshake timed out")), 15_000);
+		const endpoint = await new Promise((resolve, reject) => {
+			const timer = setTimeout(() => reject(new Error("browser-service DevTools line timed out")), 15_000);
 			helper.once("error", (err) => { clearTimeout(timer); reject(err); });
 			helper.once("exit", (code) => { clearTimeout(timer); reject(new Error(`browser-service exited early: ${code}`)); });
-			helper.stdout.on("data", (chunk) => {
-				output = (output + chunk).slice(-16_000);
-				const match = output.match(/^BROWSER_SERVICE_CDP (\d+)\r?$/m);
-				if (match) { clearTimeout(timer); resolve(Number(match[1])); }
+			helper.stderr.on("data", () => {
+				const match = errors.match(/^DevTools listening on (ws:\/\/.*)$/m);
+				if (match) { clearTimeout(timer); resolve(match[1]); }
 			});
 		});
-		const info = await (await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(5000) })).json();
-		browser = await puppeteer.connect({ browserWSEndpoint: info.webSocketDebuggerUrl, defaultViewport: null, protocolTimeout: 10_000 });
-		// Electron CDP has no Target.createTarget: use the helper's existing page.
-		const pages = await browser.pages();
-		const page = pages.find((candidate) => candidate.target().type() === "page");
+		browser = await puppeteer.connect({ browserWSEndpoint: endpoint, defaultViewport: null, protocolTimeout: 10_000 });
+		// Electron CDP has no Target.createTarget: use the helper's own page,
+		// which can appear after Chromium announces the endpoint.
+		const page = await (await browser.waitForTarget((target) => target.type() === "page", { timeout: 10_000 })).page();
 		assert.ok(page, "browser-service has no page target");
 		const failures = [];
 		page.on("console", (msg) => { if (msg.type() === "error") failures.push(msg.text()); });

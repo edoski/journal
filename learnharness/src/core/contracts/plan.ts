@@ -37,16 +37,18 @@ export interface PlanTree {
  * How big a lesson's plan map may be: what the topic page's lesson map
  * shows whole, without panning, at Edo's window (1512×982, his ruling of
  * 14 Nov 2026), each step one idea. Measured there with the sidebar open,
- * the map's pane is 696×786; inside its fade it opens a plan whole down to
- * the 75% scale its titles stay readable at (`WHOLE_COURSE_ZOOM`), which
+ * the map's pane is 864×787; inside its fade it opens a plan whole down to
+ * the 80% scale every course map opens whole at (`READABLE_ZOOM`), which
  * holds 8 rows of steps, 4 across. A plan's rows are its longest chain of
  * steps, so `deep` caps that chain; `steps` caps the count, since a map
  * that fills its rows spreads past 4 across: at 12 steps 9 plans in 10 of
  * a tutor's shapes still open whole. Pinned to the pane's geometry in
  * tests/plan-map-cap.test.ts; the planning prompt and plan_init state
- * these numbers and point here.
+ * these numbers and point here. `across` is the most steps side by side a
+ * step's card is sized for: its width is the pane's clear middle split
+ * into the plan's widest row, at most four (`stepCard`, round 14, m34).
  */
-export const PLAN_MAP_CAP = { steps: 12, deep: 8 } as const;
+export const PLAN_MAP_CAP = { steps: 12, deep: 8, across: 4 } as const;
 
 // NOTE (2026-09-11 pivot, docs/probe-teach-split.md): the tree once carried
 // `currentNodeId` / `doneNodeIds` — progress fields. They are GONE by
@@ -126,11 +128,31 @@ interface PlanCall {
 	input: unknown;
 }
 
+/** Whether `step` is one `of` rests on, directly or through others: a
+ *  step before it in teaching order on every path. */
+function restsOn(tree: PlanTree, of: string, step: string): boolean {
+	const seen = new Set<string>();
+	const queue = [of];
+	while (queue.length > 0) {
+		const at = queue.shift()!;
+		for (const edge of tree.edges) {
+			if (edge.to !== at || seen.has(edge.from)) continue;
+			if (edge.from === step) return true;
+			seen.add(edge.from);
+			queue.push(edge.from);
+		}
+	}
+	return false;
+}
+
 /** Where the lesson stands, from its calls in order: a tagged question
  *  moves the position there (leaving a node marks it visited); a
  *  lesson_progress call marks its `done` nodes visited and, when one is the
- *  current node, leaves it, so nothing is current until the next tag.
- *  Ids missing from the tree move nothing. */
+ *  current node, leaves it, so nothing is current until the next tag. A
+ *  question on a step already done is a recall check and moves nothing. A
+ *  question on a step the current one rests on, taught out of order, marks
+ *  it visited and leaves the position where it was (round 13, 2 n5: step 6
+ *  of 7 went back to step 5). Ids missing from the tree move nothing. */
 function foldPlanCalls(tree: PlanTree, calls: Iterable<PlanCall>): DerivedPlanStatuses {
 	const ids = new Set(tree.nodes.map((n) => n.id));
 	let current: string | null = null;
@@ -140,6 +162,14 @@ function foldPlanCalls(tree: PlanTree, calls: Iterable<PlanCall>): DerivedPlanSt
 		if (POSITION_QUESTION_TOOLS.includes(call.name)) {
 			const nodeId = (call.input as { nodeId?: unknown } | undefined)?.nodeId;
 			if (typeof nodeId !== "string" || !ids.has(nodeId)) continue;
+			// A question on a step already done is a recall check: the strip
+			// moves only forward (round 12, 2 n6: step 7 back to step 6).
+			if (done.has(nodeId)) continue;
+			// The strip never moves back to a step behind the one he is on.
+			if (current !== null && current !== nodeId && restsOn(tree, current, nodeId)) {
+				visited.add(nodeId);
+				continue;
+			}
 			if (current !== null && current !== nodeId) visited.add(current);
 			current = nodeId;
 		} else if (call.name === LESSON_PROGRESS_TOOL) {

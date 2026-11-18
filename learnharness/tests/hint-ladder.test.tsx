@@ -30,9 +30,9 @@ describe("a Hint press on a check", () => {
 
 describe("the ladder in every teaching prompt", () => {
 	for (const agent of ["teacher", "practice"] as const) {
-		it(`${agent}: hints climb from a question to a nudge to a step, and only show me reveals the rest`, () => {
+		it(`${agent}: hints climb from where to look to a nudge to a step, and only show me reveals the rest`, () => {
 			const prompt = courseRecordPrompt(agent, { arcs: true });
-			assert.match(prompt, /first a question that points him at what to look at.*then a nudge.*then one step/s);
+			assert.match(prompt, /first a statement of what to look at, never a question and never the problem in other words.*then a nudge.*then one step/s);
 			assert.match(prompt, /never gives the whole solution or the whole proof\. Only "show me" reveals the rest/);
 		});
 	}

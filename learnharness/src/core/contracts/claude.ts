@@ -23,8 +23,10 @@ export type ClaudeConnection =
 	| { state: "missing" }
 	| { state: "error"; message: string };
 
-/** token: T3 Code's setup token; profile: its own Claude Code config dir; default: the plain signed-in `claude`. */
-export interface ClaudeAccount { providerId: string; label: string; email: string | null; auth: "token" | "profile" | "default" }
+/** token: T3 Code's setup token; profile: its own Claude Code config dir; default: the plain signed-in `claude`.
+ *  `notInT3`: the stand-in for the plain `claude` when T3 Code lists no Claude account at all, so his
+ *  accounts are missing from T3 Code (round 13, 4 minor 6). */
+export interface ClaudeAccount { providerId: string; label: string; email: string | null; auth: "token" | "profile" | "default"; notInT3?: true }
 
 /** The weekly window as Claude Code last reported it. resetsAt is Unix seconds. */
 export interface ClaudeUsage { percentLeft: number; resetsAt: number | null; limited: boolean; checkedAt: number }
@@ -36,11 +38,27 @@ export interface ClaudeAccountStatus { account: ClaudeAccount; connection: Claud
  * (2026-11-14): there is no model or thinking choice anywhere. */
 export const CLAUDE_MODEL = { id: "claude-opus-5-5", name: "Claude Opus 5.5", thinkingLevel: "high" } as const;
 
+/** The effort of the lesson's own turns, the prober's, the teacher's and
+ *  practice's, save the turn that writes the lesson's plan, which keeps
+ *  CLAUDE_MODEL's, as every other agent does. One line to change: Edo
+ *  decides from the round-10 effort test (16 Nov 2026). */
+export const CHAT_EFFORT: "high" | "medium" = "high";
+
 export const CLAUDE_USAGE_URL = "https://claude.ai/settings/usage";
 
 /** An account whose sign-in can't be read (T3 Code holds no token for it):
  *  plain words, no account letter or file (round 7). */
 export const CLAUDE_ACCOUNT_SIGNED_OUT = "Claude isn't signed in on this account.";
+
+/** Every Claude failure's text ends by saying no API key was used, for
+ *  Settings and the logs; the lesson's line leaves it out (round 15, m22). */
+export const NO_KEY = " No API key was used.";
+
+/** Any other failure is Claude Code's own error (a compaction that keeps
+ *  refilling, an internal fault): his plan and sign-in are fine, so the
+ *  line says only what failed (round 12, 4 minor 3: "check \`claude\` in
+ *  a terminal and your plan" with 47% of the plan left). */
+export const CLAUDE_FAILED = `Claude Code stopped with an error before it finished. Retry.${NO_KEY}`;
 
 /** How a failed turn's text starts when Claude was signed out: the lesson
  *  reads every one as signed out, with Sign in and Retry beside it. */

@@ -10,6 +10,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useDialogSubject } from "@/components/ui/overlay";
 import { SHOW_WORDS, STOP_WORDS } from "@/components/study-words";
 
 /**
@@ -42,11 +43,13 @@ const COPY: Record<AbortMode, { title: string; line: string; action: string }> =
 /** The dialog's body in the shared dialog anatomy (components/ui/dialog.md) —
  * exported for render pins. */
 export function AbortTurnBody({
+	open,
 	mode,
 	onClose,
 	onConfirm,
 	busy = false,
 }: {
+	open: boolean;
 	mode: AbortMode;
 	onClose: () => void;
 	onConfirm: () => void;
@@ -59,7 +62,7 @@ export function AbortTurnBody({
 	// Enter presses the focused one, and ⌘↵ confirms from anywhere in it
 	// (the shared alert dialog's keys, alert-dialog.tsx).
 	return (
-		<AlertDialog open onOpenChange={(open) => !open && onClose()}>
+		<AlertDialog open={open} onOpenChange={(next) => !next && onClose()}>
 			<AlertDialogContent data-testid="abort-turn-dialog" className="max-w-sm">
 				<AlertDialogHeader>
 					<AlertDialogTitle data-testid="abort-turn-title">{copy.title}</AlertDialogTitle>
@@ -79,11 +82,14 @@ export function AbortTurnBody({
 	);
 }
 
-/** Show me's confirm, in the same anatomy: Cancel, and Show me. */
-export function ShowMeConfirm({ what, onClose, onConfirm }: { what: keyof typeof SHOW_WORDS; onClose: () => void; onConfirm: () => void }) {
-	const copy = SHOW_WORDS[what];
+/** Show me's confirm, in the same anatomy: Cancel, and Show me. Null
+ *  `what` = closed; while it fades out, Show me does nothing. */
+export function ShowMeConfirm({ what, onClose, onConfirm }: { what: keyof typeof SHOW_WORDS | null; onClose: () => void; onConfirm: () => void }) {
+	const { open, shown } = useDialogSubject(what);
+	if (shown === null) return null;
+	const copy = SHOW_WORDS[shown];
 	return (
-		<AlertDialog open onOpenChange={(open) => !open && onClose()}>
+		<AlertDialog open={open} onOpenChange={(next) => !next && onClose()}>
 			<AlertDialogContent data-testid="show-me-dialog" className="max-w-sm">
 				<AlertDialogHeader>
 					<AlertDialogTitle>{copy.title}</AlertDialogTitle>
@@ -91,7 +97,7 @@ export function ShowMeConfirm({ what, onClose, onConfirm }: { what: keyof typeof
 				</AlertDialogHeader>
 				<AlertDialogFooter className="pt-2">
 					<AlertDialogCancel data-testid="show-me-cancel">Cancel</AlertDialogCancel>
-					<Button data-testid="show-me-confirm" onClick={onConfirm}>
+					<Button data-testid="show-me-confirm" onClick={() => open && onConfirm()}>
 						{copy.action}
 					</Button>
 				</AlertDialogFooter>
@@ -106,12 +112,14 @@ export function AbortTurnDialog({
 	onConfirm,
 	busy = false,
 }: {
-	/** What Esc is aborting; null = closed (nothing rendered). */
+	/** What Esc is aborting; null = closed. */
 	mode: AbortMode | null;
 	onClose: () => void;
 	onConfirm: (mode: AbortMode) => void;
 	busy?: boolean;
 }) {
-	if (mode === null || typeof document === "undefined") return null;
-	return <AbortTurnBody mode={mode} onClose={onClose} onConfirm={() => onConfirm(mode)} busy={busy} />;
+	const { open, shown } = useDialogSubject(mode);
+	if (shown === null || typeof document === "undefined") return null;
+	// A closing dialog still takes a press until it fades out; only an open one acts.
+	return <AbortTurnBody open={open} mode={shown} onClose={onClose} onConfirm={() => mode && onConfirm(mode)} busy={busy} />;
 }

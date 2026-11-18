@@ -48,18 +48,16 @@ export interface JobRecord {
 	/** The sub-agent's result (steer-artifact payload). */
 	result?: unknown;
 	error?: string;
-	/** Money channel (observability, 2026-09): accumulated token usage of
-	 * the sub-agent's run, written by the runner as steps complete. Cost is
-	 * inferred at read time (core/prices.ts). Absent on pre-2026-09 jobs and
-	 * until the runner's capture lands — renderers show "—", never zero. */
+	/** Accumulated token usage of the sub-agent's run, written by the runner
+	 * as steps complete. Absent on pre-2026-09 jobs and until the first step
+	 * completes. */
 	usage?: JobUsage;
 }
 
 /** A sub-agent run's accumulated usage — the same accounting shape as a
  * chat turn (contracts/chat.ts CallUsage), flattened to one running total
  * plus a step count. Token fields are optional exactly like CallUsage: a
- * field NO model call reported stays undefined — absent is not zero (the
- * money-channel doctrine; cost renders "—", never $0). */
+ * field NO model call reported stays undefined — absent is not zero. */
 export interface JobUsage {
 	/** The model that ran the sub-agent, provider-qualified ("provider:id" —
 	 *  matches Pi catalog lookup keys). */
@@ -71,9 +69,6 @@ export interface JobUsage {
 	cacheWriteTokens: number | undefined;
 	reasoningTokens: number | undefined;
 	cacheWrite1hTokens?: number;
-	/** Individual calls for current-catalog per-call tier pricing. Absent on
-	 * older jobs; never backfill them from cumulative totals. */
-	calls?: CallUsage[];
 	/** How many model calls the run has made (each bills separately). */
 	steps: number;
 	/** The MOST RECENT model call's accounting (2026-09 dock contract): the
@@ -144,7 +139,6 @@ export function accumulateJobUsage(
 			((call.cacheWriteTokens ?? 0) > 0 && call.cacheWrite1hTokens === undefined)
 			? undefined : add(total?.cacheWrite1hTokens, call.cacheWrite1hTokens),
 		steps: (total?.steps ?? 0) + 1,
-		...(!total || total.calls ? { calls: [...(total?.calls ?? []), call] } : {}),
 		lastStep: call,
 	};
 }
@@ -369,7 +363,7 @@ function steerText(kind: JobKind, result: ResearchResult | DemoResult | VisualRe
 	if (kind === "demo")
 		return `The demo "${(result as DemoResult).title}" is built, headlessly tested, and rendered in the lesson. Builder notes: ${
 			(result as DemoResult).notes ?? "(none)"
-		}.\nTeach with it — reference its controls by name and point the learner at what to try.`;
+		}.\nTeach with it: your next message opens on one thing to try in it, by its control's name, and never reads him a value the open question asks.`;
 	return `The figure is drawn, verified by inspection, and rendered in the lesson. Maker notes: ${
 		(result as VisualResult).notes ?? "(none)"
 	}.\nReference its elements as you teach.`;
@@ -440,8 +434,8 @@ function abortText(kind: JobKind): string {
 // (core/contracts/chat.ts — single source); the UI renders the quiet
 // system line off the customType. Nothing human-looking is persisted, ever.
 
-export function buildProbeHandoffSteer(chatId: string): SteerMessage {
-	return newHandoffMessage(chatId);
+export function buildProbeHandoffSteer(chatId: string, review = false, task = false): SteerMessage {
+	return newHandoffMessage(chatId, review, task);
 }
 
 /** A mode handoff's wake (tools/handoff.ts): like the probe handoff, it

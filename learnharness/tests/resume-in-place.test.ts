@@ -133,7 +133,7 @@ function seedSession(chatId: string, engine: ScriptedModel): void {
 	chatStore.saveSession(chatId, { id, synced: messages.at(-1)!.id, anchor: entries.at(-1)!.uuid });
 }
 
-const listed = (): ChatListItem[] => chatStore.listChats().map((c) => ({ ...c, busy: false, compacting: false }));
+const listed = (): ChatListItem[] => chatStore.listChats().map((c) => ({ ...c, busy: false }));
 const item = (id: string) => listed().find((c) => c.id === id)!;
 
 // ─── a waiting lesson is offered as itself ──────────────────────────────────
@@ -144,9 +144,8 @@ describe("a lesson waiting on his typed answer", () => {
 		const chat = item(id);
 		assert.equal(sessionState(chat), "your-turn", "the tutor asked him something mid-lesson");
 
-		const [first] = todayRows([COURSE], openSessions(listed()), TODAY);
-		assert.equal(first?.kind, "session", "Home's Today line for the course is the lesson");
-		assert.equal(first?.kind === "session" ? first.chat.id : null, id);
+		const line = todayRows([COURSE], openSessions(listed()), TODAY).find((r) => r.kind === "session");
+		assert.equal(line?.kind === "session" ? line.chat.id : null, id, "Home's Today line for the lesson is the lesson itself");
 
 		const action = topicAction(RANK, MAP, listed());
 		assert.notEqual("chat" in action ? action.chat.id : null, id, "the page of a topic it only worked on never resumes it: the lesson belongs to no topic (round 7)");

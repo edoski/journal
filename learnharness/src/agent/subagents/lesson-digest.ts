@@ -15,11 +15,11 @@ import { Type, type Static } from "typebox";
 import type { ChatRecord, DigestLedger } from "../../core/contracts/chat.ts";
 import type { CourseMap } from "../../core/contracts/course-map.ts";
 import { recordHasArcs } from "../../core/contracts/course.ts";
-import { isReviewSession, openedAsReview } from "../../core/session-opening.ts";
+import { reviewRecord } from "../../core/session-opening.ts";
 import type { ChatStore, CourseRecords } from "../../core/ports.ts";
 import { derivePlanStatusesLh, derivedNodeStatus } from "../../core/contracts/plan.ts";
 import { sessionSavesOf, sessionTasksOf } from "../../core/native-messages.ts";
-import { sessionMarkdown } from "../../core/session-markdown.ts";
+import { learnerWords, sessionMarkdown } from "../../core/session-markdown.ts";
 import { closedTonight } from "../../core/session-end.ts";
 import {
 	digestArcs,
@@ -57,6 +57,9 @@ const digestSchema = Type.Object({
 					description: "The precise misconception the lesson showed, phrased so a later session can test it; null when the lesson showed the recorded gap resolved.",
 				}),
 			),
+			shows: Type.Optional(
+				Type.String({ description: "With a new gap: his own words in the lesson that showed it, quoted exactly (from his messages or his answers), never his answer to a prediction." }),
+			),
 			note: Type.Optional(Type.String({ description: "Any other judgement worth carrying (fluent but slow, relies on a picture)." })),
 			step: stepField,
 		}),
@@ -93,6 +96,7 @@ Rules:
 - Every topic and knowledge entry names its \`step\`: a plan step the lesson reached (marked current or visited under "The lesson's plan"), or "${WARM_UP}" for the part before the plan. Record nothing about a step the lesson did not reach, even when the plan or the tutor described it in advance.
 - Graded answers are already recorded. Never restate an attempt; judge from the learner's questions, confusions, explanations and self-corrections.
 - A prediction (a \`Prediction\` in the lesson, saved with \`predicted\`) is a guess before the teaching: a wrong one is expected. Never write what a prediction got wrong as a \`gap\`, on its topic or any other, not even beside a later miss.
+- A new \`gap\` quotes in \`shows\` the learner's own words that showed it, exactly as he wrote them: a message of his or an answer that counts. A gap that quotes nothing of his, or only his answer to a prediction, is refused.
 - Leave out what the saves made during the lesson already hold, and anything the lesson did not show.
 - Write to the learner, in plain words they understand days later: "you", never "he" or "the learner"; no dates or ids; math in $…$.
 - When nothing is worth recording, submit empty lists.`;
@@ -233,13 +237,14 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 			})),
 			current: map.current,
 			tasks,
-			movesPath: !openedAsReview(record) && !isReviewSession(record) && tasks.length === 0,
+			movesPath: !reviewRecord(record) && tasks.length === 0,
 			own: record.topics ?? [],
 			planFinished: planFinished(record.tree, record.messages),
 			knowledge,
 			reached: reachedSteps(record.tree, record.messages),
 			...(arcs ? { arcs } : {}),
 			closed: closedTonight(record.messages),
+			said: learnerWords(window.fresh),
 		};
 		// The save runs at the submit call, so a patch the engine refuses
 		// (a learner-facing text naming an id, a date or "he") goes back to

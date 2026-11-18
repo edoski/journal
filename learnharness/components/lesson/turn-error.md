@@ -5,10 +5,9 @@ A failed reply, under the learner's message. `data-testid="turn-error"`, `role="
 | Slot | Notes |
 |---|---|
 | sentence | 13/18 (`text-row`) in `danger`: one plain sentence the learner can act on |
-| Retry | quiet 32px button, `foreground` at 500; shown while the failed turn can be retried. Reads Try again on a dropped connection, where it asks the app what became of the reply: it reattaches to a turn still running, or shows the reply that never came with its own Try again; while the app can't be reached the line says so |
-| Sign in | quiet, `foreground` at 500; only when the turn was refused because Claude is signed out; opens the sign-in dialog |
+| Try again | quiet 32px button, `foreground` at 500; shown while the failed turn can be retried; the one word every turn line uses for it, and the sentence beside it never repeats it (round 16, m3: "Retry" and "Try again" named one act). On a dropped connection it asks the app what became of the reply: it reattaches to a turn still running, or shows the reply that never came with its own Try again; while the app can't be reached the line says so |
 | Open Settings | quiet, `muted-foreground`; only when the provider rejected the key; opens Settings on Providers |
-| Go to Home | quiet, `foreground` at 500; only when the lesson was deleted elsewhere, which also drops Retry |
+| Go to Home | quiet, `foreground` at 500; only when the lesson was deleted elsewhere, which also drops Try again |
 | Details | quiet, `muted-foreground`, `aria-expanded`; shown when the sentence replaces the provider's own text |
 | details | the provider's raw text in 12/16 mono, `muted-foreground`, wrapping, on its own line under the row |
 
@@ -16,12 +15,14 @@ A failed reply, under the learner's message. `data-testid="turn-error"`, `role="
 
 | Kind | When | Sentence |
 |---|---|---|
-| signed-out | the server refused the turn before it started (`provider_key_missing`: Claude isn't signed in); his words went back into the box. The line leaves once the account reads connected again, and his box takes focus (round 8: it stayed red after Refresh, and focus went to Sign in). While the composer's "Sign in to Claude" pill shows, the line has no Sign in of its own | Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box. |
+| signed-out | the server refused the turn before it started (`provider_key_missing`: Claude isn't signed in); his words went back into the box. The line leaves on the first status reading after the refusal that says connected, and his box takes focus (round 8: it stayed red after Refresh, and focus went to Sign in; round 10: a reading that never said signed out kept it for good). The line has no Sign in of its own: the composer's "Sign in to Claude" pill is the one sign-in, and it shows only while Claude reads signed out. A turn Claude Code failed because Claude was signed out loses its line the same way, and keeps Try again alone, under "The tutor couldn't reply." (round 15, M2: its Sign in showed exactly once Claude was back, and crashed the page). The line reads the status again as it appears and whenever the window takes focus, where he signs in elsewhere (round 16, m2: with Claude back the line stood 30 s and more) | Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box. (the second sentence only when the refused turn carried words he typed: a press such as Next problem has none, round 11, 4 minor 3) |
 | key | status 401 or 403, or the text says the key is invalid | The provider rejected your API key. |
-| busy | status 429 or 529, or a rate limit or overload | The provider is busy. Wait a moment, then retry. |
-| offline | the browser never reached the app (`Failed to fetch`, `Load failed`, Firefox's `NetworkError…`) | Couldn't reach the app. Check it's running, then try again. |
+| busy | status 429 or 529, or a rate limit or overload | The provider is busy. Wait a moment, then try again. |
+| offline | the browser never reached the app (`Failed to fetch`, `Load failed`, Firefox's `NetworkError…`); his message goes back into the box as he typed it. After a dropped connection the reply it cut stays owed: Try again asks the app about it, and it comes back by itself once the app is reachable (round 10) | Couldn't reach the app. Check it's running, then try again. Pressed again and failing again: Still can't reach the app. Check it's running, then try again. |
 | gone | the app answered `{"error":"Unknown chat"}`: the lesson was deleted, in another tab or window | This lesson was deleted. |
 | written | already prose for people (the subscription providers' curated failures, the Claude plan limit, an app route's `{"error":"…"}` sentence) | the message itself, no Details |
 | failed | anything else | The reply failed. |
+
+A press that fails the same way as the one before it is answered too: the line enters again, with "Still" where its words take it (round 9: a second Enter while the app was down changed nothing on screen, so he could not tell the press counted).
 
 Sources: Apple HIG alerts (say what happened and what to do, in plain words, no codes), Vercel's error messages guideline (every error suggests a next step), findings from the review site (the raw `401 {"type":"error",…}` line).

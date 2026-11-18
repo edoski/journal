@@ -47,7 +47,7 @@ import {
 import { activeCompactionOf, type CompactionDetails } from "./compaction.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 import { photosOf } from "./photos.ts";
-import type { SubagentArtifactData, SubagentResultMeta } from "./contracts/jobs.ts";
+import { isSubagentFailure, type SubagentArtifactData, type SubagentResultMeta } from "./contracts/jobs.ts";
 import type { PlanBlockData } from "./contracts/chat.ts";
 
 /** A view part — the loose part vocabulary the renderers consume (the same
@@ -198,9 +198,42 @@ function repeatedOutputCalls(messages: readonly LhMessage[]): ReadonlySet<string
 	return repeated;
 }
 
+/** A finished demo, visual, research or PDF result, or its abort notice. */
+const isJobMarker = (m: LhMessage): boolean => m.role === "custom" && (m.customType === "subagent-steer" || m.customType === "subagent-abort");
+
+/** The record in the order the lesson reads it: a job's result that
+ *  joined a run partway (drained at the start of the run his answer
+ *  began, or steered in between its messages) is drawn after that run's
+ *  last message, so a demo never lands between his answer and the reply
+ *  to it, behind "New reply" (round 12, 3 D1); one that opened a wake
+ *  run of its own stays where it is, above the words that introduce it.
+ *  The record keeps the order the tutor read it in. Pure. */
+export function inReadingOrder(messages: readonly LhMessage[]): readonly LhMessage[] {
+	const out: LhMessage[] = [];
+	let held: LhMessage[] = [];
+	let ended = true;
+	for (const m of messages) {
+		if (isJobMarker(m) && !ended) {
+			held.push(m);
+			continue;
+		}
+		// The next input ends the run the held results joined, a question that ended it included.
+		if (opensTurn(m) && held.length > 0) {
+			out.push(...held);
+			held = [];
+		}
+		out.push(m);
+		if (m.role === "assistant") ended = m.stopReason === "stop" || m.stopReason === "error" || m.stopReason === "aborted";
+		else if (opensTurn(m)) ended = false;
+	}
+	return held.length > 0 ? [...out, ...held] : out;
+}
+
 /** Project the native record (+ live turn working list) into the client's
- *  view messages. Pure: the same input always projects to the same list. */
-export function projectView(messages: readonly LhMessage[], live?: LiveTurnState): LhViewMessage[] {
+ *  view messages, in reading order (`inReadingOrder`). Pure: the same
+ *  input always projects to the same list. */
+export function projectView(record: readonly LhMessage[], live?: LiveTurnState): LhViewMessage[] {
+	const messages = inReadingOrder(record);
 	const out: LhViewMessage[] = [];
 	// Output calls become text rather than tool parts, so read settled
 	// failures up front: a failed call must retain the normal error path.
@@ -330,7 +363,8 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 						} else {
 							const text = sendToUserText(block);
 							if (text !== undefined) {
-								rest.push({ type: "text", id: `${m.id}-t${textN++}`, text, state: "done" });
+								// Streaming while its reply does: words still arriving.
+								rest.push({ type: "text", id: `${m.id}-t${textN++}`, text, state: streamingMessage ? "streaming" : "done" });
 							}
 						}
 						// No live tool card or acknowledgement: this channel is
@@ -461,6 +495,29 @@ function applyResultTo(part: LhViewPart | undefined, result: ToolResultMessage):
 }
 
 /** A marker's projected message (handoff/steers) or splice (plan block). */
+/** A delivered demo or figure, joined onto the tool part that called for
+ *  it (`artifact`): the steer's id carries its saved invert switch. */
+export interface PlacedArtifact {
+	messageId: string;
+	data: SubagentArtifactData;
+}
+
+/** A built demo or figure: what the lesson draws at its call. A failure
+ *  keeps its own note where it was read. */
+function placedAtCall(artifact: { kind: SubagentArtifactData["kind"]; result: SubagentArtifactData["result"] }): boolean {
+	return (artifact.kind === "demo" || artifact.kind === "visual") && artifact.result !== undefined && !isSubagentFailure(artifact.kind, artifact.result);
+}
+
+/** The tool part of a call, newest first. */
+function callPart(out: readonly LhViewMessage[], toolCallId: string | undefined): LhViewPart | undefined {
+	if (!toolCallId) return undefined;
+	for (let i = out.length - 1; i >= 0; i--) {
+		const part = out[i]!.parts.findLast((p) => p.type.startsWith("tool-") && p.toolCallId === toolCallId);
+		if (part) return part;
+	}
+	return undefined;
+}
+
 function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 	switch (marker.customType) {
 		case "course-context":
@@ -477,6 +534,16 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 				id: marker.id,
 				role: "user",
 				parts: [{ type: "data-graph-context", id: `gc_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
+		case "task-continue": {
+			// His Continue on the task: a seam that draws nothing, as a
+			// session's resume draws nothing. The model reads the content.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-task-continue", id: `tc_${marker.id}`, data: marker.details }],
 			});
 			return;
 		}
@@ -511,6 +578,15 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 				result: SubagentArtifactData["result"];
 				ui?: SubagentArtifactData["ui"];
 			};
+			// A built demo or figure is drawn where the tutor called for it,
+			// from its job the moment the job is done, before the tutor reads
+			// it (round 13, 3 N1): its result draws there, never again here.
+			const call = placedAtCall(artifact) ? callPart(out, meta.toolCallId) : undefined;
+			if (call) {
+				call.artifact = { messageId: marker.id, data: { kind: artifact.kind, result: artifact.result, ui: artifact.ui } } satisfies PlacedArtifact;
+				out.push({ id: marker.id, role: "user", metadata: { subagentResult: meta, atCall: true }, parts: [textPart(marker.content)] });
+				return;
+			}
 			out.push({
 				id: marker.id,
 				role: "user",

@@ -2,17 +2,15 @@
 
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckIcon, CircleDotIcon, CircleXIcon, DumbbellIcon, MessageSquareIcon, WaypointsIcon } from "lucide-react";
+import { CheckIcon, CircleDotIcon, CircleXIcon, DumbbellIcon, MessageSquareIcon } from "lucide-react";
 import type { TopicAttempt } from "@/src/core";
 import { cn } from "@/lib/utils";
 import { GUTTER } from "@/components/unit-inbox/topic-page/row-classes";
-import { ATTEMPT_WORDS } from "@/components/study-words";
+import { ATTEMPT_WORDS, TUTOR_WRITING } from "@/components/study-words";
 import { Button } from "@/components/ui/button";
-import { Hint } from "@/components/ui/hint";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { attemptMark, type SessionEntry } from "@/components/unit-inbox/topic-page/topic-facts";
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
-import { WhyMark } from "@/components/unit-inbox/topic-page/why-mark";
+import { StatusMark } from "@/components/unit-inbox/status-mark";
 import { LineText } from "@/components/line-text";
 
 const ICON = "size-4 text-muted-foreground";
@@ -49,7 +47,7 @@ const DATED = "grid-cols-[1rem_minmax(0,1fr)_auto_4.5rem]";
 /** The day in the date column, or its room. */
 function DateCell({ date, className }: { date: string | null; className?: string }) {
 	return date ? (
-		<span data-slot="topic-history-date" className={cn("col-start-4 justify-self-end text-label text-muted-foreground tabular-nums", className)}>
+		<span data-slot="topic-history-date" className={cn("col-start-4 justify-self-end text-callout text-muted-foreground tabular-nums", className)}>
 			{date}
 		</span>
 	) : null;
@@ -63,7 +61,7 @@ const RESULT = {
 	wrong: { Icon: CircleXIcon, words: ATTEMPT_WORDS.wrong },
 } as const;
 
-/** One scored attempt: how it went and the tutor's sentence. Not a
+/** One scored attempt: how it went and the tutor's sentence, whole. Not a
  *  control. The icon sits on the first line, and the sentence and the
  *  date share its baseline. Given `date`, it carries the date column. */
 export function AttemptEntry({ attempt, title, titleOf, ends, date }: { attempt: TopicAttempt; title?: string; titleOf: (handle: string) => string; ends: Ends; date?: string | null }) {
@@ -72,12 +70,18 @@ export function AttemptEntry({ attempt, title, titleOf, ends, date }: { attempt:
 	return (
 		<li data-slot="topic-attempt" data-result={result} className={cn("grid min-h-10 items-baseline gap-x-4 gap-y-0.5 py-2.75", GUTTER, date === undefined ? "grid-cols-[1rem_minmax(0,1fr)]" : DATED, spine(ends))}>
 			<Icon role="img" aria-label={how ? `${words}, ${how}` : words} className={cn(ICON, "mt-px self-start")} />
-			<p className={cn("line-clamp-2 text-row text-muted-foreground", date !== undefined && "col-span-2")}>
+			{/* The sentence wraps whole (round 13, 1 n11: "…4, n…" cut in the
+			    320px column beside an empty half-pane); Earlier moves the days
+			    that do not fit behind "Show the rest". A formula wider than the
+			    row breaks after a top-level relation, KaTeX's own break points,
+			    never inside a power or a fraction (globals.css; round 14, m37:
+			    one box ran past the column and was clipped to "≈ 0.7"). */}
+			<p data-slot="topic-attempt-text" className={cn("text-body text-muted-foreground", date !== undefined && "col-span-2")}>
 				<LineText>{title ?? attempt.text}</LineText>
 			</p>
 			{date !== undefined && <DateCell date={date} />}
 			{how && (
-				<span data-slot="topic-attempt-how" className={cn("col-start-2 text-label text-muted-foreground", date !== undefined && "col-span-2")}>
+				<span data-slot="topic-attempt-how" className={cn("col-start-2 text-callout text-muted-foreground", date !== undefined && "col-span-2")}>
 					<LineText>{how}</LineText>
 				</span>
 			)}
@@ -86,69 +90,54 @@ export function AttemptEntry({ attempt, title, titleOf, ends, date }: { attempt:
 }
 
 /** One session: a link to it, its title, and whether it waits on him or
- *  the tutor is writing. A lesson that planned carries the button that
- *  puts its steps on the map; the lesson on the map has its row filled.
- *  Given `date`, it carries the date column; `writing` is what it says
- *  while the tutor writes. */
+ *  the tutor is writing. A lesson that planned puts its steps on the map
+ *  when he points at it (pointer or focus), as Home's map follows the row
+ *  he points at; the lesson on the map has its row filled. Round 10, 1 m8:
+ *  the button that did it was a glyph with no words.
+ *  Given `date`, it carries the date column. */
 export function SessionItem({
 	entry,
 	shown,
 	onShow,
 	ends,
 	date,
-	writing = "The tutor is writing",
 }: {
 	entry: SessionEntry;
 	shown: boolean;
 	onShow: (id: string) => void;
 	ends: Ends;
 	date?: string | null;
-	writing?: string;
 }) {
 	const { chat, state } = entry;
 	const planned = isPlanned(entry);
-	const why = state === "your-turn" ? <WhyMark kind="reply" words="Your turn" /> : state === "working" ? <WhyMark kind="writing" words={writing} /> : null;
+	const why = state === "your-turn" ? { fact: { kind: "your-turn" } as const, words: "Your turn" } : state === "working" ? { fact: { kind: "working" } as const, words: TUTOR_WRITING } : null;
 	return (
-		<li data-slot="topic-history-session" data-shown={shown || undefined} className={cn("grid gap-x-4", GUTTER, date === undefined ? "grid-cols-[1rem_minmax(0,1fr)_auto]" : DATED, spine(ends))}>
+		<li data-slot="topic-history-session" data-shown={shown || undefined} data-on-map={planned ? "point" : undefined} className={cn("grid gap-x-4", GUTTER, date === undefined ? "grid-cols-[1rem_minmax(0,1fr)_auto]" : DATED, spine(ends))}>
 			<Button
 				variant="quiet"
 				asChild
 				data-testid="unit-page-session"
 				className={cn(
 					// Its fill reaches back over the row's gutter and 12px past the column, as every row's does (`BLEED`).
-					"col-span-full row-start-1 -mr-3 -ml-[1.875rem] grid h-10 grid-cols-subgrid items-center gap-x-4 rounded-lg pr-3 pl-[1.875rem] text-left font-normal whitespace-normal has-[>svg]:pr-3 has-[>svg]:pl-[1.875rem]",
+					// 40px for a title on one line; a longer title wraps whole, the icon, status and date on its first line
+					// (round 14, m36: "Eigenvalues a…" cut beside an empty half-pane).
+					"col-span-full row-start-1 -mr-3 -ml-[1.875rem] grid h-auto min-h-10 grid-cols-subgrid items-start gap-x-4 rounded-lg py-2.5 pr-3 pl-[1.875rem] text-left font-normal whitespace-normal has-[>svg]:pr-3 has-[>svg]:pl-[1.875rem]",
 					shown && "bg-fill-selected hover:bg-fill-selected",
 				)}
 			>
-				<Link href={`/chat/${chat.id}`}>
-					{chat.kind === "practice" ? <DumbbellIcon aria-label="Practice" className={ICON} /> : <MessageSquareIcon aria-label="Lesson" className={ICON} />}
-					<span className="truncate text-row text-foreground">
+				<Link href={`/chat/${chat.id}`} onPointerEnter={planned ? () => onShow(chat.id) : undefined} onFocus={planned ? () => onShow(chat.id) : undefined}>
+					{chat.kind === "practice" ? <DumbbellIcon aria-label="Practice" className={cn(ICON, "mt-0.5")} /> : <MessageSquareIcon aria-label="Lesson" className={cn(ICON, "mt-0.5")} />}
+					<span data-slot="topic-history-session-title" className="text-pretty text-body text-foreground">
 						<LineText>{chat.title}</LineText>
 					</span>
-					{(planned || why) && (
-						<span className="flex items-center gap-2 justify-self-end">
-							{why}
-							{planned && <span aria-hidden className="size-6" />}
+					{why && (
+						<span className="flex h-5 items-center justify-self-end">
+							<StatusMark data-slot="topic-why" {...why} className="max-w-56" />
 						</span>
 					)}
-					{date !== undefined && <DateCell date={date} />}
+					{date !== undefined && <DateCell date={date} className="leading-5" />}
 				</Link>
 			</Button>
-			{planned && (
-				<Hint label={shown ? "Its steps are on the map" : "Show its steps on the map"} side="left">
-					<Button
-						variant="quiet"
-						size="icon-inline"
-						data-slot="topic-map-toggle"
-						aria-label="Show its steps on the map"
-						aria-pressed={shown}
-						onClick={() => onShow(chat.id)}
-						className={cn("relative z-10 col-start-3 row-start-1 self-center justify-self-end", shown && "text-foreground")}
-					>
-						<WaypointsIcon aria-hidden />
-					</Button>
-				</Hint>
-			)}
 		</li>
 	);
 }
@@ -183,8 +172,8 @@ export function HistoryPane({ className, children }: { className?: string; child
 		};
 	}, [measure]);
 	return (
-		<ScrollArea bar={false} viewportRef={viewport} viewportClassName="min-h-0" data-slot="topic-history" className={cn("-mx-3 flex min-h-0 flex-col", className)} style={edgeFade(edges.top, edges.bottom)}>
+		<div ref={viewport} data-slot="topic-history" className={cn("-mx-3 min-h-0 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-ring", className)} style={edgeFade(edges.top, edges.bottom)}>
 			<div className="flex flex-col px-3">{children}</div>
-		</ScrollArea>
+		</div>
 	);
 }

@@ -94,10 +94,14 @@ export function courseStandingOf(json: unknown): CourseStanding | null {
 /** GET /api/course-standing's answer. Only a course the engine lists is
  *  read; an engine failure answers with no standing. */
 export async function courseStandingRead(workspace: string): Promise<{ status: 200 | 404; body: CourseStandingResponse }> {
+	const unknown = { status: 404 as const, body: { ok: false as const, code: "unknown_course" as const, error: "No registered course has this folder" } };
+	// A folder the registry names runs its standing beside the listing, not
+	// after it: each is the engine replaying every course (round 15, P7).
+	const registered = stores.courseRecords.registered?.();
+	if (registered && !registered.includes(workspace)) return unknown;
+	const standing = registered ? stores.courseRecords.run(workspace, { verb: "standing" }) : null;
 	const listing = await listCourses();
-	if (!listing.available || !listing.courses.some((c) => c.workspace === workspace)) {
-		return { status: 404, body: { ok: false, code: "unknown_course", error: "No registered course has this folder" } };
-	}
-	const result = await stores.courseRecords.run(workspace, { verb: "standing" });
+	if (!listing.available || !listing.courses.some((c) => c.workspace === workspace)) return unknown;
+	const result = await (standing ?? stores.courseRecords.run(workspace, { verb: "standing" }));
 	return { status: 200, body: { ok: true, standing: result.ok ? courseStandingOf(result.json) : null } };
 }

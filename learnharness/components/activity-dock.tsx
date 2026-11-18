@@ -52,8 +52,6 @@ interface FeedUsage extends NonNullable<JobRecord["usage"]> {
 }
 
 export interface FeedJob extends JobRecord {
-	/** Read-time server estimate; absent on older transport payloads. */
-	costUsd?: number | null;
 	title: string;
 	usage?: FeedUsage;
 	/** Server-joined live catalog limit (owner amendment 2026-09-23) —
@@ -372,7 +370,7 @@ function ActivityRow({
 				{STOP_WORDS[abortState ?? "idle"]}
 			</Button>)}
 			{detailOpen && (
-				<div data-testid="activity-blob-detail" className="flex flex-col gap-1 pb-2 pl-8 pr-2 pt-1 text-label text-muted-foreground">
+				<div data-testid="activity-blob-detail" className="flex flex-col gap-1 pb-2 pl-8 pr-2 pt-1 text-callout text-muted-foreground">
 					{blob.activity && <p className="break-words text-foreground">{blob.activity}</p>}
 					<Button variant="quiet" size="xs" asChild className="-ml-1.5 w-fit font-normal">
 						<Link href={target.href}>

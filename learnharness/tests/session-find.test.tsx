@@ -85,7 +85,7 @@ describe("sessionFindRanges — the displayed-text DOM seam", () => {
 		mount(`<div data-session-find-root="">
 			<p>needle visible</p>
 			<p hidden>needle hidden-attr</p>
-			<div data-lh-menu><p>needle menu</p></div>
+			<div data-radix-popper-content-wrapper><p>needle menu</p></div>
 			<span class="katex-mathml">needle mathml</span>
 			<textarea>needle draft</textarea>
 		</div>`);
@@ -134,7 +134,7 @@ describe("sessionFindHasForegroundLayer — the one-Esc law", () => {
 
 	it("a surfaced menu/dialog/cheat sheet outranks the Find bar", () => {
 		for (const html of [
-			'<div data-lh-menu></div>',
+			'<div data-radix-popper-content-wrapper><div role="listbox" data-state="open"></div></div>',
 			'<div data-testid="cheat-sheet"></div>',
 			'<div role="dialog"></div>',
 			'<div data-radix-popper-content-wrapper></div>',
@@ -150,9 +150,9 @@ describe("sessionFindHasForegroundLayer — the one-Esc law", () => {
 	});
 
 	it("a force-mounted closed popover (the lesson's details) is not surfaced, through its Popper wrapper either", () => {
-		mount(`<div data-radix-popper-content-wrapper><div role="dialog" data-lh-menu data-state="closed" hidden></div></div>`);
+		mount(`<div data-radix-popper-content-wrapper><div role="dialog" data-state="closed" hidden></div></div>`);
 		assert.equal(sessionFindHasForegroundLayer(document), false);
-		mount(`<div data-radix-popper-content-wrapper><div role="dialog" data-lh-menu data-state="open"></div></div>`);
+		mount(`<div data-radix-popper-content-wrapper><div role="dialog" data-state="open"></div></div>`);
 		assert.equal(sessionFindHasForegroundLayer(document), true);
 	});
 });

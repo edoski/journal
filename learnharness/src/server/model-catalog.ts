@@ -6,7 +6,7 @@
  * key, no environment key, no keyed provider reaches a model call.
  */
 
-import { claudeConnected, refreshClaudeConnections } from "../agent/claude-connection.ts";
+import { claudeConnected, refreshClaudeConnections, type RefreshClaudeOptions } from "../agent/claude-connection.ts";
 import { claudeSubscriptionModel, claudeSubscriptionModels } from "../agent/sdk/engine.ts";
 import type { ModelStatus } from "../core/contracts/models.ts";
 import { effectiveSettings } from "./stores.ts";
@@ -18,9 +18,8 @@ export function providerConnected(provider: string): boolean {
 }
 
 /** The live-limits index: provider:id → contextWindow over the signed-in
- *  accounts. The one source for every context meter's denominator — the
- *  activity feed (observability.ts) and compaction resolve job and turn
- *  limits through this. A model missing here reads limit-null (usage-only). */
+ *  accounts: the activity feed (observability.ts) resolves job limits
+ *  through this. A model missing here reads limit-null (usage-only). */
 export function catalogContextLimits(): Map<string, number> {
 	return new Map(claudeSubscriptionModels().map((model) => [`${model.provider}:${model.id}`, model.contextWindow]));
 }
@@ -30,9 +29,11 @@ export function claudeAccountKnown(provider: string): boolean {
 	return claudeSubscriptionModel(provider) !== undefined;
 }
 
-/** GET /api/models: the settings' account, re-checked, and the model's window. */
-export async function modelStatus(): Promise<ModelStatus> {
-	await refreshClaudeConnections();
+/** GET /api/models: the settings' account, re-checked, and the model's
+ *  window. Forced (`?refresh=1`), the sign-in is checked again at once,
+ *  with no usage probe to wait on (round 10, 4 minor 1). */
+export async function modelStatus(options: RefreshClaudeOptions = {}): Promise<ModelStatus> {
+	await refreshClaudeConnections(options);
 	const account = effectiveSettings().claude.account;
 	return {
 		account,

@@ -6,7 +6,7 @@ import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said, type SidebarPlace, type TopicFact } from "@/components/unit-inbox/sidebar-says";
-import { ARC_EXAM_WORDS, courseShareWords, firstLessonWords, startsWhyShort } from "@/components/study-words";
+import { ARC_EXAM_WORDS, ARC_ROW_EXAM_WORDS, courseShareWords, firstLessonWords, shortDay } from "@/components/study-words";
 import { nowFor } from "@/components/unit-inbox/now-inbox";
 import { todayTop } from "@/components/unit-inbox/today/today-top";
 import { buildInbox } from "@/components/unit-inbox/units";
@@ -25,8 +25,7 @@ import { lastSessionOf } from "@/components/course-page/course-head/head-facts";
 export const GROUP_IDS = ["needs-you", "learning", "not-started", "on-your-own"] as const;
 export type GroupId = (typeof GROUP_IDS)[number];
 
-/** Each group's name on the page: Needs you is Home's Today, the others
- *  the sidebar's shelves. */
+/** Each group's name on the page: Needs you is Home's Today. */
 export const GROUP_WORDS: Record<GroupId, string> = {
 	"needs-you": "Needs you",
 	learning: "Learning",
@@ -42,6 +41,11 @@ export interface CourseTopic {
 	standing: Standing;
 	current: boolean;
 	fact: TopicFact | null;
+	/** The fact's words as the row shows them, its shortest whole words
+	 *  ("Due 6 Nov", "Back 20 Nov", "Planned 18 Nov", `shownWords`), its
+	 *  whole sentence (`fact.words`, the sidebar's) kept for the row's
+	 *  hover hint. */
+	factWords: string | null;
 	/** The topic's page. */
 	href: string;
 }
@@ -61,11 +65,12 @@ const HERE: TopicFact = { kind: "here", words: CURRENT_TAG };
  * (spec: course-page.md, "The groups"):
  *   - Needs you: the topics Home's Today takes up (the sidebar's top,
  *     `todayTop` over every course), in Today's order, with Today's reason;
- *   - Learning: the sidebar's Working and Learning shelves, in their order;
+ *   - Learning: taught and not solid, or solid but weak (`restTopics`'
+ *     working, then learning), in that order;
  *   - Not started: the rest of the path, in the order the plan starts
  *     them (`starts`), those it has no day for last, in the engine's path
  *     order;
- *   - On your own: the sidebar's On your own shelf, in its order.
+ *   - On your own: solid and not weak (`restTopics`' known), in its order.
  * Each row ends in the sidebar's fact for it (`sidebarSays`). `chats`
  * are every session (with those started on a topic's page linked to it);
  * `courses` every course, since Today weighs them together. Always the
@@ -97,10 +102,32 @@ function courseRows(course: StudyCourse, chats: readonly ChatListItem[], courses
 		const here = current && group !== "needs-you" && (fact === null || fact.kind === "back" || fact.kind === "studied");
 		// A topic not started says the day the plan starts it, not the group's own "Not started" (round 5).
 		const planned: TopicFact | null = group === "not-started" && fact === null && topic.starts ? { kind: "next", words: topic.starts <= map.today ? "Planned today" : `Planned ${planDay(topic.starts)}` } : null;
-		return { topic, group, fact: here ? HERE : (planned ?? fact), standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
+		// A start the exam's plan puts after an exam still ahead, one it has no room for or leaves out, says so,
+		// its day in the hint (round 12, 1 m11: "Geometric · Planned 29 Nov" on the exam's own course page while
+		// its topic page said "Not before the exam"), where he is too (round 13, 1 n2: "You are here" beside the
+		// head's no room before the exam to start it).
+		const leftOut = map.exam?.leavesOut?.includes(topic.handle) ?? false;
+		const waits = leftOut || (map.exam?.doesNotFit?.includes(topic.handle) ?? false);
+		const afterExam = planned && topic.starts && map.exam && map.exam.daysLeft >= 0 && topic.starts > map.exam.date && waits;
+		const shown = here && !afterExam ? HERE : (planned ?? fact);
+		const words = afterExam ? ARC_ROW_EXAM_WORDS[leftOut ? "leftOut" : "noRoom"] : planned && shown === planned && topic.starts && topic.starts > map.today ? `Planned ${shortDay(topic.starts)}` : shownWords(shown);
+		return { topic, group, fact: shown, factWords: words, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
 	});
 	return { rows, said };
 }
+
+/** A row's fact in the words the sidebar and the map's card say it, so a
+ *  review reads one way on every surface ("Due 6 Nov", "Due 13
+ *  Nov, back 23 Dec"; round 15, m10: "Due 6 Nov" in the arc list beside
+ *  "Due since 6 Nov" in the Now row, "Back 23 Dec" against the card's "Due
+ *  since 13 Nov, back 23 Dec"), a method he mixed up as "Mixed up". */
+function shownWords(fact: TopicFact | null): string | null {
+	if (!fact) return null;
+	return fact.kind === "slip" && fact.slip === "mixed" ? MIXED_UP : fact.words;
+}
+
+/** A mixed-up method's slip on a row, the method named in its hint. */
+const MIXED_UP = "Mixed up";
 
 /** The arcs the course page leads with: the map's, when it has two or more
  *  he can see; null otherwise, and the page shows its four groups as a
@@ -117,9 +144,6 @@ export interface CourseArcSection {
 	/** One of its topics is one Home's Today takes up: the line says
 	 *  "Needs you" in place of where the arc stands. */
 	needsYou: boolean;
-	/** Its ring: the share of its live topics he can do on his own, as
-	 *  Home's ring counts a course; null for an arc with none live. */
-	share: number | null;
 	/** "Partly on the exam" or "Not on the exam", when the next exam leaves
 	 *  some arc out and this one is not wholly on it; else null. */
 	exam: string | null;
@@ -127,11 +151,17 @@ export interface CourseArcSection {
 	current: boolean;
 }
 
+/** Whether an arc's line offers its check: it is ready for one, and it
+ *  does not need him, so the line ends in one chip (round 16, m5: "Needs
+ *  you" beside "Test this arc"). Pure. */
+export function offersCheck(section: Pick<CourseArcSection, "arc" | "needsYou">): boolean {
+	return section.arc.state === "ready" && !section.needsYou;
+}
+
 /**
  * The course's arcs in study order (spec: course-page.md, "Arcs"), each
- * with its topics as the page's rows (the groups' words and facts), its
- * ring, "Needs you" when Today takes up one of its topics, and its exam
- * words. Null for a course `shownArcs` gives none. `chats` and `courses`
+ * with its topics as the page's rows (the groups' words and facts),
+ * "Needs you" when Today takes up one of its topics, and its exam words. Null for a course `shownArcs` gives none. `chats` and `courses`
  * as `courseGroups` reads them. Pure.
  */
 export function courseArcs(course: StudyCourse, chats: readonly ChatListItem[] = [], courses: readonly StudyCourse[] = [course]): CourseArcSection[] | null {
@@ -149,65 +179,23 @@ export function courseArcs(course: StudyCourse, chats: readonly ChatListItem[] =
 			arc,
 			topics,
 			needsYou: topics.some((row) => row.group === "needs-you"),
-			share: arcShare(course, arc.handle),
 			exam: leavesSomeOut && (cover === "part" || cover === "none") ? ARC_EXAM_WORDS[cover] : null,
 			current: arc.handle === here,
 		};
 	});
 }
 
-/** An arc's ring: the share of its live topics he can do on his own, as
- *  Home's ring counts a course (`courseProgress`); null with none live. */
-export function arcShare(course: StudyCourse, arc: ArcHandle): number | null {
-	const live = course.map.topics.filter((t) => t.arc === arc && t.excluded === undefined);
-	const progress = courseProgress({ ...course, map: { ...course.map, topics: live } });
-	return progress ? progress.solid / progress.of : null;
-}
-
-/** Where he picks up in a course with arcs, and what new topic comes next
- *  (spec: course-page.md, "What next"). */
-export interface WhatNext {
-	/** What Home's Today puts first for this course (`todayTop`), with the
-	 *  arc of the topic it leads with; null when Today has nothing here. */
-	pickUp: { line: NowLine; arc: CourseMapArc | null } | null;
-	/** The next new topic the plan starts (the earliest `starts`), other
-	 *  than the one he picks up, with why it starts then as Today's rows
-	 *  say it (`startsWhyShort`: "After Expectation", "Back to Matrices")
-	 *  and its arc; null when the plan starts none. */
-	then: { topic: CourseMapTopic; why: string; arc: CourseMapArc | null; href: string; whyNamesArc: boolean } | null;
-}
-
 /**
- * The course page's "what next", across arcs: the course's first line on
- * Home's Today, read through `todayTop` over every course, so a slip in
- * another arc that Today puts first is what he picks up; then the next new
- * topic the plan starts, in the plan's words. Null for a course the page
- * shows without arcs, or when there is nothing to say. Pure.
+ * Where he picks up in a course with arcs (spec: course-page.md, "Now"):
+ * the course's first line on Home's Today, read through `todayTop` over
+ * every course, so a slip in another arc that Today puts first is what he
+ * picks up. Null for a course the page shows without arcs, or when Today
+ * has nothing here. Pure.
  */
-export function whatNext(course: StudyCourse, chats: readonly ChatListItem[] = [], courses: readonly StudyCourse[] = [course]): WhatNext | null {
+export function pickUpLine(course: StudyCourse, chats: readonly ChatListItem[] = [], courses: readonly StudyCourse[] = [course]): NowLine | null {
 	const { map } = course;
-	const arcs = shownArcs(map);
-	if (!arcs) return null;
-	const arcOf = (topic: CourseMapTopic | null | undefined) => (topic?.arc ? (arcs.find((a) => a.handle === topic.arc) ?? null) : null);
-	const top = todayTop(nowFor(courses, chats, null, map.today), buildInbox(courses, chats, null), chats).find((item) => item.line.row.course?.map.workspace === map.workspace);
-	const pickUp = top ? { line: top.line, arc: arcOf(top.line.lead ?? top.line.topics[0]) } : null;
-	const NEVER = "9999-12-31";
-	const next = map.topics
-		.filter((t) => t.starts && t.excluded === undefined && !top?.line.topics.some((o) => o.handle === t.handle))
-		.sort((a, b) => (a.starts ?? NEVER).localeCompare(b.starts ?? NEVER))[0];
-	const why = next ? (next.startsWhy ?? { kind: "next" as const, arc: next.arc }) : null;
-	const then =
-		next && why
-			? {
-					topic: next,
-					why: startsWhyShort(why, map),
-					arc: arcOf(next),
-					href: unitHref(map.workspace, next.handle),
-					// "Next in Eigenvalues", "Back to Matrices", "Early, from Orthogonality" name the arc already.
-					whyNamesArc: why.arc !== undefined && (why.kind !== "after" || (why.needs.length === 0 && why.partners.length === 0)),
-				}
-			: null;
-	return pickUp || then ? { pickUp, then } : null;
+	if (!shownArcs(map)) return null;
+	return todayTop(nowFor(courses, chats, null, map.today), buildInbox(courses, chats, null), chats).find((item) => item.line.row.course?.map.workspace === map.workspace)?.line ?? null;
 }
 
 /** The arc a page shows first: where he is, else the first. */
@@ -215,17 +203,12 @@ export function openingArc(sections: readonly CourseArcSection[]): ArcHandle | n
 	return (sections.find((s) => s.current) ?? sections[0])?.arc.handle ?? null;
 }
 
-/** The words on the course's one button: the same as Home's lesson, with
- *  the topic page's Resume for a session that waits on him. */
-export type CourseAction = "Resume" | "Review" | "Continue" | "Start";
-
 /** The header's lesson: Home's line for this course (`todayRows`), as a
- *  lesson in Today's words, why it is next, and the button's word. */
+ *  lesson in Today's words (its press's word too), and why it is next. */
 export interface CourseNext {
 	row: TodayRow;
 	lesson: Lesson;
 	why: Why | null;
-	action: CourseAction;
 }
 
 /** What the course's button takes up, exactly as Home's line for it would:
@@ -237,8 +220,7 @@ export interface CourseNext {
 export function courseNext(course: StudyCourse, open: readonly ChatListItem[]): CourseNext {
 	const mine = open.filter((c) => c.course?.workspace === course.map.workspace);
 	const row: TodayRow = todayRows([course], mine, course.map.today)[0] ?? { kind: "course", course, step: nextStepOf(course) };
-	const lesson = lessonOf(row);
-	return { row, lesson, why: whyOf(row), action: lesson.action === "Open" ? "Resume" : lesson.action };
+	return { row, lesson: lessonOf(row), why: whyOf(row) };
 }
 
 /** The header's facts, each a few words; null where the course has none. */
@@ -247,7 +229,7 @@ export interface CourseFacts {
 	progress: string | null;
 	/** "Exam in 21 days", "Exam tomorrow", "Exam today". */
 	exam: string | null;
-	/** "Studied 2 days ago", "Studied today"; a course not studied yet,
+	/** "Studied 4 Nov", "Studied today"; a course not studied yet,
 	 *  when its first lesson comes and why ("First lesson Thu 19 Nov, after
 	 *  Probability's new topics"), else "Not studied yet". */
 	studied: string | null;
@@ -274,8 +256,8 @@ export interface CourseView {
 	groups: readonly CourseGroup[];
 	/** The course's arcs, when the page leads with them (`courseArcs`). */
 	arcs: readonly CourseArcSection[] | null;
-	/** Where he picks up and what comes next, above the arcs (`whatNext`). */
-	whatNext: WhatNext | null;
+	/** Where he picks up, Now's line under the head (`pickUpLine`). */
+	pickUp: NowLine | null;
 	said: ReadonlyMap<TopicHandle, Said>;
 	facts: CourseFacts;
 	next: CourseNext;
@@ -288,7 +270,7 @@ export interface CourseView {
  *  not among his courses; or the course. */
 export type CourseRead =
 	| { status: "loading" }
-	| { status: "unavailable" }
+	| { status: "unavailable"; reason: string }
 	| { status: "failed" }
 	| { status: "unreadable"; course: UnreadableCourse }
 	| { status: "missing" }
@@ -300,7 +282,7 @@ export function courseRead(state: StudyHomeState, workspace: string): CourseRead
 		case "loading":
 			return { status: "loading" };
 		case "unavailable":
-			return { status: "unavailable" };
+			return { status: "unavailable", reason: state.reason };
 		case "failed":
 			return { status: "failed" };
 		case "ready": {
@@ -315,7 +297,7 @@ export function courseRead(state: StudyHomeState, workspace: string): CourseRead
 					course,
 					groups: courseGroups(course, state.chats, state.courses),
 					arcs: courseArcs(course, state.chats, state.courses),
-					whatNext: whatNext(course, state.chats, state.courses),
+					pickUp: pickUpLine(course, state.chats, state.courses),
 					said: sidebarSays(state.courses, state.chats, workspace),
 					facts: courseFacts(course, state.chats),
 					next: courseNext(course, state.open),

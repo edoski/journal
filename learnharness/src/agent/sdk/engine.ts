@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import { query as sdkQuery, type Options, type SDKMessage, type SDKUserMessage, type SpawnedProcess, type SpawnOptions } from "@anthropic-ai/claude-agent-sdk";
+import { query as sdkQuery, startup as sdkStartup, type Options, type SDKMessage, type SDKUserMessage, type SpawnedProcess, type SpawnOptions } from "@anthropic-ai/claude-agent-sdk";
 import type { Api, Model, ThinkingLevel } from "@earendil-works/pi-ai";
 import { ANTHROPIC_MODELS } from "@earendil-works/pi-ai/providers/anthropic.models";
 import { CLAUDE_MODEL, CLAUDE_SUBSCRIPTION } from "../../core/contracts/claude.ts";
@@ -18,6 +18,11 @@ export interface SdkQuery extends AsyncIterable<SDKMessage> {
 }
 export type SdkPrompt = string | AsyncIterable<SDKUserMessage>;
 export type QueryFn = (params: { prompt: SdkPrompt; options: Options }) => SdkQuery;
+/** A Claude Code process started and initialized before its prompt is
+ *  known (the SDK's `startup()`): `query` sends it the prompt, once;
+ *  `close` ends it unused. */
+export interface SdkWarmQuery { query(prompt: SdkPrompt): SdkQuery; close(): void }
+export type StartupFn = (params: { options: Options }) => Promise<SdkWarmQuery>;
 
 /** How one call reaches Claude Code: the process options for an account, and
  *  the config folder whose `projects/` holds that account's sessions. */
@@ -34,6 +39,9 @@ export interface SdkEngine {
 	model: Model<Api>;
 	level?: ThinkingLevel;
 	query: QueryFn;
+	/** Starts a turn's process before the turn (prestart.ts); absent, every
+	 *  turn starts its own. */
+	startup?: StartupFn;
 	launch: () => SdkLaunch;
 }
 
@@ -121,9 +129,16 @@ export function claudeEngine(providerId: string): SdkEngine {
 		model,
 		level: CLAUDE_MODEL.thinkingLevel,
 		query: sdkQuery as QueryFn,
+		startup: sdkStartup as StartupFn,
 		launch: () => claudeSdkLaunch(claudeAccount(providerId) ?? "missing"),
 	};
 }
+
+/** Claude Code's own tools an agent may carry: they keep their names in the
+ *  record and in a seeded session. */
+export const CLAUDE_CODE_TOOLS = ["Read", "Grep", "Glob", "WebSearch"] as const;
+export type ClaudeCodeTool = (typeof CLAUDE_CODE_TOOLS)[number];
+export const isClaudeCodeTool = (name: string): name is ClaudeCodeTool => (CLAUDE_CODE_TOOLS as readonly string[]).includes(name);
 
 /** App tools reach the model as MCP tools of this in-process server. */
 export const SDK_TOOL_SERVER = "lh";

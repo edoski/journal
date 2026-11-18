@@ -52,8 +52,8 @@ test("the background save of what he learned has no Stop; a figure being made ke
 	const root = createRoot(host);
 	try {
 		await act(async () => root.render(<ActivitySection feed={feed} />));
-		assert.equal(host.querySelector('[data-testid="activity-abort"]'), null);
-		const withJob: ActivityFeed = { ...feed, jobs: [{ id: "j1", kind: "visual", chatId: "c1", toolCallId: "t", status: "running", activity: "", createdAt: new Date(2).toISOString(), updatedAt: new Date(2).toISOString(), title: "Eigen lesson", contextLimit: null, costUsd: null }] };
+		assert.ok(host.querySelector('[data-testid="activity-abort"]') === null);
+		const withJob: ActivityFeed = { ...feed, jobs: [{ id: "j1", kind: "visual", chatId: "c1", toolCallId: "t", status: "running", activity: "", createdAt: new Date(2).toISOString(), updatedAt: new Date(2).toISOString(), title: "Eigen lesson", contextLimit: null }] };
 		await act(async () => root.render(<ActivitySection feed={withJob} />));
 		assert.equal(host.querySelectorAll('[data-testid="activity-abort"]').length, 1);
 	} finally {
@@ -76,6 +76,6 @@ test("a reply he stopped reads as his stop; one a restart cut reads as cut off",
 	assert.equal(stoppedByHim([user("u1"), reply("a1", "aborted", "")]), true, "before its first word too");
 	assert.equal(stoppedByHim([user("u1")]), false, "the app restarted before any reply");
 	assert.equal(stoppedByHim([user("u1"), reply("a1", "error")]), false);
-	assert.equal(pausedWords({ stopped: true }), "You stopped the tutor");
+	assert.equal(pausedWords({ stopped: true }), "Stopped by you");
 	assert.equal(pausedWords({}), "Reply cut off");
 });

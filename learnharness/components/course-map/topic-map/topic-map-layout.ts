@@ -6,7 +6,7 @@
  */
 
 import { coordSimplex, decrossOpt, decrossTwoLayer, graphStratify, layeringSimplex, sugiyama } from "d3-dag";
-import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "@/src/core";
+import type { CourseMapEdge, TopicHandle } from "@/src/core";
 
 export const NODE_WIDTH = 224;
 export const NODE_HEIGHT = 64;
@@ -17,11 +17,8 @@ export interface NodeSize {
 	height: number;
 }
 
-/** The box a lesson's step map draws its steps in (224×64). */
+/** The layered drawing's default box (224×64). */
 export const NODE_SIZE: NodeSize = { width: NODE_WIDTH, height: NODE_HEIGHT };
-/** The topic map's card (spec: topic-map.md, Node): the pie beside a title
- *  and one line under it, wide enough for the longest status. */
-export const TOPIC_NODE_SIZE: NodeSize = { width: 248, height: 56 };
 /** Space between topics in a layer, and between layers. */
 export const NODE_GAP = 24;
 export const LAYER_GAP = 56;
@@ -62,7 +59,7 @@ export interface TopicMapLayout {
 type Need = Extract<CourseMapEdge, { kind: "needs" }>;
 
 /** One column in the given order: a course with no `needs` at all. */
-function column(topics: readonly CourseMapTopic[], node: NodeSize): TopicMapLayout {
+function column(topics: readonly { handle: TopicHandle }[], node: NodeSize): TopicMapLayout {
 	const placed = new Map<TopicHandle, PlacedTopic>();
 	topics.forEach((topic, index) => placed.set(topic.handle, { handle: topic.handle, x: 0, y: index * (node.height + NODE_GAP), layer: index }));
 	return {
@@ -84,7 +81,7 @@ function rankUnder(top: ReadonlySet<TopicHandle>, parents: ReadonlyMap<string, r
 
 /** The layered drawing of a course's needs. `top` are topics held in the
  *  first layer, above every other (an arc's entry topics, arc-view.ts). */
-export function layoutTopicMap(topics: readonly CourseMapTopic[], edges: readonly CourseMapEdge[], node: NodeSize = NODE_SIZE, top: ReadonlySet<TopicHandle> = new Set()): TopicMapLayout {
+export function layoutTopicMap(topics: readonly { handle: TopicHandle }[], edges: readonly CourseMapEdge[], node: NodeSize = NODE_SIZE, top: ReadonlySet<TopicHandle> = new Set()): TopicMapLayout {
 	const needs = edges.filter((e): e is Need => e.kind === "needs");
 	if (needs.length === 0) return column(topics, node);
 	const parents = new Map<string, string[]>(topics.map((t) => [t.handle, []]));
@@ -125,28 +122,6 @@ export function layoutTopicMap(topics: readonly CourseMapTopic[], edges: readonl
 		});
 	}
 	return { node, width, height, topics: placed, routes, layers };
-}
-
-/**
- * A route as an SVG path: between layers one smooth S-curve that leaves and
- * arrives vertically, and straight down past a layer it skips. Pure.
- */
-export function routePath(points: readonly Point[]): string {
-	const [start, ...rest] = points;
-	if (!start) return "";
-	let d = `M${start[0]},${start[1]}`;
-	let from = start;
-	rest.forEach((to, index) => {
-		// The first step and every second one after it cross a layer gap; the others run down past a skipped layer.
-		if (index % 2 === 0) {
-			const mid = (from[1] + to[1]) / 2;
-			d += ` C${from[0]},${mid} ${to[0]},${mid} ${to[0]},${to[1]}`;
-		} else {
-			d += ` L${to[0]},${to[1]}`;
-		}
-		from = to;
-	});
-	return d;
 }
 
 /** A topic with every prerequisite it has, transitively. */
@@ -192,23 +167,21 @@ export function neighbourOf(layout: TopicMapLayout, edges: readonly CourseMapEdg
 	return linked.sort((a, b) => off(a) - off(b))[0] ?? null;
 }
 
+/** Room a card's tag ("You are here", "Next") takes above it. */
+export const TAG_ROOM = 20;
+
 export interface Camera {
 	x: number;
 	y: number;
 	zoom: number;
 }
 
-/** The whole lesson shows on a topic page's step map when it fits the
- *  frame at this scale or more: below it its titles drop under 10px. */
-export const WHOLE_COURSE_ZOOM = 0.75;
 /** The smallest scale a course map opens at: its 13px card titles draw at
  *  10.4px, about the 11px under which a title is too small to read (the
  *  round-3 evaluation, 14 Nov 2026; 75% drew them at 9.75px). Not 85%,
  *  which keeps a full 11px: on Edo's window Linear Algebra cannot open
  *  there without a card cut at the frame's edge, on Home or on its page. */
 export const READABLE_ZOOM = 0.8;
-/** The furthest the map zooms out by hand. */
-export const MIN_ZOOM = 0.4;
 
 /** The scale at which the whole drawing, with `room` around it, fits a
  *  frame. `room` is in the frame's pixels at any scale, as is every room
@@ -235,22 +208,29 @@ export function cameraAt(layout: TopicMapLayout, point: Point, zoom: number, fra
 	return { x: along(point[0], layout.width, frame.width, room.x, zoom), y: along(point[1], layout.height, frame.height, room.y, zoom), zoom };
 }
 
+/** How far past the whole drawing's zoom still counts as showing it whole: a zoom React Flow rounds. */
+const FIT_SLACK = 0.001;
+
+/** Whether the camera at `zoom` shows the whole drawing, which `fitted` (`wholeZoom`, never past 100%) fits: then
+ *  nothing is off screen, and a style held still while the map fits pans neither by drag nor by scroll. Pure. */
+export function showsWhole(zoom: number, fitted: number): boolean {
+	return zoom <= fitted + FIT_SLACK;
+}
+
+/** The furthest a camera may look for a map held still while it fits: the view that shows the drawing whole at
+ *  `fitted`, around its middle. At that zoom it is the frame's own size, so React Flow centres the drawing; zoomed
+ *  in, the camera pans within it. Pure. */
+export function wholeExtent(layout: TopicMapLayout, frame: Frame, fitted: number): [[number, number], [number, number]] {
+	const half = { x: frame.width / fitted / 2, y: frame.height / fitted / 2 };
+	return [
+		[layout.width / 2 - half.x, layout.height / 2 - half.y],
+		[layout.width / 2 + half.x, layout.height / 2 + half.y],
+	];
+}
+
 /** A topic's centre in a drawing. */
 export function centreOf(layout: TopicMapLayout, placed: PlacedTopic): Point {
 	return [placed.x + layout.node.width / 2, placed.y + layout.node.height / 2];
-}
-
-/**
- * Where the map opens: the whole course in the frame when it fits at 75%
- * or more, else full size on the current topic (the first topic when the
- * course has no current one). Pure.
- */
-export function openingCamera(layout: TopicMapLayout, current: TopicHandle | null, frame: Frame, room: Room): Camera {
-	const zoom = wholeZoom(layout, frame, room);
-	const middle: Point = [layout.width / 2, layout.height / 2];
-	if (zoom >= WHOLE_COURSE_ZOOM) return cameraAt(layout, middle, zoom, frame, room);
-	const at = (current && layout.topics.get(current)) ?? layout.topics.get(layout.layers[0]?.[0] as TopicHandle);
-	return cameraAt(layout, at ? centreOf(layout, at) : middle, 1, frame, room);
 }
 
 /** The scales a map may open at when the whole course does not fit: full
@@ -298,10 +278,6 @@ export function cardFit(box: { left: number; top: number; right: number; bottom:
 	if (l < fade.x - slack || r > frame.width - fade.x + slack || t < fade.y - slack || b > frame.height - fade.y + slack) return "faded";
 	return "clear";
 }
-/** The tolerance an opening view is judged with: half of `cardFit`'s pixel,
- *  so a page that scrolls to it, rounding by up to half a pixel more (the
- *  course page, `scrollOfCamera`), still cuts nothing. */
-const OPENING_SLACK = 0.5;
 
 /**
  * Where a map opens (spec: topic-map.md, Behaviour): the whole course
@@ -338,7 +314,7 @@ export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, 
 		const axis = (at: (p: PlacedTopic) => number, size: number, span: number, f: number, extent: number, pad: number, mid: number, top = false) => {
 			const drawn = extent * zoom;
 			if (drawn + pad * 2 <= span) return [Math.round(top ? pad : (span - drawn) / 2)];
-			// Rounded inward, so a page that scrolls the course with its room can reach every candidate.
+			// Rounded inward, so every candidate stays inside the drawing and its room.
 			const [low, high] = [Math.ceil(span - drawn - pad), Math.floor(pad)];
 			const clamp = (v: number) => Math.min(high, Math.max(low, Math.round(v)));
 			const edges = (lo: number, hi: number) => [f - lo, span - f - hi, f - hi, span - f - lo, -lo, -hi, span - hi, span - lo];
@@ -359,7 +335,7 @@ export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, 
 					if (p === target) continue;
 					const l = p.x * zoom + x;
 					const t = p.y * zoom + y;
-					const fit = cardFit({ left: l, top: t, right: l + w * zoom, bottom: t + h * zoom }, frame, fade, OPENING_SLACK);
+					const fit = cardFit({ left: l, top: t, right: l + w * zoom, bottom: t + h * zoom }, frame, fade);
 					if ((fit === "clear" || fit === "faded") && next.has(p.handle)) score.nextWhole += 1;
 					if (fit === "faded") score.cost += VIEW_WORTH.faded;
 					else if (fit === "clear") score.cost -= VIEW_WORTH.whole + (before.has(p.handle) ? VIEW_WORTH.before : next.has(p.handle) ? VIEW_WORTH.next : 0);

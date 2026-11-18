@@ -2,35 +2,40 @@
 
 import Link from "next/link";
 import { CircleDashedIcon, PlayIcon, SquarePenIcon } from "lucide-react";
-import type { ChatListItem } from "@/src/core";
+import type { ChatListItem, CourseMap } from "@/src/core";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
-import { resumableSession, sessionState } from "@/components/nav/session-state";
-import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
+import { continueHref, pausedWords, sessionState } from "@/components/nav/session-state";
+import { localDay } from "@/components/day-change";
+import { topicPress } from "@/components/unit-inbox/start-unit";
+import { useStartScope } from "@/components/start/start-scope";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { UnitStatusText } from "@/components/unit-inbox/unit-status";
-import { monogram, studiedWords, unitStatus, type Unit } from "@/components/unit-inbox/units";
-import { CARD_ACTION_PLACE, ROW_ACTION, ROW_BODY, ROW_FRAME, ROW_ITEM, ROW_TITLE, RowCard, rowSurface, STATUS_LINE, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
+import { StatusMark } from "@/components/unit-inbox/status-mark";
+import { TUTOR_WRITING } from "@/components/study-words";
+import { leftWords, monogram, studiedWords, unitStatus, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
+import { CARD_ACTION_PLACE, ROW_ACTION, ROW_BODY, ROW_FRAME, ROW_ITEM, RowCard, rowSurface, rowTitle, STATUS_LINE, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MathText, mathPlain } from "@/components/ui/math-text";
 
 export { rowSurface };
 
-/** Where a shelf row's action sits: over its status slot, on the row's
- *  last line, where the status always is (`ROW_FRAME`). */
-export const SLIM_ACTION_PLACE = "right-2.5 bottom-2.5 h-5";
+/** The mark's sizes: 16px beside a line (the sidebar, the calendar, search,
+ *  the course filter), 40px where a course leads a two-line row (Home's
+ *  Today rows and the course page's Now, as `CourseBadge`). */
+const MARK_SIZE = { line: "size-4 text-caption-2", badge: "size-10 text-title-3" } as const;
 
-/** A course's 16px mark, T3 Code's project monogram: its initials in a
- *  rounded tile tinted 14% by its own ink, in SF Pro at 500. The letters
- *  span the tile and centre in it, trimmed to their cap height, so every
- *  badge's letters sit on the same centre whatever their width. */
-export function CourseMark({ title, className }: { title: string; className?: string }) {
+/** A course's mark, T3 Code's project monogram: its initials in a rounded
+ *  tile tinted 14% by its own ink, in SF Pro at 500, at every size. The
+ *  letters span the tile and centre in it, trimmed to their cap height, so
+ *  every badge's letters sit on the same centre whatever their width. */
+export function CourseMark({ title, size = "line", className }: { title: string; size?: keyof typeof MARK_SIZE; className?: string }) {
 	return (
 		<span
 			aria-hidden
 			data-slot="course-mark"
 			className={cn(
-				"flex size-4 shrink-0 items-center justify-center rounded-[25%] bg-current/14 font-sans text-[9px] font-medium leading-none text-muted-foreground transition-[opacity,filter] motion-reduce:transition-none",
+				"flex shrink-0 items-center justify-center rounded-[25%] bg-current/14 font-sans font-medium leading-none text-muted-foreground transition-[opacity,filter] motion-reduce:transition-none",
+				MARK_SIZE[size],
 				className,
 			)}
 		>
@@ -39,25 +44,25 @@ export function CourseMark({ title, className }: { title: string; className?: st
 	);
 }
 
-/** The row's one action, over its status slot: Resume opens the session
- *  waiting on the learner (or running), else Study starts a new one on the
- *  topic. Shown on hover and on keyboard focus. */
-function RowAction({ unit, className }: { unit: Unit; className?: string }) {
-	const { start, starting } = useStartUnit();
-	const resume = resumableSession(unit.sessions);
-	const label = resume ? "Resume" : STUDY_WORDS;
-	const Icon = resume ? PlayIcon : SquarePenIcon;
+/** The row's one action, over its status slot: its topic's press, as the
+ *  topic page takes it (`topicPress`): the session it opens, or the task or
+ *  lesson he began picked up, else a new session on the topic, through the
+ *  sidebar's one start (`StartScope`). Shown on hover and on keyboard focus. */
+function RowAction({ unit, map, chats, className }: { unit: Unit; map: CourseMap; chats: readonly ChatListItem[]; className?: string }) {
+	const { start, starting } = useStartScope();
+	const press = topicPress(unit.topic, map, chats);
+	const Icon = press.continues ? PlayIcon : SquarePenIcon;
 	const props = {
 		"data-slot": "row-action",
-		"aria-label": `${label}: ${mathPlain(unit.topic.title)}`,
+		"aria-label": `${press.word}: ${mathPlain(unit.topic.title)}`,
 		className: cn(ROW_ACTION, className),
 	} as const;
-	if (resume) {
+	if (press.resume) {
 		return (
 			<Button asChild variant="quiet" size="xs" {...props}>
-				<Link href={`/chat/${resume.id}`} onClick={blurAfterPointerClick}>
+				<Link href={continueHref(press.resume)} onClick={blurAfterPointerClick}>
 					<Icon aria-hidden />
-					{label}
+					{press.word}
 				</Link>
 			</Button>
 		);
@@ -68,13 +73,13 @@ function RowAction({ unit, className }: { unit: Unit; className?: string }) {
 			size="xs"
 			disabled={starting !== null}
 			onClick={(e) => {
-				start(unit);
+				start(press.creation, { key: unit.key });
 				blurAfterPointerClick(e);
 			}}
 			{...props}
 		>
 			<Icon aria-hidden />
-			{label}
+			{press.word}
 		</Button>
 	);
 }
@@ -86,10 +91,10 @@ export function isUnitOpen(unit: Unit, pathname: string): boolean {
 
 /**
  * A topic on the list, a card (`RowCard`): the course's mark and name with
- * the status slot, then the topic's title at 14/500. A click opens the
+ * the status slot, then the topic's title (`rowTitle`). A click opens the
  * topic's page; a topic the tutor writes in recedes until hovered.
  */
-export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: string; active: boolean; parent?: string }) {
+export function TopicCard({ unit, map, chats, today, active, parent }: { unit: Unit; map: CourseMap; chats: readonly ChatListItem[]; today: string; active: boolean; parent?: string }) {
 	return (
 		<RowCard
 			href={unitHref(unit.course.workspace, unit.topic.handle)}
@@ -98,64 +103,11 @@ export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: 
 			parent={parent}
 			mark={<CourseMark title={unit.course.title} />}
 			course={unit.course.title}
-			status={<UnitStatusText status={unitStatus(unit, today)} />}
+			status={<UnitStatusMark status={unitStatus(unit, today)} />}
 			title={unit.topic.title}
-			action={<RowAction unit={unit} className={CARD_ACTION_PLACE} />}
+			action={<RowAction unit={unit} map={map} chats={chats} className={CARD_ACTION_PLACE} />}
 			recede={unit.now === "working"}
 		/>
-	);
-}
-
-/**
- * A known topic on its shelf, under the sidebar's one row rule
- * (`ROW_FRAME`): the course's mark, greyed until hovered, beside the
- * title, two lines at most, then when it comes back on a line of its own,
- * right-aligned, so every shelf row keeps one pitch whatever its title.
- * A click opens the topic's page; the action starts a review now.
- * `status` and `action` replace the slot's fact and the action (the
- * shelves under Today).
- */
-export function TopicSlimRow({
-	unit,
-	today,
-	active,
-	parent,
-	status,
-	action,
-}: {
-	unit: Unit;
-	today: string;
-	active: boolean;
-	parent?: string;
-	status?: React.ReactNode;
-	action?: React.ReactNode;
-}) {
-	return (
-		<li data-slot="unit-slim" className={ROW_ITEM}>
-			<Link
-				href={unitHref(unit.course.workspace, unit.topic.handle)}
-				onClick={blurAfterPointerClick}
-				aria-current={active ? "page" : undefined}
-				data-sidebar-row={unit.key}
-				data-sidebar-parent={parent}
-				data-testid="unit-row"
-				className={cn(rowSurface(active), ROW_FRAME)}
-			>
-				<span className={ROW_BODY}>
-					<CourseMark
-						title={unit.course.title}
-						className={cn("mt-0.5", !active && "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0")}
-					/>
-					<span data-slot="unit-row-title" className={cn(ROW_TITLE, active ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground")}>
-						<MathText>{unit.topic.title}</MathText>
-					</span>
-				</span>
-				<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, STATUS_LINE, "mt-1")}>
-					{status ?? <UnitStatusText status={unitStatus(unit, today)} />}
-				</span>
-			</Link>
-			{action ?? <RowAction unit={unit} className={SLIM_ACTION_PLACE} />}
-		</li>
 	);
 }
 
@@ -167,6 +119,26 @@ export function TopicSlimRow({
  * day (`twin`, `sessionTwins`), so the two tell apart at a glance.
  * `highlighted` is the search's keyboard walk.
  */
+/** A session row's status, its state's one phrase on every surface
+ *  (session-state.md): Your turn, Tutor writing, "Left off today" for a
+ *  session he left with Done for today, the cut reply's words, else when
+ *  he last studied in it. Pure. */
+/** A row's status (`unitStatus`) in its status slot, T3 Code's status
+ *  label: the one mark (`StatusMark`) at size `slot`; a topic not started
+ *  says so in words alone, and nothing to say draws nothing. */
+export function UnitStatusMark({ status }: { status: UnitStatus }) {
+	if (status.kind === "none") return status.words ? <StatusMark data-slot="unit-status" size="slot" fact={{ kind: "unstarted" }} words={status.words} /> : null;
+	const words = status.kind === "your-turn" ? "Your turn" : status.kind === "working" ? TUTOR_WRITING : status.words;
+	return <StatusMark data-slot="unit-status" size="slot" fact={status} words={words} />;
+}
+
+export function sessionRowStatus(chat: ChatListItem, state: ReturnType<typeof sessionState>, today: string): UnitStatus {
+	if (state === "working" || state === "your-turn") return { kind: state };
+	if (state === "left") return { kind: "task", words: leftWords(chat, today || localDay(new Date())) };
+	if (state === "paused") return { kind: "stopped", words: pausedWords(chat) };
+	return { kind: "studied", words: studiedWords(chat.updatedAt, today) };
+}
+
 export function SessionSlimRow({
 	chat,
 	today,
@@ -180,7 +152,8 @@ export function SessionSlimRow({
 	chat: ChatListItem;
 	/** The engine's study day, for how long ago. */
 	today: string;
-	/** The session's day when its title repeats in the list: "6 Nov". */
+	/** The session's day when its title repeats in the list: "6 Nov",
+	 *  shown after the title when its status says no day. */
 	twin?: string | null;
 	active: boolean;
 	highlighted?: boolean;
@@ -188,6 +161,11 @@ export function SessionSlimRow({
 	parent?: string;
 }) {
 	const state = sessionState(chat);
+	const status = sessionRowStatus(chat, state, today);
+	// A twin's day goes after its title only when its status names no day of
+	// its own (round 15, 1 m8 and 4 minor 10: "Total probability practice
+	// 6 Nov … 6 Nov").
+	const day = twin && status.kind !== "studied" && status.kind !== "task" ? twin : null;
 	return (
 		<Button
 			variant="list"
@@ -214,17 +192,13 @@ export function SessionSlimRow({
 				)}
 				<span
 					data-slot="unit-row-title"
-					className={cn(
-						ROW_TITLE,
-						active || state === "your-turn" ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground",
-						state === "your-turn" && "font-medium",
-					)}
+					className={rowTitle(active || highlighted || state === "your-turn")}
 				>
 					<MathText>{chat.title}</MathText>
-					{twin && (
-						<span data-slot="session-twin" className="ml-1.5 text-label font-normal whitespace-nowrap text-muted-foreground">
+					{day && (
+						<span data-slot="session-twin" className="ml-1.5 text-callout font-normal whitespace-nowrap text-muted-foreground">
 							<span className="sr-only">, </span>
-							{twin}
+							{day}
 						</span>
 					)}
 				</span>
@@ -234,9 +208,7 @@ export function SessionSlimRow({
 				data-testid={state === "your-turn" ? "session-waiting" : undefined}
 				className={cn(TRAILING_SLOT, STATUS_LINE, "mt-1 self-end")}
 			>
-				<UnitStatusText
-					status={state === "working" || state === "your-turn" ? { kind: state } : { kind: "studied", words: studiedWords(chat.updatedAt, today) }}
-				/>
+				<UnitStatusMark status={status} />
 			</span>
 		</Button>
 	);

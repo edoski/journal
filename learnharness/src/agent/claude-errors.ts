@@ -1,7 +1,6 @@
-import { CLAUDE_LIMIT_TEXT, CLAUDE_MODEL, CLAUDE_USAGE_URL } from "../core/contracts/claude.ts";
+import { CLAUDE_FAILED, CLAUDE_LIMIT_TEXT, CLAUDE_MODEL, CLAUDE_USAGE_URL, NO_KEY } from "../core/contracts/claude.ts";
 
-/** Every Claude failure the learner sees says no API key was used. */
-export const NO_KEY = " No API key was used.";
+export { CLAUDE_FAILED, NO_KEY };
 
 export interface ClaudeRateLimit { resetsAt?: number; rateLimitType?: string }
 
@@ -21,7 +20,7 @@ export function claudeErrorMessage({ rateLimit, status, code, text = "" }: { rat
 	if (code === "model_not_found" || status === 404 || /model\b.*\b(not found|not available|unavailable|does not exist)|(invalid|unknown) model/i.test(text)) {
 		return CLAUDE_MODEL_MISSING;
 	}
-	return `Claude request failed. Check that \`claude\` works in a terminal and your plan has usage left, then retry.${NO_KEY}`;
+	return CLAUDE_FAILED;
 }
 
 /** LearnHarness runs only CLAUDE_MODEL, so there is nothing to fall back to. */

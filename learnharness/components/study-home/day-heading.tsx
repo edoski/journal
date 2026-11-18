@@ -8,7 +8,7 @@ import { dayQuestion, nothingTodayWords, type NearExam } from "@/components/stud
  *  so the clock is the learner's. */
 export function DayHeading({ id, studied = false, exam = null, empty = false }: { id?: string; studied?: boolean; exam?: NearExam | null; empty?: boolean }) {
 	return (
-		<h1 id={id} data-slot="day-heading" className="text-heading font-medium text-foreground">
+		<h1 id={id} data-slot="day-heading" className="text-title-1 text-foreground">
 			{empty ? nothingTodayWords(studied) : dayQuestion(new Date().getHours(), studied, exam)}
 		</h1>
 	);

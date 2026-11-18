@@ -189,17 +189,25 @@ def test_the_plan_never_exceeds_his_capacity_or_touches_a_day_off(
     exam = None if exam_day is None else (len(first) // 2, exam_day)
     one, today = history(first, exam=exam)
     two, _ = history(second)
-    together = agenda.plan({"one": one, "two": two}, today, 45, week)
+    replayed = agenda.replay({"one": one, "two": two}, today, 45, week)
+    together = replayed.now
+    since = replayed.since
+    assert since is not None
+    added = {"one": agenda.touched(one, since), "two": agenda.touched(two, since)}
     for offset in range(45):
         day = today + timedelta(days=offset)
         planned = [days[offset] for days in together.days.values()]
         rate = week.on(day)
-        reviews = sum(len(entry["reviews"]) for entry in planned)
+        reviews = sum(
+            topic not in added[name]
+            for name, days in together.days.items()
+            for topic in days[offset]["reviews"]
+        )
         new = sum(len(entry["new"]) for entry in planned)
         assert reviews <= math.ceil(rate.reviews.value)
         assert new <= math.ceil(rate.new.value)
         if not week.studies(day):
-            assert reviews == new == 0
+            assert sum(len(entry["reviews"]) for entry in planned) == new == 0
         for entry in planned:
             assert not set(entry["reviews"]) & set(entry["new"])
 

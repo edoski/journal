@@ -1,4 +1,4 @@
-import { nativeInputCause, needsContinuation, NEUTRAL_MARKERS, SEND_TO_USER_TOOL, type LhMessage } from "./native-messages.ts";
+import { nativeInputCause, needsContinuation, NEUTRAL_MARKERS, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, type LhMessage } from "./native-messages.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 
 /**
@@ -24,16 +24,24 @@ function isEmptyStop(m: LhMessage): boolean {
 }
 
 /** What of a reply he reads: text the voice guard kept, a message sent
- *  to him, a question. A save or a lookup shows him nothing. */
-const SHOWN_TOOLS: readonly string[] = [SEND_TO_USER_TOOL, ...QUESTION_TOOLS];
+ *  to him, a question, a problem, a problem's close (its marks and model
+ *  solution), and a save of his work (the mark under his answer; round 9:
+ *  "before it replied" stood under marks and a Model solution). Lesson
+ *  progress or a lookup shows him nothing. */
+const SHOWN_TOOLS: readonly string[] = [SEND_TO_USER_TOOL, ...QUESTION_TOOLS, PRACTICE_PROBLEM_TOOL, PRACTICE_CONCLUDE_TOOL, "course_save"];
 
 /** Whether the tutor wrote to him after his latest input: a reply in the
- *  turn that was then stopped. */
+ *  turn that was then stopped. A reply that failed or was stopped ended an
+ *  earlier attempt, which a retry or Try again ran again: what it said is
+ *  not this reply's (round 12, 4 minor 5: "mid-reply" under a Try again
+ *  stopped before its first word, after a failed turn's mark). */
 function saidSinceInput(messages: readonly LhMessage[]): boolean {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const m = messages[i]!;
 		if (m.role === "assistant") {
-			if (!isEmptyStop(m) && m.content.some((b) => (b.type === "text" && b.text.trim() !== "") || (b.type === "toolCall" && SHOWN_TOOLS.includes(b.name) && hasArguments(b.arguments)))) return true;
+			if (isEmptyStop(m)) continue;
+			if (m.stopReason === "error" || m.stopReason === "aborted") return false;
+			if (m.content.some((b) => (b.type === "text" && b.text.trim() !== "") || (b.type === "toolCall" && SHOWN_TOOLS.includes(b.name) && hasArguments(b.arguments)))) return true;
 			continue;
 		}
 		if (!isNeutral(m) && nativeInputCause(m as never, messages.slice(0, i) as never) === "learner") return false;

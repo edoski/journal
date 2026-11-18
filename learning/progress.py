@@ -27,7 +27,7 @@ import math
 from itertools import groupby
 from typing import Any
 
-from learning import arc_rules, preferences
+from learning import arc_rules, memo, preferences
 from learning.schema import PatchResult, counts, number, unaided
 
 LADDER = (3, 7, 16, 35, 75, 160)
@@ -229,7 +229,9 @@ class Replay:
     """A topic's counted days replayed in order.
 
     ``verdicts`` holds one ``(day, grade)`` per counted day; ``days`` classifies
-    every attempted day as learning, probe or practice; ``expected`` is the next
+    every attempted day as learning, probe or practice; ``guessed`` holds the
+    counted days whose ``helped`` came only from a right unaided answer he
+    marked a guess (``right_guess``); ``expected`` is the next
     expected review day after the last verdict, and ``due`` the date the engine
     stores for it: after the exam when that day is on or after an exam still
     ahead of the verdict. ``schedule`` keeps each ``(day, due)`` the replay set,
@@ -238,6 +240,7 @@ class Replay:
 
     verdicts: list[tuple[str, str]] = field(default_factory=list)
     days: dict[str, str] = field(default_factory=dict)
+    guessed: set[str] = field(default_factory=set)
     expected: date | None = None
     due: date | None = None
     streak: int = 0
@@ -312,6 +315,15 @@ def grade(observation: dict[str, Any]) -> str:
     return "helped"
 
 
+def right_guess(observation: dict[str, Any]) -> bool:
+    """A right unaided answer that only his ``sure: guess`` keeps from
+    ``solid``: weaker evidence than a sure one, never evidence he lost it."""
+    return (
+        observation.get("sure") == "guess"
+        and grade({**observation, "sure": "neutral"}) == "solid"
+    )
+
+
 def confident_error(observation: dict[str, Any]) -> bool:
     """An incorrect answer the learner was confident in."""
     return (
@@ -369,11 +381,18 @@ def review_day(base: date, days: int, exam: Exam | None) -> date:
 
 def kept(base: date, expected: date, exam: Exam | None, *, solid: bool = False) -> date:
     """The review the engine stores. With an exam still ahead of ``base``, a
-    review on or after the exam, or after a ``solid`` answer from the final
-    review on, goes to its spaced date after the exam, the day after it at the
-    earliest; a miss or a helped answer still comes back before the exam."""
+    review after a ``solid`` answer from the final review on goes to its
+    spaced date after the exam, the day after it at the earliest; a miss or a
+    helped answer still comes back before the exam, on its eve when its step
+    lands on the exam day or after and the eve is still ahead (round 16, 1
+    M1: a right guess two days before the exam fell due on the exam day, so
+    its topic could not be solid in time and the starts that need it left
+    the plan). Any other review on or after the exam goes after it."""
     if exam is None or base >= exam.day:
         return expected
+    eve = exam.day - timedelta(days=1)
+    if not solid and expected >= exam.day and eve > base:
+        return eve
     if (solid and base >= exam.final) or expected >= exam.day:
         return max(expected, exam.day + timedelta(days=1))
     return expected
@@ -410,6 +429,8 @@ def replay(
             day not in learning and (day >= result.due.isoformat() or was_due)
         ):
             result.days[day], verdict = PROBE, _probe(items)
+            if verdict == "helped" and right_guess(items[0]):
+                result.guessed.add(day)
         elif day in learning:
             result.days[day], verdict = LEARNING, _learned(items)
         else:
@@ -462,8 +483,18 @@ def _level(topic: dict[str, Any], attempts: list[Attempt], replayed: Replay) -> 
 
 
 def _lapsed(replayed: Replay) -> bool:
+    """Not solid on the last counted day after a solid one. A right answer he
+    marked a guess is no lapse: his flag may bring the review sooner, never
+    lower what the topic held (round 16, 1 M1: a right guess on the exam's
+    eve lapsed Random variables, and Expectation and Poisson, which need it,
+    left the exam)."""
     grades = [verdict for _, verdict in replayed.verdicts]
-    return bool(grades) and grades[-1] != "solid" and "solid" in grades[:-1]
+    return (
+        bool(grades)
+        and grades[-1] != "solid"
+        and replayed.verdicts[-1][0] not in replayed.guessed
+        and "solid" in grades[:-1]
+    )
 
 
 def _relearn(replayed: Replay) -> bool:
@@ -583,7 +614,14 @@ def _repaired(
 
 
 def replays(record: dict[str, Any]) -> dict[str, Replay]:
-    """Every topic's replayed verdicts and next expected review."""
+    """Every topic's replayed verdicts and next expected review; once per
+    read of the plan for the same record (``memo``)."""
+    if not memo.active():
+        return _replays(record)
+    return dict(memo.once("replays", memo.content(record), lambda: _replays(record)))
+
+
+def _replays(record: dict[str, Any]) -> dict[str, Replay]:
     histories = _histories(record["observations"])
     exam_of = examining(record)
     return {
@@ -593,7 +631,16 @@ def replays(record: dict[str, Any]) -> dict[str, Replay]:
 
 
 def standings(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Every topic's standing, in one pass over the observations."""
+    """Every topic's standing, in one pass over the observations; once per
+    read of the plan for the same record (``memo``)."""
+    if not memo.active():
+        return _standings(record)
+    return dict(
+        memo.once("standings", memo.content(record), lambda: _standings(record))
+    )
+
+
+def _standings(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
     histories = _histories(record["observations"])
     exam_of = examining(record)
     return {
@@ -951,6 +998,34 @@ def excluded(record: dict[str, Any]) -> set[str]:
     return {key for key, topic in record["topics"].items() if "excluded" in topic}
 
 
+def lessons(record: dict[str, Any]) -> dict[str, dict[str, str | None]]:
+    """The lessons he has begun: each topic an open task holds, with the
+    days he worked on it there: each day the task was made or moved (None:
+    a task holds no time) and each other day with his first prediction on
+    it, at that prediction's time. A topic whose only answers are predictions is not taught yet
+    (``schema.counts``), but a lesson he began on it is begun: its first day
+    is his start (round 12, 1 D3: after two Poisson sessions the plan still
+    put its first lesson days later and said there was no room to start
+    it). A prediction still counts for nothing; it only dates the work."""
+    found: dict[str, dict[str, str | None]] = {}
+    for task in record["tasks"].values():
+        for topic in task.get("topics", ()):
+            if topic in record["topics"]:
+                days = found.setdefault(topic, {})
+                for name in ("created", "updated"):
+                    if day := task.get(name):
+                        days.setdefault(day, None)
+    for item in effective(record["observations"]).values():
+        if not item.get("predicted"):
+            continue
+        for topic in item["topics"]:
+            days = found.get(topic, {})
+            day, stamp = item["date"], item.get("recorded")
+            if topic in found and (day not in days or (days[day] or "") > stamp):
+                days[day] = stamp
+    return {topic: dict(sorted(days.items())) for topic, days in found.items() if days}
+
+
 def needs(record: dict[str, Any], key: str) -> list[str]:
     """A topic's prerequisites that the course still studies."""
     topics = record["topics"]
@@ -1014,6 +1089,18 @@ def opens(
     if open_ is not None:
         return record["topics"][key].get("arc") in open_
     return key == front or bool(needs(record, key))
+
+
+def stood_on(
+    record: dict[str, Any], ready: list[str], untaught: Collection[str]
+) -> list[str]:
+    """``ready`` with the topics another of ``untaught`` needs first, each
+    group in its own order: within a final review a start is late, and one
+    the rest of the exam stands on keeps more of it open than one nothing
+    needs (round 11: the Probability exam's eve started Poisson, first in
+    the path, while Expectation, which Variance needs, never fit)."""
+    needed = {need for key in untaught for need in needs(record, key)}
+    return sorted(ready, key=lambda key: key not in needed)
 
 
 def holding_raises(

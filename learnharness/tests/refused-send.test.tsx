@@ -28,7 +28,7 @@ Object.defineProperty(dom.window.HTMLTextAreaElement.prototype, "defaultValue", 
 });
 Object.assign(globalThis, { window: dom.window, document: dom.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true });
 
-const { createRoot } = await import("react-dom/client");
+const { createRoot } = await import("./helpers/app-render.tsx");
 const { ProseComposer } = await import("../components/lesson/prose/prose-composer.tsx");
 const { StickToBottom } = await import("use-stick-to-bottom");
 const { emptyDockSelection } = await import("../src/core/index.ts");
@@ -54,6 +54,7 @@ test("work on a problem refused at once comes back into the box", async () => {
 				onSaveDraft={noop}
 				onSubmitAnswer={noop}
 				onSubmitThinking={() => new Promise<boolean>((resolve) => { refuse = resolve; })}
+				onSteer={async () => true}
 				onRequest={noop}
 				onDraftChange={noop}
 			/>
@@ -62,7 +63,7 @@ test("work on a problem refused at once comes back into the box", async () => {
 	const field = () => host.querySelector<HTMLTextAreaElement>("textarea")!;
 	try {
 		await act(async () => {
-			Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, "value")!.set!.call(field(), "rank 2, so nullity 3");
+			Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, "value")!.set!.call(field(), "rank 2, so nullity = ");
 			field().dispatchEvent(new dom.window.Event("input", { bubbles: true }));
 		});
 		await act(async () => {
@@ -70,7 +71,7 @@ test("work on a problem refused at once comes back into the box", async () => {
 		});
 		assert.equal(field().value, "", "the box empties while the work is on its way");
 		await act(async () => refuse(false));
-		assert.equal(field().value, "rank 2, so nullity 3", "a refused send puts his work back");
+		assert.equal(field().value, "rank 2, so nullity = ", "a refused send puts his work back as he typed it, its trailing space too (round 9, 4 #7)");
 	} finally {
 		await act(async () => root.unmount());
 		host.remove();

@@ -49,6 +49,100 @@ function replaceEscapedDollars(content: string): string {
  * (1/6)³ in displays). */
 const fullSizeFractions = (body: string) => body.replace(/\\tfrac(?![A-Za-z])/g, "\\frac");
 
+/** One argument of a TeX command at `i`: a braced group (its inside) or a
+ *  single token. Null past the end. */
+function texArg(body: string, i: number): { arg: string; end: number } | null {
+	while (body[i] === " ") i++;
+	if (i >= body.length) return null;
+	if (body[i] === "{") {
+		let depth = 0;
+		for (let j = i; j < body.length; j++) {
+			if (body[j] === "\\") { j++; continue; }
+			if (body[j] === "{") depth++;
+			else if (body[j] === "}" && --depth === 0) return { arg: body.slice(i + 1, j), end: j + 1 };
+		}
+		return null;
+	}
+	const command = /^\\[A-Za-z]+/.exec(body.slice(i));
+	return command ? { arg: command[0], end: i + command[0].length } : { arg: body[i]!, end: i + 1 };
+}
+
+/** Whether TeX has a + or − at its own level past its first character:
+ *  as a numerator over a slash it needs parentheses. */
+function sumAtTop(tex: string): boolean {
+	let depth = 0;
+	for (let i = 0; i < tex.length; i++) {
+		const c = tex[i]!;
+		if (c === "\\") {
+			if (depth === 0 && /^\\(?:pm|mp)(?![A-Za-z])/.test(tex.slice(i))) return true;
+			i += (/^\\(?:[A-Za-z]+|.)/.exec(tex.slice(i))?.[0].length ?? 1) - 1;
+		} else if (c === "{" || c === "(" || c === "[") depth++;
+		else if (c === "}" || c === ")" || c === "]") depth--;
+		else if ((c === "+" || c === "-") && depth === 0 && tex.slice(0, i).trim() !== "") return true;
+	}
+	return false;
+}
+
+/** A denominator that reads as one thing after a slash: a number, a letter
+ *  or a command with its groups, with its index, power or factorial ("n",
+ *  "k!", "x_1", "\sqrt{x}"). */
+const ATOM = /^(?:-?[0-9.]+|[A-Za-z]|\\[A-Za-z]+(?:\{[^{}]*\})*)(?:[!']|[_^](?:\{[^{}]*\}|[A-Za-z0-9]))*$/;
+
+/** The commands that join or space terms rather than stand as one: a slash
+ *  beside them reads one way. Any other command (`\binom`, `\lambda`,
+ *  `\sqrt`, `\left`) is a factor. */
+const JOINS = new Set(["cdot", "times", "div", "pm", "mp", "le", "leq", "ge", "geq", "ne", "neq", "to", "in", "notin", "approx", "sim", "equiv", "quad", "qquad", "right", "mid", "implies", "iff", "ldots", "cdots", "dots", "text", "mathrm", "end"]);
+
+/** Whether a slash fraction would take in a factor beside it ("1/2I",
+ *  "1/nᵏ (n k)", round 11, 3 n11): a letter, digit, bracket or command
+ *  that is a term straight after it, or one that ends a term straight
+ *  before it. */
+function besideFactor(before: string, after: string): boolean {
+	const next = after.trimStart();
+	const nextCommand = /^\\([A-Za-z]+)/.exec(next);
+	const follows = nextCommand ? !JOINS.has(nextCommand[1]!) : /^[A-Za-z0-9({[]/.test(next);
+	const prev = before.trimEnd();
+	const prevCommand = /\\([A-Za-z]+)$/.exec(prev);
+	const precedes = prevCommand ? !JOINS.has(prevCommand[1]!) && prevCommand[1] !== "left" : /[A-Za-z0-9)\]}!]$/.test(prev) && !/\\[{}]$/.test(prev);
+	return follows || precedes;
+}
+
+/** An inline fraction set as a slash: `\frac` and `\dfrac` shrink or stack a fraction inside a
+ *  line of prose to two thirds of the text (round 9: "−15/n", "1/n" and the
+ *  binomial expansion too small to read), and a slash keeps the line's
+ *  height and size. Parentheses only where the slash would misread. */
+function slashFractions(body: string): string {
+	let out = "";
+	let i = 0;
+	while (i < body.length) {
+		// `\dfrac` too, which inline stacked a full-size fraction and
+		// doubled the line (round 10, 3 m5: P(X = k) = c·3ᵏ/k!).
+		const frac = /^\\[td]?frac(?![A-Za-z])/.exec(body.slice(i));
+		if (!frac) {
+			out += body[i];
+			i++;
+			continue;
+		}
+		const top = texArg(body, i + frac[0].length);
+		const bottom = top && texArg(body, top.end);
+		if (!top || !bottom) {
+			out += body.slice(i);
+			break;
+		}
+		const n = slashFractions(top.arg).trim();
+		const d = slashFractions(bottom.arg).trim();
+		const slash = `${sumAtTop(n) || n.includes("/") ? `(${n})` : n}/${ATOM.test(d) ? d : `(${d})`}`;
+		out += besideFactor(out, body.slice(bottom.end)) ? `(${slash})` : slash;
+		i = bottom.end;
+	}
+	return out;
+}
+
+/** Maths inside a line of prose keeps the line's size: fractions as a
+ *  slash, and no `\displaystyle`, which set a limit's subscript under it
+ *  and doubled the line (round 9). */
+const inlineSized = (body: string) => slashFractions(body.replace(/\\displaystyle(?![A-Za-z])\s*/g, ""));
+
 /** A matrix is read as a picture, so it stands in a display of its own,
  * never inside a line of prose, where it doubles the line's height (round
  * 8: a 2 × 2 matrix inline in a question). */
@@ -66,34 +160,72 @@ function inListOrTable(text: string, i: number): boolean {
 	return /^\s*(?:[-*+]|\d+[.)])\s/.test(line) || /^\s*\|/.test(line);
 }
 
+/** The punctuation that ends a clause, after a display or a formula lifted
+ *  out of the line, on its line or the next: it goes into the display with
+ *  it, so the next paragraph never starts with it (round 9: ". Before
+ *  computing anything"). */
+const TRAILING = /^\s*([.,;:!?]+)/;
+
+/** What the display ending at `end` takes after it: the punctuation, the
+ *  source it swallows, and the break before the words that follow. */
+function trailing(markdown: string, end: number): { punct: string; swallow: number; after: string } {
+	const match = TRAILING.exec(markdown.slice(end));
+	const rest = end + (match?.[0].length ?? 0);
+	return { punct: match?.[1] ?? "", swallow: match?.[0].length ?? 0, after: rest === markdown.length || markdown[rest] === "\n" ? "" : "\n\n" };
+}
+
+/** A word joined to inline maths by a hyphen ("$x$-axis"): a word joiner
+ *  holds it to the formula, so the line never breaks between "x" and
+ *  "-axis" (round 10, 2 m6), and the word stays prose, in the prose's type
+ *  (round 11, 2 n9: `\text{-dimensional}` set "4-dimensional" in maths
+ *  type). */
+const JOINED_WORD = /^-[A-Za-z]+(?:-[A-Za-z]+)*/;
+const WORD_JOINER = "\u2060";
+
 function transformDelimiters(markdown: string): string {
 	let offset = 0;
+	let swallow = 0;
 	return readContentSpans(markdown).map(span => {
 		const start = offset; offset += span.raw.length;
-		if (span.kind !== "math") return span.raw;
-		if (span.open === "$" && MATRIX_ENV.test(span.body) && !indented(markdown, start) && !inListOrTable(markdown, start)) {
-			const end = start + span.raw.length;
+		const skip = swallow; swallow = 0;
+		if (span.kind !== "math") return span.raw.slice(skip);
+		// A matrix inside a sentence, however it was written ($…$, $$…$$ or
+		// \(…\)), stands on its own line with its punctuation (round 10,
+		// 2 m6: "Take B = (2 1; 0 3) . Which…" from a one-line $$…$$).
+		const inSentence = span.open === "$" || span.open === "\\(" || (span.open === "$$" && !span.display && lonePrefix(markdown, start, start + span.raw.length) === null);
+		if (inSentence && MATRIX_ENV.test(span.body) && !indented(markdown, start) && !inListOrTable(markdown, start)) {
+			const { punct, swallow: taken, after } = trailing(markdown, start + span.raw.length);
+			swallow = taken;
 			const before = blockPosition(markdown, start) ? "" : "\n\n";
-			const after = end === markdown.length || markdown[end] === "\n" ? "" : "\n\n";
-			return `${before}$$\n${span.body.trim()}\n$$${after}`;
+			return `${before}$$\n${span.body.trim()}${punct}\n$$${after}`;
 		}
-		if (span.open === "$") return "$" + replaceEscapedDollars(span.body) + span.close;
+		if (span.open === "$$" && span.display) {
+			const { punct, swallow: taken, after } = trailing(markdown, start + span.raw.length);
+			if (!punct) return span.raw;
+			swallow = taken;
+			return `$$${span.body.trimEnd()}${punct}\n${span.close}${after}`;
+		}
+		if (span.open === "$") {
+			const joined = JOINED_WORD.test(markdown.slice(start + span.raw.length));
+			return "$" + inlineSized(replaceEscapedDollars(span.body)) + span.close + (joined ? WORD_JOINER : "");
+		}
 		if (span.open === "$$" && !span.display) {
 			// A formula alone on its line is a display, though written as
 			// $$…$$ on one line, which remark-math reads as inline.
 			const prefix = lonePrefix(markdown, start, start + span.raw.length);
 			const body = span.body.trim();
-			return prefix === null || !body ? span.raw : `$$\n${prefix}${body}\n${prefix}$$`;
+			if (!body) return span.raw;
+			return prefix === null ? `$$${inlineSized(span.body)}$$` : `$$\n${prefix}${body}\n${prefix}$$`;
 		}
 		if (span.open !== "\\(" && span.open !== "\\[") return span.raw;
 		const body = span.body.trim();
 		if (!body) return span.raw;
-		if (span.open === "\\(") return `$$${body}$$`;
+		if (span.open === "\\(") return `$$${inlineSized(body)}$$`;
 		if (indented(markdown, start)) return `$$${body.replace(/\s*\n\s*/g, " ")}$$`;
 		const before = blockPosition(markdown, start) ? "" : "\n\n";
-		const end = start + span.raw.length;
-		const after = end === markdown.length || markdown[end] === "\n" ? "" : "\n\n";
-		return `${before}$$\n${body}\n$$${after}`;
+		const { punct, swallow: taken, after } = trailing(markdown, start + span.raw.length);
+		swallow = taken;
+		return `${before}$$\n${body}${punct}\n$$${after}`;
 	}).join("");
 }
 

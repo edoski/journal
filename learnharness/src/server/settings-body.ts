@@ -1,129 +1,48 @@
 /**
- * The shared settings-PUT body parsers — one seam per settings surface.
- * The section parsers (settings-storage wave, 2026-09-19) follow the
- * house rules below.
+ * The settings-PUT body parsers, one per settings.json section; the route
+ * maps the URL section to its parser via SETTINGS_SECTIONS.
  *
  * Replace-whole semantics: the client sends the complete desired SECTION;
  * absent fields are absent overrides ({} clears everything). No merges, so
- * a stale client can never resurrect a cleared override. Unknown body keys
- * are dropped — unknown DISK keys are
- * a different concern and are preserved by the sanitizer (core/settings.ts).
+ * a stale client can never resurrect a cleared override. Every known field
+ * is strict (a bad one is a 400, never a silent clamp or drop) and unknown
+ * body keys are dropped. Unknown DISK keys are a different concern and are
+ * kept by the disk schema (core/settings.ts).
  */
 
-import { isHexColor } from "../core";
-import { isClaudeProvider } from "../core/contracts/claude.ts";
-import type { AppearanceSettings, ClaudeSettings } from "../core/settings.ts";
+import type { z } from "zod";
+import { AppearanceSettingsSchema, ClaudeSettingsSchema } from "../core/settings.ts";
 
 /** Parsed-or-rejected — `ok: false` carries the 400's error message. */
 export type SettingsBodyResult<T> =
 	| { ok: true; settings: T }
 	| { ok: false; error: string };
 
-// ─── Section parsers (settings-storage wave, 2026-09-19) ────────────────────
-// One parser per settings.json section; the route maps the URL section to
-// its parser via SETTINGS_SECTIONS below. Strict on every known field (a
-// bad type/shape is a 400, never a silent clamp/drop), unknown keys dropped.
+/** The 400 message for the first bad field, by its path. */
+const FIELD_ERRORS: Record<string, string> = {
+	mode: "mode must be \"dark\" or \"light\"",
+	background: "background must be a #hex color or null",
+	fontFamily: "fontFamily must be a non-empty string or null",
+	proseFontSize: "proseFontSize must be an integer between 12 and 24",
+	sessionNameSerif: "sessionNameSerif must be a boolean",
+	mdRendering: "mdRendering must be an object",
+	"mdRendering.headingWeight": "mdRendering.headingWeight must be an integer between 100 and 900",
+	"mdRendering.boldColor": "mdRendering.boldColor must be a #hex color or null",
+	"mdRendering.italicColor": "mdRendering.italicColor must be a #hex color or null",
+	account: "account must be a Claude account id",
+};
 
-function asRecord(body: unknown): Record<string, unknown> | null {
-	if (!body || typeof body !== "object" || Array.isArray(body)) return null;
-	return body as Record<string, unknown>;
+function bodyParser<T>(schema: z.ZodType<T>) {
+	return (body: unknown): SettingsBodyResult<T> => {
+		const parsed = schema.safeParse(body);
+		if (parsed.success) return { ok: true, settings: parsed.data };
+		return { ok: false, error: FIELD_ERRORS[parsed.error.issues[0]?.path.join(".") ?? ""] ?? "Invalid JSON body" };
+	};
 }
 
-/** A hex-or-null color field (appearance colors): null = default. */
-function parseHexOrNull(value: unknown, field: string): { color?: string | null; error?: string } {
-	if (value === null) return { color: null };
-	if (typeof value !== "string" || !isHexColor(value)) {
-		return { error: `${field} must be a #hex color or null` };
-	}
-	return { color: value };
-}
-
-/** appearance: { mode?, background?, fontFamily?, proseFontSize?,
- *  sessionNameSerif?, mdRendering? } */
-export function parseAppearanceSettingsBody(body: unknown): SettingsBodyResult<AppearanceSettings> {
-	const raw = asRecord(body);
-	if (!raw) return { ok: false, error: "Invalid JSON body" };
-	const settings: AppearanceSettings = {};
-	if (raw.mode !== undefined) {
-		if (raw.mode !== "dark" && raw.mode !== "light") {
-			return { ok: false, error: "mode must be \"dark\" or \"light\"" };
-		}
-		settings.mode = raw.mode;
-	}
-	if (raw.background !== undefined) {
-		const parsed = parseHexOrNull(raw.background, "background");
-		if (parsed.error) return { ok: false, error: parsed.error };
-		settings.background = parsed.color ?? null;
-	}
-	if (raw.fontFamily !== undefined) {
-		if (raw.fontFamily !== null && (typeof raw.fontFamily !== "string" || !raw.fontFamily.trim())) {
-			return { ok: false, error: "fontFamily must be a non-empty string or null" };
-		}
-		settings.fontFamily = raw.fontFamily as string | null;
-	}
-	if (raw.proseFontSize !== undefined) {
-		if (
-			typeof raw.proseFontSize !== "number" ||
-			!Number.isInteger(raw.proseFontSize) ||
-			raw.proseFontSize < 12 ||
-			raw.proseFontSize > 24
-		) {
-			return { ok: false, error: "proseFontSize must be an integer between 12 and 24" };
-		}
-		settings.proseFontSize = raw.proseFontSize;
-	}
-	if (raw.sessionNameSerif !== undefined) {
-		if (typeof raw.sessionNameSerif !== "boolean") {
-			return { ok: false, error: "sessionNameSerif must be a boolean" };
-		}
-		settings.sessionNameSerif = raw.sessionNameSerif;
-	}
-	if (raw.mdRendering !== undefined) {
-		const md = asRecord(raw.mdRendering);
-		if (!md) return { ok: false, error: "mdRendering must be an object" };
-		const rendering: NonNullable<AppearanceSettings["mdRendering"]> = {};
-		if (md.headingWeight !== undefined) {
-			if (
-				typeof md.headingWeight !== "number" ||
-				!Number.isInteger(md.headingWeight) ||
-				md.headingWeight < 100 ||
-				md.headingWeight > 900
-			) {
-				return { ok: false, error: "mdRendering.headingWeight must be an integer between 100 and 900" };
-			}
-			rendering.headingWeight = md.headingWeight;
-		}
-		if (md.boldColor !== undefined) {
-			const parsed = parseHexOrNull(md.boldColor, "mdRendering.boldColor");
-			if (parsed.error) return { ok: false, error: parsed.error };
-			rendering.boldColor = parsed.color ?? null;
-		}
-		if (md.italicColor !== undefined) {
-			const parsed = parseHexOrNull(md.italicColor, "mdRendering.italicColor");
-			if (parsed.error) return { ok: false, error: parsed.error };
-			rendering.italicColor = parsed.color ?? null;
-		}
-		if (Object.keys(rendering).length) settings.mdRendering = rendering;
-	}
-	return { ok: true, settings };
-}
-
-/** claude: { account? } — the Claude account every agent runs on. Whether
- *  T3 Code still has that account is the route's check. */
-export function parseClaudeSettingsBody(body: unknown): SettingsBodyResult<ClaudeSettings> {
-	const raw = asRecord(body);
-	if (!raw) return { ok: false, error: "Invalid JSON body" };
-	if (raw.account === undefined) return { ok: true, settings: {} };
-	if (typeof raw.account !== "string" || !isClaudeProvider(raw.account)) {
-		return { ok: false, error: "account must be a Claude account id" };
-	}
-	return { ok: true, settings: { account: raw.account } };
-}
-
-/** The section→parser map for PUT /api/settings/[section]. */
+/** The section→parser map for PUT /api/settings/[section]. Whether T3 Code
+ *  still has the claude section's account is the route's check. */
 export const SETTINGS_SECTIONS = {
-	appearance: parseAppearanceSettingsBody,
-	claude: parseClaudeSettingsBody,
+	appearance: bodyParser(AppearanceSettingsSchema),
+	claude: bodyParser(ClaudeSettingsSchema),
 } as const;
-
-export type SettingsSectionName = keyof typeof SETTINGS_SECTIONS;

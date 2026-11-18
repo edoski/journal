@@ -1,12 +1,12 @@
 # Agenda rows
 
-How a line of agenda's Today reads: the hybrid rows (`hybrid/hybrid.md`), the pie by the course, "2d ago" at the end of the course line, the reason as an icon and a few words at the end of the lesson line, both flush right. `today.tsx` draws them with no switch.
+How a line of agenda's Today reads: the hybrid rows (`hybrid/hybrid.md`), the pie by the course, "6 Nov" at the end of the course line, the reason as an icon and a few words at the end of the lesson line, both flush right. `today.tsx` draws them with no switch.
 
-Four candidates ran behind a Rows switch: `reason` (every row says why it is there now, as a sentence), `recency` (a row is a thread, "Studied 2 days ago"), `progress` (each course a tile with a pie that fills) and `hybrid`, against the course-and-lesson line of 12 Nov 2026. Edo picked hybrid on 13 Nov 2026, and the other three, the old line and the switch were deleted.
+Four candidates ran behind a Rows switch: `reason` (every row says why it is there now, as a sentence), `recency` (a row is a thread, "Studied 4 Nov"), `progress` (each course a tile with a pie that fills) and `hybrid`, against the course-and-lesson line of 12 Nov 2026. Edo picked hybrid on 13 Nov 2026, and the other three, the old line and the switch were deleted.
 
 ## Shared
 
-`row-facts.ts` holds what the rows read, engine fields only, each pure and tested (`tests/study-home.test.tsx`): `whyOf` (a session waiting on him; a review's lapse from `signals.lapsed`, else its most overdue `review.overdue`; an open task's `step`; the current topic), `studiedAgo` (`lastActiveDaysAgo`) and its sentence `lastStudied` (the course page's), `courseProgress` (topics he can do on his own, `independent` or better and not weak, of the map's topics), `foldLines` (past five courses, "Also today"). `progress-ring.tsx` draws `courseProgress` as the course's ring (`../../ui/pie.md`), never a topic's pie. `line-target.tsx` makes a whole line one control (a link to a waiting session, or Continue); `today-also.tsx` is the overflow line.
+`row-facts.ts` holds what the rows read, engine fields only, each pure and tested (`tests/study-home.test.tsx`): `whyOf` (a session waiting on him; a review's lapse from `signals.lapsed`, else its most overdue `review.overdue`; an open task's `step`; the current topic), `lastStudied` (`lastActiveDaysAgo`, the course page's), `courseProgress` (topics he can do on his own, `independent` or better and not weak, of the map's topics), `foldLines` (past five courses, "Also today"). `course-badge.tsx` draws `courseProgress` round the course's mark (`CourseBadge`, hybrid/hybrid.md), never a topic's pie. `line-target.tsx` makes a whole line one control through `linePress`, what a line of Today does wherever it is drawn (a link to a waiting session, or its course's step taken up), which the sidebar's card reads too (`../../unit-inbox/now-card.md`, press); `today-also.tsx` is the overflow line.
 
 ## The signal test
 

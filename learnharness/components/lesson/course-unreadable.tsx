@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CourseListing, UnreadableProblem } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
+import { useSerialRead } from "@/components/serial-read";
 import { LESSON_WORDS } from "@/components/study-words";
 import { unreadableLine } from "@/components/study-home/unreadable-course";
 
@@ -18,14 +19,20 @@ export function unreadableProblem(listing: CourseListing | null, workspace: stri
  *  back. */
 function useUnreadable(workspace: string | undefined): UnreadableProblem | null {
 	const [problem, setProblem] = useState<UnreadableProblem | null>(null);
-	const read = useCallback(() => {
-		if (!workspace) return;
-		void fetch("/api/courses", { cache: "no-store" })
-			.then((res) => (res.ok ? (res.json() as Promise<CourseListing>) : null))
-			.then((listing) => setProblem(unreadableProblem(listing, workspace)))
-			.catch(() => {});
-	}, [workspace]);
-	useEffect(read, [read]);
+	const course = useRef(workspace);
+	course.current = workspace;
+	// One read at a time: every write of the session asks again, and a read
+	// per write had the engine read every course over and over during a
+	// turn, so the notice cleared late once the record read again (round
+	// 13, 4 minor 5).
+	const read = useSerialRead(async () => {
+		const asked = course.current;
+		if (!asked) return;
+		const res = await fetch("/api/courses", { cache: "no-store" });
+		const listing = res.ok ? ((await res.json()) as CourseListing) : null;
+		if (course.current === asked) setProblem(unreadableProblem(listing, asked));
+	});
+	useEffect(read, [read, workspace]);
 	useServerEvent("course-changed", read);
 	useServerEvent("courses-changed", read);
 	useServerEvent("record-changed", read);
@@ -41,7 +48,7 @@ export function CourseUnreadableLine({ workspace }: { workspace: string | undefi
 	const problem = useUnreadable(workspace);
 	if (!problem) return null;
 	return (
-		<p role="status" data-testid="course-unreadable" className="text-row text-muted-foreground">
+		<p role="status" data-testid="course-unreadable" className="text-body text-muted-foreground">
 			{unreadableLine(problem)} {LESSON_WORDS.unreadableNotSaved}
 		</p>
 	);

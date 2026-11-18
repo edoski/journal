@@ -13,12 +13,15 @@ import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createFauxCore, fauxAssistantMessage, fauxText } from "@earendil-works/pi-ai";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
+import { realEngineMissing } from "./helpers/real-engine.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-brief-"));
 const PYTHON = path.join(TMP, "python");
 fs.writeFileSync(PYTHON, `#!/bin/sh\nexec "${process.execPath}" "${path.join(HERE, "fixtures", "fake-learning-engine.mjs")}" "$@"\n`, { mode: 0o755 });
 process.env.LH_DATA_DIR = path.join(TMP, "data");
+// The test's own HOME: no engine registry, never the registry of the person running it.
+process.env.HOME = path.join(TMP, "home");
 process.env.LH_LEARNING_ENGINE = TMP;
 process.env.LH_LEARNING_PYTHON = PYTHON;
 await signInTestClaude();
@@ -32,6 +35,10 @@ const { buildModeHandoffSteer } = await import("../src/core/contracts/jobs.ts");
 const { handleChatInput, handleChatRequest } = await import("../src/server/chat-handler.ts");
 const { runningTurn } = await import("../src/server/turn-runs.ts");
 const { chatStore } = await import("../src/store/chats.ts");
+const { emit } = await import("../src/core/events.ts");
+/** The fake engine's records changed, as a save announces it: the brief's
+ *  kept reads are read again. */
+const recordsChanged = () => emit("courses-changed", {});
 const { createPracticeAgent, createProberAgent } = await import("../src/agent/teacher-agent.ts");
 
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
@@ -41,7 +48,6 @@ after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 // `topics`, and a run-up that pushes the most overdue review past the five.
 const ENGINE_ROOT = path.resolve(HERE, "..", "..");
 const ENGINE_PYTHON = path.join(ENGINE_ROOT, ".venv", "bin", "python");
-const realEngine = fs.existsSync(ENGINE_PYTHON);
 
 type Resume = Record<string, unknown>;
 
@@ -93,8 +99,7 @@ function realResumes(): { open: Resume; focused: Resume; plan: Resume } {
 	return { open, focused: JSON.parse(engine("2026-11-07", ["resume"])) as Resume, plan };
 }
 
-// CI sets LH_REQUIRE_REAL_ENGINE, so a moved venv fails the gate instead of skipping these.
-describe("course brief projection of the real engine's resume", { skip: !realEngine && !process.env.LH_REQUIRE_REAL_ENGINE && "learning engine not installed" }, () => {
+describe("course brief projection of the real engine's resume", { skip: realEngineMissing(ENGINE_PYTHON) }, () => {
 	let RESUME: Resume = {};
 	let FOCUSED: Resume = {};
 	let PLAN: Resume = {};
@@ -104,7 +109,7 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 
 	it("teach: the weekday, levels, due topics without review keys, every weak gap, every open task's step, preferences and pinned knowledge", () => {
 		const { text } = projectCourseBrief(RESUME, "teach");
-		assert.match(text, /^\[Course record\] Linear Algebra · today 2026-11-07 \(Saturday\) · exam in 10 days/);
+		assert.match(text, /^\[Course record\] Linear Algebra · today 2026-11-07 \(Saturday\) · exam on Tuesday 17 November/);
 		assert.match(text, /Path, current rank: systems \(independent\), pivots \(new\), rank \(attempted\)/);
 		assert.match(text, /^Not started yet \(never taught, whatever their planned day\): pivots, eigen$/m, "round 8 (1 D10): the tutor misread which topics are started; eigen has a gap but was never taught");
 		assert.match(text, /- rank \(attempted\)\n/);
@@ -144,7 +149,7 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 
 	it("practice adds the current topic's review prompt, points and gap, and its wrongly chosen method", () => {
 		const { text } = projectCourseBrief(RESUME, "practice");
-		assert.match(text, /- rank \(attempted\)\n {2}prompt: Why is rank the dimension of the column space\?\n {2}points: span; independence\n {2}gap: counts vectors/);
+		assert.match(text, /- rank \(attempted\)\n {2}asked in its earlier reviews, newest first: "Rank of \[\[1,2\],\[2,4\]\]\?"\n {2}prompt: Why is rank the dimension of the column space\?\n {2}points: span; independence\n {2}gap: counts vectors/, "round 14, m5: the review lists what it asked before, so it asks another part");
 		assert.match(text, /wrongly chose pivots ×1/);
 	});
 
@@ -224,6 +229,7 @@ describe("course brief injection", () => {
 	it("a handoff to practice re-sends the brief for practice, with the run-up", async () => {
 		const workspace = "/study/linalg";
 		process.env.FAKE_ENGINE_PLAN = JSON.stringify({ today: "2026-11-07", courses: [{ workspace, runup: { days_left: 12, unready: ["rank"] } }] });
+		recordsChanged();
 		const chat = chatStore.createChat("practise rank", { workspace, title: "Linear Algebra" });
 		const handoff = { id: "h1", role: "assistant", content: [{ type: "toolCall", id: "call-h1", name: "practice", arguments: { scope: "rank", reason: "asked" } }], api: "faux", provider: "t", model: "t", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "toolUse", timestamp: 1 };
 		const result = { id: "r1", role: "toolResult", toolCallId: "call-h1", toolName: "practice", content: [{ type: "text", text: "ok" }], details: { ok: true, mode: "practice" }, isError: false, timestamp: 2 };
@@ -241,6 +247,7 @@ describe("course brief injection", () => {
 		const handle = runningTurn(chat.id);
 		if (handle) await new Response(handle.subscribe()).text();
 		delete process.env.FAKE_ENGINE_PLAN;
+		recordsChanged();
 		const messages = chatStore.getChat(chat.id)!.messages;
 		const brief = messages.find((m) => (m as { customType?: string }).customType === "course-context") as { content: string; details: { key: string } } | undefined;
 		assert.ok(brief, "the wake carries a brief");
@@ -343,8 +350,20 @@ describe("the daily plan of every course", () => {
 
 	it("gives a topic every review the plan holds, those of topics not taught yet inside the final review included", () => {
 		const { text } = projectCourseBrief(TODAY, "teach", plan([PROBABILITY]));
-		assert.match(text, /\n- Sat 14 Nov: review Law of total probability \(due since Sat 7 Nov, earlier days are full\), Poisson distribution, Expectation and linearity; start Variance \(after Expectation and linearity\)\n/);
+		assert.match(text, /\n- Sat 14 Nov: review Law of total probability \(due since Sat 7 Nov, earlier days are full\), Poisson distribution, Expectation and linearity; start Variance \(after Expectation and linearity, which it needs\)\n/);
 		assert.match(text, /\n- Sun 15 Nov: review Binomial distribution\n- Mon 16 Nov: review Variance, Bayes' rule\n/, "a topic's later review and a new topic's first one have their days");
+	});
+
+	it("says why a start waits on a topic it is kept apart from, the reason he is given when he asks (round 15, m2)", () => {
+		// Lens 1, 9 Nov: Poisson moved 9 → 13 Nov the day before, after a partly right Binomial review, and the tutor said
+		// "I can't see a recorded reason for the move", though the engine gives `why.poisson = {after, partners: [binomial]}`.
+		const map = courseMap("/study/probability", "Probability", null, [
+			topic("binomial", "Binomial distribution", { review: scheduled("2026-11-10") }),
+			topic("poisson", "Poisson distribution", untaught("2026-11-13", { kind: "after", needs: [], partners: ["binomial" as TopicHandle] })),
+		]);
+		const { text } = projectCourseBrief(TODAY, "teach", { plan: { workspace: "/study/probability", courses: [{ map, days: [day("2026-11-13", [], ["poisson"])] }], unread: [] } });
+		assert.match(text, /- Fri 13 Nov: start Poisson distribution \(after Binomial distribution, which it waits on until that is solid\)/);
+		assert.match(text, /A start's “after …” note is why it starts that day, the reason to give when he asks/);
 	});
 
 	it("gives the final review's days and what it has no room for, and what cannot start before the exam", () => {
@@ -377,13 +396,17 @@ describe("the daily plan of every course", () => {
 
 	it("says a day he was told moved, from which day and what of his study moved it, so the tutor never names it in silence", () => {
 		const moved = courseMap("/study/linalg", "Linear Algebra", null, [
-			topic("eigen", "Eigenvalues", { review: scheduled("2026-11-11", { exam: null, since: "2026-11-09" }), moved: { from: "2026-11-10", by: "study", courses: ["Probability"] } }),
+			topic("eigen", "Eigenvalues", { review: scheduled("2026-11-11", { exam: null, since: "2026-11-09" }), moved: { from: "2026-11-10", by: "study", courses: ["Probability"], day: "today" as const } }),
 			topic("projection", "Projection", { level: "new", starts: "2026-11-12", moved: { from: "2026-11-11", by: "missed" } }),
 		]);
 		const days = [day("2026-11-11", ["eigen"]), { date: "2026-11-12", reviews: [], new: ["projection" as TopicHandle] }];
 		const { text } = projectCourseBrief(TODAY, "teach", { plan: { workspace: "/study/linalg", courses: [{ map: moved, days }], unread: [] } });
 		assert.match(text, /- Wed 11 Nov: review Eigenvalues \(moved from Tue 10 Nov after your Probability study today\)/);
 		assert.match(text, /- Thu 12 Nov: start Projection \(moved from Wed 11 Nov, no study yesterday\)/);
+		const quiet = courseMap("/study/linalg", "Linear Algebra", null, [topic("eigen", "Eigenvalues", { review: scheduled("2026-11-11", { exam: null, since: "2026-11-09" }), moved: { from: "2026-11-09", by: "missed", on: "2026-11-05" } })]);
+		const after = projectCourseBrief(TODAY, "teach", { plan: { workspace: "/study/linalg", courses: [{ map: quiet, days: [day("2026-11-11", ["eigen"])] }], unread: [] } }).text;
+		assert.match(after, /- Wed 11 Nov: review Eigenvalues \(moved from Mon 9 Nov, no study since Thu 5 Nov\)/, "round 10 (1 M3): the tutor reads the true cause, so it never guesses one");
+		assert.match(after, /Say a day moved only where its note says “moved from”, with that note's cause; otherwise name the day alone/, "round 10 (1 M3): a close blamed a missed review he had done");
 		const calm = projectCourseBrief(TODAY, "teach", plan([LINEAR_ALGEBRA])).text;
 		assert.match(calm, /\nLinear Algebra · [^\n]*\nOverdue: none\n/);
 		assert.match(projectCourseBrief(TODAY, "teach", plan([PROBABILITY])).text, /\nOverdue: 2 reviews: Binomial distribution \(2 days, planned today\), Law of total probability \(1 day, planned Sat 14 Nov\)\n/);
@@ -428,6 +451,7 @@ describe("the brief fetch reads every course's plan", () => {
 			],
 		});
 		process.env.FAKE_ENGINE_MAP = JSON.stringify(MAP);
+		recordsChanged();
 		const log = path.join(TMP, "plan-log.jsonl");
 		process.env.FAKE_ENGINE_LOG = log;
 		try {
@@ -439,18 +463,102 @@ describe("the brief fetch reads every course's plan", () => {
 			delete process.env.FAKE_ENGINE_PLAN;
 			delete process.env.FAKE_ENGINE_MAP;
 			delete process.env.FAKE_ENGINE_LOG;
+			recordsChanged();
+		}
+	});
+
+	it("reads a first turn's opening from the turn itself, which the record does not hold yet (round 14, m1)", async () => {
+		const { fetchCourseBrief } = await import("../src/server/course-brief.ts");
+		process.env.FAKE_ENGINE_PLAN = JSON.stringify({
+			today: "2026-11-08",
+			courses: [{ workspace: "/study/probability", title: "Probability", plan: { days: [{ date: "2026-11-08", reviews: ["binomial"], new: [] }, { date: "2026-11-20", reviews: [], new: ["variance"] }] } }],
+		});
+		process.env.FAKE_ENGINE_MAP = JSON.stringify({
+			today: "2026-11-08",
+			revision: 1,
+			title: "Probability",
+			topics: [
+				{ topic: "binomial", title: "Binomial distribution", level: "assisted", review: "2026-11-08", overdue: 2 },
+				{ topic: "variance", title: "Variance", level: "new", starts: "2026-11-20", starts_why: { kind: "next" } },
+			],
+		});
+		recordsChanged();
+		try {
+			const record = { ...linked("/study/probability"), topics: ["variance"], messages: [] };
+			const first = await fetchCourseBrief(record, "Variance");
+			assert.match(first!.text, /\("Your Binomial distribution review is still due today\."\)/);
+			assert.doesNotMatch((await fetchCourseBrief(record, "My exam plan has no room for Variance. How can I still fit it in before the exam?"))!.text, /Started early/);
+		} finally {
+			delete process.env.FAKE_ENGINE_PLAN;
+			delete process.env.FAKE_ENGINE_MAP;
+			recordsChanged();
 		}
 	});
 
 	it("a failed map costs the turn nothing: the brief comes without the plan", async () => {
 		const { fetchCourseBrief } = await import("../src/server/course-brief.ts");
 		process.env.FAKE_ENGINE_FAIL = "map";
+		recordsChanged();
 		try {
 			const brief = await fetchCourseBrief(linked("/study/probability"));
 			assert.match(brief!.text, /Due today:/);
 			assert.doesNotMatch(brief!.text, /Daily plan/);
 		} finally {
 			delete process.env.FAKE_ENGINE_FAIL;
+			recordsChanged();
 		}
+	});
+});
+
+describe("a topic started ahead of plan (round 13, 1 n7; round 14, m1; round 15, m12)", () => {
+	const linalg = { workspace: "/study/linalg", courses: [{ map: LINEAR_ALGEBRA, days: DAYS["/study/linalg"]! }], unread: [] };
+	const withProbability = { ...linalg, courses: [...linalg.courses, { map: PROBABILITY, days: DAYS["/study/probability"]! }] };
+	it("says only the review still due today, in one short clause before the first question", () => {
+		const { text } = projectCourseBrief(TODAY, "teach", { plan: withProbability, opened: ["inner-product"], opening: "Inner products" });
+		assert.match(text, /\nStarted early: his plan starts Inner products on a later day, and he starts it today while your Binomial distribution review and your Random variables and distributions review are still due today\. Your first message says so in one short clause before its question \("Your Binomial distribution review and your Random variables and distributions review are still due today\."\), and nothing else about his plan/);
+		assert.doesNotMatch(text, /ahead of your plan|not solid yet|Tuesday 17 November/, "never the plan's day, the prerequisites or the opener of round 14");
+	});
+
+	it("a fresh start with nothing due today opens on its first question: no word about the plan, shaky prerequisites or today's other starts (round 15, m12)", () => {
+		const shaky = courseMap("/study/linalg", "Linear Algebra", null, [topic("change-basis", "Change of basis", { review: scheduled("2026-11-12") }), topic("diagonal", "Diagonalization", untaught("2026-11-20", { kind: "after", needs: ["change-basis" as TopicHandle], partners: [] })), topic("inner-product", "Inner products", untaught("2026-11-08", { kind: "next" }))]);
+		const startsToday = { workspace: "/study/linalg", courses: [{ map: shaky, days: [{ date: shaky.today, reviews: [], new: ["inner-product" as TopicHandle] }] }], unread: [] };
+		const { text } = projectCourseBrief(TODAY, "teach", { plan: startsToday as never, opened: ["diagonal"], opening: "Start Diagonalization" });
+		assert.doesNotMatch(text, /Started early|Ahead of plan|ahead of your plan|not solid yet/);
+	});
+
+	it("says nothing for a topic his plan starts today, one already taught, or his review", () => {
+		const onDay = courseMap("/study/linalg", "Linear Algebra", null, [topic("inner-product", "Inner products", untaught("2026-11-08", { kind: "next" }))]);
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: { ...withProbability, courses: [{ map: onDay, days: [] }, withProbability.courses[1]!] }, opened: ["inner-product"], opening: "Inner products" }).text, /Started early/);
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: withProbability, opened: ["kernel"], opening: "Kernel and rank-nullity" }).text, /Started early/);
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: withProbability, opened: ["inner-product"], opening: "Inner products", review: true }).text, /Started early/);
+	});
+
+	it("says nothing in a lesson he began, in Ask the tutor, or when no review is due today (round 14, m1)", () => {
+		const begun = courseMap("/study/linalg", "Linear Algebra", null, [topic("inner-product", "Inner products", untaught("2026-11-09", { kind: "begun" }))]);
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: { ...withProbability, courses: [{ map: begun, days: [] }, withProbability.courses[1]!] }, opened: ["inner-product"], opening: "Inner products" }).text, /Started early/, "a lesson under way goes on, never a start");
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: withProbability, opened: ["inner-product"], opening: "My exam plan has no room for Inner products. How can I still fit it in before the exam?" }).text, /Started early/, "Ask the tutor answers his question first");
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: linalg, opened: ["inner-product"], opening: "Inner products" }).text, /Started early/, "no review is due today");
+	});
+});
+
+describe("a due review's earlier questions (round 14, m5)", () => {
+	it("lists what each earlier review asked, newest first, so this one asks another part", () => {
+		const resume = { today: "2026-11-08", due: [{ topic: "rank", overdue: 0, level: "assisted", asked: ["Found the rank of a 3 by 3 matrix by counting pivots", "Counted nonzero entries instead of pivots"] }] };
+		for (const role of ["teach", "practice"] as const) {
+			assert.match(projectCourseBrief(resume, role).text, /\n- rank \(assisted\)\n {2}asked in its earlier reviews, newest first: "Found the rank of a 3 by 3 matrix by counting pivots"; "Counted nonzero entries instead of pivots"/);
+		}
+	});
+});
+
+describe("the lesson's own topics in the plan (round 14, m2)", () => {
+	it("carry no moved note or start reason, so the tutor never announces the live lesson's day mid-lesson", () => {
+		const moving = courseMap("/study/probability", "Probability", null, [topic("poisson", "Poisson distribution", { ...untaught("2026-11-11", { kind: "next" }), moved: { from: "2026-11-09", by: "study", courses: ["Probability"], day: "today" } }), topic("binomial", "Binomial distribution", { review: scheduled("2026-11-12"), moved: { from: "2026-11-10", by: "answered" } })]);
+		const days = [day("2026-11-11", [], ["poisson"]), day("2026-11-12", ["binomial"])];
+		const plans = { workspace: "/study/probability", courses: [{ map: moving, days }], unread: [] };
+		const away = projectCourseBrief(TODAY, "teach", { plan: plans }).text;
+		assert.match(away, /Poisson distribution \(moved from Mon 9 Nov after your Probability study today\)/);
+		const inside = projectCourseBrief(TODAY, "teach", { plan: plans, live: ["poisson", "binomial"] }).text;
+		assert.doesNotMatch(inside, /\(moved from/);
+		assert.match(inside, /start Poisson distribution \(this session's topic: its day is the close's to say, not yours now\)/);
 	});
 });

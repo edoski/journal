@@ -27,7 +27,6 @@ import { fakeFor, onFake, sendToUser, type ScriptedModel } from "./helpers/fake-
 assert.equal(process.env.NODE_ENV, "test", "Run with NODE_ENV=test; these tests must not invoke real providers.");
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-retry-failed-turn-"));
 process.env.LH_DATA_DIR = path.join(scratch, "data");
-process.env.LH_CREDENTIALS_DIR = scratch;
 await signInTestClaude();
 
 const { SessionModel } = await import("../components/session-core.ts");

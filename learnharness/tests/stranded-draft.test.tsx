@@ -5,7 +5,7 @@ import React, { act } from "react";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { parseHTML } from "linkedom";
-import type { Root } from "react-dom/client";
+import type { Root } from "./helpers/app-render.tsx";
 import { StickToBottom } from "use-stick-to-bottom";
 import { ProseComposer } from "../components/lesson/prose/prose-composer.tsx";
 import { forgetRescue, holdsRescue, keepRescue, overtakenDraft } from "../components/lesson/stranded-draft.ts";
@@ -58,6 +58,19 @@ test("the box remembers which words were rescued until he makes them his", () =>
 	assert.equal(holdsRescue("c1", "trace is 7, det is"), false);
 });
 
+test("words another window overtook keep their trailing space (round 10, 4 minor 5)", async () => {
+	const { rescuedBox } = await import("../components/lesson/stranded-draft.ts");
+	assert.deepEqual(overtakenDraft("q:1", null, { key: "q:1", text: "Av = 4v, so v = " }, null), { to: "box", words: "Av = 4v, so v = " });
+	assert.deepEqual(overtakenDraft("q:1", null, { key: "q:1", text: "so v = " }, "hint"), { to: "carry", words: "so v = ", why: "hint" });
+	forgetRescue("c10");
+	assert.equal(rescuedBox("c10", "", "so v = "), "so v = ");
+	assert.equal(rescuedBox("c10", "my note ", "so v = "), "my note\n\nso v = ");
+	keepRescue("c10", "so v = ", "q:1");
+	assert.equal(holdsRescue("c10", "so v = "), true, "the box still holds the rescue as it came");
+	assert.equal(holdsRescue("c10", "my note\n\nso v = "), true);
+	forgetRescue("c10");
+});
+
 test("nothing is overtaken when the dock stays, nothing was typed, or the words belong to another dock", () => {
 	assert.equal(overtakenDraft("q:1", "q:1", { key: "q:1", text: "x" }, null), null);
 	assert.equal(overtakenDraft("q:1", null, { key: "q:1", text: "  " }, null), null);
@@ -75,7 +88,7 @@ test("Esc back to the answer never moves rescued words into the next question's 
 	const noop = () => {};
 	const host = document.createElement("div") as unknown as HTMLElement;
 	document.body.append(host);
-	const { createRoot } = await import("react-dom/client");
+	const { createRoot } = await import("./helpers/app-render.tsx");
 	const root = createRoot(host);
 	roots.push(root);
 	await act(async () => {
@@ -92,6 +105,7 @@ test("Esc back to the answer never moves rescued words into the next question's 
 					onSaveDraft={noop}
 					onSubmitAnswer={noop}
 					onSubmitThinking={async () => true}
+					onSteer={async () => true}
 					onRequest={noop}
 					onDraftChange={noop}
 				/>
@@ -109,7 +123,7 @@ test("the composer answering a question reports what he types as he types it", a
 	const noop = () => {};
 	const host = document.createElement("div") as unknown as HTMLElement;
 	document.body.append(host);
-	const { createRoot } = await import("react-dom/client");
+	const { createRoot } = await import("./helpers/app-render.tsx");
 	const root = createRoot(host);
 	roots.push(root);
 	await act(async () => {
@@ -126,6 +140,7 @@ test("the composer answering a question reports what he types as he types it", a
 					onSaveDraft={noop}
 					onSubmitAnswer={noop}
 					onSubmitThinking={async () => true}
+					onSteer={async () => true}
 					onRequest={noop}
 					onDraftChange={(key: string, text: string) => seen.push([key, text])}
 				/>
@@ -159,4 +174,36 @@ test("the rescue leaves the box once the question after it closes, unless he mad
 	assert.equal(keptWords("c8:rescued"), undefined, "and forgets it");
 	keepRescue("c8", "so 2x + y = 0", "q:k1");
 	assert.equal(boxAfterClose("c8", "so 2x + y = 0, so v = (1, −2)", "q:k2"), null, "words he typed on are his message");
+});
+
+// Round 11 (4 major 1): after he sent his work on a problem, words he typed
+// in its box while the tutor replied were erased when the problem closed.
+test("words he typed in the box after sending from it go to the message box when it closes", async () => {
+	const { typedAfterSend } = await import("../components/lesson/stranded-draft.ts");
+	assert.equal(typedAfterSend("p:1", null, { key: "p:1", text: "also, does it work for sin(1/n)? " }), "also, does it work for sin(1/n)? ", "as he typed them");
+	assert.equal(typedAfterSend("p:1", "q:2", { key: "p:1", text: "why 1/e?" }), "why 1/e?", "a question opening straight after takes nothing");
+	assert.equal(typedAfterSend("p:1", null, null), null, "nothing typed since the send");
+	assert.equal(typedAfterSend("p:1", null, { key: "p:1", text: " " }), null);
+	assert.equal(typedAfterSend("p:1", "p:1", { key: "p:1", text: "x" }), null, "the box is still open");
+});
+
+// Round 11 (4 minor 2): a message kept while the app was down sat hidden in
+// the Ask box once the resumed turn asked its question, with no line.
+test("words in the message box that a question now hides get one line saying where they are", async () => {
+	const { boxLine } = await import("../components/lesson/stranded-draft.ts");
+	const { LESSON_WORDS } = await import("../components/study-words.ts");
+	assert.equal(boxLine(null, true, true), LESSON_WORDS.messageKept);
+	assert.equal(boxLine(null, true, false), null, "nothing hidden, no line");
+	assert.equal(boxLine(null, false, true), null, "with nothing open the box shows them");
+	assert.equal(boxLine("answered", true, true), LESSON_WORDS.answeredElsewhereOpen, "another window's rescue keeps its own line");
+	assert.equal(boxLine("answered", false, false), LESSON_WORDS.answeredElsewhere);
+	assert.equal(boxLine("hint", false, false), LESSON_WORDS.hintElsewhere);
+});
+
+// Round 12 (4 minor 8): during another window's hint the line promised the
+// tutor would ask the question again, but a hint asks nothing again: the
+// question stays open and the words come back when the hint is done.
+test("the line during another window's hint says the words come back when the hint is done", async () => {
+	const { boxLine } = await import("../components/lesson/stranded-draft.ts");
+	assert.equal(boxLine("hint", false, false), "Another window asked for a hint. What you typed here comes back when the hint is done.");
 });

@@ -62,7 +62,7 @@ export function readContentSpans(text: string): ContentSpan[] {
 				while (start >= 0 && start < text.length) {
 					start++;
 					const next = text.indexOf("\n", start);
-					const match = /^([ \t]{0,3})(\$+)[ \t]*\r?$/.exec(text.slice(start, next < 0 ? text.length : next));
+					const match = /^([ \t]{0,3})(\$+)(?:[ \t]*\r?$|(?=[.,;:!?]))/.exec(text.slice(start, next < 0 ? text.length : next));
 					if (match && match[2]!.length >= size) { at = start + match[1]!.length; close = match[2]!; after = at + close.length; break; }
 					start = next;
 				}

@@ -27,7 +27,7 @@ async function mount(mode: AbortMode, onClose = () => {}, onConfirm = () => {}) 
 	host = document.createElement("div");
 	document.body.appendChild(host);
 	root = createRoot(host);
-	await act(async () => { root!.render(<AbortTurnBody mode={mode} onClose={onClose} onConfirm={onConfirm} />); });
+	await act(async () => { root!.render(<AbortTurnBody open mode={mode} onClose={onClose} onConfirm={onConfirm} />); });
 }
 
 const text = (testid: string) => document.querySelector(`[data-testid="${testid}"]`)?.textContent ?? "";

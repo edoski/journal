@@ -15,23 +15,23 @@
  * Electron shell does (electron/main.cjs) — with --electron it uses
  * Electron's bundled Node via ELECTRON_RUN_AS_NODE, otherwise host Node —
  * 127.0.0.1 on a kernel-assigned
- * free port, NODE_ENV=production, a THROWAWAY LH_DATA_DIR and
- * LH_CREDENTIALS_DIR under os.tmpdir() (no real sign-in or data ever touch it) —
- * polls GET / until 200, then probes the GET-only API surface (chats /
- * models / settings — no side effects). Any non-200, an early server
- * exit, or a 30s boot timeout fails the gate and prints the server's own
+ * free port, NODE_ENV=production, a THROWAWAY LH_DATA_DIR under
+ * os.tmpdir() (no real sign-in or data ever touch it) —
+ * waits for the shell's own readiness check (electron/server-ready.cjs),
+ * then probes the home route and the GET-only API surface (chats / models
+ * / settings — no side effects). Any non-200, an early server exit, or a
+ * 30s boot timeout fails the gate and prints the server's own
  * log tail for diagnosis. The child is ALWAYS killed before exit — a
  * leaked server holds its port against the next run (learned the hard
  * way, same day).
  */
 import { spawn } from "node:child_process";
 import { probeEnv, verifyDemoRuntime } from "./smoke-demo-runtime.mjs";
-import { verifyProviderRuntime } from "./smoke-provider-runtime.mjs";
 import { verifyCompressionRuntime } from "./smoke-compression-runtime.mjs";
 import { verifyImageRuntime } from "./smoke-image-runtime.mjs";
 import { createRequire } from "node:module";
+import { waitForServer } from "../electron/server-ready.cjs";
 import * as fs from "node:fs";
-import * as http from "node:http";
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -42,10 +42,9 @@ const SERVER = path.join(STANDALONE, "server.js");
 const ELECTRON_MODE = process.argv.includes("--electron");
 const RUNTIME = ELECTRON_MODE ? createRequire(import.meta.url)("electron") : process.execPath;
 
-const POLL_MS = 500;
 const BOOT_TIMEOUT_MS = 30_000;
 /** GET-only probes — the routes that exercised today's failure class. */
-const PROBES = ["/api/chats", "/api/models", "/api/settings"];
+const PROBES = ["/", "/api/chats", "/api/models", "/api/settings"];
 
 if (!fs.existsSync(SERVER)) {
 	console.error("[smoke-server] .next/standalone/server.js missing — run next build first.");
@@ -64,27 +63,10 @@ function freePort() {
 	});
 }
 
-/** One GET; resolves the status code (0 = connection refused/failed). */
-function get(url) {
-	return new Promise((resolve) => {
-		const req = http.get(url, (res) => {
-			res.resume();
-			resolve(res.statusCode ?? 0);
-		});
-		req.on("error", () => resolve(0));
-		req.setTimeout(5000, () => {
-			req.destroy();
-			resolve(0);
-		});
-	});
-}
-
 async function main() {
 	// HTTP boot alone never imports the dynamically loaded demo engine.
 	// Fail before packaging if its standalone dependency graph is incomplete.
 	verifyDemoRuntime(STANDALONE, RUNTIME);
-	// /api/models only reads catalogs; initialize the real lazy SDK offline too.
-	verifyProviderRuntime(STANDALONE, RUNTIME);
 	// A plain GET without Accept-Encoding never exercises gzip backpressure.
 	verifyCompressionRuntime(STANDALONE, RUNTIME);
 	// Photon's WASM and the resize worker load unbundled from the payload.
@@ -121,7 +103,6 @@ async function main() {
 			PORT: String(port),
 			HOSTNAME: "127.0.0.1",
 			LH_DATA_DIR: dataDir,
-			LH_CREDENTIALS_DIR: home,
 		},
 		stdio: ["ignore", "pipe", "pipe"],
 	});
@@ -131,6 +112,7 @@ async function main() {
 	child.on("exit", () => {
 		exited = true;
 	});
+	const ready = waitForServer(child, url, { timeoutMs: BOOT_TIMEOUT_MS });
 
 	const kill = () =>
 		new Promise((resolve) => {
@@ -152,21 +134,10 @@ async function main() {
 
 	let failed = null;
 	try {
-		// 1) Boot: poll GET / until 200 (or timeout / early exit).
-		let boot = 0;
-		const deadline = Date.now() + BOOT_TIMEOUT_MS;
-		while (Date.now() < deadline) {
-			if (exited) throw new Error(`server exited before answering on ${url}`);
-			boot = await get(url);
-			if (boot === 200) break;
-			await new Promise((r) => setTimeout(r, POLL_MS));
-		}
-		if (boot !== 200) throw new Error(`server never answered 200 on ${url} (last status: ${boot})`);
-		console.log(`[smoke-server] boot ok: GET / → 200 (${url})`);
-
-		// 2) API surface: every probe must be 200.
+		await ready;
+		console.log(`[smoke-server] boot ok (${url})`);
 		for (const route of PROBES) {
-			const status = await get(url + route);
+			const { status } = await fetch(url + route, { signal: AbortSignal.timeout(5000) });
 			if (status !== 200) throw new Error(`GET ${route} → ${status} (expected 200)`);
 			console.log(`[smoke-server] GET ${route} → 200`);
 		}

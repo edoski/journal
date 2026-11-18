@@ -1,0 +1,15 @@
+# Road
+
+The course page as a road to its exam, as Things puts a deadline beside its headings and Duolingo draws a path (Edo picked it over Current, Overview and Agenda on 17 Nov 2026: "all of this looks good now honestly"). One row of two columns: the road on the left (`road-list.tsx`, `RoadList`), the map on the right. Above them the head and Now (`../course-head/course-head.md`); at the page's foot, centred, New lesson's composer with this course chosen (`../course-composer.md`).
+
+The road is the course's one list of arcs. The map beside it lists none (`SplitMap` draws `ArcMap` with `index={false}`), so the arcs are never listed twice side by side (Edo, 17 Nov 2026: the two lists beside each other made the layout feel "not really laid out correctly"; he liked the map's arc list, so the road takes its look).
+
+- Every arc in study order, drawn as the map's arc list draws its rows (`road-arc.tsx`, `ArcIndex`'s anatomy): its number and whole name (`ArcLabel`), the dot of "You are here" on the arc he is in. Each arc is its own block, with a rail down its left as tall as the arc and its open topics and a small gap before the next, so the arcs read as separate containers; the rail is bright on the arc the map shows (Edo, 17 Nov 2026).
+- The column is the linked columns' 24rem (`LINKED_GRID`), the topic page's history's width too, so names and facts show whole. Every fact and every topic row's fact end on one line, 16px in from the column's edge (`BLOCK`'s right inset); a row's hover fill ends 12px past its fact, 4px inside the column, so its rounded corner and its focus ring show whole (Edo, 17 Nov 2026: Probability's highlighted row was cut at the column's edge). An open arc's topics are clipped only down, for the slide (`overflow-y-clip`), never across.
+- Each row ends in the one fact the road needs: "Needs you" when Today takes up one of its topics, Check it on an arc ready for its check that does not need him (`offersCheck`: one chip per arc, round 16, m5) (it starts the check through the page's one start, `../../start/lesson-start.md`), "Check passed", or "Starts 20 Nov" for an arc not started (`arcStarts`); nothing otherwise. An arc past the exam is muted.
+- The exam is a row on the track (`road-exam`, its run-up on press), after the last arc it examines and the plan fits (`examStop`).
+- One arc is open at a time: pressing, or walking onto, an arc opens it and closes the last, its topics sliding open and the last's sliding shut (Radix Collapsible's height, `animate-collapsible-down`/`-up`, none under reduced motion). The list opens at once; the map shows the arc once the walk rests on it 120ms, so arrows held down never outrun the list. Its topics nest under its name. Hovering a topic row lights its card on the map, as the linked columns do on every course page.
+
+No folds and no Whole road press: every arc shows (Edo, 17 Nov 2026, on the folds: "Scrap all of that").
+
+Not on the road: arc pills, Pick up and Then (Now and the rows' facts say what is next), "In progress" and "Not started" on the lines, the exam in the head (it is on the road).

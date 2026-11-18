@@ -23,7 +23,18 @@ export function useFakeEngine(dir: string, courses: unknown[]): FakeEngine {
 	const log = path.join(dir, "engine-calls.jsonl");
 	const planFile = path.join(dir, "plan.json");
 	fs.writeFileSync(python, `#!/bin/sh\nexec "${process.execPath}" "${FAKE}" "$@"\n`, { mode: 0o755 });
-	const setPlan = (next: unknown[]) => fs.writeFileSync(planFile, JSON.stringify({ today: "2026-11-07", courses: next }));
+	// The test's own HOME, whose engine registry follows the listing as the
+	// real engine's does: the app keys its kept engine reads on it, and no
+	// test reads the registry of the person running it.
+	const home = path.join(dir, "home");
+	const registry = path.join(home, "Library", "Application Support", "Learning", "workspaces.json");
+	fs.mkdirSync(path.dirname(registry), { recursive: true });
+	process.env.HOME = home;
+	process.env.FAKE_ENGINE_REGISTRY = registry;
+	const setPlan = (next: unknown[]) => {
+		fs.writeFileSync(planFile, JSON.stringify({ today: "2026-11-07", courses: next }));
+		fs.writeFileSync(registry, JSON.stringify({ schema: 2, workspaces: Object.fromEntries((next as { workspace: string }[]).map((c) => [c.workspace, {}])) }));
+	};
 	setPlan(courses);
 	process.env.LH_LEARNING_ENGINE = dir;
 	process.env.LH_LEARNING_PYTHON = python;

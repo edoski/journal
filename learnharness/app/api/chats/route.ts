@@ -1,5 +1,5 @@
 import { derivePlanStatusesLh, newSessionModeMessage, openingTitle, newSessionResumeMessage, sessionResumeText, sessionTasksOf, type LhMessage } from "@/src/core";
-import { compactionInFlight, courseGone, courseLinkFor, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
+import { courseGone, courseLinkFor, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
 import type { ChatListItem } from "@/src/core";
 
 /** The session picker's list: record-derived summaries (phase, pending
@@ -14,15 +14,16 @@ export async function GET() {
 	const chats: ChatListItem[] = listChats().map((c) => ({
 		...c,
 		busy: isTurnRunning(c.id),
-		compacting: compactionInFlight(c.id),
 		courseDeleted: courseGone(c.course),
 	}));
 	return Response.json({ chats });
 }
 
 export async function POST(req: Request) {
-	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; course?: unknown; resume?: unknown; topics?: unknown; arcCheck?: unknown };
+	const body = (await req.json().catch(() => ({}))) as { title?: unknown; name?: unknown; kind?: unknown; course?: unknown; resume?: unknown; topics?: unknown; arcCheck?: unknown };
 	const title = typeof body.title === "string" ? body.title : "";
+	// A start the app words for him names itself apart from its opening question (round 11, 1 N14).
+	const name = typeof body.name === "string" && body.name.trim().length > 0 ? body.name.trim() : null;
 	// The Current design's Practice switch starts the session in practice;
 	// without it the prober routes the opening, and the agents hand the
 	// session between teaching and practice from there.
@@ -50,7 +51,11 @@ export async function POST(req: Request) {
 	// A lesson opened on topics is named after them, not the verb that
 	// opened it ("Start Poisson distribution" is "Poisson distribution");
 	// a review keeps its words (`openingTitle`).
-	const chat = createChat(titleFromPrompt(openingTitle(title, topics) || "Untitled session"), course, topics, arcCheck);
+	// A start named apart from its opening asks his question in his words
+	// (Ask the tutor), which shows as his message (round 13, 1 n8). It is
+	// opened on no topic: it belongs to those its work is on (round 16, M3).
+	const named = name !== null;
+	const chat = createChat(titleFromPrompt(name ?? (openingTitle(title, topics, !practice && !arcCheck) || "Untitled session")), course, named ? [] : topics, arcCheck, named);
 	const opening: LhMessage[] = practice ? [newSessionModeMessage("practice") as LhMessage] : [];
 	if (resumed) {
 		// The lesson's plan carries over as this session's plan map, so the

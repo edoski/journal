@@ -37,11 +37,13 @@ export const researchInputSchema = Type.Object({
 });
 
 export const demoInputSchema = Type.Object({
-	title: Type.String({ description: "Short title for the demo card, e.g. 'Damped harmonic oscillator'." }),
+	title: Type.String({ description: "Short title for the demo card, e.g. 'Damped harmonic oscillator', in words: never a formula he is still to find." }),
 	brief: Type.String({
 		description:
 			"Precise brief for the builder: the concept, the parameters/controls and what each does, the interactions, and the visual style. " +
-			"The builder sees NOTHING else of the lesson — include everything it needs, including necessary formulas and constants.",
+			"The builder sees NOTHING else of the lesson — include everything it needs, including necessary formulas and constants. " +
+			"It never prints a formula, value or result he is still to find (a step not yet done, or the open question): label each control and readout by what it is (\"chance per slot\"), never by the result. " +
+			"Write maths as he reads it: a matrix by its columns (\"columns (a, c) and (b, d)\"), never as code (\"[[a, b], [c, d]]\").",
 	}),
 });
 
@@ -82,12 +84,15 @@ function dispatch(
 const RESEARCH_ACK =
 	"This call is fire-and-forget: continue your turn and keep teaching — do not wait, poll, or mention waiting. " +
 	"The researched brief arrives as a new message when ready and the lesson resumes from it; cite its sources when you use them.";
-const DEMO_ACK =
+/** The demo is built after the turn moves on (round 13, 3 N1: "In the
+ *  demo, slide d…" in the same turn, with nothing on his screen). */
+export const DEMO_ACK =
 	"This call is fire-and-forget: continue your turn and keep teaching — do not wait, poll, or mention waiting. " +
-	"The tested demo arrives as a new message when ready and is rendered in the lesson; teach with it then.";
+	"The demo is not on his screen yet: it appears where you called for it once it is built and tested, and a new message tells you then. " +
+	"Until that message, say nothing of it and ask nothing that needs it: teach the step in words now; point him at its controls, and ask what needs it, once it has arrived.";
 const VISUAL_ACK =
 	"This call is fire-and-forget: continue your turn and keep teaching — do not wait, poll, or mention waiting. " +
-	"The verified figure arrives as a new message when ready and is rendered in the lesson; reference it then.";
+	"The figure is not on his screen yet: it appears where you called for it once it is verified, and a new message tells you then; reference it only after that.";
 const PDF_ACK =
 	"This call is fire-and-forget: continue your turn and keep teaching — do not wait, poll, or mention waiting. " +
 	"The document brief arrives as a new message when ready; weave it into the lesson and cite its pages.";

@@ -58,7 +58,7 @@ Dependency arrows point **down only**. Each layer may import the core barrel; no
 ├──────────────────────────────────────────────────────────────┤
 │ CORE       src/core        pure domain: contracts (6 domains),│
 │            ports, merger + derivation, coverage, question-   │
-│            core, plan-tree, phases, layout, prices. No IO     │
+│            core, plan-tree, phases, layout. No IO             │
 │            (two files use node:crypto — pure                  │
 │            but node-bound, hence kept out of the barrel)      │
 ├──────────────────────────────────────────────────────────────┤
@@ -101,7 +101,7 @@ flowchart TB
     subgraph CORE["CORE — src/core — pure domain, zero IO"]
         CONTRACTS["contracts/ — 6 domains: plan · graph · chat · jobs · probe · models"]
         PORTS["ports.ts — ChatStore · GraphStore · JobStore (types only)"]
-        BRAIN["merger + derivation · coverage · question-core · plan-tree · phases · layout · prices · tool-parts"]
+        BRAIN["merger + derivation · coverage · question-core · plan-tree · phases · layout · tool-parts"]
         CBAR["barrel index.ts — browser-safe exports ONLY"]
     end
 
@@ -444,7 +444,7 @@ The researcher searches with Claude Code's built-in `WebSearch`, next to the app
 | **LLMs judge; code mechanizes** — grading, merging, fingerprints, layout are deterministic; a failed LLM stage checkpoints nothing |
 | **The persisted record is the only source of truth** — agents are stateless per-turn rebuilds; no unanswered tool call reaches a provider |
 | **Failure containment** — side channels (context, extraction, usage, naming) are fire-and-forget behind try/catch seams; a side-channel failure never touches the response or the persist; the turn registry clears on every path |
-| **Absence is not zero** — unreported tokens, absent prices, absent levels render as absent, never fabricated |
+| **Absence is not zero** — unreported tokens, absent levels render as absent, never fabricated |
 | **Schema-valid ⇔ parseable** — boundary zod schemas are shared verbatim by producer and consumer |
 
 ### Known deviations from the ideal (documented, deliberate or accepted)
@@ -502,7 +502,7 @@ The bus itself is a `globalThis`-backed listener set (the Next per-entry-module 
 
 All deterministic, no network: engines are injected (pi-ai's **faux provider** — `createFauxCore`/`setResponses` — wrapped as the `PiEngine` production uses), `globalThis.fetch` is stubbed where transport matters, and pure logic gets in-memory port implementations. Suites either mirror production wiring with the real fs adapters (backup-and-clear of the ledgers they touch) or swap in-memory ports deliberately ("this suite never touches data/graph"). Four strata:
 
-1. **Pure core units** — merger via real adapters, derivation, coverage, question grading, plan tree, phases, clusters, layout, tool-parts, prices, fuzzy search.
+1. **Pure core units** — merger via real adapters, derivation, coverage, question grading, plan tree, phases, clusters, layout, tool-parts, fuzzy search.
 2. **Server flows** — `handleChatRequest` driven end-to-end with scripted faux engines: persistence, liveness, steer claiming, the wake pipeline (409 retry, quiz deferral, idempotency), crash recovery, the data-dir seam (including a fresh child process).
 3. **Sub-agent loops** — researcher/demo-builder/visual-maker with fake headless APIs; the extraction pipeline end-to-end (audit drops, failure-checkpoints-nothing, single-flight, abort); the practice pipeline end-to-end (partition echo/coverage retries, failure isolation, semaphore width, abort mid-generation, grading, boot sweep).
 4. **Render tests** — transcript, cards, docks, composer, sidebar, coverage, stats, practice surfaces (creation dialog both modes, chain table incl. the shared-TopBar + lines-law pins, list, exam states) via React server-side rendering (`renderToStaticMarkup`), no DOM library.

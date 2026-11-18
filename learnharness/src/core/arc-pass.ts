@@ -626,7 +626,7 @@ export interface ArcSubmit {
 	arcs: ArcPlan[];
 	/** The next exam's arcs, when the material states its scope. */
 	examArcs?: string[];
-	/** Topics of those arcs the exam leaves out. */
+	/** Topics the exam leaves out, in arcs after its own. */
 	leavesOut?: string[];
 	/** Edges it thinks false: recorded, never applied. */
 	doubts?: { topic: string; need: string; reason: string }[];
@@ -640,6 +640,8 @@ export interface ArcSubmit {
 export interface ArcPassView extends MapCourseView {
 	/** The exam's day, when it has one. */
 	examDate: string | null;
+	/** The topics the record already says the exam leaves out (`exam.leaves_out`). */
+	leftOut?: readonly string[];
 	/** Needs the edge step proposes and the record does not hold yet, by
 	 *  topic: also in the topic's `needs`, so the cut holds them. */
 	proposed?: Readonly<Record<string, readonly string[]>>;
@@ -647,7 +649,9 @@ export interface ArcPassView extends MapCourseView {
 
 /** The view, from the record and the topics he has studied. */
 export function arcPassView(view: MapCourseView, record: unknown): ArcPassView {
-	return { ...view, examDate: text(obj(obj(record).exam).date) ?? null };
+	const exam = obj(obj(record).exam);
+	const left = Array.isArray(exam.leaves_out) ? exam.leaves_out.filter((t): t is string => typeof t === "string") : [];
+	return { ...view, examDate: text(exam.date) ?? null, ...(left.length > 0 ? { leftOut: left } : {}) };
 }
 
 /** A ref's unit of the material: its source and locator. */
@@ -701,9 +705,18 @@ export function arcPassProblems(submit: ArcSubmit, view: ArcPassView): string | 
 		if (!view.examDate) problems.push("examArcs names the exam's arcs, but the course has no exam date: leave it out.");
 		for (const a of submit.examArcs) if (!handles.has(a)) problems.push(`examArcs names "${a}", which is no arc of the answer.`);
 	}
-	if (submit.leavesOut?.length) {
-		if (!submit.examArcs?.length) problems.push("leavesOut needs examArcs: it lists topics of the exam's arcs the exam leaves out, only when the material states such an exam.");
-		for (const t of submit.leavesOut) if (!submit.examArcs?.includes(home.get(t) ?? "")) problems.push(`leavesOut lists "${t}", which is in none of examArcs.`);
+	if (submit.leavesOut?.length && !submit.examArcs?.length) problems.push("leavesOut needs examArcs: it lists the topics the exam leaves out, only when the material states such an exam.");
+	// The exam's scope is known as the arcs form, so no arc holds topics both inside and outside it (arcs rubric A10;
+	// round 15, m11: Covariance, which the exam leaves out, in its Expectation arc): a topic it leaves out sits in an
+	// arc after the exam's arcs.
+	if (submit.examArcs?.length) {
+		const last = Math.max(...submit.examArcs.map((a) => submit.arcs.findIndex((x) => x.handle === a)));
+		for (const t of new Set([...(submit.leavesOut ?? []), ...(view.leftOut ?? [])])) {
+			const at = home.get(t);
+			if (at === undefined) continue;
+			if (submit.examArcs.includes(at)) problems.push(`"${t}", which the exam leaves out, is in "${at}", one of examArcs: an arc holds topics the exam examines or topics it leaves out, never both. Put "${t}" in an arc after the exam's arcs, and list it in leavesOut.`);
+			else if (submit.arcs.findIndex((x) => x.handle === at) < last) problems.push(`leavesOut lists "${t}", in "${at}", an arc before the exam's: put it in an arc after them.`);
+		}
 	}
 	for (const t of submit.titles ?? []) {
 		if (!(t.topic in view.topics)) problems.push(`titles names "${t.topic}", which is no topic of the course.`);

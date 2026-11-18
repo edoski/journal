@@ -18,7 +18,7 @@
 import { answeredQuestionsOf, HIS_MESSAGE, savedQuestionsOf, type LhMessage } from "./native-messages.ts";
 import type { AnswerSaves } from "./contracts/chat.ts";
 import type { AnswerMark, MarkGrade, MarkRow } from "./contracts/marks.ts";
-import { chosenSure, isMarkResult } from "./contracts/marks.ts";
+import { chosenSure, isMarkResult, markHow } from "./contracts/marks.ts";
 
 const GRADES: readonly MarkGrade[] = ["solid", "helped", "missed"];
 /** The conclude result's receipt line (tools/practice.ts). */
@@ -60,16 +60,20 @@ function placesOf(messages: readonly LhMessage[]): Map<string, number> {
  *  In transcript order. The record's kept save links (`answerSaves`) fill
  *  in only the attempts no save in the transcript links, so a save the
  *  transcript lost to a restart still marks its answer, and a link the
- *  transcript holds is never copied onto another answer. Every reader of
- *  the links passes the whole record, so none leaves the kept ones out. */
-export function markLinks(record: { readonly messages: readonly LhMessage[]; readonly answerSaves?: AnswerSaves }): Record<string, string[]> {
+ *  transcript holds is never copied onto another answer. A kept link to an
+ *  answer the lesson does not hold marks nothing, except while a turn runs
+ *  (`running`): its calls, a problem's conclude among them, reach the
+ *  transcript only when it ends, and the card shows as soon as the engine
+ *  holds the attempts (round 15, 2 D2). Every reader of the links passes
+ *  the whole record, so none leaves the kept ones out. */
+export function markLinks(record: { readonly messages: readonly LhMessage[]; readonly answerSaves?: AnswerSaves }, { running = false }: { running?: boolean } = {}): Record<string, string[]> {
 	const { messages, answerSaves: saves = {} } = record;
 	const links = transcriptLinks(messages);
 	const answered = answeredQuestionsOf(messages);
 	const place = placesOf(messages);
 	const linked = new Set(Object.values(links).flat());
 	for (const [key, ids] of Object.entries(saves)) {
-		if (!(answered.has(key) || messages.some((m) => m.role === "user" && m.id === key))) continue;
+		if (!(answered.has(key) || messages.some((m) => m.role === "user" && m.id === key) || (running && !place.has(key)))) continue;
 		const found = ids.filter((id) => typeof id === "string" && !linked.has(id));
 		for (const id of found) linked.add(id);
 		if (found.length) links[key] = [...(links[key] ?? []), ...found];
@@ -116,29 +120,34 @@ function transcriptLinks(messages: readonly LhMessage[]): Record<string, string[
 	return links;
 }
 
-/** What a re-mark in this session may correct (round 8, 2 m1: the tutor
- *  silently re-marked an older answer to a different question): `saved`,
- *  every attempt this session's saves and problems recorded, which it may
- *  set right on its own; `disputed`, every attempt a dispute of his named,
- *  which only a ruling on that dispute re-marks. Pure. */
-export function remarkableOf(messages: readonly LhMessage[], kept?: AnswerSaves): { saved: Set<string>; disputed: Set<string> } {
-	// The saves kept with the lesson the moment the engine took them count
-	// too: a restart can lose the transcript's receipt (round 8).
+/** Every attempt this session's saves and problems recorded, its receipts
+ *  and the saves kept with the lesson the moment the engine took them,
+ *  since a restart can lose the transcript's receipt (round 8). Pure. */
+export function savedOf(messages: readonly LhMessage[], kept?: AnswerSaves): Set<string> {
 	const saved = new Set<string>(Object.values(kept ?? {}).flat());
+	for (const message of messages) {
+		if (message.role !== "toolResult" || message.isError) continue;
+		if (message.toolName === "conclude") {
+			const receipt = CONCLUDE_RECEIPT.exec(textOf(message.content));
+			if (receipt) for (const id of savedIds(receipt[1]!)) saved.add(id);
+		} else if (message.toolName === "course_save") {
+			for (const id of savedIds(textOf(message.content))) saved.add(id);
+		}
+	}
+	return saved;
+}
+
+/** What a re-mark in this session may correct: every attempt a dispute of
+ *  his named, which only a ruling on that dispute re-marks (Edo, round 14
+ *  m12: never re-mark unasked). Pure. */
+export function remarkableOf(messages: readonly LhMessage[]): { disputed: Set<string> } {
 	const disputed = new Set<string>();
 	for (const message of messages) {
 		if (message.role === "custom" && message.customType === "dispute") {
 			for (const id of ids((message.details as { observations?: unknown } | null)?.observations)) disputed.add(id);
-		} else if (message.role === "toolResult" && !message.isError) {
-			if (message.toolName === "conclude") {
-				const receipt = CONCLUDE_RECEIPT.exec(textOf(message.content));
-				if (receipt) for (const id of savedIds(receipt[1]!)) saved.add(id);
-			} else if (message.toolName === "course_save") {
-				for (const id of savedIds(textOf(message.content))) saved.add(id);
-			}
 		}
 	}
-	return { saved, disputed };
+	return { disputed };
 }
 
 /** The answer whose mark ⌘⇧M disputes: the newest one with a mark. */
@@ -226,9 +235,15 @@ export function answerMarksOf(
 		const leaves = [...new Set(found.flatMap((f) => f.leaves))];
 		const rows = leaves.flatMap((id) => rowOf(observations, id) ?? []);
 		if (rows.length === 0) continue;
-		const disputes = [...new Set(found.flatMap((f) => f.chain))].map((id) => item(observations, id)).filter((o) => typeof o?.disputed === "string");
-		const ruling = disputes.map((o) => o?.ruling).filter((r): r is string => typeof r === "string").at(-1) ?? null;
-		marks[key] = { rows: labelled(rows, titles), disputed: disputes.length > 0, ruling };
+		const disputed = [...new Set(found.flatMap((f) => f.chain))].some((id) => typeof item(observations, id)?.disputed === "string");
+		const changed = disputed && ids.some((id, i) => {
+			const before = rowOf(observations, id);
+			return before !== null && found[i]!.leaves.some((leaf) => {
+				const after = rowOf(observations, leaf);
+				return after !== null && (after.result !== before.result || markHow(after) !== markHow(before) || after.sure !== before.sure);
+			});
+		});
+		marks[key] = { rows: labelled(rows, titles), disputed, changed };
 	}
 	return marks;
 }

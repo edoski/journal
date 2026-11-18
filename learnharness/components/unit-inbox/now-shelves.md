@@ -1,29 +1,35 @@
-# Now shelves
+# Sessions
 
-The shelves at the sidebar's foot, under Today (`unit-inbox.md`, "Today on top"). `now-shelves.tsx` (`NowShelves`) draws `restShelves` (`now-inbox.ts`) on `UnitShelf`; `now-skeleton.tsx` (`NowSkeleton`) holds the top's place while the courses are read; `sidebar-note.tsx` (`SidebarNote`) is the list's quiet one-line note.
+The one list at the sidebar's foot, under Today (`unit-inbox.md`, "Today on top"): the sidebar holds what to do today and his chats, like T3 Code's sidebar (Edo, 16 Nov 2026). `now-shelves.tsx` (`SessionsShelf`) draws `restSessions` (`now-inbox.ts`) on `UnitShelf`; `now-skeleton.tsx` (`NowSkeleton`) holds the top's place while the courses are read; `sidebar-note.tsx` (`SidebarNote`) is the list's quiet one-line note.
 
-## Shelves
+The Learning and On your own shelves are gone (16 Nov 2026): they sorted topics by standing, which the course page's groups, Home's map and the topic page already show per course, while the sidebar mixed every course together. The split itself stays where those pages read it (`restTopics`, through `sidebarSays`).
 
-In this order, after a spacer (`mt-auto`) that rests them at the bottom of a short list. Every shelf starts folded (`lh:topic-sidebar-folded`, Learning added), shows 10 rows open, then "Show 25 more", and keeps the open page's row in view while folded.
+## Sessions
 
-| Shelf | Holds | Order | Row | Status |
-|---|---|---|---|---|
-| Tutor writing | topics the tutor writes in, not on top; only while one runs | the latest first | card (`TopicCard`) | the spinner and Tutor writing |
-| Learning | taught and not solid, or solid but weak (a lapse, a mistake to fix), not on top; the course page's Learning holds the same topics | one waiting on him first, then the latest studied | one line (`TopicSlimRow`) | when it comes back (`shelfStatus`): Review (history) while today's review takes it up (`plannedKeys`, Home's `todaysReview`), "in 5d" when the engine has set its date, else how long since he studied it (the newest session, else the day it was first taught, "2w"); a 6px accent dot on the folded header while a hidden topic waits on him |
-| On your own | solid and not weak, the topics Home's pie counts (`courseProgress`): the due ones not on top, then the rest | due first (the longest overdue first) with how overdue; then the soonest back, "Back in 5d" | one line | the row's own fact (`shelfStatus`, unit-inbox.md's status slot): "3d overdue" (history), "Back in 5d" (calendar-clock) |
-| Other sessions | sessions on no listed topic and not on top as their own card | newest first | one line, a session | Your turn, the spinner or how long ago in Home's words; a repeated title carries its day; the dot as on Learning |
+After a spacer (`mt-auto`) that rests it at the bottom of a short list.
 
-"On your own" is the course page's group and Home's "N of M on your own", and holds the same topics; the top is the course page's Needs you, and each row says what that page's row says (course-page.md, "The groups") (`tests/now-inbox.test.ts`; the words are `NOW_SHELF_WORDS`).
+| | |
+|---|---|
+| holds | every session under the course filter (every course, or the chosen course's), on a topic or on none, less a session Today draws as its own card |
+| order | newest first, by its last change, as T3 Code's thread list |
+| row | one line, a session (`SessionItem`, the shelf row's anatomy), with its menu |
+| status | Your turn, the spinner and Tutor writing, or how long ago in Home's words; a title another listed session shares carries its day ("6 Nov") after it when its status names no day, never twice (round 15, 1 m8: "… 10 Nov … 10 Nov") |
+| folded | starts folded (`lh:topic-sidebar-folded`, `{ sessions }`); folded, it keeps in view the open page's row and a session the tutor writes in that Today does not show, with Tutor writing; a 6px accent dot on the header while a hidden session waits on him and Today does not show it (`saidOnTop`) |
+| open | 10 rows, then "Show the rest", which shows every row (`UnitShelf`) |
+
+**Today repeats nothing.** T3 Code lists a thread in one place: its inbox puts each thread in one section, and its thread list holds each once. So a session Today draws as its own card is not a Sessions row. A session on a topic Today takes up is still a row: the card is the topic and the row is the session, and the topic card already says its Your turn or Tutor writing, so that session lights no dot and is not kept in view while folded.
+
+The header is the name alone, "Sessions", with no count (`SESSIONS_WORDS`; `tests/sidebar-sessions.test.tsx`, `tests/now-inbox.test.ts`).
 
 ## States
 
 | State | List |
 |---|---|
 | loading | `NowSkeleton`: three 60px skeleton cards on the card pitch, `aria-busy`, an sr-only "Loading" |
-| nothing needs him | `SidebarNote` "Nothing needs you today", then the shelves |
-| no courses | "No courses yet" |
-| engine down | the waiting sessions as session cards, then "Couldn’t read your courses", then Other sessions |
+| nothing needs him | `SidebarNote` "Nothing needs you today", then Sessions |
+| no courses | "No courses yet", then Sessions |
+| engine down | the waiting sessions as session cards, then "Couldn’t read your courses", then Sessions |
 
 `SidebarNote`: `data-slot="sidebar-note"`, 12px muted, centred, 24px above and below.
 
-Sources: T3 Code's sidebar (Working, Snoozed, Settled shelves at the foot, folded; its 12px header); the research for the sidebar's Today (fold with a plan: every shelf row says when it comes back, else when it was studied).
+Sources: T3 Code's sidebar (its thread list, newest first, each thread once; its folded shelves at the foot with a 12px header).

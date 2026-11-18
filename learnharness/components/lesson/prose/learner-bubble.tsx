@@ -38,7 +38,7 @@ export function LearnerBubble({
 	const bubble = (
 		<div data-testid={testId} data-slot="learner-bubble" className={cn("ms-auto w-fit max-w-full min-w-0 rounded-2xl bg-card px-4 py-2.5", className)}>
 			{label && (
-				<div className="flex min-h-6 items-center gap-1.5 text-row text-muted-foreground">
+				<div className="flex min-h-6 items-center gap-1.5 text-body text-muted-foreground">
 					{Icon && <Icon aria-hidden className="size-3.5 shrink-0" />}
 					{label}
 				</div>

@@ -4,9 +4,6 @@
  * on (electron/main.cjs), so this file is the renderer's entire access to
  * Electron — keep it a minimal, explicit API surface.
  *
- *   window.lh.platform — read-only OS identity for native window-control
- *   gutters (darwin: left traffic lights; win32/linux: right overlay).
- *
  *   window.lh.expandWindow() — widen the window to the sidebar auto-close
  *   threshold (928px) when the sidebar is opened below it. The main
  *   process clamps: no-op if the window is already wide enough.
@@ -17,6 +14,10 @@
  *   publishes it as --lh-zoom so physical-constant lengths (the traffic-
  *   light gutter) can divide by it.
  *
+ *   window.lh.lightsCentre — the traffic lights' centre from the window's
+ *   top, in points (TRAFFIC_LIGHTS in electron/main.cjs, passed as
+ *   --lh-lights-centre); the renderer publishes it as --lh-lights-centre.
+ *
  *   window.lh.pickFolder() — the system folder picker for Context's Link a
  *   folder; resolves to the folder's path, or null when cancelled.
  *
@@ -25,7 +26,6 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("lh", {
-	platform: process.platform,
 	expandWindow: () => ipcRenderer.send("lh:expand-window"),
 	onZoom: (cb) => {
 		const listener = (_event, factor) => cb(factor);
@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld("lh", {
 		return () => ipcRenderer.removeListener("lh:zoom", listener);
 	},
 	getZoom: () => ipcRenderer.invoke("lh:zoom:get"),
+	lightsCentre: Number(process.argv.find((arg) => arg.startsWith("--lh-lights-centre="))?.split("=")[1]),
 	pickFolder: () => ipcRenderer.invoke("lh:pick-folder"),
 	/** The machine woke from sleep; returns unsubscribe. */
 	onResume: (cb) => {

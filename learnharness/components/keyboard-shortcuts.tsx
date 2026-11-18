@@ -23,7 +23,8 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { askSurface, navigatingTo, pageShown } from "@/components/held-asks";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Hint } from "@/components/ui/hint";
 import { Kbd } from "@/components/ui/kbd";
@@ -41,6 +42,7 @@ import {
 	type KeyScope,
 } from "@/src/core";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
+import { useTypeToCompose } from "@/components/type-to-compose";
 import { useSpatialArrows } from "@/components/spatial-arrows";
 
 // Re-exported for the contract pin (tests/keyboard-toggle-sidebar.test.ts):
@@ -55,9 +57,12 @@ function modalOpen(): boolean {
 
 export function KeyboardShortcuts() {
 	const router = useRouter();
+	const pathname = usePathname();
+	useEffect(() => pageShown(pathname), [pathname]);
 	const [cheatOpen, setCheatOpen] = useState(false);
 	const { open: openSettings } = useSettingsDialog();
 	useSpatialArrows();
+	useTypeToCompose();
 
 	// Router + cheat + settings state inside a ref so the keydown listener
 	// (attached once) never goes stale.
@@ -89,12 +94,6 @@ export function KeyboardShortcuts() {
 			}
 
 			if (e.key === "Escape") {
-				// Our own overlay is the topmost layer.
-				if (cheatOpen) {
-					setCheatOpen(false);
-					e.preventDefault();
-					return;
-				}
 				// THE ONE-ESC LAW (owner, keyboard round 2026-10-06): one
 				// Esc, one action, on the topmost active layer. Field-level
 				// handlers claim at their element (focus in a field: the
@@ -123,6 +122,7 @@ export function KeyboardShortcuts() {
 			// ride the window event for the mounted surface to catch.
 			switch (action) {
 				case "new-session":
+					navigatingTo("/chat/new");
 					handlersRef.current.router.push("/chat/new");
 					break;
 				case "open-settings":
@@ -147,12 +147,17 @@ export function KeyboardShortcuts() {
 					window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
 					break;
 				case "find":
-				case "pick-course":
-					// The mounted surface owns Find (session text / graph nodes)
-					// and the course picker. Claim the chord so Chromium's own
-					// finder or Open File cannot open too.
+					// The mounted surface owns Find (session text / graph nodes).
+					// Claim the chord so Chromium's own finder cannot open too.
 					e.preventDefault();
 					window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
+					break;
+				case "pick-course":
+					// The course picker owns it, and one on a page still on its way
+					// (⌘N, then ⌘O) takes it as it mounts (held-asks.ts). Claim the
+					// chord so Open File cannot open too.
+					e.preventDefault();
+					askSurface(action);
 					break;
 				default:
 					window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
@@ -160,7 +165,7 @@ export function KeyboardShortcuts() {
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [cheatOpen]);
+	}, []);
 
 	return <CheatSheet open={cheatOpen} onClose={() => setCheatOpen(false)} />;
 }
@@ -172,6 +177,7 @@ const SHEET_SECTIONS: readonly { label: string; scope: KeyScope; group?: KeyGrou
 	{ label: "Anywhere", scope: "global" },
 	{ label: "Pages", scope: "global", group: "pages" },
 	{ label: "Calendar", scope: "global", group: "calendar" },
+	{ label: "Home", scope: "global", group: "home" },
 	...KEY_SCOPES.filter(({ scope }) => scope !== "global"),
 ];
 
@@ -188,9 +194,8 @@ export function cheatSheetSections(): { label: string; actions: KeyActionDef[] }
  *  in the app's own words. A label too long for its column wraps under
  *  itself rather than losing its end. */
 function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-	if (!open) return null;
 	return (
-		<Dialog open onOpenChange={(next) => !next && onClose()}>
+		<Dialog open={open} onOpenChange={(next) => !next && onClose()}>
 			<DialogContent aria-describedby={undefined} data-testid="cheat-sheet" className="max-w-3xl">
 				<DialogHeader>
 					<DialogTitle>Keyboard shortcuts</DialogTitle>
@@ -201,9 +206,9 @@ function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 				<div data-slot="cheat-sheet-columns" className="columns-2 gap-8">
 					{cheatSheetSections().map(({ label, actions }) => (
 						<section key={label} aria-label={label} className="flex break-inside-avoid flex-col pb-4 last:pb-0">
-							<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{label}</h3>
+							<h3 className="flex h-7 items-center text-callout text-muted-foreground">{label}</h3>
 							{actions.map((a) => (
-								<div key={a.id} data-slot="cheat-sheet-row" className="flex min-h-8 items-center justify-between gap-4 py-1.5 text-row">
+								<div key={a.id} data-slot="cheat-sheet-row" className="flex min-h-8 items-center justify-between gap-4 py-1.5 text-body">
 									<span className="min-w-0 text-pretty text-foreground">{a.label}</span>
 									<Kbd>{formatBinding(bindingForAction(a.id))}</Kbd>
 								</div>

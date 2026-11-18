@@ -9,7 +9,7 @@ import { InvertDiscIcon } from "@/components/artifacts/invert-disc";
 import { ChatActionsContext } from "@/components/chat";
 import { downloadFile, slugFilename } from "@/components/artifacts/download";
 import { DispatchCard } from "@/components/artifacts/dispatch-card";
-import type { ArtifactPartProps, DemoResult } from "@/src/core";
+import { withDemoBase, type ArtifactPartProps, type DemoResult } from "@/src/core";
 
 /**
  * Demo artifact card (W6): while the part is input-available, a job activity
@@ -48,8 +48,11 @@ setTimeout(post,50);
 setTimeout(post,400);
 })();</script>`;
 
-/** Inject the bridge before </body> (or at the end of a body-less document). */
-export function buildDemoSrcDoc(html: string): string {
+/** The demo on its base (`withDemoBase`: a light page, shadcn's button
+ *  variants, never the browser's dark colours; round 12, 2 M2), with the
+ *  bridge before </body> (or at the end of a body-less document). */
+export function buildDemoSrcDoc(source: string): string {
+	const html = withDemoBase(source);
 	if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, `${DEMO_BRIDGE_SCRIPT}</body>`);
 	return `${html}${DEMO_BRIDGE_SCRIPT}`;
 }
@@ -87,7 +90,7 @@ export function reduceDemoBridgeState(state: DemoBridgeState, data: unknown): De
  * itself renders from the steer message via DemoOutputCard. */
 export function DemoCard({ part }: ArtifactPartProps) {
 	if (part.state !== "output-available") return null;
-	return <DispatchCard toolCallId={part.toolCallId} kind="demo" />;
+	return <DispatchCard toolCallId={part.toolCallId} kind="demo" artifact={part.artifact} />;
 }
 
 /** The demo artifact — exported: the steer card renders the delivered
@@ -105,7 +108,7 @@ export function DemoOutputCard({
 	const result = output as DemoResult | undefined;
 	if (!result || typeof result.html !== "string" || typeof result.title !== "string") {
 		return (
-			<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+			<div className="rounded-xl border bg-card p-4 text-body text-muted-foreground">
 				Demo completed, but the result could not be displayed.
 			</div>
 		);
@@ -114,11 +117,11 @@ export function DemoOutputCard({
 	if (failed) {
 		return (
 			<div className="rounded-xl border bg-card p-4 text-card-foreground" data-testid="demo-card-failed">
-				<div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+				<div className="flex items-center gap-2 text-subheadline uppercase tracking-wide text-muted-foreground">
 					Interactive demo
 					<span className="rounded bg-red-500/15 px-1.5 py-0.5 text-red-500">failed</span>
 				</div>
-				<p className="mt-2 text-sm text-muted-foreground">{result.notes ?? "The demo could not be built."}</p>
+				<p className="mt-2 text-body text-muted-foreground">{result.notes ?? "The demo could not be built."}</p>
 			</div>
 		);
 	}
@@ -178,10 +181,10 @@ function DemoFrame({
 			   figure card's grammar plus a name. Switch + download far right. */}
 			<div className="flex items-center justify-between gap-2">
 				<div className="flex min-w-0 items-baseline gap-2">
-					<span className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+					<span className="shrink-0 text-subheadline uppercase tracking-wide text-muted-foreground">
 						interactive demo
 					</span>
-					<span className="truncate text-xs font-medium tracking-wide text-foreground">{title}</span>
+					<span className="truncate text-subheadline tracking-wide text-foreground">{title}</span>
 				</div>
 				<div className="flex shrink-0 items-center gap-1.5">
 					<Toggle
@@ -244,10 +247,10 @@ export function DemoErrorChip({
 }) {
 	return (
 		<div
-			className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger"
+			className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-body text-danger"
 			data-testid="demo-error-chip"
 		>
-			<span className="font-medium">This demo threw an error</span>
+			<span className="">This demo threw an error</span>
 			<span className="min-w-0 flex-1 truncate font-mono text-xs" title={message}>
 				{message}
 			</span>

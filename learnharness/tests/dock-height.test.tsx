@@ -26,14 +26,13 @@ Object.assign(globalThis, {
 const { useDockReserve, forwardDockWheel } = await import("../components/dock-height.ts");
 
 describe("the composer's reserve", () => {
-	it("reports the block's height and the scrollbar gutter at mount and on resize, and lets go on unmount", async () => {
+	it("reports the block's height at mount and on resize, and lets go on unmount", async () => {
 		let height = 120;
 		const heights: number[] = [];
-		const insets: number[] = [];
 		function Host() {
 			const scrollRef = useRef<HTMLDivElement>(null);
 			const blockRef = useRef<HTMLDivElement>(null);
-			useDockReserve({ scrollRef, blockRef, onHeight: (h) => heights.push(h), onScrollbarInset: (i) => insets.push(i) });
+			useDockReserve({ scrollRef, blockRef, onHeight: (h) => heights.push(h) });
 			return (
 				<div ref={scrollRef}>
 					<div ref={blockRef} />
@@ -49,7 +48,6 @@ describe("the composer's reserve", () => {
 		try {
 			await act(async () => root.render(<Host />));
 			assert.deepEqual(heights, [120]);
-			assert.equal(insets.length, 1);
 			const observer = observers.at(-1)!;
 			assert.ok(observer.elements.has(block()));
 			height = 180;

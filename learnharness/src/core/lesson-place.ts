@@ -5,7 +5,7 @@
  * the transcript, live; this is only what the transcript cannot say. Pure.
  */
 
-import { currentArc } from "./contracts/course-arcs.ts";
+import { currentArc, namedArc, type NamedArc } from "./contracts/course-arcs.ts";
 import type { CourseMap } from "./contracts/course-map.ts";
 
 export interface LessonPlace {
@@ -13,7 +13,7 @@ export interface LessonPlace {
 	 *  when the lesson has no topic or the map does not list it. */
 	topic: { handle: string; title: string } | null;
 	/** The topic's arc, in a course with arcs; null otherwise. */
-	arc: { title: string } | null;
+	arc: NamedArc | null;
 }
 
 /** The lesson's place: the first of its candidate topics the map lists
@@ -25,6 +25,5 @@ export function lessonPlaceOf(map: Pick<CourseMap, "topics" | "arcs" | "current"
 	const topic = (topics ?? []).map((handle) => map.topics.find((t) => t.handle === handle)).find((t) => t !== undefined);
 	if (!topic) return { topic: null, arc: null };
 	const arcHandle = topic.arc ?? (map.current === topic.handle ? currentArc(map) : null);
-	const arc = arcHandle ? (map.arcs ?? []).find((a) => a.handle === arcHandle) : undefined;
-	return { topic: { handle: topic.handle, title: topic.title }, arc: arc ? { title: arc.title } : null };
+	return { topic: { handle: topic.handle, title: topic.title }, arc: arcHandle ? namedArc(map.arcs ?? [], arcHandle) : null };
 }

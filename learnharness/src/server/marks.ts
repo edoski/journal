@@ -9,6 +9,7 @@
 import { answerMarksOf, correctorsToRead, markLinks } from "../core/answer-marks.ts";
 import type { AnswerMarksResponse } from "../core/contracts/marks.ts";
 import { stores } from "./stores.ts";
+import { isTurnRunning } from "./turn-liveness.ts";
 
 /** How many rounds of corrections one read follows. */
 const CHAIN_ROUNDS = 8;
@@ -35,7 +36,7 @@ export async function answerMarks(chatId: string): Promise<{ status: 200 | 404; 
 	const chat = stores.chatStore.getChat(chatId);
 	if (!chat) return { status: 404, body: { ok: false, error: "Not found" } };
 	const workspace = chat.course?.workspace;
-	const links = markLinks(chat);
+	const links = markLinks(chat, { running: isTurnRunning(chatId) });
 	const linked = [...new Set(Object.values(links).flat())];
 	if (!workspace || linked.length === 0) return { status: 200, body: { ok: true, marks: {} } };
 	const observations = await shown(workspace, linked);

@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ChatListItem, ChatRecord } from "../src/core/contracts/chat.ts";
@@ -22,7 +22,8 @@ import type { StudyCourse } from "../src/core/contracts/study.ts";
 import type { SessionPlan } from "../src/core/contracts/topic.ts";
 import { sessionPlanOf, topicRecordOf } from "../src/server/topic.ts";
 import { topicFacts, type TopicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
-import { hybridMarks, mapLessonAtFirst, nextSteps } from "../components/unit-inbox/topic-page/hybrid/hybrid-facts.ts";
+import { hybridMarks, mapLeftOff, mapLessonAtFirst, nextSteps } from "../components/unit-inbox/topic-page/hybrid/hybrid-facts.ts";
+import { stoppedHereWords } from "../components/study-words.ts";
 import { HybridTopic } from "../components/unit-inbox/topic-page/hybrid/hybrid-topic.tsx";
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "topic");
@@ -54,7 +55,7 @@ const MAP: CourseMap = {
 const COURSE: StudyCourse = { map: MAP, unready: null, due: null, newToday: [], lastActiveDaysAgo: 0 };
 
 function chat(id: string, title: string, updatedAt: string, over: Partial<ChatListItem> = {}): ChatListItem {
-	return { id, title, createdAt: updatedAt, updatedAt, kind: "teach", messageCount: 6, phase: "teach", pendingQuestion: false, pendingProblem: false, course: { workspace: WORKSPACE, title: "Linear Algebra" }, topics: [], ownTopics: over.topics ?? [], busy: false, compacting: false, ...over };
+	return { id, title, createdAt: updatedAt, updatedAt, kind: "teach", messageCount: 6, phase: "teach", pendingQuestion: false, pendingProblem: false, course: { workspace: WORKSPACE, title: "Linear Algebra" }, topics: [], ownTopics: over.topics ?? [], busy: false, ...over };
 }
 
 const EIGEN_PLAN = sessionPlanOf(fixture("chat_demo_eigen.json") as ChatRecord) as SessionPlan;
@@ -99,11 +100,24 @@ describe("the hybrid's facts", () => {
 			[...marks].filter(([, mark]) => mark.tag || mark.status !== "upcoming").map(([id, mark]) => [titleOf(EIGEN_PLAN, [id])[0], mark.status, mark.tag]),
 			[
 				["The eigen-equation Av = λv", "visited", null],
-				["Computing a 2×2 spectrum", "current", null],
+				["Computing a 2×2 spectrum", "current", "Your turn"],
 				["An eigenbasis makes A diagonal", "upcoming", "Next"],
 			],
 		);
 		assert.equal(hybridMarks(DET_PLAN, false).get(DET_PLAN.current!)!.tag, "Left off here");
+	});
+
+	it("says Left off here only over a lesson the page resumes, else the day it stopped (round 16, m22)", () => {
+		const facts = factsOf(EIGEN, [EIGEN_LESSON, EIGEN_EARLIER], [EIGEN_PLAN, { ...DET_PLAN, id: "chat_eigen_before" }]);
+		const entry = (id: string) => facts.sessions.find((s) => s.chat.id === id)!;
+		assert.equal(mapLeftOff(entry("chat_demo_eigen"), facts.action, facts.today), "Left off here", "Now resumes it");
+		assert.equal(mapLeftOff(entry("chat_eigen_before"), facts.action, facts.today), "Stopped here on 6 Nov", "nothing resumes it");
+		assert.equal(hybridMarks({ ...DET_PLAN, id: "chat_eigen_before" }, false, "Stopped here on 6 Nov").get(DET_PLAN.current!)!.tag, "Stopped here on 6 Nov");
+		const det = factsOf(DET, [DET_LESSON], [DET_PLAN]);
+		assert.equal(det.action.kind, "continue");
+		assert.equal(mapLeftOff(det.sessions[0]!, det.action, det.today), "Stopped here yesterday", "Continue carries on a task elsewhere, never where the plan stopped");
+		assert.equal(stoppedHereWords(0, "2026-11-08"), "Stopped here today");
+		assert.equal(stoppedHereWords(1, "2026-11-08"), "Stopped here yesterday");
 	});
 });
 
@@ -111,24 +125,32 @@ describe("the hybrid page drawn", () => {
 	it("draws the history and the shown lesson's map side by side, with no button in the head since Now holds the action", () => {
 		const document = page(factsOf(EIGEN, [EIGEN_LESSON, EIGEN_EARLIER], [EIGEN_PLAN, { ...DET_PLAN, id: "chat_eigen_before" }]));
 		assert.equal(document.querySelector('[data-testid="unit-page"]')!.getAttribute("data-topic-candidate"), "hybrid");
-		assert.equal(document.querySelector('[data-testid="topic-action"]'), null);
+		assert.ok(document.querySelector('[data-testid="topic-action"]') === null);
 		const panes = document.querySelector('[data-slot="topic-panes"]')!;
 		assert.deepEqual([...panes.querySelectorAll(":scope > div > [data-slot]")].map((pane) => pane.getAttribute("data-slot")), ["topic-history", "topic-lesson-map"]);
-		const steps = [...document.querySelectorAll('[data-slot="topic-step"]')];
-		assert.equal(steps.length, 7);
+		const map = document.querySelector('[data-slot="topic-lesson-map"]')!;
+		const steps = [...map.querySelectorAll('[data-slot="course-map-node"]')];
+		assert.equal(steps.length, 7, "every step on the course map's card");
 		assert.ok(steps.every((step) => step.getAttribute("href") === "/chat/chat_demo_eigen"));
-		assert.equal(document.querySelector('[data-slot="topic-step-tag"]')!.textContent, "Next");
+		assert.deepEqual(
+			[...map.querySelectorAll('[data-slot="course-map-tag"]')].map((tag) => tag.textContent),
+			["Your turn", "Next"],
+			"the course map's tags: Your turn over the step his question asks about, Next over the one after",
+		);
+		assert.equal(map.querySelector('[data-current="true"]')!.getAttribute("data-status"), "current");
 	});
 
-	it("opens the shown lesson from Now and gives every earlier lesson that planned the button that puts it on the map", () => {
+	it("opens the shown lesson from Now, and shows a lesson that planned on the map when he points at it, with no unlabelled map button (round 10, 1 m8)", () => {
 		const document = page(factsOf(EIGEN, [EIGEN_LESSON, EIGEN_EARLIER], [EIGEN_PLAN, { ...DET_PLAN, id: "chat_eigen_before" }]));
 		const now = document.querySelector('[data-slot="pickup-now"]')!;
 		assert.equal(now.querySelector('[data-slot="pickup-now-press"]')!.getAttribute("href"), "/chat/chat_demo_eigen");
-		assert.equal(now.querySelector('[data-slot="topic-map-toggle"]')!.getAttribute("aria-pressed"), "true");
+		assert.equal(now.getAttribute("data-shown"), "true");
+		assert.equal(document.querySelectorAll('[data-slot="topic-map-toggle"]').length, 0, "no glyph without words beside Resume or on a row");
 		const rows = [...document.querySelectorAll('[data-slot="topic-history-session"]')];
 		assert.deepEqual(
-			rows.map((row) => [row.querySelector("a")!.getAttribute("href"), row.getAttribute("data-shown"), row.querySelector('[data-slot="topic-map-toggle"]')?.getAttribute("aria-pressed")]),
-			[["/chat/chat_eigen_before", null, "false"]],
+			rows.map((row) => [row.querySelector("a")!.getAttribute("href"), row.getAttribute("data-shown"), row.getAttribute("data-on-map")]),
+			[["/chat/chat_eigen_before", null, "point"]],
+			"pointing at it puts its steps on the map",
 		);
 	});
 
@@ -140,10 +162,13 @@ describe("the hybrid page drawn", () => {
 		assert.ok(attempts.every((row) => row.querySelector("a, button") === null));
 	});
 
-	it("gives the history the whole width when no lesson planned, with no map and no toggle", () => {
+	it("keeps the history in its column when no lesson planned, with no map and no toggle (round 16, m21: Earlier ran the page's width, each date at the far edge)", () => {
 		const document = page(factsOf(RANK, RANK_SESSIONS, [], RANK_RECORD));
-		assert.equal(document.querySelector('[data-slot="topic-panes"]'), null);
-		assert.equal(document.querySelector('[data-slot="topic-lesson-map"]'), null);
+		const panes = document.querySelector('[data-slot="topic-panes"]');
+		assert.ok(panes, "the two columns stand without a map");
+		assert.match(panes!.className, /grid-cols-\[minmax\(0,24rem\)_minmax\(0,1fr\)\]/, "the history keeps the list's width");
+		assert.ok(panes!.querySelector('[data-slot="topic-history"]'), "the history is the left column");
+		assert.ok(document.querySelector('[data-slot="topic-lesson-map"]') === null);
 		assert.equal(document.querySelectorAll('[data-slot="topic-map-toggle"]').length, 0);
 		assert.ok(document.querySelector('[data-slot="topic-history"]'));
 	});

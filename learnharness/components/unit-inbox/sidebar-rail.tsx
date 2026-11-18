@@ -56,24 +56,36 @@ function RailButton({
 }
 
 /**
- * The folded sidebar (spec: unit-inbox.md, "Folded"), T3 Code's and
- * shadcn's icon rail: a 48px column with the open button on top, then
- * Home, Calendar, Search (which opens the sidebar on its field) and New
- * lesson, and Settings at the foot, each named in a tooltip with its
- * shortcut. In the Mac app it starts below the traffic lights' band and
- * is as wide as they are (`.lh-rail`), so the page starts clear of them.
+ * The folded rail's open button (spec: unit-inbox.md, "Folded"), where T3
+ * Code's sidebar toggle stands: centred in the rail's head in a browser, and
+ * in the Mac app beside the traffic lights, level with them
+ * (`.lh-rail-toggle`). The app shell draws it after the page, so in the Mac
+ * app the page's own drag band, which it stands over, cannot take its clicks
+ * (Electron resolves drag regions in page order).
  */
-export function SidebarRail({ pathname, onOpen, onNewLesson, onSettings }: { pathname: string; onOpen: () => void; onNewLesson: () => void; onSettings: () => void }) {
+export function RailOpenButton({ shown, onOpen }: { shown: boolean; onOpen: () => void }) {
+	// Mounted open or folded; it shows once the panel's edge has swept past it, and goes as the edge comes back (`rail-toggle-motion`).
+	return (
+		<div inert={!shown} className={cn("lh-rail-toggle rail-toggle-motion", !shown && "invisible")}>
+			<RailButton icon={PanelLeftOpenIcon} label="Open sidebar" action="toggle-sidebar" onClick={onOpen} testId="sidebar-open" />
+		</div>
+	);
+}
+
+/**
+ * The folded sidebar (spec: unit-inbox.md, "Folded"), shadcn's icon rail:
+ * a 48px column whose head is the window's 52px band, which holds the open
+ * button (`RailOpenButton`), then Home, Calendar, Search (which opens the
+ * sidebar on its field) and New lesson, and Settings at the foot, each named
+ * in a tooltip with its shortcut.
+ */
+export function SidebarRail({ pathname, onNewLesson, onSettings }: { pathname: string; onNewLesson: () => void; onSettings: () => void }) {
 	return (
 		<nav aria-label="Sidebar" data-slot="sidebar-rail" className="flex h-full w-full flex-col items-center border-r bg-background pb-2">
-			<div className="lh-drag lh-lights-band w-full shrink-0" />
-			{/* The open button's head is as tall as a page's top bar, so its
-			    rule sits on the top bar's bottom edge (lh-rail-head). */}
 			<div className="lh-drag lh-rail-head relative flex w-full shrink-0 items-center justify-center">
-				<RailButton icon={PanelLeftOpenIcon} label="Open sidebar" action="toggle-sidebar" onClick={onOpen} testId="sidebar-open" />
-				<span aria-hidden className="lh-rail-rule absolute left-1/2 h-px w-5 -translate-x-1/2 bg-border" />
+				<span aria-hidden data-slot="sidebar-rail-rule" className="absolute bottom-0 left-1/2 h-px w-5 -translate-x-1/2 bg-border" />
 			</div>
-			<div className="lh-drag flex w-full flex-1 flex-col items-center gap-1 pt-2">
+			<div className="lh-drag flex w-full flex-1 flex-col items-center gap-1 pt-0.5">
 				<RailButton icon={HouseIcon} label="Home" href="/" here={pathname === "/"} />
 				<RailButton icon={CalendarDaysIcon} label="Calendar" href="/calendar" here={pathname === "/calendar"} />
 				<RailButton icon={SearchIcon} label="Search" action="sessions-search" onClick={() => window.dispatchEvent(new Event(kbdEventForAction("sessions-search")))} />

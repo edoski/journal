@@ -11,7 +11,9 @@ import type { CalendarCourse } from "../src/core/contracts/calendar.ts";
 import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { doesNotFitOf, finalReviewOf, planDays, plannedOf, scheduleOf } from "../src/server/calendar.ts";
-import { calendarEntries, distanceWords, dueDay, finalReviewWords, lookOf, misfitWords, moreWords, quietBetween, unreviewedWords, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
+import { finalReviewGapWords } from "../components/study-words.ts";
+import { courseMove, todaySteps } from "../components/study-home/study-facts.ts";
+import { calendarEntries, distanceWords, dueDay, finalReviewWords, lookOf, misfitWords, moreWords, quietBetween, roadLines, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
 
 const TODAY = "2026-11-08";
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -83,12 +85,20 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 		course: { workspace: "/study/linalg", title: "Linear Algebra" },
 		topics: [],
 		busy: false,
-		compacting: false,
 		...over,
 	};
 }
 
 const summary = (entries: ReturnType<typeof calendarEntries>) => entries.map((e) => `${e.day} ${lookOf(e)} ${e.title}`);
+
+describe("an exam's next step", () => {
+	it("names the later day it is planned for and offers nothing to start today (round 10: 1 m9)", () => {
+		const exam = calendarEntries({ courses: [PROB], chats: [], scope: null }).find((e) => e.kind === "exam");
+		assert.deepEqual(exam?.kind === "exam" && exam.next && [exam.next.verb, exam.next.what, exam.next.on], ["Review", "Bayes' rule", "2026-11-09"]);
+		const today = calendarEntries({ courses: [LINALG], chats: [], scope: null }).find((e) => e.kind === "exam");
+		assert.equal(today?.kind === "exam" && today.next?.on, null, "a step for today is today's");
+	});
+});
 
 describe("calendar entries", () => {
 	it("puts each exam on its date, today's review today, and each later day's reviews and new topics as the daily plan proposes", () => {
@@ -133,7 +143,7 @@ describe("calendar entries", () => {
 			reviews.map((e) => e.kind === "review" && [e.title, e.day, e.since, e.waits]),
 			[
 				["Bayes' rule", "2026-11-09", null, null],
-				["Limits", "2026-12-03", "Due since 1 Oct", "Waits for your Probability exam"],
+				["Limits", "2026-12-03", "Due 1 Oct", "Waits for your Probability exam"],
 				["Limits", "2026-12-20", null, null],
 			],
 		);
@@ -147,7 +157,7 @@ describe("calendar entries", () => {
 			{ planned: [{ date: "2026-11-11", reviews: ["eigen" as TopicHandle], new: [] }] },
 		);
 		const [review] = calendarEntries({ courses: [MOVED], chats: [], scope: null }).filter((e) => e.kind === "review");
-		assert.deepEqual(review?.kind === "review" && [review.day, review.since, review.waits], ["2026-11-11", null, "Earlier days are full"]);
+		assert.deepEqual(review?.kind === "review" && [review.day, review.since, review.waits], ["2026-11-11", null, null], "nor that earlier days are full (round 11)");
 	});
 
 	it("says from which told day a review or a start moved and what of his study moved it", () => {
@@ -156,7 +166,7 @@ describe("calendar entries", () => {
 			"Linear Algebra",
 			{
 				topics: [
-					topic("eigen", { title: "Eigenvalues", review: { kind: "scheduled", date: "2026-11-11", held: { exam: null, since: "2026-11-09" } }, moved: { from: "2026-11-10", by: "study", courses: ["Probability"] } }),
+					topic("eigen", { title: "Eigenvalues", review: { kind: "scheduled", date: "2026-11-11", held: { exam: null, since: "2026-11-09" } }, moved: { from: "2026-11-10", by: "study", courses: ["Probability"], day: "today" as const } }),
 					topic("projection", { title: "Projection", level: "new", starts: "2026-11-12", moved: { from: "2026-11-11", by: "missed" } }),
 				],
 			},
@@ -174,10 +184,17 @@ describe("calendar entries", () => {
 		const span = entries.find((e) => e.kind === "review" && e.title === "Span");
 		assert.deepEqual(span?.kind === "review" && span.action, { kind: "review", opening: "Review Span" });
 		const task = entries.find((e) => e.kind === "task");
-		assert.equal(task?.kind === "task" && task.opening, "Continue Problem sheet 4");
+		assert.deepEqual(task?.kind === "task" && task.move, { kind: "start", opening: "Continue Problem sheet 4", topics: ["rank"] });
 		assert.equal(task?.kind === "task" && task.topic?.handle, "rank");
 		const exam = entries.find((e) => e.kind === "exam" && e.course.workspace === "/study/linalg");
 		assert.deepEqual(exam?.kind === "exam" && [exam.road, exam.finalReview], [[{ from: "2026-11-09", to: "2026-11-09", titles: ["Eigenvalues"] }], "2026-11-23"]);
+	});
+
+	it("continues an open task in the session that holds it, as Home's line does (round 13, N6: the calendar's Continue started a new session)", () => {
+		const sheet = chat({ title: "Problem sheet 4", tasks: ["sheet-4"], topics: ["rank"], updatedAt: "2026-11-06T19:45:00" });
+		const task = calendarEntries({ courses: [LINALG], chats: [sheet], scope: null }).find((e) => e.kind === "task");
+		assert.ok(task?.kind === "task" && task.move.kind === "open" && task.move.chat === sheet, `Continue opens ${JSON.stringify(task?.kind === "task" && task.move)}`);
+		assert.deepEqual(task.move, courseMove(LINALG, [sheet], todaySteps(LINALG).find((s) => s.kind === "task")));
 	});
 
 	it("puts each session on the day of its last message, with its type, its topic and whether it waits", () => {
@@ -250,6 +267,18 @@ describe("calendar entries", () => {
 		assert.equal(yesterday.filter((e) => e.day === TODAY).length, 1, "an older session stays on its own day; today keeps the task");
 	});
 
+	it("lists no Unfinished row for a review he left for next time: it rides with its next review (round 10, 1 m7)", () => {
+		const LA_LATER = course("/study/linalg", "Linear Algebra", {
+			tasks: [{ key: "eigen-review", title: "Eigenvalues review", step: "The eigenvector of B", updated: "2026-11-06" }],
+			topics: [topic("eigen", { title: "Eigenvalues", level: "assisted", tasks: ["eigen-review"], review: { kind: "scheduled", date: "2026-11-12" } })],
+		}, { planned: [{ date: "2026-11-12", reviews: ["eigen" as TopicHandle], new: [] }] });
+		const la = { workspace: "/study/linalg", title: "Linear Algebra" };
+		const review = chat({ id: "eigen-r", title: "Review Eigenvalues", course: la, topics: ["eigen"], ended: "left", updatedAt: "2026-11-06T09:00:00" });
+		const entries = calendarEntries({ courses: [LA_LATER], chats: [review], scope: null });
+		assert.deepEqual(summary(entries).filter((line) => line.includes("task")), []);
+		assert.ok(summary(entries).includes("2026-11-12 review Eigenvalues"), "its review day lists the review");
+	});
+
 	it("keeps one course when scoped, and with it no session outside a course", () => {
 		const general = chat({ course: undefined });
 		const entries = calendarEntries({ courses: [LINALG, PROB], chats: [general, chat()], scope: "/study/prob" });
@@ -261,6 +290,14 @@ describe("calendar entries", () => {
 		assert.equal(sessionType(chat({ phase: "probe" })), "lesson");
 		assert.equal(sessionType(chat({ phase: "plan" })), "lesson");
 		assert.equal(sessionType(chat({ phase: "teach" })), "lesson");
+	});
+
+	it("shows a session on every day he worked in it, its status on the last alone (round 16, m8)", () => {
+		// The Linear maps lesson begun on Fri 6 Nov and left on Sat 7 Nov.
+		const lesson = chat({ title: "Linear maps lesson", updatedAt: "2026-11-07T15:00:00", studiedDays: ["2026-11-06", "2026-11-07"], ended: "left" });
+		const days = calendarEntries({ courses: [LINALG], chats: [lesson], scope: null }).filter((e) => e.kind === "session" && e.chat.id === lesson.id);
+		assert.deepEqual(days.map((e) => e.day), ["2026-11-06", "2026-11-07"]);
+		assert.ok(days[0]!.kind === "session" && days[0]!.status === null, "the earlier day is what he did, no status");
 	});
 
 	it("knows a quiet week", () => {
@@ -285,10 +322,10 @@ describe("calendar words", () => {
 		assert.equal(finalReviewWords(null, TODAY), null);
 	});
 
-	it("says how far a day is from the engine's", () => {
+	it("says today, tomorrow or yesterday beside a day, and never counts days (round 14, m9)", () => {
 		assert.deepEqual(
 			["2026-11-08", "2026-11-09", "2026-11-07", "2026-11-19", "2026-11-29", "2026-11-01"].map((d) => distanceWords(d, TODAY)),
-			["Today", "Tomorrow", "Yesterday", "In 11 days", "In 21 days", "7 days ago"],
+			["Today", "Tomorrow", "Yesterday", null, null, null],
 		);
 	});
 });
@@ -380,6 +417,24 @@ describe("the road to an exam", () => {
 		assert.equal(finalReviewWords("2026-12-08", TODAY), "Final review from 8 Dec");
 	});
 
+	it("lists the final review among the road's weeks by its day, a week split at its start (round 9, 1 D8)", () => {
+		const planned = [day("2026-11-09", "a"), day("2026-11-13", "b"), day("2026-11-17", "c")];
+		const road = roadOf(planned, "2026-11-19", titleOf, "2026-11-12");
+		assert.deepEqual(roadLines(road, "2026-11-12"), [
+			{ kind: "week", week: { from: "2026-11-09", to: "2026-11-09", titles: ["Groups"] } },
+			{ kind: "final", day: "2026-11-12" },
+			{ kind: "week", week: { from: "2026-11-13", to: "2026-11-13", titles: ["Subgroups"] } },
+			{ kind: "week", week: { from: "2026-11-17", to: "2026-11-17", titles: ["Cosets"] } },
+		]);
+		const now = roadOf([day("2026-11-17"), day("2026-11-18", "d")], "2026-11-19", titleOf, "2026-11-13");
+		assert.deepEqual(
+			roadLines(now, "2026-11-13").map((line) => line.kind),
+			["final", "week"],
+			"\"Final review now\" comes before a start inside it",
+		);
+		assert.deepEqual(roadLines(road, null).map((line) => line.kind), ["week", "week", "week"]);
+	});
+
 	it("gives the exam entry its road and its final review", () => {
 		const topics = [topic("a", { title: "Groups", level: "new" }), topic("b", { title: "Subgroups", level: "new" })];
 		const gt = course("/study/gt", "Group Theory", { exam: { date: "2026-12-14", daysLeft: 36 }, topics }, { planned: [day("2026-11-09", "a"), day("2026-11-10", "b")], finalReview: "2026-12-08" });
@@ -435,8 +490,13 @@ describe("the plan's reasons and gaps in the calendar", () => {
 		);
 		const entries = calendarEntries({ courses: [COURSE], chats: [], scope: null });
 		const exam = entries.find((e) => e.kind === "exam");
-		assert.deepEqual(exam?.kind === "exam" && exam.unreviewed, ["Kernel"]);
-		assert.equal(unreviewedWords(["Kernel", "Rank"]), "No room in it for Kernel and Rank");
+		assert.deepEqual(exam?.kind === "exam" && exam.unreviewed, [{ title: "Kernel" }]);
+		assert.deepEqual(finalReviewGapWords([{ title: "Kernel" }, { title: "Rank", reason: "full" }]), ["No room in it for Kernel and Rank"]);
+		assert.deepEqual(
+			finalReviewGapWords([{ title: "Binomial", reason: "full" }, { title: "Poisson", reason: "too_late" }, { title: "Geometric", reason: "no_study_day" }]),
+			["No room in it for Binomial", "Poisson starts too close to the exam for a review", "No study day left in it for Geometric"],
+			"round 9 (1 D8): the calendar says why as the head does, never \"No room\" for a topic that starts too close",
+		);
 		const fresh = entries.find((e) => e.kind === "new");
 		assert.equal(fresh?.kind === "new" && fresh.waits, "After Probability's new topics");
 	});

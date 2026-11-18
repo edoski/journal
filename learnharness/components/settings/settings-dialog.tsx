@@ -77,9 +77,7 @@ export function SettingsDialogProvider({
 	return (
 		<DialogContext.Provider value={{ open }}>
 			{children}
-			{show && (
-				<SettingsDialog onClose={() => setShow(false)} initialSection={landOn} />
-			)}
+			<SettingsDialog open={show} onClose={() => setShow(false)} initialSection={landOn} />
 		</DialogContext.Provider>
 	);
 }
@@ -89,9 +87,11 @@ export function useSettingsDialog() {
 }
 
 function SettingsDialog({
+	open,
 	onClose,
 	initialSection,
 }: {
+	open: boolean;
 	onClose: () => void;
 	initialSection: SectionId;
 }) {
@@ -99,7 +99,7 @@ function SettingsDialog({
 	// the left, the section's grouped rows on the right. The Radix dialog
 	// owns Esc, the backdrop and focus.
 	return (
-		<Dialog open onOpenChange={(open) => !open && onClose()}>
+		<Dialog open={open} onOpenChange={(next) => !next && onClose()}>
 			<DialogContent
 				aria-describedby={undefined}
 				data-testid="settings-dialog"
@@ -190,18 +190,18 @@ export function SettingsDialogBody({
 					{error && (
 						<p
 							role="alert"
-							className="mx-6 mt-6 text-row text-danger"
+							className="mx-6 mt-6 text-body text-danger"
 							data-testid="settings-error"
 						>
 							{error}
 						</p>
 					)}
 					{record === undefined ? (
-						<p className="px-6 py-6 text-row text-muted-foreground">
+						<p className="px-6 py-6 text-body text-muted-foreground">
 							Loading settings…
 						</p>
 					) : record === null ? (
-						<p className="px-6 py-6 text-row text-muted-foreground">
+						<p className="px-6 py-6 text-body text-muted-foreground">
 							Settings could not be loaded — refresh to retry.
 						</p>
 					) : (
@@ -213,7 +213,7 @@ export function SettingsDialogBody({
 								>
 									<SettingsGroup label="About">
 										<SettingsRow label="Version" testid="row-version">
-											<span className="text-row tabular-nums text-muted-foreground">{APP_VERSION || "unknown"}</span>
+											<span className="text-body tabular-nums text-muted-foreground">{APP_VERSION || "unknown"}</span>
 										</SettingsRow>
 									</SettingsGroup>
 								</SettingsSection>
@@ -283,7 +283,7 @@ export function SettingsDialogBody({
 						<XIcon />
 					</Button>
 				</Hint>
-				<div className="min-w-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="settings-content">
+				<div className="min-w-0 flex-1 overflow-y-auto" data-testid="settings-content">
 					{sections}
 				</div>
 			</TabsContent>

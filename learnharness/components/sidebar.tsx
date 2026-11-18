@@ -7,6 +7,7 @@ import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UnitSidebar } from "@/components/unit-inbox/unit-sidebar";
+import { RailOpenButton } from "@/components/unit-inbox/sidebar-rail";
 import { ServerSidebarWidth } from "@/components/unit-inbox/sidebar-width";
 import { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_OPEN_COOKIE, SIDEBAR_WIDTH_COOKIE, sidebarCookie } from "@/components/sidebar-cookies";
 import { kbdEventForAction } from "@/src/core";
@@ -44,19 +45,24 @@ function storeOpen(open: boolean): void {
  */
 const SIDEBAR_AUTOCLOSE = 928;
 
-// Module scope, guarded for SSR (the server has no navigator).
-const IS_ELECTRON = typeof navigator !== "undefined" && navigator.userAgent.includes("Electron");
+/** The Mac app: its preload's bridge (`window.lh`, electron/preload.cjs) is
+ *  there before any page script runs. Not the user agent: T3 Code's preview,
+ *  where Edo reviews the app, is an Electron browser too, and keying on
+ *  "Electron" drew the Mac app's chrome there with no traffic lights (round
+ *  14: the folded rail's open button at the window's foot, an empty band at
+ *  the rail's top). Module scope, guarded for SSR (the server has no window). */
+const IN_MAC_APP = typeof window !== "undefined" && window.lh !== undefined;
 
 declare global {
 	interface Window {
 		/** Preload bridge (electron/preload.cjs) — Electron only, absent in the browser. */
 		lh?: {
-			/** Read-only host OS; determines the native-control gutter. */
-			platform?: string;
 			expandWindow: () => void;
 			/** The zoom truth (owner round 7): subscribes to "lh:zoom" pushes; returns unsubscribe. */
 			onZoom?: (cb: (factor: number) => void) => () => void;
 			getZoom?: () => Promise<number>;
+			/** The traffic lights' centre from the window's top, in points (electron/main.cjs). */
+			lightsCentre?: number;
 		};
 	}
 }
@@ -81,14 +87,15 @@ export function SidebarProvider({ children, initial = { open: null, width: SIDEB
 	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
-		// Electron shell detection (merged chrome, 2026-09-17): keys the
-		// .lh-electron CSS (app/globals.css) that turns the header bands
-		// into the window's drag surface. Post-mount only — server HTML
-		// and first client render must agree (no hydration mismatch),
-		// and in the plain browser the class never appears.
-		if (IS_ELECTRON) {
+		// The Mac app (merged chrome, 2026-09-17): keys the .lh-electron CSS
+		// (app/globals.css) that turns the header bands into the window's
+		// drag surface and puts the folded rail's open button beside the
+		// traffic lights. Post-mount only — server HTML and first client
+		// render must agree (no hydration mismatch), and in any browser the
+		// class never appears.
+		if (IN_MAC_APP) {
 			document.documentElement.classList.add("lh-electron");
-			document.documentElement.dataset.lhPlatform = window.lh?.platform ?? "";
+			document.documentElement.style.setProperty("--lh-lights-centre", `${window.lh?.lightsCentre}px`);
 		}
 
 		// THE ZOOM TRUTH (owner round 7, 2026-10-05): ⌘±/⌘0 zoom the UI
@@ -119,7 +126,7 @@ export function SidebarProvider({ children, initial = { open: null, width: SIDEB
 	// Both this and the mount effect land before the first paint, so a
 	// narrow window never flashes the open sidebar on load.
 	useEffect(() => {
-		if (!IS_ELECTRON) return; // plain-browser tabs open freely
+		if (!IN_MAC_APP) return; // browser tabs open freely
 		const onResize = () => setNarrow(window.innerWidth < SIDEBAR_AUTOCLOSE);
 		onResize();
 		window.addEventListener("resize", onResize);
@@ -160,8 +167,9 @@ export function SidebarProvider({ children, initial = { open: null, width: SIDEB
 	return (
 		<SidebarContext.Provider value={{ open: open && !narrow, toggle }}>
 			<ServerSidebarWidth.Provider value={initial.width}>
-				{/* transitions gated on mount: no slide-in flash on page load */}
-				<div className={cn("flex h-dvh", mounted && "[&_.sidebar-motion]:transition-[width,margin,opacity]")}>{children}</div>
+				{/* The sidebar's fold moves only once mounted, so nothing slides in
+				    on page load (.lh-sidebar-motion, app/globals.css). */}
+				<div className={cn("flex h-dvh", mounted && "lh-sidebar-motion")}>{children}</div>
 			</ServerSidebarWidth.Provider>
 		</SidebarContext.Provider>
 	);
@@ -169,10 +177,18 @@ export function SidebarProvider({ children, initial = { open: null, width: SIDEB
 
 /** The app frame: sidebar inline + content. Rendered once in the root layout. */
 export function AppShell({ children }: { children: React.ReactNode }) {
+	const { open, toggle } = useSidebar();
 	return (
 		<SettingsDialogProvider>
 			<UnitSidebar />
-			<main className="min-w-0 flex-1">{children}</main>
+			{/* `data-sidebar` keys the page's band gutter in the Mac app (`.lh-band-start`). */}
+			<main data-sidebar={open ? "open" : "folded"} className="min-w-0 flex-1">
+				{children}
+			</main>
+			{/* The folded rail's open button, after the page: in the Mac app it
+			    stands over the page's drag band, and Electron resolves drag
+			    regions in page order (unit-inbox.md, "Folded"). */}
+			<RailOpenButton shown={!open} onOpen={toggle} />
 			{/* The single document-level keydown listener (keyboard wave A) —
 			    after the content in the tree, but it's window-level so order only
 			    matters for the events it dispatches, never for DOM priority. */}

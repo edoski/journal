@@ -1,7 +1,8 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { LESSON_WORDS, leftOffWords, overdueWords, reviewWords, slipMark, slipWords, STANDING_WORDS, type SlipKey } from "@/components/study-words";
+import { leftOffWords, overdueWords, reviewWords, slipMark, STANDING_WORDS, type SlipKey } from "@/components/study-words";
+import { slipBeside } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
-import { sessionState } from "@/components/nav/session-state";
+import { currentSessions, pausedWords, resumableSession, sessionState } from "@/components/nav/session-state";
 
 /**
  * The sidebar's topics. Each unit (a course map topic the learner has
@@ -16,11 +17,14 @@ export type Shelf = "learning" | "review" | "known";
 export interface UnitCourse {
 	workspace: string;
 	title: string;
+	/** The engine's study day (`CourseMap.today`), against which a press
+	 *  reads whether memory asks for the topic's review (`topicOpening`). */
+	today: string;
 }
 
 /** What a unit's sessions are doing now: one waits on the learner, the
  *  tutor writes in one, one is left for next time, or nothing runs. */
-export type UnitNow = "your-turn" | "working" | "left" | null;
+export type UnitNow = "your-turn" | "working" | "paused" | "left" | null;
 
 export interface Unit {
 	/** `<workspace>#<handle>`, unique across courses. */
@@ -65,8 +69,8 @@ export interface UnitInbox {
 	other: readonly ChatListItem[];
 }
 
-/** The shelves that fold under Today. */
-export type FoldedShelf = "working" | "learning" | "known" | "other";
+/** The list that folds under Today (now-shelves.md). */
+export type FoldedShelf = "sessions";
 
 export const SOLID: ReadonlySet<string> = new Set(["independent", "retained", "transferred"]);
 
@@ -87,29 +91,43 @@ export function taskOf(map: Pick<CourseMap, "tasks" | "focus">, topic: CourseMap
 	return held.find((task) => task.key === map.focus) ?? held[0] ?? null;
 }
 
-/** Why the engine calls a topic weak, in the app's words, a method he
- *  mixed it up with named by its title on the course's map; null when it
- *  does not. Pure. */
+/** Why the engine calls a topic weak, or what its open mistake is, in the
+ *  app's words, a method he mixed it up with named by its title on the
+ *  course's map; null when neither. An open mistake the engine does not
+ *  call weak (a partly right answer) still reads as one, as the course's
+ *  Mistakes list holds it (round 9, 2 m1). Pure. */
 export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): string | null {
-	if (!topic.weak) return null;
-	return slipWords(topic.signals, (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle);
+	return slipBeside(topic, (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle)?.words ?? null;
 }
 
 /** What a topic's own sessions are doing now: those that belong to it
  *  (`ownTopics`), never one that only touched it on the way, so a lesson
- *  is "Your turn" on its own topic alone. Pure. */
-export function nowOf(sessions: readonly ChatListItem[], handle: string): UnitNow {
-	return sessionsNow(sessions.filter((c) => ownsTopic(c, handle)));
+ *  is "Your turn" on its own topic alone; `course` as `currentSessions`
+ *  reads it. Pure. */
+export function nowOf(sessions: readonly ChatListItem[], handle: string, course: readonly ChatListItem[] = []): UnitNow {
+	return sessionsNow(sessions.filter((c) => ownsTopic(c, handle)), course);
+}
+
+/** The session a topic's row resumes: of those that belong to it
+ *  (`ownsTopic`), the one to pick up, as its status (`nowOf`) and its
+ *  page's Now read it; never one that only touched it on the way (round
+ *  13, 2 M1: Problem sheet 4, left for next time, was Vectors' Resume
+ *  under On your own, since the sheet's first check was on vectors).
+ *  Pure. */
+export function rowResume(unit: Pick<Unit, "sessions" | "topic">): ChatListItem | null {
+	return resumableSession(unit.sessions.filter((c) => ownsTopic(c, unit.topic.handle)));
 }
 
 /** What any of these sessions is doing now: one waits on the learner, the
  *  tutor writes in one, or one was left for next time. A topic read with
  *  every session tied to it (`topicSessions`) says what its page's Now and
  *  the session's card on Today's top say. Pure. */
-export function sessionsNow(sessions: readonly ChatListItem[]): UnitNow {
-	const states = sessions.map(sessionState);
+export function sessionsNow(sessions: readonly ChatListItem[], course: readonly ChatListItem[] = []): UnitNow {
+	const states = currentSessions(sessions, course).map(sessionState);
 	if (states.includes("your-turn")) return "your-turn";
 	if (states.includes("working")) return "working";
+	// A reply cut off says so on its topic, never an older left session's or task's day (round 14, m33).
+	if (states.includes("paused")) return "paused";
 	return states.includes("left") ? "left" : null;
 }
 
@@ -133,10 +151,10 @@ export function buildInbox(courses: readonly StudyCourse[], chats: readonly Chat
 	const scoped = scope === null ? courses : courses.filter((c) => c.map.workspace === scope);
 	const units: Unit[] = [];
 	for (const { map } of scoped) {
-		const course = { workspace: map.workspace, title: map.title };
+		const course = { workspace: map.workspace, title: map.title, today: map.today };
 		for (const topic of map.topics) {
 			const sessions = topicSessions(chats, map.workspace, topic.handle);
-			const now = nowOf(sessions, topic.handle);
+			const now = nowOf(sessions, topic.handle, chats);
 			const shelf = shelfOf(topic, now);
 			if (shelf) units.push({ key: unitKey(map.workspace, topic.handle), course, topic, shelf, sessions, now, task: taskOf(map, topic), slip: slipOf(map, topic) });
 		}
@@ -170,10 +188,10 @@ export function daysBetween(from: string, to: string): number {
  *     first;
  *   - the engine calls the topic weak ("Not right last time", "Mistake to
  *     fix", "Mixed up with Rank", "Sure, but wrong");
- *   - a solid topic's review is due ("Due today", "3d overdue");
- *   - an open task holds it, and when he left off ("Left off 3d ago");
+ *   - a solid topic's review is due ("Due today", "Due 5 Nov");
+ *   - an open task holds it, and when he left off ("Left off 6 Nov");
  *   - when its next review comes ("Back in 5d");
- *   - else when he last studied it ("Today", "3d ago").
+ *   - else when he last studied it ("Today", "6 Nov").
  * A topic still being learned never says its review is due: almost all
  * of them are.
  */
@@ -181,16 +199,16 @@ export type UnitStatus =
 	| { kind: "your-turn" }
 	| { kind: "working" }
 	| { kind: "slip"; words: string; slip: SlipKey }
-	| { kind: "review" | "task" | "returns" | "studied"; words: string }
+	| { kind: "review" | "task" | "back" | "studied" | "stopped"; words: string }
 	/** Nothing to say; `words` names a topic he has not started ("Not
 	 *  started"), which search lists beside the topics he has. */
 	| { kind: "none"; words?: string };
 
-/** When an open task was left, in the app's words ("Left off 3d ago"):
+/** When an open task was left, in the app's words ("Left off 6 Nov"):
  *  the engine's day it last changed, never its step, which the tutor
  *  writes. Pure. */
 export function taskWords(task: Pick<CourseMapTask, "updated">, today: string): string {
-	return leftOffWords(task.updated ? Math.max(0, daysBetween(task.updated, today)) : null);
+	return leftOffWords(task.updated ? Math.max(0, daysBetween(task.updated, today)) : null, today);
 }
 
 /** The learner's own calendar day of a session's time, or a study day as
@@ -201,25 +219,53 @@ const dayOf = (at: string) => {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-/** When something was last studied, in Home's words: "Today", "3d ago".
+/** When something was last studied, in Home's words: "Today", "6 Nov".
  *  `at` is a session's time or a study day. Pure. */
 export function studiedWords(at: string, today: string): string {
-	return agoWords(Math.max(0, daysBetween(dayOf(at), today || dayOf(new Date().toISOString()))));
+	const day = today || dayOf(new Date().toISOString());
+	return agoWords(Math.max(0, daysBetween(dayOf(at), day)), day);
 }
 
-export function unitStatus(unit: Unit, today: string): UnitStatus {
+/** When a session left for next time was left, in the app's one phrase for
+ *  work left open (round 9, 2 m6: one Eigen lesson read "Left for next
+ *  time" on its topic and "Left off today" on the topic its task holds):
+ *  "Left off today", "Left off 6 Nov". `today` is the engine's day. Pure. */
+export function leftWords(chat: Pick<ChatListItem, "updatedAt">, today: string): string {
+	return leftOffWords(Math.max(0, daysBetween(dayOf(chat.updatedAt), today)), today);
+}
+
+/** A topic row's one status. `asked`: Today reviews the topic
+ *  (`plannedKeys`). Pure. */
+export function unitStatus(unit: Unit, today: string, asked = false): UnitStatus {
 	const { topic } = unit;
 	const slip = unit.slip ? ({ kind: "slip", words: unit.slip, slip: slipMark(topic.signals, (handle) => handle).key } as const) : null;
-	// A wrong answer still open outranks a lesson left for next time
-	// (round 8: Eigen's mistake hid behind "Left for next time").
-	if (unit.now === "left") return slip && topic.signals.mistake ? slip : { kind: "task", words: LESSON_WORDS.leftForTonight };
+	// A wrong answer still open outranks a session that waits on him or
+	// was left for next time (round 8: Eigen's mistake hid behind "Left for
+	// next time"; round 9, 3 m13: Determinants' behind "Your turn"), except
+	// a lesson he left today with the mistake for its next session while
+	// Today does not review the topic: Home has no line for it and the close
+	// said where he picks up, so it says it is left off, never "Mistake to
+	// fix" while Today asks nothing (round 13, 3 N4).
+	const leftToday = unit.now === "left" && unit.sessions.some((c) => ownsTopic(c, topic.handle) && sessionState(c) === "left" && dayOf(c.updatedAt) >= today);
+	if (slip && topic.signals.mistake && unit.now !== "working" && !(leftToday && !asked)) return slip;
+	if (unit.now === "left") {
+		const left = unit.sessions.find((c) => ownsTopic(c, topic.handle) && sessionState(c) === "left");
+		return { kind: "task", words: left ? leftWords(left, today) : leftOffWords(null, today) };
+	}
+	if (unit.now === "paused") {
+		const cut = unit.sessions.find((c) => ownsTopic(c, topic.handle) && sessionState(c) === "paused");
+		return { kind: "stopped", words: pausedWords(cut ?? {}) };
+	}
 	if (unit.now) return { kind: unit.now };
 	if (slip) return slip;
-	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
-	if (unit.task) return { kind: "task", words: taskWords(unit.task, today) };
-	// A review held past memory's day is due already ("Due since 6 Nov"):
+	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue, today) };
+	// An open task's day, unless he studied the topic itself since it last changed: then that study is the
+	// latest about it (round 14, m33: Rank read "Left off 6 Nov", the sheet's day, after his Rank practice today).
+	const studied = unit.sessions.find((c) => ownsTopic(c, topic.handle))?.updatedAt;
+	if (unit.task && !(studied && unit.task.updated && dayOf(studied) > unit.task.updated)) return { kind: "task", words: taskWords(unit.task, today) };
+	// A review held past memory's day is due already ("Due 6 Nov"):
 	// a fact that needs him, which the map's card shows, never a date ahead.
-	if (topic.review?.kind === "scheduled") return { kind: topic.review.held && topic.review.held.since < today ? "review" : "returns", words: reviewWords(topic.review, today) };
+	if (topic.review?.kind === "scheduled") return { kind: topic.review.held && topic.review.held.since < today ? "review" : "back", words: reviewWords(topic.review, today) };
 	const at = unit.sessions[0]?.updatedAt ?? topic.introduced;
 	if (at) return { kind: "studied", words: studiedWords(at, today) };
 	return topic.level === "new" ? { kind: "none", words: STANDING_WORDS[0] } : { kind: "none" };
@@ -267,7 +313,8 @@ export function taskSessions(chats: readonly ChatListItem[], workspace: string, 
 	return chats.filter((c) => c.course?.workspace === workspace && (c.tasks ?? []).includes(task)).sort(newestFirst);
 }
 
-const newestFirst = (a: ChatListItem, b: ChatListItem) => b.updatedAt.localeCompare(a.updatedAt);
+/** Newest first, by the last change. */
+export const newestFirst = (a: ChatListItem, b: ChatListItem) => b.updatedAt.localeCompare(a.updatedAt);
 
 /** A new session's first message from a topic's page: the prompt, led by
  *  the topic's title unless the prompt names it, so the tutor works on

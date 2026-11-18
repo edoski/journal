@@ -1,7 +1,7 @@
 import { parseHTML } from "linkedom";
 
 /** An isolated linkedom DOM with the browser APIs Radix layers reach for
- *  (computed style, ResizeObserver, form elements), so a test can mount a
+ *  (computed style, ResizeObserver, media queries, SVG's screen matrix, form elements), so a test can mount a
  *  real open menu, select, popover or dialog and press its keys. Import this
  *  module before any component: Radix picks its layout effect when it loads,
  *  and without a document then it never mounts a portal. */
@@ -39,7 +39,9 @@ function installRadixDom() {
 	for (const [key, value] of Object.entries(globals)) {
 		Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
 	}
-	Object.assign(dom.window, { innerWidth: 1280, innerHeight: 800, ResizeObserver: NoopResizeObserver, getComputedStyle });
+	// No media query matches: full motion, as the map reads before it glides between arcs.
+	const matchMedia = (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} });
+	Object.assign(dom.window, { innerWidth: 1280, innerHeight: 800, ResizeObserver: NoopResizeObserver, getComputedStyle, matchMedia });
 	// React reads `oninput in document` once to choose real input events
 	// over its legacy polyfill, which needs focus events linkedom lacks.
 	Object.defineProperty(dom.document, "oninput", { configurable: true, writable: true, value: null });
@@ -54,6 +56,8 @@ function installRadixDom() {
 		setPointerCapture() {},
 		releasePointerCapture() {},
 	});
+	// No layout: an SVG has no screen matrix, so the map's lines draw unsnapped, as a server render does.
+	Object.assign((dom.window as unknown as { SVGElement: { prototype: object } }).SVGElement.prototype, { getScreenCTM: () => null });
 	return dom;
 }
 

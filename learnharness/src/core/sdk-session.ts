@@ -1,7 +1,7 @@
 import type { AssistantMessage, ImageContent, TextContent, ToolResultMessage } from "@earendil-works/pi-ai";
 import { activeCompactionOf } from "./compaction.ts";
 import { CLAUDE_MODEL } from "./contracts/claude.ts";
-import { isUiOnlyMarker, type LhMarkerMessage, type LhMessage } from "./native-messages.ts";
+import { isQuestionRepose, isUiOnlyMarker, type LhMarkerMessage, type LhMessage } from "./native-messages.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 
 /**
@@ -84,8 +84,8 @@ export const QUESTION_POSED_TEXT = "Question posed. The turn ends here: the lear
 
 /** Owed record messages as the next user message's blocks. Learner words and
  *  photos pass as they are; markers give their model-facing text; an answer
- *  is tagged with the question call it answers; an app-made conclude reads
- *  as a note. Model output the session already holds, UI-only markers and
+ *  is tagged with the question call it answers; an app-made conclude, and
+ *  the questions the app asked again after Done for today, read as notes. Model output the session already holds, UI-only markers and
  *  the record's compaction markers (the session keeps its own summary) give
  *  nothing. */
 export function sdkInputBlocks(owed: readonly LhMessage[]): SdkInputBlock[] {
@@ -104,7 +104,8 @@ export function sdkInputBlocks(owed: readonly LhMessage[]): SdkInputBlock[] {
 				break;
 			}
 			case "assistant":
-				if (m.provider === SYNTHETIC_PROVIDER) for (const block of m.content) if (block.type === "toolCall") synthetic.add(block.id);
+				if (isQuestionRepose(m)) out.push(...reposeNotes(m as AssistantMessage));
+				else if (m.provider === SYNTHETIC_PROVIDER) for (const block of m.content) if (block.type === "toolCall") synthetic.add(block.id);
 				break;
 			case "toolResult":
 				out.push(...resultBlocks(m, synthetic));
@@ -112,6 +113,17 @@ export function sdkInputBlocks(owed: readonly LhMessage[]): SdkInputBlock[] {
 		}
 	}
 	return out;
+}
+
+/** What the model reads for the questions the app asked again after his
+ *  Done for today: each call it posed, so the answer tagged with it reads
+ *  as his answer to that question. */
+function reposeNotes(repose: AssistantMessage): SdkInputBlock[] {
+	return repose.content.flatMap((block) => {
+		if (block.type !== "toolCall") return [];
+		const question = (block.arguments as { question?: unknown } | null)?.question;
+		return [{ type: "text" as const, text: `<app_note tool="${block.name}" call="${block.id}">\nHe pressed Done for today with your question left open, so the app asked it again, as you posed it, for when he came back: "${typeof question === "string" ? question : ""}". What follows answers this call or sets it aside, like any question you pose.\n</app_note>` }];
+	});
 }
 
 function resultBlocks(result: ToolResultMessage, synthetic: ReadonlySet<string>): SdkInputBlock[] {

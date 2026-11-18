@@ -52,9 +52,27 @@ second pillar of input).
 | Rename session | F2 | `lh:kbd-rename-session` (chat.tsx) |
 | Cheat sheet | ? | keyboard-shortcuts.tsx |
 | Find in this lesson | ⌘F | `lh:kbd-find` (session-find.tsx) |
-| Try again | Enter *on the empty message box, or outside any field* | composer.tsx `enterAction` (`empty-action`) after a reply that never came or a failed turn |
+| Try again | Enter *on the empty message box, or outside any field* | lesson/lesson-composer.tsx `enterAction` (`empty-action`) after a reply that never came or a failed turn |
 | Stop the tutor | Esc, or a click on the square | the "Abort this turn?" confirm (abort-turn-dialog.tsx); Enter never stops a turn (round 3, 14 Nov 2026) |
 | Go to the newest reply | ⌘↓ | `lh:kbd-jump-latest` (lesson/scroll-cue.tsx; acts only while the cue above the dock shows) |
+
+## Page lists (audit 17 Nov 2026, finding 12)
+
+Home's Today, the course page's road and the topic page's sections walk
+one way, through one hook (`components/list-walk/use-list-walk.ts`,
+spec `components/list-walk/list-walk.md`):
+
+- **↑/↓** step, clamped at the ends, no wrap. **Home/End** jump to the
+  list's first or last row. **Esc** leaves the walk.
+- **↑ on the first row** steps onto the head's control above the list:
+  Now's row on the course page, the trail's last link on the topic page,
+  and **↓** from there comes back. Home's head is the map, which the walk
+  never reaches (Edo, 15 Nov 2026, N3), so there ↑ keeps the first line.
+- With nothing focused, ↓ or Home enters at the first row, ↑ or End at
+  the last (window capture phase, ahead of the page's spatial arrows).
+- A page's own keys sit on top: Home's ← →, ⌘E and ⌘↵
+  (`study-home/home-keys.ts`; its letters type into its composer); the
+  road's ← → on a header and → on a row.
 
 ## Model menu keyboard machine (owner polish, 2026-09-17)
 

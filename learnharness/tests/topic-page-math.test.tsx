@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ChatListItem, ChatRecord } from "../src/core/contracts/chat.ts";
@@ -56,7 +56,6 @@ const LESSON: ChatListItem = {
 	topics: ["determinant"],
 	ownTopics: ["determinant"],
 	busy: false,
-	compacting: false,
 };
 const EARLIER: ChatListItem = { ...LESSON, id: "chat_cofactors", title: "$\\det$ by cofactors", updatedAt: "2026-11-06T08:00:00.000Z", pendingQuestion: false };
 const ATTEMPT = { id: "o1", date: "2026-11-07", recorded: null, result: "partial" as const, unaided: false, grade: "helped" as const, gaveUp: false, predicted: false, sure: null, chose: null, text: "Read $\\det = -2$ as an area doubled and flipped", session: null, uncertain: false };
@@ -71,7 +70,7 @@ const document = parseHTML(
 	)}</body></html>`,
 ).document;
 
-const step = (words: string) => [...document.querySelectorAll('[data-slot="topic-step"]')].find((el) => el.getAttribute("aria-label")!.startsWith(words))!;
+const step = (words: string) => [...document.querySelectorAll('[data-slot="topic-lesson-map"] [data-slot="course-map-node"]')].find((el) => el.getAttribute("aria-label")!.startsWith(words))!;
 
 describe("math on the topic page", () => {
 	it("typesets a step title's formula in its map node, and names it in plain words", () => {
@@ -79,13 +78,13 @@ describe("math on the topic page", () => {
 		assert.ok(node, "the node's label is the plain words");
 		assert.equal(node.querySelectorAll('[data-slot="math-text"] .katex').length, 1);
 		assert.doesNotMatch(node.getAttribute("aria-label")!, /\$|\\det/);
-		const caption = document.querySelector('[data-slot="topic-steps"] figcaption')!.textContent!;
+		const caption = document.querySelector('[data-slot="topic-lesson-map"] figcaption')!.textContent!;
 		assert.match(caption, /Your turn on det\(AB\) = det A · det B/);
 	});
 
 	it("keeps a plain step title plain", () => {
 		const node = step(PLAIN);
-		assert.equal(node.querySelector('[data-slot="math-text"]'), null);
+		assert.ok(node.querySelector('[data-slot="math-text"]') === null);
 		assert.match(node.textContent!, new RegExp(PLAIN));
 	});
 

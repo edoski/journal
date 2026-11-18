@@ -4,6 +4,7 @@ import { useEffect, type KeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { BookOpenIcon, MapIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ArcLabel } from "@/components/course-map/arc-label";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { MathText, mathPlain } from "@/components/ui/math-text";
@@ -109,7 +110,7 @@ export function LessonRoadmap({
 						size="row"
 						data-slot="lesson-roadmap-trigger"
 						data-testid="roadmap"
-						aria-label={`Where this lesson is: ${mathPlain(label)}`}
+						aria-label={label ? `Where this lesson is: ${mathPlain(label)}` : "Where this lesson is"}
 						className="min-w-0 shrink gap-2.5 font-normal"
 					>
 						<span data-slot="roadmap-strip" aria-hidden className="flex shrink-0 items-center gap-1">
@@ -117,9 +118,11 @@ export function LessonRoadmap({
 								<span key={s.id} data-status={s.status} className={cn("shrink-0 rounded-full", stripDot(s))} />
 							))}
 						</span>
-						<span className="min-w-0 truncate">
-							<MathText>{label}</MathText>
-						</span>
+						{label && (
+							<span className="min-w-0 truncate">
+								<MathText>{label}</MathText>
+							</span>
+						)}
 					</Button>
 				</PopoverTrigger>
 			</Hint>
@@ -132,7 +135,7 @@ export function LessonRoadmap({
 								<span aria-hidden className="flex size-4 shrink-0 items-center justify-center">
 									<span className={cn("size-2 rounded-full", rowDot(s))} />
 								</span>
-								<span className={cn("min-w-0 flex-1 truncate", s.status === "current" ? "text-foreground" : "text-muted-foreground")}>
+								<span className={cn("min-w-0 flex-1 break-words", s.status === "current" ? "text-foreground" : "text-muted-foreground")}>
 									<MathText>{s.title}</MathText>
 								</span>
 								{word && <span className="shrink-0 text-muted-foreground">{word}</span>}
@@ -149,12 +152,12 @@ export function LessonRoadmap({
 											onOpenChange(false);
 											onJump(s.id);
 										}}
-										className="flex h-8 w-full items-center gap-3 rounded-md px-2 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+										className="flex min-h-8 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-body outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
 									>
 										{inner}
 									</button>
 								) : (
-									<div data-slot="roadmap-step" data-status={s.status} className="flex h-8 items-center gap-3 rounded-md px-2 text-row">
+									<div data-slot="roadmap-step" data-status={s.status} className="flex min-h-8 items-center gap-3 rounded-md px-2 py-1.5 text-body">
 										{inner}
 									</div>
 								)}
@@ -217,18 +220,17 @@ function RoadmapLinks({ place, course }: { place?: LessonPlace; course: { title:
 					</span>
 				</Link>
 			)}
-			<Link href={courseHref(course.workspace)} data-slot="roadmap-link" data-testid="roadmap-course" className={LINK_ROW}>
-				<MapIcon aria-hidden className="size-4 shrink-0" />
-				<span className="min-w-0 flex-1 truncate">Course map</span>
-				{place?.arc && (
-					<span data-slot="arc-pill" className="max-w-32 shrink-0 truncate rounded-full bg-fill-hover px-2 py-0.5 text-label text-muted-foreground">
-						{place.arc.title}
-					</span>
-				)}
+			{/* The arc on a line of its own, whole: beside "Course map" it was cut, its number left bare (round 15, 4 free). */}
+			<Link href={courseHref(course.workspace)} data-slot="roadmap-link" data-testid="roadmap-course" className={cn(LINK_ROW, "group/arc", place?.arc && "h-auto items-start py-1.5")}>
+				<MapIcon aria-hidden className={cn("size-4 shrink-0", place?.arc && "mt-0.5")} />
+				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+					<span className="truncate">Course map</span>
+					{place?.arc && <ArcLabel {...place.arc} />}
+				</span>
 			</Link>
 		</>
 	);
 }
 
 const LINK_ROW =
-	"flex h-8 items-center gap-3 rounded-md px-2 text-row text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";
+	"flex h-8 items-center gap-3 rounded-md px-2 text-body text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";

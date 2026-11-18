@@ -2,7 +2,8 @@
  * The Inbox candidate "today" (components/unit-inbox/today/): the sidebar's
  * top is exactly Home's Today, one card per line, a session's line as the
  * session under its one title and a course's line as the topic it leads
- * with, and every other topic on exactly one shelf.
+ * with, every other topic in exactly one group, and every session not on
+ * top as its own card under Sessions.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -14,11 +15,12 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { lessonTitle } from "../components/study-home/agenda-rows/row-facts.ts";
 import { needsYouNow } from "../components/study-home/needs-you.ts";
-import { nowFor, restShelves, sessionKey } from "../components/unit-inbox/now-inbox.ts";
+import { nowFor, restSessions, restTopics, sessionKey } from "../components/unit-inbox/now-inbox.ts";
 import type { NowListProps } from "../components/unit-inbox/now-list-props.ts";
 import { TodayList } from "../components/unit-inbox/today/today-list.tsx";
 import { claimedKeys, steadyTop, itemKey, todayTop, type NowItem } from "../components/unit-inbox/today/today-top.ts";
 import { buildInbox } from "../components/unit-inbox/units.ts";
+import { courseHref } from "../components/unit-inbox/unit-href.ts";
 import { sessionState } from "../components/nav/session-state.ts";
 import type { ChatListItem, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { CHATS, chat, COURSES, LINALG, map, PROB, TODAY, topic } from "./fixtures/now-demo.ts";
@@ -44,7 +46,8 @@ describe("todayTop", () => {
 		);
 		assert.deepEqual(
 			top.map((i) => (i.kind === "topic" ? i.unit.topic.title : i.line.title)),
-			["Eigenvalues lesson", "Rank practice", "Random variables and distributions", "Linear independence"],
+			["Random variables and distributions", "Linear independence", "Convergent sequences", "Chain rule", "Continue Eigenvalues lesson"],
+			"each course's review first, then the lesson he is in today, the other sessions waiting on him folded after it (round 10, 1 m2; round 11, 3 n5)",
 		);
 		assert.ok(top.length <= 5);
 	});
@@ -99,8 +102,8 @@ describe("todayTop", () => {
 		assert.deepEqual(
 			top.map((i) => [i.kind, itemKey(i)]),
 			[
-				["session", sessionKey("loose")],
 				["topic", "/s/prob#rv"],
+				["session", sessionKey("loose")],
 			],
 		);
 	});
@@ -108,7 +111,7 @@ describe("todayTop", () => {
 	it("keeps only the chosen course's lines under the course filter", () => {
 		assert.deepEqual(
 			topOf(COURSES, CHATS, "/s/linalg").top.map((i) => itemKey(i)),
-			[sessionKey("chat_eigen"), sessionKey("chat_rank"), "/s/linalg#independence"],
+			["/s/linalg#independence", sessionKey("chat_eigen"), sessionKey("chat_rank")],
 		);
 		assert.deepEqual(
 			topOf(COURSES, CHATS, "/s/calc").top.map((i) => itemKey(i)),
@@ -123,22 +126,22 @@ describe("todayTop", () => {
 		assert.deepEqual(
 			top.map((i) => [i.line.key, itemKey(i)]),
 			[
+				["/s/linalg#review:independence", "/s/linalg#independence"],
 				["a", sessionKey("a")],
 				["b", sessionKey("b")],
-				["/s/linalg#review:independence", "/s/linalg#independence"],
 			],
 		);
 	});
 
-	it("puts every listed topic and every session on the top or on exactly one shelf", () => {
+	it("puts every listed topic on the top or in exactly one group, and every session once: its own card or a Sessions row", () => {
 		const { inbox, top } = topOf(COURSES);
-		const shelves = restShelves(inbox, new Set(top.flatMap(claimedKeys)));
-		const units = [...top.flatMap((i) => claimedKeys(i).filter((k) => k !== sessionKey(i.line.key))), ...[...shelves.learning, ...shelves.working, ...shelves.known].map((u) => u.key)];
+		const onTop = new Set(top.flatMap(claimedKeys));
+		const rest = restTopics(inbox, onTop);
+		const units = [...top.flatMap((i) => claimedKeys(i).filter((k) => k !== sessionKey(i.line.key))), ...[...rest.learning, ...rest.working, ...rest.known].map((u) => u.key)];
 		assert.equal(new Set(units).size, units.length, "no topic twice");
 		for (const u of [...inbox.active, ...inbox.working, ...inbox.known]) assert.ok(units.includes(u.key), `${u.key} placed`);
-		const shown = new Set([...top, ...[...shelves.learning, ...shelves.working, ...shelves.known].map((u) => ({ kind: "topic" as const, unit: u }))].flatMap((i) => (i.kind === "topic" ? i.unit.sessions.map((c) => c.id) : i.kind === "session" ? [i.chat.id] : [])));
-		for (const c of shelves.other) shown.add(c.id);
-		for (const c of CHATS) assert.ok(shown.has(c.id), `${c.id} reachable`);
+		const sessions = [...top.flatMap((i) => (i.kind === "session" ? [i.chat.id] : [])), ...restSessions(CHATS, null, onTop).map((c) => c.id)];
+		assert.deepEqual([...sessions].sort(), CHATS.map((c) => c.id).sort(), "every session once");
 	});
 
 	it("draws the engine-down list as the waiting sessions' own cards", () => {
@@ -170,7 +173,7 @@ describe("one lesson, one card", () => {
 				[[sessionKey("tour"), "Eigenvalues lesson"]],
 				`after touching ${touched.join(", ") || "nothing else"}`,
 			);
-			assert.equal(needs.lines[0]!.lead?.handle, "eigen", "its topic is the one it belongs to, never the step it is on");
+			assert.equal(needs.lines.find((l) => l.key === "tour")?.lead?.handle, "eigen", "its topic is the one it belongs to, never the step it is on");
 		}
 	});
 
@@ -183,7 +186,7 @@ describe("one lesson, one card", () => {
 		assert.equal(now.independence, null);
 		assert.equal("diag" in now ? now.diag : null, null);
 		const { top } = topOf([LINALG], chats);
-		const shelves = restShelves(inbox, new Set(top.flatMap(claimedKeys)));
+		const shelves = restTopics(inbox, new Set(top.flatMap(claimedKeys)));
 		assert.ok(!shelves.learning.some((u) => u.topic.handle === "eigen"), "the lesson's own topic is not a second row");
 	});
 });
@@ -194,7 +197,7 @@ describe("one review, one row", () => {
 		for (const chats of [[review], [{ ...review, pendingProblem: false, busy: true }]]) {
 			const { inbox, top } = topOf([LINALG], chats);
 			const drawn = steadyTop(topOf([LINALG], [review]).top, top, inbox, chats);
-			const shelves = restShelves(inbox, new Set(drawn.flatMap(claimedKeys)));
+			const shelves = restTopics(inbox, new Set(drawn.flatMap(claimedKeys)));
 			const rows = [...shelves.learning, ...shelves.working, ...shelves.known].map((u) => u.topic.handle);
 			assert.ok(!rows.includes("rank" as TopicHandle) && !rows.includes("independence" as TopicHandle), `no second row (${chats[0]!.busy ? "writing" : "his turn"})`);
 		}
@@ -215,18 +218,18 @@ describe("steadyTop", () => {
 	}
 
 	it("keeps the lesson he is in at its place, as Working, while the tutor writes, so a turn changes neither order nor count", () => {
-		const { top } = topOf(COURSES);
+		const { top } = topOf([LINALG]);
 		for (const id of ["chat_eigen", "chat_rank"]) {
-			const during = turn(COURSES, top, writing(CHATS, id));
+			const during = turn([LINALG], top, writing(CHATS, id));
 			assert.deepEqual(keysOf(during), keysOf(top), `${id} while the tutor writes`);
 			const card = during.find((i) => i.line.key === id);
 			assert.ok(card?.kind === "session" && sessionState(card.chat) === "working", "drawn as Working");
 		}
 		for (const id of ["chat_eigen", "chat_rank"]) {
-			const during = turn(COURSES, top, writing(CHATS, id));
-			const after = turn(COURSES, during, answered(CHATS, id, "2026-11-08T10:00:00.000Z"));
+			const during = turn([LINALG], top, writing(CHATS, id));
+			const after = turn([LINALG], during, answered(CHATS, id, "2026-11-08T10:00:00.000Z"));
 			assert.deepEqual(keysOf(after), keysOf(top), `${id} back on his turn, where it was`);
-			assert.deepEqual(keysOf(turn(COURSES, after, answered(CHATS, id, "2026-11-08T10:00:00.000Z"))), keysOf(top), "and it stays there");
+			assert.deepEqual(keysOf(turn([LINALG], after, answered(CHATS, id, "2026-11-08T10:00:00.000Z"))), keysOf(top), "and it stays there");
 		}
 	});
 
@@ -236,15 +239,16 @@ describe("steadyTop", () => {
 		const next = turn(COURSES, top, woke);
 		assert.deepEqual(keysOf(next), keysOf(topOf(COURSES, woke).top));
 		const rankFirst = answered(CHATS, "chat_rank", "2026-11-08T10:00:00.000Z");
-		assert.deepEqual(keysOf(turn(COURSES, [], rankFirst)).slice(0, 2), [sessionKey("chat_rank"), sessionKey("chat_eigen")]);
+		const sessions = (top: readonly NowItem[]) => keysOf(top).filter((k) => k.startsWith("chat:"));
+		assert.deepEqual(sessions(turn([LINALG], [], rankFirst)), [sessionKey("chat_rank"), sessionKey("chat_eigen")]);
 	});
 
 	it("keeps a course's due review on its own line beside a kept session on another topic, as Today does", () => {
 		const alone = CHATS.filter((c) => c.id !== "chat_rank");
-		const { top } = topOf(COURSES, alone);
-		assert.equal(itemKey(top[0]!), sessionKey("chat_eigen"));
+		const { top } = topOf([LINALG], alone);
+		assert.deepEqual(keysOf(top).slice(0, 2), ["/s/linalg#independence", sessionKey("chat_eigen")]);
 		assert.ok(top.some((i) => i.line.key.startsWith("/s/linalg#review")), "the eigen lesson does not hide Linear Algebra's review");
-		const during = turn(COURSES, top, writing(alone, "chat_eigen"));
+		const during = turn([LINALG], top, writing(alone, "chat_eigen"));
 		assert.deepEqual(keysOf(during), keysOf(top));
 	});
 
@@ -256,7 +260,8 @@ describe("steadyTop", () => {
 			during.map((i) => [i.kind, itemKey(i)]),
 			top.map((i) => [i.kind, itemKey(i)]),
 		);
-		assert.ok(during[0]?.kind === "session" && during[0].chat.busy);
+		const card = during.find((i) => i.kind === "session");
+		assert.ok(card?.kind === "session" && card.chat.busy);
 		const done = turn([PROB], during, [{ ...loose, pendingQuestion: false }]);
 		assert.deepEqual(keysOf(done), ["/s/prob#rv"]);
 	});
@@ -268,7 +273,7 @@ describe("steadyTop", () => {
 });
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
-const FOLDED = { working: true, learning: true, known: true, other: true };
+const FOLDED = { sessions: true };
 
 function renderList(over: Partial<NowListProps> = {}, courses: readonly StudyCourse[] = COURSES, chats = CHATS) {
 	const props: NowListProps = {
@@ -290,12 +295,12 @@ function renderList(over: Partial<NowListProps> = {}, courses: readonly StudyCou
 }
 
 describe("TodayList", () => {
-	it("draws the demo's four cards with Home's reasons in order, then the folded shelves", () => {
+	it("draws the demo's cards with Home's reasons in order, then the folded Sessions list", () => {
 		const doc = renderList();
 		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
-			["Eigenvalues lesson", "Rank practice", "Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence"],
+			["Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence", "Review Convergent sequences, Cauchy sequences", "Review Chain rule, Riemann sums, Improper integrals", "Continue Eigenvalues lesson"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
@@ -304,19 +309,33 @@ describe("TodayList", () => {
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
-			["Your turn", "Your turn", "3d overdue", "4d overdue"],
+			["Due 5 Nov", "Due 4 Nov", "Due 1 Nov", "Not right last time", "Your turn"],
 		);
 		assert.deepEqual(
 			[...doc.querySelectorAll('[data-slot="unit-section-header"]')].map((h) => h.textContent),
-			["Learning, your turn", "On your own", "Other sessions"],
+			["Sessions, your turn"],
 		);
-		assert.ok(doc.querySelector('[data-slot="unit-shelf-attention"]'), "Learning's dot: a session from before yesterday waits");
-		assert.equal(doc.querySelector('[data-slot="unit-slim"]'), null, "every shelf folded");
-		assert.equal(doc.querySelector('[data-slot="sidebar-note"]'), null);
+		assert.ok(doc.querySelector('[data-slot="unit-shelf-attention"]'), "the dot: a session from before yesterday waits");
+		assert.ok(doc.querySelector('[data-testid="session-row"]') === null, "Sessions folded");
+		assert.ok(doc.querySelector('[data-slot="sidebar-note"]') === null);
+	});
+
+	it("never marks a course card open on its course page, which it does not open; the session holding its task does (round 10, 2: the selected row stayed on sheet 4 there, 43a)", () => {
+		const exam: StudyCourse = {
+			map: map({ workspace: "/s/exam", title: "Exam prep", tasks: [{ key: "paper", title: "Past paper 2024", step: "Question 3", updated: TODAY }], focus: "paper" }),
+			unready: null,
+			due: [],
+			lastActiveDaysAgo: 0,
+			newToday: [],
+		};
+		const open = (pathname: string, chats: readonly ChatListItem[] = []) => [...renderList({ pathname }, [exam], chats).querySelectorAll('[aria-current="page"]')].map((a) => a.getAttribute("data-sidebar-row"));
+		assert.deepEqual(open(courseHref("/s/exam")), [], "the course page is not the card's");
+		const paper = chat("paper", { title: "Past paper 2024", course: { workspace: "/s/exam", title: "Exam prep" }, tasks: ["paper"], ended: "closed", updatedAt: "2026-11-07T09:00:00.000Z" });
+		assert.deepEqual(open("/chat/paper", [paper]), ["course:/s/exam"], "the session that holds its task is");
 	});
 
 	it("marks the open session's card", () => {
-		const doc = renderList({ pathname: "/chat/chat_rank" });
+		const doc = renderList({ pathname: "/chat/chat_rank" }, [LINALG]);
 		const open = [...doc.querySelectorAll('[aria-current="page"]')].map((a) => a.getAttribute("data-sidebar-row"));
 		assert.deepEqual(open, [sessionKey("chat_rank")]);
 	});
@@ -329,19 +348,20 @@ describe("TodayList", () => {
 		const down = renderList({ unavailable: true }, [], CHATS);
 		assert.equal(down.querySelectorAll('[data-slot="unit-card"]').length, 2);
 		assert.equal(down.querySelector('[data-slot="sidebar-note"]')?.textContent, "Couldn’t read your courses");
-		// A session waiting since before yesterday lights Other's dot.
-		assert.match(down.querySelector('[data-slot="unit-section-header"]')?.textContent ?? "", /^Other sessions, your turn$/);
+		// A session waiting since before yesterday lights the dot.
+		assert.match(down.querySelector('[data-slot="unit-section-header"]')?.textContent ?? "", /^Sessions, your turn$/);
 	});
 
-	it("keeps a course whose record can't be read as a card under Today's, named, that opens its course page", () => {
+	it("says a course whose record can't be read as a quiet note under Today's cards, never a card that reads as a session (round 14, 4 free)", () => {
 		const broken = { workspace: "/s/analysis", title: "Real Analysis", problem: "damaged" as const };
 		const doc = renderList({ unreadable: [broken] });
-		const card = [...doc.querySelectorAll('[data-slot="unit-card"]')].at(-1)!;
-		assert.equal(card.querySelector('[data-testid="unit-row"] > span:first-child')?.textContent, "RAReal Analysis");
-		assert.equal(card.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent, "Couldn't read this course's record");
-		assert.match(card.querySelector("a")?.getAttribute("href") ?? "", /^\/unit\//);
+		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
+		assert.equal(cards.some((card) => /record/.test(card.textContent ?? "")), false, "no card for it among the sessions");
+		const note = doc.querySelector('[data-slot="unreadable-note"]');
+		assert.equal(note?.textContent, "Couldn’t read Real Analysis’s record");
+		assert.match(note?.getAttribute("href") ?? "", /^\/unit\//, "it opens its course page, which says why");
 		const alone = renderList({ unreadable: [broken] }, [], []);
-		assert.equal(alone.querySelectorAll('[data-slot="unit-card"]').length, 1);
-		assert.equal(alone.querySelector('[data-slot="sidebar-note"]'), null, "not No courses yet");
+		assert.equal(alone.querySelectorAll('[data-slot="unit-card"]').length, 0);
+		assert.equal([...alone.querySelectorAll('[data-slot="sidebar-note"]')].map((n) => n.textContent).join(" | "), "Couldn’t read Real Analysis’s record", "not No courses yet");
 	});
 });

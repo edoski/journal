@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { documentToMarkdown, type PdfPage } from "./pdf-markdown.ts";
 
 /**
@@ -48,25 +49,58 @@ async function loadPdfjs() {
 
 /** Standard-font data dir (live-smoke finding 2026-09-19: without it pdfjs
  *  warns and falls back on non-embedded standard fonts — Helvetica, Times…).
- *  The node side takes a plain filesystem path, shared by text and rendering.
- *  pdfjs checks endsWith("/") even on Windows: use a literal trailing slash,
- *  NOT path.sep ("\\" on Windows). Node fs accepts this path on every OS. */
+ *  The node side takes a plain filesystem path, shared by text and rendering;
+ *  pdfjs requires its trailing slash. */
 export function standardFontsDir(): string {
 	return path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "node_modules", "pdfjs-dist", "standard_fonts") + "/";
 }
 
-async function openDocument(filePath: string) {
-	return openBytes(new Uint8Array(await fs.readFile(filePath)));
+/**
+ * The legacy build in plain node reads every document on one main-thread
+ * fake worker, and a document's teardown (the loading task's destroy(), the
+ * worker's Terminate) clears that worker's module-wide caches: the WASM image
+ * decoder, patterns, primitives. A read still running in another document
+ * then waits on promises that never settle, and the process exits mid-await
+ * (18 Nov 2026: a 1,127-page textbook measured beside an 80-page deck). So
+ * documents read side by side, a teardown waits until none is reading, and
+ * once one is due no new document opens until it is done, so documents never
+ * pile up waiting for a quiet moment. The gate lives on globalThis: pdfjs is
+ * one server-external module, while Next bundles this file into every route
+ * and into instrumentation, so a gate per copy would let one copy's teardown
+ * run under another copy's read.
+ */
+interface PdfGate { reading: number; ending: PDFDocumentLoadingTask[]; due: Promise<void> | null; done: () => void }
+type PdfGateGlobal = { __lhPdfGate?: PdfGate };
+const gate: PdfGate = ((globalThis as typeof globalThis & PdfGateGlobal).__lhPdfGate ??= { reading: 0, ending: [], due: null, done: () => {} });
+
+async function tearDown(): Promise<void> {
+	while (gate.ending.length > 0) await gate.ending.shift()!.destroy().catch(() => {});
+	const done = gate.done;
+	gate.due = null;
+	done();
 }
 
-async function openBytes(data: Uint8Array) {
+/** Open a PDF, read it with `use`, and tear it down once no other document
+ *  is reading. Every pdfjs document in this process goes through here. */
+export async function readPdf<T>(data: Uint8Array, use: (doc: PDFDocumentProxy) => Promise<T>): Promise<T> {
 	const pdfjs = await loadPdfjs();
-	// The legacy build in plain node runs on a main-thread fake worker (no
-	// workerSrc needed); teardown is the loading task's destroy().
+	while (gate.due) await gate.due;
+	gate.reading++;
 	// verbosity 0 = errors only — scanned PDFs (JBIG2 XObjects) otherwise
 	// flood the log with per-page warnings (live-smoke finding 2026-09-19).
 	const task = pdfjs.getDocument({ data, standardFontDataUrl: standardFontsDir(), verbosity: 0 });
-	return { doc: await task.promise, task };
+	try {
+		return await use(await task.promise);
+	} finally {
+		gate.reading--;
+		gate.ending.push(task);
+		gate.due ??= new Promise<void>((resolve) => (gate.done = resolve));
+		if (gate.reading === 0) void tearDown();
+	}
+}
+
+async function readPdfFile<T>(filePath: string, use: (doc: PDFDocumentProxy) => Promise<T>): Promise<T> {
+	return readPdf(new Uint8Array(await fs.readFile(filePath)), use);
 }
 
 /** Concatenate a page's text items into a body string. */
@@ -107,22 +141,16 @@ function mathDensity(text: string): number {
  *  no page walk, no text extraction (unlike pdfInfo). The reader's upfront
  *  unreadable-source gate; garbage files throw pdfjs's precise error. */
 export async function pdfProbe(filePath: string): Promise<void> {
-	const { task } = await openDocument(filePath);
-	await task.destroy();
+	await readPdfFile(filePath, async () => {});
 }
 
 /** pdf_info: page count + per-page triage signals. ALWAYS run first. */
 export async function pdfInfo(filePath: string): Promise<PdfInfo> {
 	const pdfjs = await loadPdfjs(); // OPS constant for the operator-list scan
-	const { doc, task } = await openDocument(filePath);
-	try {
-		return await documentInfo(filePath, doc, pdfjs.OPS.paintImageXObject);
-	} finally {
-		await task.destroy();
-	}
+	return readPdfFile(filePath, (doc) => documentInfo(filePath, doc, pdfjs.OPS.paintImageXObject));
 }
 
-async function documentInfo(filePath: string, doc: Awaited<ReturnType<typeof openDocument>>["doc"], paintImage: number): Promise<PdfInfo> {
+async function documentInfo(filePath: string, doc: PDFDocumentProxy, paintImage: number): Promise<PdfInfo> {
 	const pages: PdfPageInfo[] = [];
 	let totalText = 0;
 	for (let i = 1; i <= doc.numPages; i++) {
@@ -181,19 +209,12 @@ export type PdfConversion =
 /** An uploaded PDF's pages as Markdown (the notes import's door). The page
  *  cap is checked before any page is read. */
 export async function convertPdf(data: Uint8Array, maxPages: number): Promise<PdfConversion> {
-	let opened: Awaited<ReturnType<typeof openBytes>>;
 	try {
-		opened = await openBytes(data);
+		return await readPdf<PdfConversion>(data, async (doc) =>
+			doc.numPages > maxPages ? { kind: "too-long", pageCount: doc.numPages } : { kind: "converted", pages: await documentToMarkdown(doc) },
+		);
 	} catch {
 		return { kind: "unreadable" };
-	}
-	try {
-		if (opened.doc.numPages > maxPages) return { kind: "too-long", pageCount: opened.doc.numPages };
-		return { kind: "converted", pages: await documentToMarkdown(opened.doc) };
-	} catch {
-		return { kind: "unreadable" };
-	} finally {
-		await opened.task.destroy();
 	}
 }
 
@@ -204,15 +225,12 @@ function pageMarkdown(page: PdfPage): string {
 
 /** pdf_extract: Markdown of the requested pages, `--- Page N ---` headed. */
 export async function pdfExtract(filePath: string, pageSpec: string): Promise<string> {
-	const { doc, task } = await openDocument(filePath);
-	try {
+	return readPdfFile(filePath, async (doc) => {
 		const pages = parsePageSpec(pageSpec, doc.numPages);
 		if (pages.length === 0) return "No pages selected — page spec matched nothing.";
 		const converted = await documentToMarkdown(doc, pages);
 		return converted.map((page) => `--- Page ${page.number} ---\n${pageMarkdown(page)}`).join("\n");
-	} finally {
-		await task.destroy(); // operator lists and decoded images stay cached until then
-	}
+	});
 }
 
 export interface PdfSearchHit {
@@ -243,13 +261,7 @@ export async function pdfSearch(
 	}
 	const hits: PdfSearchHit[] = [];
 	const pageTexts = new Map<number, string>();
-	const { doc, task } = await openDocument(filePath);
-	let converted;
-	try {
-		converted = await documentToMarkdown(doc);
-	} finally {
-		await task.destroy();
-	}
+	const converted = await readPdfFile(filePath, (doc) => documentToMarkdown(doc));
 	for (const page of converted) {
 		const i = page.number;
 		const text = pageMarkdown(page);

@@ -5,7 +5,7 @@ import { CheckIcon, ChevronRightIcon } from "lucide-react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
-import { OVERLAY_ATTRS, OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/overlay"
+import { OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/overlay"
 
 /** shadcn dropdown menu drawing the menu anatomy (spec: menu.md,
  *  dropdown-menu.md): radius 12 surface, 32px radius 8 items, fill steps for
@@ -13,7 +13,7 @@ import { OVERLAY_ATTRS, OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/com
 
 /** The menu surface, shared with context-menu.tsx. */
 export const MENU_CONTENT =
-  "min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-xl border bg-popover p-1 text-row text-popover-foreground shadow-lg outline-none"
+  "min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-xl border bg-popover p-1 text-body text-popover-foreground shadow-lg outline-none"
 
 /** One 32px row, shared with context-menu.tsx. Radix marks the pointer's or
  *  the arrow keys' row `data-highlighted`; both take the same fill step. */
@@ -29,9 +29,9 @@ export const MENU_ROW_DESTRUCTIVE =
 export const MENU_ROW_CHECKED =
   "pr-8 data-[state=checked]:bg-fill-selected data-[state=checked]:data-[highlighted]:bg-fill-selected"
 
-export const MENU_LABEL = "px-2 py-1.5 text-label font-medium text-muted-foreground data-[inset]:pl-8"
+export const MENU_LABEL = "px-2 py-1.5 text-callout text-muted-foreground data-[inset]:pl-8"
 export const MENU_SEPARATOR = "-mx-1 my-1 h-px bg-border"
-export const MENU_SHORTCUT = "ml-auto text-label text-muted-foreground tabular-nums"
+export const MENU_SHORTCUT = "ml-auto text-callout text-muted-foreground tabular-nums"
 export const MENU_INDICATOR = "pointer-events-none absolute right-2 flex size-3.5 items-center justify-center"
 
 function DropdownMenu({
@@ -73,7 +73,6 @@ function DropdownMenuContent({
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
-        {...OVERLAY_ATTRS}
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         onEscapeKeyDown={claimEscape(onEscapeKeyDown)}
@@ -259,7 +258,6 @@ function DropdownMenuSubContent({
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.SubContent
         data-slot="dropdown-menu-sub-content"
-        {...OVERLAY_ATTRS}
         className={cn(
           OVERLAY_LAYER,
           OVERLAY_MOTION,

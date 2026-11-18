@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { askedAgain, digitOption, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec } from "../components/lesson/prose/prose-question-data.ts";
+import { askedAgain, digitOption, reaskedFrom, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec } from "../components/lesson/prose/prose-question-data.ts";
 import { dismissedAnswer, emptyDockSelection } from "../src/core/index.ts";
 
 const check = { question: "Which way does $A$ stretch?", correctAnswer: "Along $(1,1)$, by 3.", type: "check" };
@@ -103,6 +103,13 @@ describe("a question asked again after a hint", () => {
 		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, aside)] }, { parts: [hint, ask("q2", reworded)] }])], ["q2"]);
 	});
 
+	it("is drawn once when asked again word for word after his answer, as after a question he sent as his answer by mistake (round 10, 2 m7)", () => {
+		const asQuestion = proseAnswer(spec, emptyDockSelection(), "Why does independence matter here?", "neutral");
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, asQuestion)] }, { parts: [hint, ask("q2", check)] }])], ["q2"]);
+		const other = { ...check, question: "Which way does $B$ stretch?" };
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, asQuestion)] }, { parts: [hint, ask("q2", other)] }])], [], "a new question after his answer is drawn in full");
+	});
+
 	it("draws a different question after a hint in full: another step, or another form", () => {
 		const onStep = { ...check, nodeId: "stretch" };
 		const otherStep = { ...check, nodeId: "det", question: "What is $\\det A$?" };
@@ -117,7 +124,21 @@ describe("a question asked again after a hint", () => {
 		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted), hint, refused, ask("q3", check)] }])], ["q3"]);
 	});
 
-	it("draws a question that follows an answer", () => {
-		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, answered), ask("q2", check)] }])], []);
+	it("draws a prediction posed after a side question in full: another type of question on the same step (round 14, 2 D1)", () => {
+		// "let me guess first": the tutor set the Av check aside and posed a
+		// prediction on the same node, whose words never showed.
+		const av = { ...check, nodeId: "eigenbasis", type: "check", question: "What is $Av$ for $v = 2b_1 + b_2$?" };
+		const guess = { nodeId: "eigenbasis", type: "predict", question: "Can every 2×2 matrix be made diagonal this way, and why?" };
+		const aside = dismissedAnswer("explain", av.question, "asked");
+		const lesson = [{ parts: [ask("q1", av, aside)] }, { parts: [hint, ask("q2", guess)] }];
+		assert.equal(reaskedFrom(lesson, "q2"), null, "the prediction asks something new");
+		assert.deepEqual([...askedAgain(lesson)], [], "its words are drawn");
+		const reasked = { ...av, question: "So what is $Av$ for $v = 2b_1 + b_2$?" };
+		assert.equal(reaskedFrom([{ parts: [ask("q1", av, aside)] }, { parts: [hint, ask("q2", reasked)] }], "q2"), "q1", "the check asked again, reworded, is still a re-ask");
+	});
+
+	it("draws a new question that follows an answer, and the same one, his retry after a nudge (Edo, 18 Nov 2026), once", () => {
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, answered), ask("q2", { ...check, question: "Which way does $B$ stretch?" })] }])], []);
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, answered), ask("q2", check)] }])], ["q2"]);
 	});
 });

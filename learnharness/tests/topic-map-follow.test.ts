@@ -7,8 +7,8 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
-import { READABLE_ZOOM, TOPIC_NODE_SIZE, cardFit, framedCamera, layoutTopicMap, slackOf, wholeZoom, type Camera, type CardFit } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { RETURN_DWELL_MS, REVEAL_DWELL_MS, litCamera, litFollow } from "../components/course-map/topic-map/lit-camera.ts";
+import { READABLE_ZOOM, cardFit, framedCamera, layoutTopicMap, slackOf, wholeZoom, type Camera, type CardFit } from "../components/course-map/topic-map/topic-map-layout.ts";
+import { RETURN_DWELL_MS, REVEAL_DWELL_MS, litCamera, litFollow, scrollOn, type Box } from "../components/course-map/topic-map/lit-camera.ts";
 
 const h = (handle: string) => handle as TopicHandle;
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -17,7 +17,10 @@ const topic = (handle: string): CourseMapTopic => ({ handle: h(handle), title: h
 /** Linear Algebra on the demo seed, as topic-map-framing.test.ts has it. */
 const NEEDS: Record<string, readonly string[]> = { vectors: [], span: ["vectors"], independence: ["span"], basis: ["independence"], matmul: ["vectors"], elimination: [], rank: ["basis", "elimination"], kernel: ["rank"], determinant: ["matmul"], cramer: ["determinant"], invertibility: ["rank", "determinant"], "change-basis": ["basis", "matmul", "invertibility"], eigen: ["determinant", "rank", "invertibility", "kernel"], diagonalization: ["eigen", "basis", "change-basis"], "inner-product": ["vectors"], projection: ["inner-product", "basis"] };
 const EDGES: CourseMapEdge[] = Object.entries(NEEDS).flatMap(([t, prereqs]) => prereqs.map((p) => ({ kind: "needs" as const, prerequisite: h(p), topic: h(t) })));
-const LAYOUT = layoutTopicMap(Object.keys(NEEDS).map(topic), EDGES, TOPIC_NODE_SIZE);
+/** A fixed card for the camera's arithmetic, apart from the map's own (canvas-layout.ts), so each case's premise
+ *  (a topic that opens cut, one out of view) holds whatever the map's card becomes. */
+const CARD = { width: 248, height: 56 };
+const LAYOUT = layoutTopicMap(Object.keys(NEEDS).map(topic), EDGES, CARD);
 const HERE = h("eigen");
 
 /** Home's map frame at 1512×982, measured in the running app, its fade and the tag's room. */
@@ -157,5 +160,28 @@ describe("when the map's camera moves", () => {
 		f.stay();
 		mock.timers.tick(REVEAL_DWELL_MS);
 		assert.deepEqual(moves, []);
+	});
+});
+
+describe("where a view scrolls to show one topic", () => {
+	// Three topics side by side, 224 wide, 24 apart, on a surface with room to scroll past them.
+	const row = (xs: number[], y = 100): Map<TopicHandle, Box> => new Map(xs.map((x, i) => [h(`t${i}`), { x, y, width: 224, height: 64 }]));
+	const surface = { width: 1400, height: 400 };
+	const fade = { x: 48, y: 32 };
+
+	it("leaves a topic already clear of the fade where it is", () => {
+		assert.equal(scrollOn(row([300, 548, 796]), h("t1"), { left: 200, top: 0, width: 696, height: 400 }, surface, fade), null);
+	});
+
+	it("brings a topic into view cutting none at the view's edges when it can, moving as little as it can", () => {
+		const boxes = row([300, 548, 796]);
+		const to = scrollOn(boxes, h("t2"), { left: 0, top: 0, width: 600, height: 400 }, surface, fade)!;
+		const view = { left: to.left, right: to.left + 600 };
+		assert.ok(796 >= view.left + 48 && 1020 <= view.right - 48, "the target clear of the fade");
+		for (const b of boxes.values()) {
+			const showsPastFade = b.x + b.width > view.left + 48 && b.x < view.right - 48;
+			const whole = b.x >= view.left && b.x + b.width <= view.right;
+			assert.ok(!showsPastFade || whole, `topic at ${b.x} is not cut`);
+		}
 	});
 });

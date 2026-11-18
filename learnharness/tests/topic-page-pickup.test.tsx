@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ChatListItem, ChatRecord } from "../src/core/contracts/chat.ts";
@@ -24,6 +24,7 @@ import { sessionPlanOf, topicRecordOf } from "../src/server/topic.ts";
 import { topicFacts, type TopicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { HybridTopic } from "../components/unit-inbox/topic-page/hybrid/hybrid-topic.tsx";
 import { pickupSections } from "../components/unit-inbox/topic-page/pickup/pickup-facts.ts";
+import { SectionsPane } from "../components/unit-inbox/topic-page/pickup/sections.tsx";
 import { mapLessonAtFirst } from "../components/unit-inbox/topic-page/hybrid/hybrid-facts.ts";
 import { cardLine } from "../components/course-map/topic-map/topic-standing.ts";
 import { trailDays, TRY_WORDS } from "../components/unit-inbox/topic-page/trail/trail-facts.ts";
@@ -63,7 +64,7 @@ const MAP: CourseMap = {
 const COURSE: StudyCourse = { map: MAP, unready: null, due: null, newToday: [], lastActiveDaysAgo: 0 };
 
 function chat(id: string, title: string, updatedAt: string, over: Partial<ChatListItem> = {}): ChatListItem {
-	return { id, title, createdAt: updatedAt, updatedAt, kind: "teach", messageCount: 6, phase: "teach", pendingQuestion: false, pendingProblem: false, course: { workspace: WORKSPACE, title: "Linear Algebra" }, topics: [], ownTopics: over.topics ?? [], busy: false, compacting: false, ...over };
+	return { id, title, createdAt: updatedAt, updatedAt, kind: "teach", messageCount: 6, phase: "teach", pendingQuestion: false, pendingProblem: false, course: { workspace: WORKSPACE, title: "Linear Algebra" }, topics: [], ownTopics: over.topics ?? [], busy: false, ...over };
 }
 
 const EIGEN_PLAN = sessionPlanOf(fixture("chat_demo_eigen.json") as ChatRecord) as SessionPlan;
@@ -99,15 +100,18 @@ function order(document: Document): string[] {
 }
 
 describe("Now", () => {
-	it("says since when a review the plan holds past its due day is due, as the sidebar says it, never Nothing due (round 4) or Nothing planned today (round 8, 1 D11)", () => {
+	it("says a review the plan holds past its due day by the plan's day, never Due today beside it (round 12, 1 m1, 2 n1), in the one phrase for nothing due today, with no press (round 15, m9: \"Nothing today · Study\" and \"Nothing due · Study\")", () => {
 		const held = topic("binomial", { title: "Binomial distribution", level: "assisted", introduced: "2026-11-05", review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-06" } } });
 		const { now, scheduled } = pickupSections(factsOf(held));
-		assert.equal(now.words, "Due since 6 Nov, back 10 Nov", "with the day the plan brings it back, as the sidebar says it");
+		assert.equal(now.words, "Nothing due today", "Scheduled gives the plan's day, the head memory's");
+		assert.equal(now.press, null, "no press beside the Scheduled day");
 		const today = topic("binomial", { ...held, review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-08" } } });
-		assert.equal(pickupSections(factsOf(today)).now.words, "Due today");
+		assert.equal(pickupSections(factsOf(today)).now.words, "Nothing due today");
 		assert.equal(scheduled?.kind, "review");
 		const ahead = topic("binomial", { ...held, review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-09" } } });
-		assert.equal(pickupSections(factsOf(ahead)).now.words, "Nothing due", "a review memory asks for later is not due yet");
+		assert.equal(pickupSections(factsOf(ahead)).now.words, "Nothing due today", "a review memory asks for later: the same phrase");
+		const doc = render(<SectionsPane facts={factsOf(held)} busy={false} onAct={() => {}} onTask={() => {}} shown={null} onShow={() => {}} />);
+		assert.ok(doc.querySelector('[data-slot="pickup-now-press"]') === null, "Now draws no press");
 	});
 
 	it("holds every row of the action table: what to pick up, where it stands in a few words, the press and the session it opens", () => {
@@ -117,15 +121,30 @@ describe("Now", () => {
 				return [now.kind, now.words, now.note, now.press, now.chat];
 			}),
 			[
-				["resume", "Computing a 2×2 spectrum", "Your turn", "Resume", "chat_demo_eigen"],
-				["open", "Computing a 2×2 spectrum", "Tutor writing", "Open", "chat_demo_eigen"],
-				["review", "2d overdue", null, "Review", null],
+				["resume", "Eigenvalues and eigenvectors", "Your turn", "Resume", "chat_demo_eigen"],
+				["open", "Eigenvalues and eigenvectors", "Tutor writing", "Resume", "chat_demo_eigen"],
+				["review", "Due 6 Nov", null, "Review", null],
 				["continue", "Problem sheet 4", "Part (c)", "Continue", null],
 				["start", "First lesson", null, "Start", null],
-				["continue", DET_STOPPED, "Left off yesterday", "Continue", "chat_demo_det"],
-				["study", "Nothing due", null, "Study", null],
+				["continue", "Determinants as volume scaling", "Left off 7 Nov", "Continue", "chat_demo_det"],
+				["study", "Nothing due today", null, null, null],
 			],
 		);
+	});
+
+	it("names the lesson or the task it continues, as Home names its line, never a teaching step (round 11, 2 N2 and 1 N9)", () => {
+		// Shot 49: Kernel's Now read "Which inputs does a matrix send to zero?", a step the sheet session's tutor planned; shot 41: the task under Now and the same lesson under Next by another name.
+		const sheet = chat("chat_sheet", "Continue Problem sheet 4", "2026-11-08T09:00:00.000Z", { pendingQuestion: true, topics: ["rank"], tasks: ["sheet-4"] });
+		const facts = factsOf(RANK, [sheet], [{ ...DET_PLAN, id: "chat_sheet" }]);
+		const { now } = pickupSections(facts);
+		assert.deepEqual([now.words, now.note, now.chat], ["Problem sheet 4", "Your turn", "chat_sheet"]);
+		assert.notEqual(now.words, DET_STOPPED);
+	});
+
+	it("says a reply cut short as the sidebar and Home say it, never Your turn (round 9, 2 m7)", () => {
+		const cut = chat("chat_cut", "Diagonalization preview", "2026-11-06T21:40:05.000Z", { ended: "cut", topics: ["eigen"] });
+		assert.equal(pickupSections(factsOf(EIGEN, [cut])).now.note, "Reply cut off");
+		assert.equal(pickupSections(factsOf(EIGEN, [{ ...cut, stopped: true }])).now.note, "Stopped by you");
 	});
 
 	it("names the session when the lesson planned nothing", () => {
@@ -214,19 +233,30 @@ describe("a topic not started", () => {
 		assert.deepEqual(
 			rows.map((r) => [r.getAttribute("href"), r.querySelector('[data-slot="pickup-builds-on-standing"]')!.textContent]),
 			[
-				["/unit/L3N0dWR5L2xpbmFsZw/rank", "Unfinished"],
-				["/unit/L3N0dWR5L2xpbmFsZw/kernel", "Sure, but wrong"],
+				["/unit/L3N0dWR5L2xpbmFsZw/rank", "Not right last time"],
+				["/unit/L3N0dWR5L2xpbmFsZw/kernel", "Tried, not right yet"],
 			],
-			"each says what its card on the map beside it says (round 8, 3 m12)",
+			"each says where he stands on it, its pie's words, never a session's status (round 14, m38)",
 		);
 		assert.deepEqual(
 			why?.builds.map((b) => [b.topic.handle, b.words, cardLine(facts.said.get(b.topic.handle))?.words]),
 			[
-				["rank", "Unfinished", "Unfinished"],
-				["kernel", "Sure, but wrong", "Sure, but wrong"],
+				["rank", "Not right last time", undefined],
+				["kernel", "Tried, not right yet", "Sure, but wrong"],
 			],
+			"the card beside keeps the sidebar's fact of the topic under the same pie, never a session's (round 15, m8)",
 		);
 		assert.equal(document.querySelector('[data-slot="pickup-material"]')!.textContent, "Section 4.7Blitzstein and Hwang");
+	});
+
+	// Round 10, 3 m9: "Random variables and dis…" beside "Right with help" in the 320px history column.
+	it("wraps a long title onto a second line instead of cutting it, the row growing to hold it", () => {
+		const row = page(facts).querySelector('[data-slot="pickup-builds-on"]')!;
+		const title = row.querySelector('[data-slot="pickup-builds-on-title"]')!;
+		assert.doesNotMatch(title.className, /\btruncate\b/, "the title is never cut to one line");
+		assert.match(title.className, /\bline-clamp-2\b/, "two lines at most");
+		assert.doesNotMatch(row.className, /(?:^|\s)h-10(?:\s|$)/, "a fixed 40px row would clip the second line");
+		assert.match(row.className, /\bmin-h-10\b/, "one line keeps the history's 40px row");
 	});
 
 	it("draws beside it the course map cut to the topic and everything it builds on, near or far", () => {
@@ -236,13 +266,27 @@ describe("a topic not started", () => {
 		assert.ok(document.querySelector('[data-slot="topic-panes"] [data-slot="topic-builds-map"]'), "the map column");
 		const alone = topicFacts({ course: { ...COURSE, map }, topic: topic("vectors-2", { level: "new" }), chats: [], read: null });
 		assert.equal(alone.buildsMap, null);
-		assert.equal(page(alone).querySelector('[data-slot="topic-builds-map"]'), null, "a topic that builds on nothing takes the width");
+		assert.ok(page(alone).querySelector('[data-slot="topic-builds-map"]') === null, "a topic that builds on nothing takes the width");
+	});
+
+	// Round 13, 1 n6: on 10 Nov the begun Poisson page was Now and Earlier only.
+	it("keeps all of it, and dates the day the lesson goes on, while a lesson he began has not introduced it", () => {
+		const begun = { ...POISSON, starts: TODAY, startsWhy: { kind: "begun" as const } };
+		const lesson = chat("chat_poisson", "Poisson distribution lesson", "2026-11-07T10:00:00.000Z", { topics: ["poisson"], ownTopics: ["poisson"], ended: "left" });
+		const going = topicFacts({ course: { ...COURSE, map }, topic: begun, chats: [lesson], read: { record, plans: [] } });
+		const { now, why, scheduled } = pickupSections(going);
+		assert.deepEqual([now.kind, now.chat], ["resume", "chat_poisson"]);
+		assert.deepEqual(why?.builds.map((b) => b.topic.handle), ["rank", "kernel"]);
+		assert.deepEqual(scheduled, { kind: "lesson", day: "Today", waits: null, why: null });
+		const document = page(going);
+		assert.deepEqual(order(document).slice(0, 4), ["now", "builds on", "in your material", "scheduled"]);
+		assert.ok(document.querySelector('[data-slot="topic-panes"] [data-slot="topic-builds-map"]'), "the map column");
 	});
 
 	it("says none of it once a session or the engine has started it", () => {
 		const taught = topicFacts({ course: { ...COURSE, map }, topic: { ...POISSON, level: "introduced", introduced: TODAY }, chats: [], read: { record, plans: [] } });
 		assert.equal(pickupSections(taught).why, null);
-		assert.equal(page(taught).querySelector('[data-slot="topic-builds-map"]'), null);
+		assert.ok(page(taught).querySelector('[data-slot="topic-builds-map"]') === null);
 	});
 });
 
@@ -278,29 +322,31 @@ describe("the sections drawn", () => {
 	it("draws every row of the action table as Now, the session it opens as a link and every other press as a button, with no button in the head", () => {
 		for (const [name, facts] of ROWS) {
 			const document = page(facts);
-			assert.equal(document.querySelector('[data-testid="topic-action"]'), null, `${name}: no head button`);
+			assert.ok(document.querySelector('[data-testid="topic-action"]') === null, `${name}: no head button`);
 			const now = document.querySelector('[data-slot="pickup-now"]')!;
 			assert.equal(now.getAttribute("data-action"), facts.action.kind, name);
-			const press = now.querySelector('[data-slot="pickup-now-press"]')!;
-			if ("chat" in facts.action) assert.equal(press.getAttribute("href"), `/chat/${facts.action.chat.id}`, name);
-			else assert.equal(press.tagName, "BUTTON", name);
+			const press = now.querySelector('[data-slot="pickup-now-press"]');
+			// Nothing due today has no press (round 15, m9).
+			if (facts.action.kind === "study") assert.ok(press === null, `${name}: no press`);
+			else if ("chat" in facts.action) assert.equal(press!.getAttribute("href"), `/chat/${facts.action.chat.id}`, name);
+			else assert.equal(press!.tagName, "BUTTON", name);
 		}
 	});
 
 	it("says why the scheduled review waits when something holds it, and only then", () => {
 		const held = factsOf({ ...VECTORS, review: { kind: "scheduled", date: "2026-12-03", held: { exam: "Probability", since: "2026-10-01" } } });
-		assert.deepEqual(pickupSections(held).scheduled, { kind: "review", day: "Thu 3 Dec", waits: "Due since 1 Oct, waits for your Probability exam" });
+		assert.deepEqual(pickupSections(held).scheduled, { kind: "review", day: "Thu 3 Dec", waits: "Due 1 Oct, waits for your Probability exam" });
 		const line = page(held).querySelector('[data-slot="pickup-scheduled"]')!;
-		assert.equal(line.querySelector('[data-slot="pickup-scheduled-waits"]')!.textContent, "Due since 1 Oct, waits for your Probability exam");
-		assert.equal(page(factsOf(VECTORS)).querySelector('[data-slot="pickup-scheduled-waits"]'), null);
+		assert.equal(line.querySelector('[data-slot="pickup-scheduled-waits"]')!.textContent, "Due 1 Oct, waits for your Probability exam");
+		assert.ok(page(factsOf(VECTORS)).querySelector('[data-slot="pickup-scheduled-waits"]') === null);
 	});
 
-	it("keeps the lesson Now opens on the map, its map button pressed, Now itself a plain row with no fill", () => {
+	it("keeps the lesson Now opens on the map, Now itself a plain row with no fill and no map button", () => {
 		const document = page(ROWS[0]![1]);
 		const now = document.querySelector('[data-slot="pickup-now"]')!;
 		assert.equal(now.getAttribute("data-shown"), "true");
 		assert.doesNotMatch(now.className, /bg-fill-selected|ring-1/, "no box around Now");
-		assert.equal(now.querySelector('[data-slot="topic-map-toggle"]')!.getAttribute("aria-pressed"), "true");
+		assert.ok(now.querySelector('[data-slot="topic-map-toggle"]') === null, "no map button on Now");
 		assert.ok(document.querySelector('[data-slot="topic-lesson-map"]'));
 	});
 });

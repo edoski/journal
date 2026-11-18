@@ -22,7 +22,7 @@ function DialogOverlay({ className, ...props }: React.ComponentProps<typeof Dial
 			data-slot="dialog-overlay"
 			className={cn(
 				DIALOG_LAYER,
-				"fixed inset-0 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-reduce:animate-none",
+				"fixed inset-0 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
 				className,
 			)}
 			{...props}
@@ -50,7 +50,7 @@ function DialogContent({ className, onEscapeKeyDown, onOpenAutoFocus, onCloseAut
 				}}
 				className={cn(
 					DIALOG_LAYER,
-					"fixed top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border bg-popover p-6 text-popover-foreground shadow-2xl outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 motion-reduce:animate-none",
+					"fixed top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border bg-popover p-6 text-popover-foreground shadow-2xl outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
 					className,
 				)}
 				{...props}
@@ -65,12 +65,12 @@ export function DialogHeader({ className, ...props }: React.ComponentProps<"div"
 
 /** 18/24 at 600. */
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
-	return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-subheading font-semibold text-foreground", className)} {...props} />;
+	return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-title-1 text-foreground", className)} {...props} />;
 }
 
 /** 14/20, muted. */
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
-	return <DialogPrimitive.Description data-slot="dialog-description" className={cn("text-control text-muted-foreground", className)} {...props} />;
+	return <DialogPrimitive.Description data-slot="dialog-description" className={cn("text-body text-muted-foreground", className)} {...props} />;
 }
 
 /** Actions at the right, the primary one last. */

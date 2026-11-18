@@ -70,7 +70,7 @@ test("an answered check never draws the committed answer: the tutor's reply is t
 	const root = createRoot(host);
 	try {
 		await act(async () => root.render(<ProseQuestion tool="explain" toolCallId="reveal" input={input} output={answer} open={false} />));
-		assert.equal(host.querySelector('[data-testid="prose-disclosure"]'), null);
+		assert.ok(host.querySelector('[data-testid="prose-disclosure"]') === null);
 		assert.doesNotMatch(host.textContent ?? "", /First paragraph|The answer/);
 	} finally { await act(async () => root.unmount()); host.remove(); }
 });

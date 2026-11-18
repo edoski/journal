@@ -1,14 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { PageNotice, PageReading } from "@/components/page-frame/page-frame";
+import { WindowPage } from "@/components/page-frame/window-page";
 import { CoursesUnavailable } from "@/components/course-picker";
-import { SetupDialog } from "@/components/setup-dialog";
-import { useLessonStart } from "@/components/start/use-lesson-start";
+import { StartScope } from "@/components/start/start-scope";
+import { takeLine, useLessonStart, type TakeLine } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import { doneToday, nearExam, type NearExam } from "@/components/study-home/day-record";
 import { needsYouNow } from "@/components/study-home/needs-you";
-import { courseMove, todayCourses, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
+import { todayCourses, type TodayRow } from "@/components/study-home/study-facts";
 import { UnreadableLines } from "@/components/study-home/unreadable-course";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
 import type { ChatListItem, StudyCourse } from "@/src/core";
@@ -29,13 +30,14 @@ export interface HomeReady {
 	/** The nearest exam in the coming week, which the heading names (`nearExam`). */
 	exam: NearExam | null;
 	busy: boolean;
-	/** Take up a course line's step, else the course's next (`courseMove`). */
-	onContinue: (workspace: string, step?: NextStep) => void;
+	/** Take up a course line's step, else the course's next (`takeLine`). */
+	onContinue: TakeLine;
 }
 
 /**
  * What every study home shares (spec: lessons.md): the page chrome, the
- * read of the courses with its states, and the lesson start. A home gives
+ * read of the courses with its states, and the lesson start, the one its
+ * lines and its composer share (`StartScope`). A home gives
  * its column's classes and draws the ready state; `quiet` leaves out the
  * lines that name an unreadable course, while a map fills the page.
  */
@@ -52,87 +54,68 @@ export function HomeFrame({
 	const lesson = useLessonStart();
 
 	return (
-		<div className="relative flex h-dvh min-w-0 flex-col">
-			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
-			<main data-slot="study-home" className="min-h-0 flex-1 overflow-hidden">
-				<div className={className}>
-					<HomeBody state={state} onRetry={retry} quiet={quiet} busy={lesson.busy} onStart={lesson.start}>
-						{children}
+		<WindowPage>
+			<StartScope lesson={lesson}>
+				<main data-slot="study-home" className="min-h-0 flex-1 overflow-hidden">
+					<HomeBody state={state} onRetry={retry}>
+						{({ courses, chats, failed, readAt }) => (
+							<div className={className}>
+								{courses.length > 0 &&
+									children({
+										...homeOf(courses, chats, readAt),
+										busy: lesson.busy,
+										onContinue: takeLine(lesson.take, courses, chats),
+									})}
+								{(!quiet || courses.length === 0) && <UnreadableLines courses={failed} />}
+								{lesson.error && (
+									<p role="alert" className="shrink-0 text-body text-danger">
+										{lesson.error}
+									</p>
+								)}
+							</div>
+						)}
 					</HomeBody>
-					{lesson.error && (
-						<p role="alert" className="shrink-0 text-row text-danger">
-							{lesson.error}
-						</p>
-					)}
-				</div>
-			</main>
-			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
-		</div>
+				</main>
+			</StartScope>
+		</WindowPage>
 	);
 }
 
-function HomeBody({
-	state,
-	onRetry,
-	quiet,
-	busy,
-	onStart,
-	children,
-}: {
-	state: StudyHomeState;
-	onRetry: () => void;
-	quiet: boolean;
-	busy: boolean;
-	onStart: (opening: string, workspace: string, options: { topics: readonly string[]; from?: string }) => void;
-	children: (home: HomeReady) => React.ReactNode;
-}) {
-	const router = useRouter();
+/** Home's lines and what goes with them, from the courses read. */
+function homeOf(courses: readonly StudyCourse[], chats: readonly ChatListItem[], readAt: string | undefined) {
+	const { rows } = needsYouNow(courses, chats, courses[0]!.map.today, readAt);
+	return {
+		rows,
+		lessons: rows.map(lessonOf),
+		courses: todayCourses(rows, courses),
+		chats,
+		done: doneToday(chats, new Date(), courses),
+		exam: nearExam(courses.flatMap(({ map }) => (map.exam ? [{ course: map.title, date: map.exam.date, daysLeft: map.exam.daysLeft }] : []))),
+	};
+}
+
+/** Home's read: the page's notice while it reads or can't (`PageNotice`), else its column. */
+function HomeBody({ state, onRetry, children }: { state: StudyHomeState; onRetry: () => void; children: (ready: Extract<StudyHomeState, { status: "ready" }>) => React.ReactNode }) {
 	switch (state.status) {
 		case "loading":
-			return <Notice>Reading your courses…</Notice>;
+			return <PageReading />;
 		case "unavailable":
-			return <CoursesUnavailable reason={state.reason} />;
+			return (
+				<PageNotice>
+					<CoursesUnavailable reason={state.reason} />
+				</PageNotice>
+			);
 		case "failed":
 			return (
-				<Notice>
+				<PageNotice>
 					Couldn’t read your courses.{" "}
 					<Button variant="quiet" size="sm" onClick={onRetry} className="text-link hover:text-link">
 						Try again
 					</Button>
-				</Notice>
+				</PageNotice>
 			);
-		case "ready": {
-			if (state.courses.length === 0) {
-				if (state.failed.length > 0) return <UnreadableLines courses={state.failed} />;
-				return <Notice>No courses yet. Start a lesson from New lesson and pick a course there.</Notice>;
-			}
-			const today = state.courses[0]!.map.today;
-			const { rows } = needsYouNow(state.courses, state.chats, today);
-			return (
-				<>
-					{children({
-						rows,
-						lessons: rows.map(lessonOf),
-						courses: todayCourses(rows, state.courses),
-						chats: state.chats,
-						done: doneToday(state.chats, new Date()),
-						exam: nearExam(state.courses.flatMap(({ map }) => (map.exam ? [{ course: map.title, date: map.exam.date, daysLeft: map.exam.daysLeft }] : []))),
-						busy,
-						onContinue: (workspace, step) => {
-							const course = state.courses.find((c) => c.map.workspace === workspace);
-							if (!course) return;
-							const move = courseMove(course, state.chats, step);
-							if (move.kind === "open") router.push(`/chat/${move.chat.id}`);
-							else onStart(move.opening, workspace, { topics: move.topics, from: move.from });
-						},
-					})}
-					{!quiet && <UnreadableLines courses={state.failed} />}
-				</>
-			);
-		}
+		case "ready":
+			if (state.courses.length === 0 && state.failed.length === 0) return <PageNotice>No courses yet. Start a lesson from New lesson and pick a course there.</PageNotice>;
+			return children(state);
 	}
-}
-
-function Notice({ children }: { children: React.ReactNode }) {
-	return <p className="text-row text-muted-foreground">{children}</p>;
 }

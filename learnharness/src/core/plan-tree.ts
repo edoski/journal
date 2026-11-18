@@ -158,20 +158,47 @@ export function planMapTooBig(tree: Pick<PlanTree, "nodes" | "edges">): string |
 	);
 }
 
+/** What a rewrite of the plan mid-lesson drops: the steps of the plan he
+ *  has on his strip, once one was taught, that the rewrite leaves out and
+ *  no lesson_progress marked done (round 13, 2 n5: the Eigen strip went
+ *  from 7 dots to 6, "Every step taught", when a rewrite dropped the
+ *  eigenbasis step still to come). A map that keeps none of its steps is a
+ *  lesson on something else and drops nothing. Words the tutor can act on,
+ *  or null. */
+export function planDropsSteps(before: Pick<PlanTree, "nodes"> | null | undefined, next: Pick<PlanTree, "nodes">, taughtOn: boolean, done: ReadonlySet<string>): string | null {
+	if (!before || !taughtOn) return null;
+	const kept = new Set(next.nodes.map((n) => n.id));
+	const dropped = before.nodes.filter((n) => !kept.has(n.id) && !done.has(n.id));
+	// A map with none of the old steps is a lesson on something else, as a handoff back from practice moves to.
+	if (dropped.length === 0 || dropped.length === before.nodes.filter((n) => !done.has(n.id)).length && !before.nodes.some((n) => kept.has(n.id))) return null;
+	return (
+		`This rewrite drops steps of the lesson he already sees on his strip: ${dropped.map((n) => `${n.id} (${JSON.stringify(n.title)})`).join(", ")}. ` +
+		"Keep them, with the same ids: a step left for another session stays on the plan, and one he has shown he holds is marked done with lesson_progress."
+	);
+}
+
 /** A relation between two things, in plain text or TeX: a title holding
  *  one states a result rather than naming an idea. */
 const RELATION = /[=≠≈≡∼≃≅∝→↦⇒⟹⇔⟺≤≥<>∈⊂⊆~]|->|\\(?:to|rightarrow|Rightarrow|longrightarrow|Longrightarrow|implies|iff|Leftrightarrow|mapsto|leq?|geq?|neq?|approx|sim|simeq|cong|equiv|propto|in|subset|subseteq|lt|gt)(?![A-Za-z])/;
+
+/** A condition or a law in words: a title holding one states when
+ *  something holds rather than naming the question (round 9: "Pivots in
+ *  every column" above the question asking what the echelon form must
+ *  look like). "Every" states a law over a place ("in every column", "for
+ *  every $x$"); naming a task's whole object states none (round 10:
+ *  "Finding every eigenvalue" was refused in each Eigen run). */
+const CONDITION = /\b(?:(?:in|for|at|on|of|to) every|always|never|whenever|exactly when|only when|only if|if and only if|iff|precisely when|necessary and sufficient)\b/i;
 
 /** The roadmap shows every title before its step is taught, so a title that
  *  states its step's result shows him the answer to the question on screen.
  *  Returns words the tutor can act on, or null when every title names an idea. */
 export function planTitlesGiveAway(tree: Pick<PlanTree, "nodes">): string | null {
-	const spoilers = tree.nodes.filter((n) => RELATION.test(n.title)).map((n) => JSON.stringify(n.title));
+	const spoilers = tree.nodes.filter((n) => RELATION.test(n.title) || CONDITION.test(n.title)).map((n) => JSON.stringify(n.title));
 	if (spoilers.length === 0) return null;
 	return (
 		`These titles state their step's result: ${spoilers.join(", ")}. ` +
-		"He sees every title before the step is taught, so a title names what the step teaches, never its result or formula: " +
-		"\"The no-event case\", not \"P(no event) = e^{-λ}\"."
+		"He sees every title before the step is taught, so a title names what the step teaches, never its result, formula or condition: " +
+		"\"The no-event case\", not \"P(no event) = e^{-λ}\"; \"What the echelon form needs\", not \"Pivots in every column\"."
 	);
 }
 

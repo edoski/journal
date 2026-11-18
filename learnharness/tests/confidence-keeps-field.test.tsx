@@ -9,7 +9,7 @@ import React, { act } from "react";
 import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { createRoot, type Root } from "react-dom/client";
+import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { ConfidenceIcon } from "../components/lesson/prose/prose-composer.tsx";
 
 let root: Root | null = null;
@@ -31,4 +31,15 @@ test("a press on the meter leaves focus in his field, so Enter sends with the co
 	assert.equal(down.defaultPrevented, true, "the press does not move focus out of his field");
 	await act(async () => meter.click());
 	assert.deepEqual(picks, ["confident"]);
+});
+
+test("the meter's bars are wider than an icon's 2px stroke, with round ends (Edo, 15 Nov 2026)", async () => {
+	const host = document.createElement("div");
+	document.body.appendChild(host);
+	root = createRoot(host);
+	await act(async () => root!.render(<ConfidenceIcon value="neutral" onChange={() => {}} />));
+	const svg = document.querySelector('[data-testid="confidence-choice"] svg')!;
+	assert.equal(svg.querySelectorAll("line").length, 3, "three bars");
+	assert.ok(Number(svg.getAttribute("stroke-width")) > 3, `bars wider than a hairline: ${svg.getAttribute("stroke-width")}`);
+	assert.equal(svg.getAttribute("stroke-linecap"), "round");
 });

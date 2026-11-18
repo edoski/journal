@@ -23,7 +23,6 @@ import { pdfExtract, pdfInfo, pdfProbe, pdfSearch } from "../subagents/pdf-ops.t
 
 const USER_AGENT =
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
-const FETCH_TIMEOUT_MS = 60_000;
 /** PDFs run bigger than pages — arxiv papers routinely 5-20 MB. */
 const MAX_PDF_BYTES = 25 * 1024 * 1024;
 
@@ -101,7 +100,9 @@ export function createPdfReadTools(dir: string): Record<string, AgentTool<any>> 
 				"(short ≤10 pages, medium ≤40, long), and flagged (math/image-heavy) pages. " +
 				"Then read it with pdf_extract / pdf_search. Use when web_fetch reports a URL is a PDF.",
 			parameters: pdfFetchInput,
-			execute: serverExecute("web_fetch_pdf", pdfFetchInput, async ({ url }): Promise<PdfFetchSummary | string> => {
+			// The download runs under the tool guard's signal, the one limit:
+			// its timeout and the turn's stop (tool-execute.ts).
+			execute: serverExecute("web_fetch_pdf", pdfFetchInput, async ({ url }, { signal }): Promise<PdfFetchSummary | string> => {
 				try {
 					const parsed = new URL(url);
 					if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
@@ -115,7 +116,7 @@ export function createPdfReadTools(dir: string): Record<string, AgentTool<any>> 
 							"User-Agent": USER_AGENT,
 							Accept: "application/pdf,application/octet-stream,*/*",
 						},
-						signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+						signal,
 					});
 					if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
 					const contentType = resp.headers.get("content-type") ?? "";

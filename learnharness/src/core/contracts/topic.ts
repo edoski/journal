@@ -68,10 +68,21 @@ export interface SessionPlan {
 	current: string | null;
 	/** Nodes of earlier step-tagged questions. */
 	visited: string[];
+	/** The node the newest step-tagged question asks about, a check back on
+	 *  a step done before included, which `current` does not follow; absent
+	 *  or null before any. Where his turn is while the lesson waits on him
+	 *  (round 14, m40). */
+	asked?: string | null;
+	/** Nodes the tutor's `lesson_progress` marked done; absent when none
+	 *  (round 16, m23: his map drew a taught step as one still ahead). */
+	done?: string[];
 }
 
 /** What GET /api/topic answers. `record` is null when the engine could not
- *  be read; `plans` holds only sessions that have a plan. */
+ *  be read; `plans` holds only sessions that have a plan. `firstReview`,
+ *  asked for a lesson he began (`?begun=1`), is the first day the engine's
+ *  daily plan reviews the topic, null when it plans none or the plan could
+ *  not be read. */
 export type TopicReadResponse =
-	| { ok: true; record: TopicRecord | null; plans: SessionPlan[] }
+	| { ok: true; record: TopicRecord | null; plans: SessionPlan[]; firstReview?: string | null }
 	| { ok: false; code: "bad_request" | "unknown_course"; error: string };

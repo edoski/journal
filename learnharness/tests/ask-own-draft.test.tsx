@@ -25,7 +25,7 @@ Object.defineProperty(globalThis, "localStorage", { value: storage, configurable
 const dom = parseHTML("<html><body></body></html>");
 Object.assign(globalThis, { window: dom.window, document: dom.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true });
 
-const { createRoot } = await import("react-dom/client");
+const { createRoot } = await import("./helpers/app-render.tsx");
 const { formToKept, keepWords, keptWords, setKeptWindow } = await import("../components/lesson/kept-drafts.ts");
 const { ProseComposer } = await import("../components/lesson/prose/prose-composer.tsx");
 const { StickToBottom } = await import("use-stick-to-bottom");
@@ -59,6 +59,7 @@ async function mount(start: { box: string; mode: "answer" | "ask" }) {
 					onSaveDraft={noop}
 					onSubmitAnswer={noop}
 					onSubmitThinking={async () => true}
+					onSteer={async () => true}
 					onRequest={noop}
 					onDraftChange={noop}
 				/>

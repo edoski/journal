@@ -1,20 +1,51 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { ArrowRightIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import type { PressWord } from "@/components/study-words";
 import { cn } from "@/lib/utils";
+
+/** The column every page sits in: centred, up to 80rem, 24px sides, 24px
+ *  above the window's foot. Home wears it too, so moving between pages no
+ *  edge moves. */
+export const PAGE_COLUMN = "mx-auto w-full max-w-[80rem] px-6 pb-6";
 
 /**
  * The page frame (spec: page-frame.md) every page with a head and a body
  * shares, the course page and the topic page first: one centred column
- * under the window's 52px band, its head, then its body filling the rest.
+ * whose first 32px row is centred on the band's centre line
+ * (`--lh-band-centre`), level with the folded rail's open button and
+ * Home's course tabs, its head, then its body filling the rest.
  */
 export function PageFrame({ className, children, ...rest }: ComponentProps<"div">) {
 	return (
-		<div data-slot="page-frame" className={cn("mx-auto flex min-h-0 w-full max-w-[80rem] flex-1 flex-col gap-5 px-6 pt-6 pb-6", className)} {...rest}>
+		<div data-slot="page-frame" className={cn(PAGE_COLUMN, "flex min-h-0 flex-1 flex-col gap-5 pt-[calc(var(--lh-band-centre)-1rem)]", className)} {...rest}>
 			{children}
 		</div>
 	);
+}
+
+/**
+ * What a page says in its place (spec: page-frame.md, "Notices"): one
+ * line in the frame's first row, the 32px row its title takes, so nothing
+ * jumps when the page arrives or between pages. Every page's notice is
+ * this one: why it can't show (the engine down is `CoursesUnavailable`
+ * in it), and while it reads (`PageReading`).
+ */
+export function PageNotice({ children, ...rest }: ComponentProps<"div">) {
+	return (
+		<PageFrame className="h-full">
+			<div data-slot="page-notice" className="flex min-h-8 flex-wrap items-center text-body text-muted-foreground" {...rest}>
+				{children}
+			</div>
+		</PageFrame>
+	);
+}
+
+/** Every page while it reads: one sentence in the notice's place, never a
+ *  skeleton of one page's head. */
+export function PageReading() {
+	return <PageNotice role="status">Reading your courses…</PageNotice>;
 }
 
 /** A hairline between the facts of the standing line, 12px tall, 12px
@@ -28,11 +59,13 @@ const BETWEEN_FACTS = "*:not-first:before:ml-3 *:not-first:before:mr-1.5 *:not-f
  * 20/500 with the page's actions at its right end, then the lines under
  * it: what to do next (`lead`, 14/500 in full ink), the standing line (a
  * 16px mark and a few words per fact, muted, a thin divider between
- * facts), then any more (`children`: a mistake, an error). Every page's
- * head has the same rows: the line above the title is kept, empty, when a
- * page has none, and the lines under it take two lines' room at least, so
- * the title and the body under the head sit at the same height on every
- * page. A hairline under it closes the head off from the page's body.
+ * facts), then any more (`children`: a mistake, an error). The head's
+ * first row stands on the band's centre line: the title, or the line
+ * above it when a page has one, a 32px row so it centres there (Edo,
+ * 16 Nov 2026: the course page's title should align with the open button,
+ * as Home's tabs do, with no empty line above it). The lines under the
+ * title take two lines' room at least. A hairline under it closes the
+ * head off from the page's body.
  */
 export function PageHead({
 	eyebrow,
@@ -40,13 +73,17 @@ export function PageHead({
 	actions,
 	lead,
 	standing,
+	compact = false,
 	children,
 	className,
 	...rest
 }: {
+	/** The lines under the title take the room they fill, one line's at
+	 *  least, not two (the course page, and the topic page beside it). */
+	compact?: boolean;
 	eyebrow?: ReactNode;
 	title: ReactNode;
-	/** The page's actions, right to left in weight: `PageAction` last. */
+	/** The page's actions, quiet buttons, right to left in weight. */
 	actions?: ReactNode;
 	/** What to do next: the head's primary line, under the title. */
 	lead?: ReactNode;
@@ -56,27 +93,29 @@ export function PageHead({
 } & Omit<ComponentProps<"header">, "title">) {
 	return (
 		<header data-slot="page-head" className={cn("flex shrink-0 flex-col gap-1 border-b border-border/60 pb-4", className)} {...rest}>
-			<p data-slot="page-eyebrow" aria-hidden={eyebrow ? undefined : true} className="h-4 truncate text-label text-muted-foreground">
-				{eyebrow}
-			</p>
+			{eyebrow && (
+				<p data-slot="page-eyebrow" className="flex h-8 min-w-0 items-center truncate text-callout text-muted-foreground">
+					{eyebrow}
+				</p>
+			)}
 			<div className="flex min-h-8 items-center justify-between gap-4">
-				<h1 data-slot="page-title" className="min-w-0 text-heading font-medium text-pretty text-foreground">
+				<h1 data-slot="page-title" className="min-w-0 text-title-1 text-pretty text-foreground">
 					{title}
 				</h1>
 				{actions && (
-					<div data-slot="page-actions" className="-mr-2 flex shrink-0 items-center gap-1">
+					<div data-slot="page-actions" className="lh-no-drag -mr-2 flex shrink-0 items-center gap-1">
 						{actions}
 					</div>
 				)}
 			</div>
-			<div data-slot="page-lines" className="mt-1 flex min-h-12 flex-col gap-2">
+			<div data-slot="page-lines" className={cn("mt-1 flex flex-col gap-2", compact ? "min-h-5" : "min-h-12")}>
 				{lead && (
-					<div data-slot="page-lead" className="flex min-h-5 min-w-0 items-center text-control font-medium text-foreground">
+					<div data-slot="page-lead" className="flex min-h-5 min-w-0 items-center text-headline text-foreground">
 						{lead}
 					</div>
 				)}
 				{standing && (
-					<div data-slot="page-standing" className={cn("flex min-h-5 min-w-0 flex-wrap items-center gap-y-1 text-row text-muted-foreground tabular-nums", BETWEEN_FACTS)}>
+					<div data-slot="page-standing" className={cn("flex min-h-5 min-w-0 flex-wrap items-center gap-y-1 text-body text-muted-foreground tabular-nums", BETWEEN_FACTS)}>
 						{standing}
 					</div>
 				)}
@@ -96,36 +135,16 @@ export function PageFact({ icon, children, className, ...rest }: { icon: ReactNo
 	);
 }
 
-/**
- * The page's press, the topic page's Now press: its word in the accent at
- * 500 with an arrow that steps right on hover, on a quiet shadcn Button.
- * A link with `href`, else a button.
- */
-export function PageAction({
-	href,
-	children,
-	className,
-	...button
-}: { href?: string; children: ReactNode } & Omit<ComponentProps<typeof Button>, "asChild" | "variant" | "size" | "children">) {
-	const press = cn("group/press font-medium text-link hover:text-link", className);
-	const words = (
-		<>
-			{children}
-			<ArrowRightIcon aria-hidden className="transition-transform duration-150 group-hover/press:translate-x-0.5 motion-reduce:transition-none" />
-		</>
-	);
-	if (href) {
-		return (
-			<Button asChild variant="quiet" size="row" className={press} {...button}>
-				<Link href={href} aria-disabled={button.disabled || undefined} onClick={button.disabled ? (e) => e.preventDefault() : undefined}>
-					{words}
-				</Link>
-			</Button>
-		);
-	}
+/** The page's one press, the course page's Now and the topic page's Now
+ *  alike: its word (`pressWord`) in a 32px pill in the send button's fill,
+ *  centred on its row, the arrow stepping right while the row
+ *  (`group/press`) is hovered. Drawn inside the row that is the press,
+ *  never a control of its own. */
+export function PagePress({ word }: { word: PressWord }) {
 	return (
-		<Button variant="quiet" size="row" className={press} {...button}>
-			{words}
-		</Button>
+		<span data-slot="page-press" className={cn(buttonVariants({ size: "pill" }), "pointer-events-none shrink-0 self-center font-medium")}>
+			{word}
+			<ArrowRightIcon aria-hidden className="size-4 transition-transform duration-150 group-hover/press:translate-x-0.5 motion-reduce:transition-none" />
+		</span>
 	);
 }

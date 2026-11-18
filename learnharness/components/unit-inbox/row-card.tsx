@@ -15,16 +15,22 @@ export const rowSurface = (active: boolean) =>
 	);
 
 /**
- * Every row's trailing slot: an icon and a few words, always whole (Edo,
- * 14 Nov 2026: the status keeps its words whatever the title's length).
- * It never shrinks; the text beside it makes the room instead. Where it
+ * Every row's trailing slot: an icon and a few words, whole whatever the
+ * title's length (Edo, 14 Nov 2026). The text beside it makes the room
+ * first, the course name giving way whole; only words longer than the
+ * whole line end in an ellipsis (`SLOT_WORDS`), never cut at the card's
+ * edge (round 14, 1 n7: "After Random variables and distri"). Where it
  * sits is the sidebar's one row rule (`STATUS_LINE`, row-card.md).
  * Its mark is a flat run of icon and words (`contents` roots, every part
  * 16px tall). Give it its line's height with the padding that centres
  * one 16px line (`py-0.5` in 20px, `py-1` in 24px).
  */
 export const TRAILING_SLOT =
-	"ml-auto flex shrink-0 items-center justify-end gap-x-1 whitespace-nowrap text-label tabular-nums text-muted-foreground";
+	"ml-auto flex min-w-0 items-center justify-end gap-x-1 whitespace-nowrap text-callout tabular-nums text-muted-foreground";
+
+/** A status's words in its slot: whole while the line holds them, else
+ *  cut with an ellipsis, the icon before them kept. */
+export const SLOT_WORDS = "min-w-0 truncate";
 
 /**
  * The sidebar's one row rule (spec: row-card.md): every row is its title,
@@ -36,9 +42,20 @@ export const TRAILING_SLOT =
  */
 export const ROW_FRAME = "flex flex-col px-2.5 py-2";
 
-/** Every row's title: 14px on a 20px line, wrapping onto a second line
- *  and cut only past it. */
-export const ROW_TITLE = "line-clamp-2 min-w-0 text-control text-pretty";
+/** Every row's title: T3 Code's thread title, 14px on a 20px line,
+ *  wrapping onto a second and third line and cut only past them (round
+ *  16, m25: "Review Random variables and distributions, Binomial…" cut a
+ *  combined review's second topic with room below). `loud` is a row
+ *  that needs him or is open (a card, the open row, a session waiting on
+ *  him): 500 in full ink. Otherwise it is T3 Code's quiet row, 400 at 75%
+ *  ink until the row is hovered or has keyboard focus. */
+export const rowTitle = (loud: boolean) =>
+	cn(
+		"line-clamp-3 min-w-0 text-pretty",
+		loud
+			? "text-sidebar-title text-foreground"
+			: "text-sidebar-title-quiet text-foreground/75 group-hover/sidebar-row:text-foreground group-has-[:focus-visible]/sidebar-row:text-foreground",
+	);
 
 /** A shelf row's first line: the course mark beside the title. */
 export const ROW_BODY = "flex min-w-0 items-start gap-2";
@@ -57,7 +74,7 @@ export const STATUS_SLOT = cn(
 /** A row's one action, over its status slot: hidden until the row is
  *  hovered or the action has keyboard focus. The caller places it. */
 export const ROW_ACTION =
-	"pointer-events-none absolute inline-flex items-center gap-1 rounded-md px-1.5 text-label font-medium text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100 hover:bg-transparent disabled:opacity-0 group-hover/sidebar-row:disabled:opacity-100 motion-reduce:transition-none [&>svg]:size-3";
+	"pointer-events-none absolute inline-flex items-center gap-1 rounded-md px-1.5 text-callout text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100 hover:bg-transparent disabled:opacity-0 group-hover/sidebar-row:disabled:opacity-100 motion-reduce:transition-none [&>svg]:size-3";
 
 /** Every row's list item: 2px above and below, so every row's pitch is
  *  its height plus 4. */
@@ -70,8 +87,8 @@ export const CARD_ACTION_PLACE = "right-2.5 top-2.5 h-5";
  * The sidebar's card (spec: row-card.md), the shell every card shares,
  * under the one row rule (`ROW_FRAME`): line 1 the course's mark and name
  * with the status slot, on one line always: the status keeps its words and
- * the name gives way to an ellipsis when both do not fit (the mark still
- * names the course). Then the title at 14/500 on the name's edge, where a
+ * the name gives way, whole, when both do not fit (the mark still names
+ * the course), never cut to "Linear Alg…". Then the title, T3 Code's at 500 (`rowTitle`), on the name's edge, where a
  * shelf row's title starts, two lines at most; the whole card one link,
  * its action (if any) over the status slot. `recede` dims a card the tutor
  * writes in to 70% until its row is hovered or anything in it (the card or
@@ -110,14 +127,16 @@ export function RowCard({
 		<>
 			<span className="flex h-5 items-center gap-2">
 					<span className="flex h-5 shrink-0 items-center">{mark}</span>
-					<span data-slot="unit-card-course" className="min-w-0 flex-1 truncate text-label text-muted-foreground">
-						{course}
+					{/* The name whole or not at all: too long for the room beside the status, it wraps onto a second line the 20px line hides, after an empty first item, and the badge names the course (round 10, 1 m8: "Linear Alg…"). */}
+					<span data-slot="unit-card-course" className="flex h-5 min-w-0 flex-1 flex-wrap overflow-hidden text-callout text-muted-foreground">
+						<span aria-hidden="true" className="h-5 w-0" />
+						<span className="whitespace-nowrap leading-5">{course}</span>
 					</span>
 					<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, STATUS_LINE)}>
 						{status}
 					</span>
 				</span>
-			<span data-slot="unit-row-title" className={cn(ROW_TITLE, "mt-1 pl-6 font-medium text-foreground")}>
+			<span data-slot="unit-row-title" className={cn(rowTitle(true), "mt-1 pl-6")}>
 				<MathText>{title}</MathText>
 			</span>
 		</>

@@ -38,7 +38,7 @@ const nextConfig: NextConfig = {
 	// Anchored "./"-prefixed forms behave the same. **/data/**/* fixes
 	// suffix matching in Next's JavaScript collector, but NOT its native
 	// Turbopack tracer: that still prunes gcp-metadata and its private deps.
-	// Keep the narrow closure workaround below AND the native runtime gate.
+	// Keep the narrow closure workaround below.
 	// Real SDK data/ directories still need their explicit includes too.
 	// The recursive-DMG payload (repo dist/ swept into the bundle, shipping
 	// the previous build inside the next) is instead prevented by the
@@ -92,8 +92,7 @@ const nextConfig: NextConfig = {
 			// Next 16.3.2 and 16.4.3 native Turbopack apply unanchored excludes while
 			// traversing modules; **/data/**/* still prunes gcp-metadata and
 			// its private runtime chain. Includes are applied after traversal.
-			// This is the verified GoogleAuth closure, not a general dep copy;
-			// the offline native Pi gate must catch future SDK closure changes.
+			// This is the verified GoogleAuth closure, not a general dep copy.
 			"node_modules/gcp-metadata/**/*",
 			"node_modules/json-bigint/**/*",
 			"node_modules/bignumber.js/**/*",

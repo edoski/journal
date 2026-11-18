@@ -4,14 +4,21 @@ import { useEffect, useState } from "react";
 import type { ChatListItem, StudyCourse, StudyListing } from "@/src/core";
 import { useServerEvent } from "@/components/server-events";
 import { useDayChange } from "@/components/day-change";
-import { TopicNotice, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
+import { TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
+import { PageNotice, PageReading } from "@/components/page-frame/page-frame";
+import { WindowPage } from "@/components/page-frame/window-page";
+import { CoursesUnavailable } from "@/components/course-picker";
+import { withLessonHere } from "@/components/study-home/study-facts";
 
-type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; courses: StudyCourse[]; chats: ChatListItem[] };
+type Read = { status: "loading" } | { status: "unavailable"; reason: string } | { status: "missing" } | { status: "ready"; course: StudyCourse; courses: StudyCourse[]; chats: ChatListItem[] };
 
 /** The topic's course, every course and every session, read again when a turn settles,
  *  the list changes, the course record changes or the day turns over. A
- *  failed read keeps the last one. */
-function useUnitRead(workspace: string): Read {
+ *  failed read keeps the last one. "You are here" is placed as Home and
+ *  the sidebar place it (`withLessonHere`), so every surface puts it on
+ *  one topic (round 14, m6: topic maps said Random variables while Home
+ *  and the course page said Poisson). */
+export function useUnitRead(workspace: string): Read {
 	const [read, setRead] = useState<Read>({ status: "loading" });
 	const [attempt, setAttempt] = useState(0);
 	useServerEvent("turn-settled", () => setAttempt((n) => n + 1));
@@ -26,8 +33,10 @@ function useUnitRead(workspace: string): Read {
 		])
 			.then(([study, { chats }]) => {
 				if (!live) return;
-				const course = study.available ? study.courses.find((c) => c.map.workspace === workspace) : undefined;
-				setRead(course ? { status: "ready", course, courses: study.available ? study.courses : [course], chats } : { status: "missing" });
+				if (!study.available) return setRead({ status: "unavailable", reason: study.reason });
+				const courses = withLessonHere(study.courses, chats);
+				const course = courses.find((c) => c.map.workspace === workspace);
+				setRead(course ? { status: "ready", course, courses, chats } : { status: "missing" });
 			})
 			.catch(() => live && setRead((prev) => (prev.status === "ready" ? prev : { status: "missing" })));
 		return () => {
@@ -46,14 +55,18 @@ export function UnitPage({ workspace, handle }: { workspace: string; handle: str
 	const read = useUnitRead(workspace);
 	const topic = read.status === "ready" ? read.course.map.topics.find((t) => t.handle === handle) : undefined;
 	return (
-		<div className="relative flex h-dvh min-w-0 flex-col">
-			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
-			<div aria-hidden className="h-13 shrink-0" />
-			{read.status === "ready" && topic ? (
+		<WindowPage>
+			{read.status === "loading" ? (
+				<PageReading />
+			) : read.status === "unavailable" ? (
+				<PageNotice>
+					<CoursesUnavailable reason={read.reason} />
+				</PageNotice>
+			) : read.status === "ready" && topic ? (
 				<TopicPage course={read.course} courses={read.courses} topic={topic} chats={read.chats} />
 			) : (
-				<TopicNotice>{read.status === "loading" ? "Loading…" : "This topic is not in the course record."}</TopicNotice>
+				<PageNotice>This topic is not in the course record.</PageNotice>
 			)}
-		</div>
+		</WindowPage>
 	);
 }

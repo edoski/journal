@@ -44,6 +44,9 @@ const askOptionProps = {
 	description: Type.Optional(
 		Type.String({ description: "Never shown to him: the label alone says what the option is." }),
 	),
+	stops: Type.Optional(
+		Type.Boolean({ description: "True on an option that ends the session for today (\"Stop here for today\"): picking it is his Done for today, so the app closes the session as that does." }),
+	),
 };
 
 /** GLM wobble guard (owner-approved, 2026-09-26): models sometimes emit
@@ -123,12 +126,21 @@ export function questionNeedsReveal(tool: string, rawInput: unknown, phase: stri
 
 /** The teaching-cycle role field of the teach explain. Bare words, never
  *  quoted (the quote-copy wobble — see tests/tool-heal.test.ts). */
+/** What makes a question a prediction, where its type is written (round 13,
+ *  3 N5: "What chance p per slot would match that rate?" and "How could you
+ *  rewrite (1 + x/n)^n so that this fact gives its limit?" opened their
+ *  steps as predictions, and his worked answers were kept as "Prediction,
+ *  not counted"). The doctrine said it; the field said only "before". */
+export const PREDICT_RULE =
+	"A prediction is a guess he cannot yet work out. A question he can compute or derive from what he has been taught " +
+	"or already knows is a check, even one that opens a step, since his worked answer must count.";
+
 const predictCheckType = Type.Union([Type.Literal("predict"), Type.Literal("check")], {
 	description:
-		"REQUIRED — the question's role in the teaching cycle, as a bare word (no quotes): predict = posed BEFORE " +
+		"REQUIRED — the question's role in the teaching cycle, as a bare word (no quotes): predict = a guess posed BEFORE " +
 		"you teach the step (its own turn; the learner answers, then your teaching resolves it — arrives open, never " +
-		"collapsed); check = posed AFTER the step's teaching is complete (arrives collapsed behind the Check your " +
-		"understanding reveal). ONE question per turn either way.",
+		"collapsed; kept, never counted); check = a question he can work out, posed once what it needs is taught (arrives collapsed behind the Check your " +
+		`understanding reveal; counted). ${PREDICT_RULE} ONE question per turn either way.`,
 });
 
 // ─── the explain tool (free response, owner 2026-09-27) ────────────────────
@@ -139,11 +151,20 @@ const predictCheckType = Type.Union([Type.Literal("predict"), Type.Literal("chec
 // on submit, and is restated in the answer result the model grades against;
 // the client never grades free text).
 
+/** The ask's own rule where the question is written (round 11: 11 refusals
+ *  of a reason asked as a second ask, "…, and why does each factor of your
+ *  expression belong there?"). Said in its positive form only: the
+ *  counterexample the voice gave was the very ask drafts kept writing.
+ *  voice-check's `compoundAsk` holds the example to it. */
+export const ONE_ASK_RULE =
+	"It asks one thing. His reason is asked by ending that one ask with \", and why?\" " +
+	"(\"What is the probability that exactly one of 12 bulbs fails, and why?\"), which covers each factor of a formula too; " +
+	"the question ends there.";
+
+const QUESTION_FIELD = `The single question to ask. ${ONE_ASK_RULE} ONE question per turn: ask, then end your turn — the answer determines the next.`;
+
 export const explainInputBase = Type.Object({
-	question: Type.String({
-		description:
-			"The single question to ask. ONE question per turn: ask, then end your turn — the answer determines the next.",
-	}),
+	question: Type.String({ description: QUESTION_FIELD }),
 	correctAnswer: Type.String({
 		description:
 			"REQUIRED. The full correct answer in your own words, reasoning included — COMMITTED before the learner " +
@@ -152,6 +173,14 @@ export const explainInputBase = Type.Object({
 			"It is shown to him on submit; your next reply grades the nuance of what he wrote.",
 	}),
 });
+
+/** The guess's own rule where the teach question is written (round 12,
+ *  2 M1: "Go ahead, guess." posed as a check, and his guess became the
+ *  topic's open mistake). The voice guard's `guessAsked` holds a draft to
+ *  it; a probe question has no prediction to pose. */
+export const GUESS_RULE =
+	"A guess he asks to make (\"let me guess first\"), or one you invite (\"Take a guess\"), is posed as type predict, " +
+	"so it is kept and never counts; the open question is asked again once his guess is answered.";
 
 /** The TEACH-side explain object: base + the teaching-cycle role field
  *  and the plan-position field. The required pair leads the property
@@ -169,9 +198,10 @@ export const explainInputObject = Type.Object({
 			"The lesson's position on the map derives from these tags (the node the latest tagged question is about is " +
 			"where the map stands; earlier ones count as visited). A node takes as many questions as it deserves: stay on " +
 			"one node for as many turns as the understanding needs — one reasoning step at a time, never rush forward. " +
-			"For off-map checks use ask_user_question.",
+			"A question off the plan with a right answer (a guess, a side check) is still this tool, tagged with the node it grows from; ask_user_question never asks one.",
 	}),
 	...explainInputBase.properties,
+	question: Type.String({ description: `${QUESTION_FIELD} ${GUESS_RULE}` }),
 });
 
 /** The DISPLAY parse for persisted explain calls (tool-parts.ts): the
@@ -223,6 +253,14 @@ export const askInputSchema = Type.Object({
 // call boundary in execute (askOptionProblems, above).
 
 export type AskToolInput = Static<typeof askInputSchema>;
+
+/** Whether his answer to a choices question picked an option the tutor
+ *  marked as ending the session for today (`stops`). Pure. */
+export function picksStop(input: unknown, answer: { answers?: ReadonlyArray<{ index?: number }> }): boolean {
+	const options = parseOptionsIfString((input as { options?: unknown } | null)?.options as string | undefined);
+	if (!Array.isArray(options)) return false;
+	return (answer.answers ?? []).some((picked) => typeof picked.index === "number" && (options[picked.index - 1] as { stops?: unknown } | undefined)?.stops === true);
+}
 export type ExplainToolInput = Static<typeof explainInputObject>;
 
 /** A real selected answer, in the order the options were displayed. */
@@ -292,7 +330,20 @@ export interface QuestionAnswerData {
 	 *  something first and the question waits to be asked again. Set only
 	 *  through dismissedAnswer, so it never rides an answer. */
 	reason?: DismissReason;
+	/** What he had typed in the question's box when Done for today set it
+	 *  aside (reason "tonight"): kept with the lesson, so the line that says
+	 *  it was left shows it and the question asked again opens with it on
+	 *  every way back, in any window (round 15, 3 m1). His only: its words
+	 *  are never in what the tutor reads (`compactAnswerForModel`, which
+	 *  says only that one was kept), never graded. */
+	draft?: LeftDraft;
 	answeredAt: string;
+}
+
+/** His half answer to a question Done for today set aside. */
+export interface LeftDraft {
+	text: string;
+	confidence?: Confidence;
 }
 
 /** The reasons a dismissal names. A plain Esc skip names none. */
@@ -454,6 +505,13 @@ export function dismissedAnswer(kind: QuestionKind, questionText: string, reason
 	};
 }
 
+/** What the agent reads when he pressed Hint on a check. His draft rides
+ *  beside it as `text`: a hint that restates it, or the nudge before it,
+ *  gives him nothing (round 16, m12: after "y = 3x/2", the hint was "the
+ *  second entry is 3/2 times the first"). */
+export const HINT_REQUEST_TEXT =
+	"He pressed Hint: a request, not an answer. `text`, when present, is his draft so far. Give the next rung of the hint ladder above what his draft and your last message already give him: one move or fact neither says, never his draft or your nudge said again in other words. Then ask this check again.";
+
 /** What the agent reads when he pressed Show me on a check. */
 export const SHOW_ME_TEXT =
 	"He pressed Show me: he gives up on this question, with the work below if he wrote any. Save it as an attempt he gave up (result incorrect, gave_up true, his work as the response). Then show him the worked answer: where his work stopped, when he wrote some, then the steps. Ask nothing more about it.";
@@ -462,11 +520,22 @@ export const SHOW_ME_TEXT =
 export const LEFT_FOR_TONIGHT_TEXT =
 	"He stopped for today with this question open. Not an answer: no grade, no attempt recorded. Its answer was never shown to him.";
 
+/** What the agent reads beside a question Done for today set aside with
+ *  his half answer in its box: only that it was kept, never its words
+ *  (round 16, m13: with nothing to say so, the close read "You still
+ *  haven't started Linear maps and their matrices" under his half answer). */
+export const LEFT_DRAFT_TEXT =
+	"He had started an answer to it, kept in his box for when he comes back. It is not an attempt: grade nothing. In the close it is his half answer waiting for him there (\"Your half answer to the kernel question waits here for next time.\"), never a topic or question he has not started, and never what it says.";
+
 /** What the agent reads for a question he set aside to ask something
  *  (round 6: the question stays open, so it comes back as it was and the
- *  transcript draws it once). */
+ *  transcript draws it once). A message asking to be taught instead sets
+ *  it aside for good (round 9: a review re-asked its question after three
+ *  "stop quizzing me and teach me", since this text outranked the probe's
+ *  rule to conclude). It names no action: the prober hands over to the
+ *  teacher, the teacher teaches. */
 export const ASKED_INSTEAD_TEXT =
-	"He asked you something before answering: his message follows. Not an answer: no grade, no attempt recorded, its answer never shown. The question is still open: answer his message, then ask this question again, word for word, with a fresh call.";
+	"He asked you something before answering: his message follows. Not an answer: no grade, no attempt recorded, its answer never shown. The question is still open: answer his message without working the open question for him (no step, value or factor of its answer, since a reply that gives any of them away costs him his answer on his own), then ask this question again, word for word, with a fresh call. When his message asks to be taught or told instead of asked (\"stop quizzing me\", \"just explain it\"), the question is set aside: do what your instructions say for that request, and never ask it again. When his message asks to guess first, his guess is a prediction: pose it as one, so it is kept and never counts, and ask this question again once his guess is answered. When his message asks nothing and only answers the question (a guess, a value, a choice), it is his answer to it: save it as his attempt naming \"his-message\", a prediction when the question asked for one, and reply to it as to an answer.";
 
 /**
  * The MODEL-VISIBLE answer record (owner, tool-result diet 2026-10-02):
@@ -479,13 +548,13 @@ export const ASKED_INSTEAD_TEXT =
  */
 export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, unknown> {
 	if (ad.dismissed) {
-		if (ad.reason === "tonight") return { kind: ad.kind, dismissed: true, reason: LEFT_FOR_TONIGHT_TEXT };
+		if (ad.reason === "tonight") return { kind: ad.kind, dismissed: true, reason: LEFT_FOR_TONIGHT_TEXT, ...(ad.draft?.text.trim() ? { draftKept: LEFT_DRAFT_TEXT } : {}) };
 		if (ad.reason === "asked") return { kind: ad.kind, dismissed: true, reason: ASKED_INSTEAD_TEXT };
 		return { kind: ad.kind, dismissed: true };
 	}
 	const out: Record<string, unknown> = { kind: ad.kind };
 	if (ad.hintRequested) {
-		out.hintRequested = "He pressed Hint: a request, not an answer. Give the next rung of the hint ladder, then ask this check again.";
+		out.hintRequested = HINT_REQUEST_TEXT;
 	}
 	if (ad.showMe) out.showMe = SHOW_ME_TEXT;
 	// Array.isArray: the seam is called with `unknown` answers (test

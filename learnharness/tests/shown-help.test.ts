@@ -74,8 +74,8 @@ describe("which questions he answered, and whether he had seen their solution fi
 		const first = asked("Run BFS from $s$ and give every dist.");
 		const second = asked("Explain why no path to $e$ is shorter than 3.");
 		const answers = answeredQuestionsOf([...first.messages, ...second.messages]);
-		assert.deepEqual(answers.get(first.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, recorded: false });
-		assert.deepEqual(answers.get(second.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, recorded: false });
+		assert.deepEqual(answers.get(first.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, asked: "Run BFS from $s$ and give every dist.", recorded: false });
+		assert.deepEqual(answers.get(second.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, asked: "Explain why no path to $e$ is shorter than 3.", recorded: false });
 	});
 
 	it("the same words asked again after he answered them were seen", () => {
@@ -130,9 +130,9 @@ describe("saving an answer to a question whose solution he had seen", () => {
 	it("the question field is the app's: checked, and taken off before the engine reads the patch", async () => {
 		const check = asked("Compute the eigenvalues of $A$.");
 		const { saves, tools } = savingCourse(check.messages);
-		await courseSave(tools, [attempt(["eigen"], "correct", "none", { question: check.id }), attempt(["kernel"], "correct", "none", { question: check.id })]);
+		await courseSave(tools, [attempt(["eigen", "kernel"], "correct", "none", { question: check.id })]);
 		assert.equal("question" in saves[0]!.observations![0]!, false);
-		assert.equal(saves[0]!.observations!.length, 2);
+		assert.equal(saves[0]!.observations!.length, 1);
 	});
 
 	it("a question that is no answer of this session is refused, naming the fix, and nothing is saved", async () => {

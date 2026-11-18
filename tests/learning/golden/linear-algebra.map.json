@@ -5,7 +5,7 @@
   "exam": {
     "date": "2026-12-03",
     "days_left": 25,
-    "final_review": "2026-11-19"
+    "final_review": "2026-11-16"
   },
   "current": "eigen",
   "focus": "sheet-4",
@@ -14,7 +14,12 @@
       "key": "sheet-4",
       "title": "Problem sheet 4: rank and nullity",
       "step": "Part (c): show $\\dim \\ker A = 2$ for the $3 \\times 5$ matrix $A$",
-      "updated": "2026-11-06"
+      "updated": "2026-11-06",
+      "topics": [
+        "rank",
+        "basis",
+        "kernel"
+      ]
     }
   ],
   "topics": [
@@ -25,16 +30,9 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-28",
-      "review": "2026-11-15",
+      "review": "2026-11-09",
       "held": true,
       "due": "2026-10-12",
-      "moved": {
-        "from": "2026-11-20",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ]
-      },
       "weak": false,
       "tasks": []
     },
@@ -47,7 +45,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-30",
-      "review": "2026-11-16",
+      "review": "2026-11-11",
       "held": true,
       "due": "2026-10-12",
       "weak": false,
@@ -62,13 +60,9 @@
       "contrasts": [],
       "level": "independent",
       "introduced": "2026-10-05",
-      "review": "2026-11-09",
+      "review": "2026-11-23",
       "held": true,
       "due": "2026-10-28",
-      "moved": {
-        "from": "2026-11-13",
-        "by": "left"
-      },
       "weak": true,
       "gap": "You treat pairwise non-parallel vectors as independent and miss a third vector in their span",
       "lapsed": true,
@@ -87,7 +81,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-07",
-      "review": "2026-11-20",
+      "review": "2026-11-13",
       "held": true,
       "due": "2026-10-29",
       "weak": false,
@@ -104,15 +98,9 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-12",
-      "review": "2026-11-08",
-      "overdue": 2,
-      "moved": {
-        "from": "2026-11-09",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ]
-      },
+      "review": "2026-11-12",
+      "held": true,
+      "due": "2026-11-06",
       "weak": true,
       "mistake": true,
       "lapsed": true,
@@ -127,16 +115,9 @@
       ],
       "level": "retained",
       "introduced": "2026-10-15",
-      "review": "2026-11-18",
+      "review": "2026-11-27",
       "held": true,
       "due": "2026-11-06",
-      "moved": {
-        "from": "2026-11-16",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ]
-      },
       "weak": true,
       "mistake": true,
       "lapsed": true,
@@ -157,7 +138,7 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-03",
-      "review": "2026-11-11",
+      "review": "2026-11-13",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -179,8 +160,9 @@
       "contrasts": [],
       "level": "attempted",
       "introduced": "2026-11-06",
-      "review": "2026-11-08",
-      "overdue": 1,
+      "review": "2026-11-09",
+      "held": true,
+      "due": "2026-11-07",
       "weak": true,
       "mistake": true,
       "confident_errors": 1,
@@ -199,9 +181,7 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-04",
-      "review": "2026-11-13",
-      "held": true,
-      "due": "2026-11-09",
+      "review": "2026-11-09",
       "weak": false,
       "right": "helped",
       "tasks": []
@@ -217,16 +197,9 @@
       ],
       "level": "introduced",
       "introduced": "2026-11-05",
-      "review": "2026-11-19",
+      "review": "2026-11-20",
       "held": true,
       "due": "2026-11-06",
-      "moved": {
-        "from": "2026-11-16",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ]
-      },
       "weak": false,
       "tasks": []
     },
@@ -243,7 +216,7 @@
       "starts_why": {
         "kind": "after",
         "needs": [
-          "determinant"
+          "rank"
         ]
       },
       "weak": false,
@@ -259,7 +232,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-14",
+      "starts": "2026-11-19",
       "starts_why": {
         "kind": "after",
         "needs": [
@@ -297,11 +270,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "moved": {
-        "from": "2026-11-19",
-        "by": "left"
-      },
-      "starts": "2026-11-15",
+      "starts": "2026-11-25",
       "starts_why": {
         "kind": "after",
         "needs": [
@@ -319,12 +288,9 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-11",
+      "starts": "2026-11-18",
       "starts_why": {
-        "kind": "early",
-        "waiting_on": [
-          "determinant"
-        ]
+        "kind": "early"
       },
       "weak": false,
       "tasks": []
@@ -338,15 +304,11 @@
       ],
       "contrasts": [],
       "level": "new",
-      "moved": {
-        "from": "2026-11-11",
-        "by": "left"
-      },
-      "starts": "2026-11-12",
+      "starts": "2026-11-20",
       "starts_why": {
-        "kind": "early",
-        "waiting_on": [
-          "determinant"
+        "kind": "after",
+        "needs": [
+          "inner-product"
         ]
       },
       "weak": false,

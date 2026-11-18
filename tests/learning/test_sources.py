@@ -71,6 +71,20 @@ def test_scan_stops_at_its_limit(
     assert result["truncated"] is True
 
 
+def test_scan_lists_a_linked_folder_against_the_course_sources(tmp_path: Path) -> None:
+    material = tmp_path / "course"
+    linked = tmp_path / "Linked notes"
+    files(material, "own.md")
+    files(linked, "held.pdf", "new.tex", "picture.png", ".hidden/x.md")
+    registered = {"held": {"path": str(linked / "held.pdf")}}
+    result = sources.scan(material, registered, folder=linked)
+    assert result["directory"] == str(linked)
+    assert [(item["path"], item.get("handle")) for item in result["files"]] == [
+        ("held.pdf", "held"),
+        ("new.tex", None),
+    ]
+
+
 def test_prepare_registers_new_files_under_free_handles(tmp_path: Path) -> None:
     material = tmp_path / "material"
     files(material, "Week 1/Lecture Notes.pdf", "data.csv", "o12.md")

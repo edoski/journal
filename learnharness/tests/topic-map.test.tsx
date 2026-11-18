@@ -21,14 +21,13 @@ import {
 	NODE_HEIGHT,
 	NODE_WIDTH,
 	READABLE_ZOOM,
-	TOPIC_NODE_SIZE,
+	cameraAt,
 	cardFit,
+	centreOf,
 	chainOf,
 	framedCamera,
 	layoutTopicMap,
 	neighbourOf,
-	openingCamera,
-	routePath,
 	type Camera,
 	type TopicMapLayout,
 } from "../components/course-map/topic-map/topic-map-layout.ts";
@@ -127,15 +126,15 @@ describe("where he stands on a topic", () => {
 	});
 
 	it("takes a quarter off a topic he could do on his own that the engine now calls weak, says what the pie shows, and marks every weak topic", () => {
-		assert.deepEqual(standingOf(byHandle("matmul")), { fill: 0.75, slipping: true, words: "Not right last time" }, "a 3/4 pie never says On your own, nor help while a wrong answer is open (round 8)");
-		assert.deepEqual(standingOf(byHandle("rank")), { fill: 0.75, slipping: true, words: "Right with help" });
+		assert.deepEqual(standingOf(byHandle("matmul")), { fill: 0.75, slipping: true, words: "Slipping", short: "Slipping" }, "a 3/4 pie never says On your own");
+		assert.deepEqual(standingOf(byHandle("rank")), { fill: 0.75, slipping: false, words: "Right with help", short: "Right with help" }, "still being learned: it never slips (round 11, 3 N1)");
 		assert.equal(standingOf(byHandle("determinant")).slipping, false);
 	});
 
-	it("says it in the pie's words, with no engine level names", () => {
+	it("says it in the pie's words, Slipping on a topic he is losing, with no engine level names", () => {
 		assert.deepEqual(
-			["eigen", "cramer", "kernel", "determinant", "span"].map((handle) => standingOf(byHandle(handle)).words),
-			["Not started", "Taught, not tried", "Tried, not right yet", "Right with help", "On your own"],
+			["eigen", "cramer", "kernel", "determinant", "span", "matmul"].map((handle) => standingOf(byHandle(handle)).words),
+			["Not started", "Taught, not tried", "Tried, not right yet", "Right with help", "On your own", "Slipping"],
 		);
 	});
 });
@@ -154,8 +153,8 @@ describe("why a topic needs him", () => {
 
 	it("says a mistake he has answered right since is fixed, to be checked again", () => {
 		const fixed = (signals: { gap?: string; lapsed?: boolean }) => slip(topic("t", { level: "assisted", weak: true, signals: { ...QUIET, ...signals, repaired: true } }))!;
-		assert.equal(fixed({ gap: "Writes det as ad + bc" }), "Fixed, check again later");
-		assert.equal(fixed({ lapsed: true }), "Fixed, check again later");
+		assert.equal(fixed({ gap: "Writes det as ad + bc" }), "Check again another day");
+		assert.equal(fixed({ lapsed: true }), "Check again another day");
 	});
 
 	it("says nothing for a topic still being learned, one resting until its review, or one not started", () => {
@@ -165,7 +164,7 @@ describe("why a topic needs him", () => {
 	});
 
 	it("names a node for a screen reader: title, that he is there, the standing, the card's line", () => {
-		assert.equal(topicLabel(byHandle("rank"), true, { kind: "your-turn", words: "Your turn" }), "Rank, You are here, Right with help, Your turn");
+		assert.equal(topicLabel(byHandle("rank"), true, { kind: "review", words: "Due today" }), "Rank, You are here, Right with help, Due today");
 		assert.equal(topicLabel(byHandle("vectors"), false, null), "Vectors, On your own");
 	});
 });
@@ -225,12 +224,6 @@ describe("topic map geometry", () => {
 		}
 	});
 
-	it("draws a route as S-curves between layers and straight lines past the layers it skips", () => {
-		assert.equal(routePath([[0, 0], [40, 56]]), "M0,0 C0,28 40,28 40,56");
-		assert.equal(routePath([[0, 0], [40, 56], [40, 120], [10, 176]]), "M0,0 C0,28 40,28 40,56 L40,120 C40,148 10,148 10,176");
-		assert.equal(routePath([]), "");
-	});
-
 	it("stacks a course with no needs in one column, in the engine's order", () => {
 		const column = layoutTopicMap([topic("a"), topic("b"), topic("c")], []);
 		assert.deepEqual(column.layers, [[h("a")], [h("b")], [h("c")]]);
@@ -255,51 +248,11 @@ describe("topic map geometry", () => {
 	});
 });
 
-describe("where the map opens", () => {
-	const layout = layoutTopicMap(MAP.topics, MAP.edges);
-	const ROOM = { x: 64, y: 60 };
-	/** A topic's box on screen under a camera. */
-	const onScreen = (camera: Camera, handle: string) => {
-		const placed = layout.topics.get(h(handle))!;
-		const left = placed.x * camera.zoom + camera.x;
-		const top = placed.y * camera.zoom + camera.y;
-		return { left, top, right: left + NODE_WIDTH * camera.zoom, bottom: top + NODE_HEIGHT * camera.zoom };
-	};
-
-	it("shows the whole course, clear of the frame's faded edge, when it fits at three quarters or more", () => {
-		const frame = { width: 1192, height: 740 };
-		const camera = openingCamera(layout, MAP.current, frame, ROOM);
-		assert.ok(camera.zoom >= 0.75 && camera.zoom < 1);
-		for (const handle of Object.keys(NEEDS)) {
-			const box = onScreen(camera, handle);
-			assert.ok(box.left >= ROOM.x * camera.zoom - 0.5 && box.right <= frame.width - ROOM.x * camera.zoom + 0.5, `${handle} is in view across`);
-			assert.ok(box.top >= ROOM.y * camera.zoom - 0.5 && box.bottom <= frame.height - ROOM.y * camera.zoom + 0.5, `${handle} is in view down`);
-		}
-	});
-
-	it("opens at full size on the current topic when the course does not fit", () => {
-		const frame = { width: 896, height: 350 };
-		const camera = openingCamera(layout, MAP.current, frame, ROOM);
-		assert.equal(camera.zoom, 1);
-		const box = onScreen(camera, "rank");
-		assert.ok(Math.abs((box.left + box.right) / 2 - frame.width / 2) <= 0.5, "centred across");
-		assert.ok(Math.abs((box.top + box.bottom) / 2 - frame.height / 2) <= 0.5, "centred down");
-	});
-
-	it("never looks past the drawing: a current topic on the first layer sits a room's depth under the frame's top", () => {
-		const camera = openingCamera(layout, h("vectors"), { width: 896, height: 350 }, ROOM);
-		assert.equal(onScreen(camera, "vectors").top, ROOM.y);
-	});
-
-	it("centres a drawing narrower than the frame, and opens on the first topic when the course has no current one", () => {
-		const chain = layoutTopicMap([topic("a"), topic("b"), topic("c"), topic("d"), topic("e"), topic("f")], edgesOf({ b: ["a"], c: ["b"], d: ["c"], e: ["d"], f: ["e"] }));
-		const camera = openingCamera(chain, null, { width: 896, height: 350 }, ROOM);
-		assert.deepEqual(camera, { x: (896 - NODE_WIDTH) / 2, y: ROOM.y, zoom: 1 });
-	});
-});
-
 describe("where a course map opens framed", () => {
-	const layout = layoutTopicMap(MAP.topics, MAP.edges, TOPIC_NODE_SIZE);
+	/** A fixed card for the camera's arithmetic, apart from the map's own (canvas-layout.ts; topic-map-framing.test.ts
+	 *  frames the map's own drawing), so each case's premise holds whatever the map's card becomes. */
+	const CARD = { width: 248, height: 56 };
+	const layout = layoutTopicMap(MAP.topics, MAP.edges, CARD);
 	const FADE = { x: 64, y: 40 };
 	const TAG = 20;
 	/** Every topic's box on screen under a camera, sorted into wholly clear of the fade and cut by the frame's edge
@@ -309,7 +262,7 @@ describe("where a course map opens framed", () => {
 		for (const [handle, at] of layout.topics) {
 			const left = at.x * camera.zoom + camera.x;
 			const top = at.y * camera.zoom + camera.y;
-			const fit = cardFit({ left, top, right: left + TOPIC_NODE_SIZE.width * camera.zoom, bottom: top + TOPIC_NODE_SIZE.height * camera.zoom }, frame, FADE);
+			const fit = cardFit({ left, top, right: left + CARD.width * camera.zoom, bottom: top + CARD.height * camera.zoom }, frame, FADE);
 			if (fit === "cut") out.cut.push(handle);
 			else if (fit === "clear") out.clear.push(handle);
 			if (fit === "clear" || fit === "faded") out.whole.push(handle);
@@ -355,7 +308,7 @@ describe("where a course map opens framed", () => {
 		const fits = new Map([...layout.topics].map(([handle, at]) => {
 			const left = at.x * onPage.zoom + onPage.x;
 			const top = at.y * onPage.zoom + onPage.y;
-			return [handle as string, cardFit({ left, top, right: left + TOPIC_NODE_SIZE.width * onPage.zoom, bottom: top + TOPIC_NODE_SIZE.height * onPage.zoom }, page, pageFade)];
+			return [handle as string, cardFit({ left, top, right: left + CARD.width * onPage.zoom, bottom: top + CARD.height * onPage.zoom }, page, pageFade)];
 		}));
 		assert.equal(fits.get("eigen"), "clear");
 		for (const next of nextOf("eigen")) assert.ok(["clear", "faded"].includes(fits.get(next)!), `${next} on its page`);
@@ -378,14 +331,14 @@ describe("where a course map opens framed", () => {
 	it("opens Probability's course page on where he is, its tag and the topics it leads to clear (the round-3 evaluation)", () => {
 		const needs = { "total-probability": ["conditional"], bayes: ["conditional", "total-probability"], independence: ["conditional"], binomial: ["random-variables", "independence"], poisson: ["random-variables"], geometric: ["random-variables", "independence"], expectation: ["random-variables"], variance: ["expectation"], covariance: ["variance", "independence"] };
 		const handles = ["conditional", "total-probability", "bayes", "independence", "random-variables", "binomial", "poisson", "geometric", "expectation", "variance", "covariance"];
-		const probability = layoutTopicMap(handles.map((handle) => topic(handle)), edgesOf(needs), TOPIC_NODE_SIZE);
+		const probability = layoutTopicMap(handles.map((handle) => topic(handle)), edgesOf(needs), CARD);
 		const page = { width: 696, height: 782 };
 		const fade = { x: 48, y: 32 };
 		const camera = framedCamera(probability, h("random-variables"), page, fade, TAG, "top");
 		const fits = new Map([...probability.topics].map(([handle, at]) => {
 			const left = at.x * camera.zoom + camera.x;
 			const top = at.y * camera.zoom + camera.y;
-			return [handle, cardFit({ left, top, right: left + TOPIC_NODE_SIZE.width * camera.zoom, bottom: top + TOPIC_NODE_SIZE.height * camera.zoom }, page, fade)];
+			return [handle, cardFit({ left, top, right: left + CARD.width * camera.zoom, bottom: top + CARD.height * camera.zoom }, page, fade)];
 		}));
 		assert.equal(fits.get(h("random-variables")), "clear");
 		assert.ok(probability.topics.get(h("random-variables"))!.y * camera.zoom + camera.y - TAG >= fade.y - 1, "its tag is clear");
@@ -402,7 +355,7 @@ describe("where a course map opens framed", () => {
 	it("shows more topics than centring the current one at full size would", () => {
 		const frame = { width: 784, height: 700 };
 		const framed = sort(framedCamera(layout, MAP.current, frame, FADE, TAG), frame);
-		const centred = sort(openingCamera(layout, MAP.current, frame, { x: FADE.x, y: FADE.y + TAG }), frame);
+		const centred = sort(cameraAt(layout, centreOf(layout, layout.topics.get(MAP.current!)!), 1, frame, { x: FADE.x, y: FADE.y + TAG }), frame);
 		assert.ok(framed.clear.length > centred.clear.length, `${framed.clear.length} against ${centred.clear.length}`);
 		assert.ok(framed.cut.length <= centred.cut.length);
 	});
@@ -421,24 +374,24 @@ describe("topic map drawing", () => {
 		assert.equal(nodes.length, 16);
 		assert.ok(nodes.every((n) => n.tagName === "A"));
 		assert.equal(node("rank").getAttribute("href"), unitHref(MAP.workspace, "rank"));
-		assert.equal(node("rank").getAttribute("aria-label"), "Rank, You are here, Right with help, Check on your own");
+		assert.equal(node("rank").getAttribute("aria-label"), "Rank, You are here, Right with help");
 		assert.equal(node("rank").getAttribute("aria-description"), "Needs Basis and dimension, Matrix multiplication, Gaussian elimination");
 		assert.equal(node("eigen").getAttribute("aria-label"), "eigen, Not started");
 	});
 
 	it("shows a title and its pie on every node, and under it what the sidebar says when it needs him, or else where he stands", () => {
-		assert.equal(document.querySelectorAll('[data-slot="topic-glyph"]').length, 16);
+		assert.equal(document.querySelectorAll('[data-slot="course-map-node"] [data-slot="topic-glyph"]').length, 16);
 		assert.deepEqual(
-			[...document.querySelectorAll('[data-slot="topic-need"]')].map((line) => line.textContent),
-			["10d overdue", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Check on your own", "Sure, but wrong"],
+			[...document.querySelectorAll('[data-slot="topic-need"] [data-slot="status-words"]')].map((line) => line.textContent),
+			["Due 29 Oct", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Sure, but wrong"],
 		);
-		assert.equal(node("determinant").querySelector('[data-slot="topic-need"]'), null);
+		assert.ok(node("determinant").querySelector('[data-slot="topic-need"]') === null);
 		assert.equal(node("determinant").querySelector('[data-slot="topic-standing"]')!.textContent, "Right with help");
 		assert.equal(node("eigen").querySelector('[data-slot="topic-glyph"]')!.getAttribute("data-fill"), "0");
 	});
 
 	it("tags the current topic, keeps one tab stop on it, and opens no popover", () => {
-		assert.equal(document.querySelector('[data-slot="course-map-current-tag"]')!.textContent, "You are here");
+		assert.equal(document.querySelector('[data-slot="course-map-tag"]')!.textContent, "You are here");
 		assert.equal(node("rank").getAttribute("aria-current"), "location");
 		assert.deepEqual(
 			nodes.filter((n) => n.getAttribute("tabindex") === "0").map((n) => n.getAttribute("data-testid")),
@@ -451,7 +404,8 @@ describe("topic map drawing", () => {
 	it("keeps You are here and the topics it leads to at full strength while a page lights others, and dims the rest only as far as their words still read (round 5: Diagonalization at 2.8:1)", () => {
 		const lit = render(<TopicMap map={MAP} said={said} highlight={new Set([h("basis")])} />);
 		const strength = (handle: string) => {
-			const card = lit.querySelector(`[data-testid="map-node-${handle}"]`)!.parentElement!;
+			// The card's link sits in its surface, inside the card that fades.
+			const card = lit.querySelector(`[data-testid="map-node-${handle}"]`)!.parentElement!.parentElement!;
 			const styled = /opacity:\s*([\d.]+)/.exec(card.getAttribute("style") ?? "")?.[1];
 			const classed = /(?:^|\s)opacity-(\d+)(?:\s|$)/.exec(card.getAttribute("class") ?? "")?.[1];
 			return styled ? Number(styled) : classed ? Number(classed) / 100 : 1;
@@ -462,10 +416,10 @@ describe("topic map drawing", () => {
 		assert.ok(contrastAt(dimmed) >= 4.5, `its muted line at ${contrastAt(dimmed).toFixed(2)}:1`);
 	});
 
-	it("draws one line per need, hidden from a screen reader", () => {
-		const needs = [...document.querySelectorAll('[data-slot="course-map-need"]')];
-		assert.equal(needs.length, 23);
-		assert.ok(needs.every((path) => path.getAttribute("d")!.startsWith("M")));
-		assert.ok(needs.every((path) => path.closest("[aria-hidden]")), "the needs are read from each node's description");
+	it("draws its needs as lines hidden from a screen reader, one path at rest", () => {
+		const lines = [...document.querySelectorAll('[data-slot="course-map-line"]')];
+		assert.equal(lines.length, 1, "every line at rest is one path (map-lines.test.tsx)");
+		assert.ok(lines.every((path) => path.getAttribute("d")!.startsWith("M")));
+		assert.ok(lines.every((path) => path.closest("[aria-hidden]")), "the needs are read from each node's description");
 	});
 });

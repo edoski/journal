@@ -524,3 +524,20 @@ def test_a_prediction_on_a_due_day_is_not_the_review() -> None:
     course.attempts(2, att("correct", text="predict the next step", predicted=True))
     assert "due_topics" not in course.record["observations"]["o2"]
     assert course.due == due
+
+
+def test_a_right_guess_after_a_solid_day_spaces_the_review_but_is_no_lapse() -> None:
+    """Round 16, 1 M1: a right Random variables answer marked Guessing, on the
+    exam's eve, made the topic lapsed, so Expectation and Poisson, which need
+    it, left the exam. His flag on a right answer may change the spacing,
+    never the level he held: it is no lapse."""
+    course = started(att("correct"))
+    course.attempts(2, att("correct", text="held"))
+    assert course.standing["level"] == "independent"
+    course.attempts(5, att("correct", text="right, but a guess", sure="guess"))
+    assert course.verdicts[-1] == (on(5).isoformat(), "helped")
+    assert course.due == on(7).isoformat()
+    assert course.standing["level"] == "independent"
+    assert "lapsed" not in course.standing
+    course.attempts(7, att("incorrect", text="then a miss"))
+    assert course.standing["lapsed"] is True

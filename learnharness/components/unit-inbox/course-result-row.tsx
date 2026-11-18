@@ -29,7 +29,7 @@ export function CourseResultRow({ course, arc, active }: { course: StudyCourse; 
 			>
 				<CourseMark title={title} className={cn(!active && "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0")} />
 				<span
-					className={cn("min-w-0 flex-1 truncate text-control", active ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground")}
+					className={cn("min-w-0 flex-1 truncate text-body", active ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground")}
 				>
 					<MathText>{arc ? `${arc.title}, in ${title}` : title}</MathText>
 				</span>

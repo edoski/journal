@@ -2,13 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
-import { SetupDialog } from "@/components/setup-dialog";
-import { useLessonStart } from "@/components/start/use-lesson-start";
+import { lessonCreation, useLessonStart } from "@/components/start/use-lesson-start";
+import { StartScope } from "@/components/start/start-scope";
 import { topicSessions } from "@/components/unit-inbox/units";
 import { HybridTopic } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
-import { PageFrame } from "@/components/page-frame/page-frame";
+import { PageReading } from "@/components/page-frame/page-frame";
 import { topicFacts, type Press, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { useTopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
+import { continueHref } from "@/components/nav/session-state";
+import { lessonBegun } from "@/components/study-words";
 
 /** What the page's body takes. */
 export interface TopicPageProps {
@@ -23,11 +25,12 @@ export interface TopicPageProps {
 }
 
 /**
- * The topic page (spec: topic-page.md): the start around the hybrid body,
- * whose history pane holds the action, so it has no composer: a new
- * lesson starts from the sidebar's New lesson, and a start that fails
- * says so under the head. The page appears once the topic read has
- * answered, so nothing shifts in afterwards.
+ * The topic page (spec: topic-page.md): the page's one start (`StartScope`)
+ * around the hybrid body, whose history pane holds the action and whose
+ * foot the course page's composer with the topic chosen, so the action,
+ * a task and the composer share one sign-in and one failure line under the
+ * head. The page appears once the topic read has answered, so nothing
+ * shifts in afterwards.
  */
 export function TopicPage({
 	course,
@@ -50,31 +53,20 @@ export function TopicPage({
 		topic.handle,
 		topic.tasks,
 		sessions.map((chat) => chat.id),
+		lessonBegun(topic),
 	);
-	const start = (opening: string, from?: string) => lesson.start(opening, workspace, { topics: [topic.handle], from });
-	const press = (does: Press) => ("open" in does ? router.push(`/chat/${does.open.id}`) : start(does.opening, does.from));
-	if (topicRead.status === "loading") return <TopicNotice>Loading…</TopicNotice>;
+	const start = (opening: string, from?: string) => lesson.start(lessonCreation(opening, workspace, { topics: [topic.handle], from }));
+	const press = (does: Press) => ("open" in does ? router.push(continueHref(does.open)) : start(does.opening, does.from));
+	if (topicRead.status === "loading") return <PageReading />;
 	const facts = topicFacts({ course, courses, topic, chats, read: topicRead.read });
 	const act = () => {
 		const { action } = facts;
-		if ("chat" in action) router.push(`/chat/${action.chat.id}`);
+		if ("chat" in action) router.push(continueHref(action.chat));
 		else start(action.opening, "from" in action ? action.from : undefined);
 	};
 	return (
-		<>
-			<HybridTopic facts={facts} busy={lesson.busy} error={lesson.error} onAct={act} onTask={press} />
-			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
-		</>
-	);
-}
-
-/** The one plain sentence the topic page shows in its place, in the page frame. */
-export function TopicNotice({ children }: { children: React.ReactNode }) {
-	return (
-		<PageFrame>
-			<p data-slot="topic-notice" className="flex min-h-8 items-center text-row text-muted-foreground">
-				{children}
-			</p>
-		</PageFrame>
+		<StartScope lesson={lesson}>
+			<HybridTopic facts={facts} busy={lesson.busy} onAct={act} onTask={press} />
+		</StartScope>
 	);
 }

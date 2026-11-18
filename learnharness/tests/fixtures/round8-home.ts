@@ -50,7 +50,6 @@ export function chat(over: Partial<ChatListItem>): ChatListItem {
 		pendingQuestion: false,
 		pendingProblem: false,
 		busy: false,
-		compacting: false,
 		course: LA,
 		topics: ["eigen"],
 		ownTopics: ["eigen"],

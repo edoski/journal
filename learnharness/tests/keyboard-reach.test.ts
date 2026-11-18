@@ -38,14 +38,15 @@ describe("the cheat sheet groups them in plain words", () => {
 	it("lists its sections in order", () => {
 		assert.deepEqual(
 			sections.map((s) => s.label),
-			["Anywhere", "Pages", "Calendar", "In a lesson", "Answering a question"],
+			["Anywhere", "Pages", "Calendar", "Home", "In a lesson", "Answering a question"],
 		);
 	});
 
-	it("Pages: move with the arrows, open with Enter", () => {
+	it("Pages: move with the arrows, open with Enter, jump to a list's ends", () => {
 		assert.deepEqual(rows("Pages"), [
 			["Move between rows and links", "↑ ↓ ← →"],
 			["Open the row or link", "↵"],
+			["Jump to the list's first or last row", "Home End"],
 		]);
 	});
 
@@ -59,15 +60,33 @@ describe("the cheat sheet groups them in plain words", () => {
 		]);
 	});
 
-	it("Lesson: more sure, less sure, pick a course", () => {
-		const alt = IS_MAC ? "⌥" : "Alt+";
+	it("Home: the map's course, its enlarge and its arcs, and Today's rows, its letters ⌘ chords since its composer takes letters (Edo's notes, N2 and N3; Stacked arcs, 17 Nov 2026; Edo, 18 Nov 2026)", () => {
+		const shift = IS_MAC ? "⇧" : "Shift+";
 		const mod = IS_MAC ? "⌘" : "Ctrl+";
+		assert.deepEqual(rows("Home"), [
+			["The course left or right on the map", "← →"],
+			["Enlarge the map, and back", `${mod}E`],
+			["The arc above on the map", `${shift}↑`],
+			["The arc below on the map", `${shift}↓`],
+			["Go to You are here on the map", `${mod}J`],
+			["Move between Today's rows", "↑ ↓"],
+			["Open the row's course page, else the map's", `${mod}↵`],
+		]);
+	});
+
+	it("Lesson: more sure, less sure", () => {
+		const alt = IS_MAC ? "⌥" : "Alt+";
 		const lesson = rows("In a lesson");
-		assert.deepEqual(lesson.slice(-3), [
+		assert.deepEqual(lesson.slice(-2), [
 			["More sure", `${alt}↑`],
 			["Less sure", `${alt}↓`],
-			["Pick a course", `${mod}O`],
 		]);
+	});
+
+	it("lists ⌘O under Anywhere, for a new lesson's course, never among the lesson's keys where it does nothing (round 16, m28)", () => {
+		const mod = IS_MAC ? "⌘" : "Ctrl+";
+		assert.ok(rows("Anywhere").some(([label, keys]) => label === "Pick the course for a new lesson" && keys === `${mod}O`));
+		assert.ok(!rows("In a lesson").some(([, keys]) => keys === `${mod}O`));
 	});
 
 	it("files every action somewhere", () => {

@@ -18,6 +18,9 @@ import { courseMapOf, createCourseRecords } from "../src/store/course-records.ts
 import { currentArc, examCovers, type CourseMapArc } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { LINALG_ARCS } from "./fixtures/now-demo.ts";
+import { todaySteps } from "../components/study-home/study-facts.ts";
+import { lessonPlaceOf } from "../src/core/lesson-place.ts";
+import { calendarEntries } from "../components/calendar/calendar-facts.ts";
 import { subscribe } from "../src/core/events.ts";
 import { courseTools } from "../src/agent/tools/course.ts";
 import { createPracticeAgent, createProberAgent, createTeacherAgent } from "../src/agent/teacher-agent.ts";
@@ -25,6 +28,7 @@ import { createFauxCore } from "@earendil-works/pi-ai";
 import type { CourseRecords } from "../src/core/ports.ts";
 import type { CourseVerb } from "../src/core/contracts/course.ts";
 import type { ChatStore, JobStore } from "../src/core/ports.ts";
+import { realEngineMissing } from "./helpers/real-engine.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-records-"));
@@ -57,7 +61,8 @@ describe("course records adapter (fake engine)", () => {
 				{ workspace: "/s/odd", error: "an engine before problems" },
 			],
 		});
-		const listing = await createCourseRecords(engine).list();
+		const { plan, ...listing } = (await createCourseRecords(engine).list()) as { plan?: unknown };
+		assert.equal((plan as { today?: string }).today, "2026-11-07", "the plan the list came from comes with it");
 		assert.deepEqual(listing, {
 			available: true,
 			courses: [
@@ -213,7 +218,9 @@ describe("course records adapter (fake engine)", () => {
 				{ topic: "elimination", title: "Gaussian elimination", needs: ["vectors"], contrasts: ["cramer"], level: "assisted", right: "partial", review: "2026-11-06", overdue: 2, weak: true, choice_errors: { cramer: 1 }, tasks: [] },
 				{ topic: "rank", title: "Rank", needs: ["elimination", "gone"], contrasts: [], level: "assisted", right: "sideways", review: "2026-11-05", overdue: 3, weak: true, gap: "Counts nonzero entries", stale: true, repaired: true, tasks: ["sheet-4"] },
 				{ topic: "cramer", needs: ["vectors"], contrasts: ["elimination"], level: "introduced", weak: false, tasks: [] },
-				{ topic: "det", title: "Determinants", needs: [], contrasts: [], level: "new", starts: "2026-11-19", starts_after: ["Probability"], moved: { from: "2026-11-12", by: "study", courses: ["Probability"] }, weak: false, tasks: [] },
+				{ topic: "det", title: "Determinants", needs: [], contrasts: [], level: "new", starts: "2026-11-19", starts_after: ["Probability"], moved: { from: "2026-11-12", by: "study", courses: ["Probability"], day: "today" }, weak: false, tasks: [] },
+				{ topic: "inverse", title: "Inverse matrices", needs: [], contrasts: [], level: "new", starts: "2026-11-20", moved: { from: "2026-11-12", by: "study", courses: ["Linear Algebra"], day: "today", waits_on: ["elimination"] }, weak: false, tasks: [] },
+				{ topic: "span", title: "Span", needs: [], contrasts: [], level: "assisted", review: "2026-11-10", moved: { from: "2026-11-25", by: "answered" }, weak: false, tasks: [] },
 				{ topic: "odd", level: "mastered", needs: [], contrasts: [], weak: false, tasks: [] },
 			],
 		};
@@ -230,13 +237,15 @@ describe("course records adapter (fake engine)", () => {
 		assert.deepEqual(map.tasks, [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: "2026-11-06" }]);
 		assert.deepEqual(
 			map.topics.map((t) => t.handle),
-			["vectors", "basis", "elimination", "rank", "cramer", "det"],
+			["vectors", "basis", "elimination", "rank", "cramer", "det", "inverse", "span"],
 			"a topic with a level the engine does not have is not drawn",
 		);
 		const [vectors, basis, elimination, rank, cramer] = map.topics;
 		assert.deepEqual(vectors!.review, { kind: "scheduled", date: "2026-11-23" });
 		assert.deepEqual(map.topics.find((t) => t.handle === "det")?.startsAfter, ["Probability"], "a start says which courses' new topics come first");
-		assert.deepEqual(map.topics.find((t) => t.handle === "det")?.moved, { from: "2026-11-12", by: "study", courses: ["Probability"] }, "a day he was told that moved says from which day and why");
+		assert.deepEqual(map.topics.find((t) => t.handle === "det")?.moved, { from: "2026-11-12", by: "study", courses: ["Probability"], day: "today" }, "a day he was told that moved says from which day and why");
+		assert.deepEqual(map.topics.find((t) => t.handle === "inverse")?.moved, { from: "2026-11-12", by: "study", courses: ["Linear Algebra"], day: "today", waitsOn: ["Gaussian elimination"] }, "round 14, m3: a start that moved because a topic it needs slipped names that topic");
+		assert.deepEqual(map.topics.find((t) => t.handle === "span")?.moved, { from: "2026-11-25", by: "answered" }, "round 14, m3: his own answer today moved a day he was told");
 		assert.equal("moved" in basis!, false);
 		assert.deepEqual(basis!.review, { kind: "scheduled", date: "2026-12-04", held: { exam: "Probability", since: "2026-11-02" } }, "a review a final review holds back says which, and since when");
 		assert.deepEqual(rank!.review, { kind: "due", date: "2026-11-05", overdue: 3 });
@@ -277,6 +286,20 @@ const parsed = (json: unknown): CourseMap => {
 };
 const topicOf = (map: CourseMap, handle: string) => map.topics.find((t) => t.handle === handle)!;
 
+describe("a task's topics (round 9, 2 m8)", () => {
+	it("keep the task's own order, so a session it starts is placed under its first topic, never the path's first", () => {
+		const map = parsed(goldenMap("linear-algebra"));
+		assert.deepEqual(map.tasks.find((t) => t.key === "sheet-4")?.topics, ["rank", "basis", "kernel"]);
+		const course = { map, unready: null, due: [], lastActiveDaysAgo: 0, newToday: [] };
+		const step = todaySteps(course).find((s) => s.kind === "task");
+		assert.ok(step?.kind === "task");
+		assert.deepEqual(step.topics, ["rank", "basis", "kernel"], "the topics Continue Problem sheet 4 starts its session on");
+		assert.equal(lessonPlaceOf(map, step.topics).topic?.title, "Rank and the column space", "the lesson's crumb");
+		const entry = calendarEntries({ courses: [{ ...course, planned: [], doesNotFit: [], finalReview: null }], chats: [], scope: null }).find((e) => e.kind === "task");
+		assert.equal(entry?.kind === "task" ? entry.topic?.handle : null, "rank", "the calendar's row for the sheet");
+	});
+});
+
 describe("course map arcs (E2's goldens)", () => {
 	it("a course without arcs has no arc fields, and each planned start says why it comes then", () => {
 		const map = parsed(goldenMap("linear-algebra"));
@@ -284,8 +307,8 @@ describe("course map arcs (E2's goldens)", () => {
 		assert.equal("currentArc" in map, false);
 		assert.equal(map.topics.some((t) => "arc" in t), false, "no topic names an arc");
 		assert.equal(currentArc(map), null);
-		assert.deepEqual(topicOf(map, "invertibility").startsWhy, { kind: "after", needs: ["determinant"], partners: [] });
-		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", waitingOn: ["determinant"], exam: false });
+		assert.deepEqual(topicOf(map, "invertibility").startsWhy, { kind: "after", needs: ["rank"], partners: [] });
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", waitingOn: [], exam: false });
 		assert.deepEqual(
 			map.topics.filter((t) => t.startsWhy).map((t) => t.handle),
 			map.topics.filter((t) => t.starts).map((t) => t.handle),
@@ -312,7 +335,7 @@ describe("course map arcs (E2's goldens)", () => {
 			"every topic in one arc",
 		);
 		assert.equal(map.currentArc, "eigenvalues");
-		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", arc: "orthogonality", waitingOn: ["rank", "determinant"], exam: true });
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", arc: "orthogonality", waitingOn: [], exam: false });
 		assert.deepEqual(topicOf(map, "change-basis").startsWhy, { kind: "after", arc: "eigenvalues", needs: ["invertibility"], partners: [] });
 	});
 
@@ -352,8 +375,8 @@ describe("course map arcs (E2's goldens)", () => {
 	it("the exam's scope of arcs and the topics it leaves out, as far as the map shows them", () => {
 		const golden = goldenMap("linear-algebra-arcs");
 		const exam = { ...(golden.exam as object), arcs: ["spaces", "systems", "gone"], leaves_out: ["kernel", "nope"] };
-		assert.deepEqual(parsed({ ...golden, exam }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-19", arcs: ["spaces", "systems"], leavesOut: ["kernel"] });
-		assert.deepEqual(parsed({ ...golden, exam: { ...exam, arcs: null } }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-19", leavesOut: ["kernel"] }, "null is the whole course, less what it leaves out");
+		assert.deepEqual(parsed({ ...golden, exam }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-16", arcs: ["spaces", "systems"], leavesOut: ["kernel"] });
+		assert.deepEqual(parsed({ ...golden, exam: { ...exam, arcs: null } }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-16", leavesOut: ["kernel"] }, "null is the whole course, less what it leaves out");
 	});
 
 	it("the topics an exam leaves out in a course without arcs", () => {
@@ -521,10 +544,8 @@ describe("course composition into the agents", () => {
 });
 
 const { root: ENGINE_ROOT, python: ENGINE_PYTHON } = LEARNING_ENGINE;
-const realEngine = fs.existsSync(ENGINE_PYTHON) && fs.existsSync(path.join(ENGINE_ROOT, "learning", "cli.py"));
 
-// CI sets LH_REQUIRE_REAL_ENGINE, so a moved venv fails the gate instead of skipping these.
-describe("course records adapter (the real engine, throwaway course)", { skip: !realEngine && !process.env.LH_REQUIRE_REAL_ENGINE && "learning engine not installed" }, () => {
+describe("course records adapter (the real engine, throwaway course)", { skip: realEngineMissing(ENGINE_PYTHON) }, () => {
 	it("a save lands under the engine's own rules and a fresh resume reflects it", async () => {
 		const home = fs.mkdtempSync(path.join(TMP, "home-"));
 		const workspace = fs.mkdtempSync(path.join(TMP, "course-"));
