@@ -32,30 +32,38 @@ export const TIED_SUPERVISOR = [
 ].join("\n");
 
 /** Spawns `bin args` tied to this server, with piped stdin, stdout and
- *  stderr. */
+ *  stderr. When the supervisor ends, whatever is left of its group ends
+ *  with it: the Agent SDK's close kills the process it spawned, the
+ *  supervisor alone, with SIGKILL when the command is slow to stop, and the
+ *  command and watcher it left behind held the server's pipes open (round
+ *  16, 18 Nov 2026: an arc pass that had finished never exited, on twelve
+ *  orphaned watchers). A supervisor that ended normally leaves none. */
 export function spawnTiedChild(bin: string, args: readonly string[], options: Omit<SpawnOptions, "stdio" | "detached">): ChildProcess {
-	return spawn("/bin/sh", ["-c", TIED_SUPERVISOR, "tied", bin, ...args], {
+	const child = spawn("/bin/sh", ["-c", TIED_SUPERVISOR, "tied", bin, ...args], {
 		...options,
 		// Its own process group, so one signal reaches the command and its
 		// watcher together.
 		detached: true,
 		stdio: ["pipe", "pipe", "pipe", "pipe"],
 	});
+	child.once("exit", () => signalGroup(child, "SIGKILL"));
+	return child;
+}
+
+function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
+	try {
+		process.kill(-child.pid!, signal);
+	} catch {
+		// Already gone.
+	}
 }
 
 /** Ends a tied child and everything it started: SIGTERM to its group, then
  *  SIGKILL after a grace period if it is still there. */
 export function stopTiedChild(child: ChildProcess, graceMs = 2000): void {
 	if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined) return;
-	const signalGroup = (signal: NodeJS.Signals) => {
-		try {
-			process.kill(-child.pid!, signal);
-		} catch {
-			// Already gone.
-		}
-	};
-	signalGroup("SIGTERM");
+	signalGroup(child, "SIGTERM");
 	setTimeout(() => {
-		if (child.exitCode === null && child.signalCode === null) signalGroup("SIGKILL");
+		if (child.exitCode === null && child.signalCode === null) signalGroup(child, "SIGKILL");
 	}, graceMs).unref();
 }

@@ -59,3 +59,23 @@ test("the command reads the server's stdin and writes to its stdout", async () =
 	await new Promise((resolve) => echo.on("close", resolve));
 	assert.equal(out, "hello\n");
 });
+
+test("a supervisor killed outright takes the rest of its group with it, so nothing holds the server open", async () => {
+	// The Agent SDK's close (0.3.x): stdin ends, SIGTERM to the process it
+	// spawned 2 s later, SIGKILL 5 s after that, to the supervisor alone. An
+	// arc pass's twelve readers left their watchers (and a slow claude)
+	// orphaned, holding the server's lifeline pipe, so the pass never exited
+	// (round 16, 18 Nov 2026).
+	const slow = spawnTiedChild("sh", ["-c", "trap '' TERM; echo ready; while :; do sleep 1; done"], {});
+	const closed = new Promise((resolve) => slow.on("close", resolve));
+	await new Promise((resolve) => slow.stdout!.once("data", resolve));
+	slow.stdin!.end();
+	slow.kill("SIGTERM");
+	slow.kill("SIGKILL");
+	try {
+		assert.ok(await gone(slow.pid!, 3000), "the command and the watcher are gone with their supervisor");
+		await closed;
+	} finally {
+		try { process.kill(-slow.pid!, "SIGKILL"); } catch { /* gone */ }
+	}
+});
