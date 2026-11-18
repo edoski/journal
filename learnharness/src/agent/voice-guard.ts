@@ -661,6 +661,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `His answer's save failed, so his card shows no mark, and this reply never says how his answer was judged: ${quoted(b.excerpt)}. Open on the verdict in words ("Right, …", "Not right: …", "Partly right: …"), then the rest.`;
 		case "begun":
 			return `This lesson began today, so at its close it continues, never starts: ${quoted(b.excerpt)}. Say it continues on its day ("which you continue tomorrow, Monday 9 November").`;
+		case "vector":
+			return `A short vector goes inline as a tuple, $(1,1)$, or $(1,1)^{\\mathsf T}$ when it is a column, never as a column matrix in a sentence or a display of its own, which stacks it over several lines: ${quoted(b.excerpt)}. Keep display maths for matrices and equations.`;
 		case "review-lesson":
 			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
