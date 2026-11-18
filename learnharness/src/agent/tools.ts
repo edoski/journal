@@ -164,7 +164,23 @@ export interface ProberToolContext extends ProbeDoneContext {
 	jobStore: JobStore;
 	/** Fire the background runner for a freshly created job. */
 	spawn: (job: JobRecord, input: ResearchInput | DemoInput | VisualInput | PdfInput) => void;
+	/** The session saves to a course record, whose goal every lesson in it
+	 *  serves: the probe asks no goal question. */
+	course?: boolean;
 }
+
+/** In a course, a lesson's goal is the topic it is on, for the course's own
+ *  goal, however he named the topic (round 16, m11: a Poisson lesson asked
+ *  for in a Binomial review's chat got "What do you want from Poisson?
+ *  Select all that apply", whose three overlapping picks changed nothing). */
+const COURSE_GOAL_SET =
+	"A lesson in a course already has its goal: the topic it is on, for the course's own goal, whether the session opened on it or his words named it. Ask him nothing about it; start bracketing with `recall`.";
+
+/** The prober's ask in a course session: the goal question is refused. */
+const courseAskTool: AgentTool<typeof askInputSchema> = {
+	...askUserQuestionTool,
+	execute: async () => invalidInputResult("ask_user_question", [COURSE_GOAL_SET]),
+};
 
 /** The prober's tool set: recall (no nodeId) + ask + the learner-fs
  *  set + probe_done + the two phase-omnipresent job dispatch tools. Every
@@ -182,7 +198,7 @@ export function createProberTools(ctx: ProberToolContext): Record<string, AgentT
 	// the standard argument heal over the WHOLE registry — every tool,
 	// not just the one the latest wobble incident landed on.
 	return withPracticeHandoff(healToolRecord({
-		ask_user_question: askUserQuestionTool,
+		ask_user_question: ctx.course ? courseAskTool : askUserQuestionTool,
 		// Job dispatch in the probe phase (owner ruling, 2026-09-20):
 		// research + pdf are available in every phase — the prober can
 		// verify facts or read learner PDFs while assessing. demo/visual

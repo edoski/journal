@@ -199,7 +199,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
  * handler keys teacher construction on.
  */
 export function createProberAgent(ctx: ProberToolContext, opts: AgentBuildOptions = {}) {
-	return baseAgentOptions("prober", opts, Object.values(createProberTools(ctx)));
+	return baseAgentOptions("prober", opts, Object.values(createProberTools({ ...ctx, course: opts.course !== undefined })));
 }
 
 /**
