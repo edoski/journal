@@ -185,13 +185,15 @@ def _move(workspace: Workspace, to: int, batch: Path) -> str:
     return _move_record(workspace.record, key(workspace), to, batch)
 
 
-def _move_forgotten(workspace: Workspace, to: int, batch: Path) -> dict[str, str]:
+def _move_forgotten(
+    workspace: Workspace, to: int, batch: Path, moved: dict[str, str]
+) -> None:
     """The records kept of the course deleted in ``workspace`` to schema
-    ``to``, by path: each ``migrated`` or ``current``."""
-    return {
-        str(path): _move_record(path, f"{key(workspace)}-{path.stem}", to, batch)
-        for path in sorted(workspace.forgotten.glob("*.json"))
-    }
+    ``to``, each entered in ``moved`` by path as it lands (``migrated`` or
+    ``current``), so one that fails leaves the earlier ones reported."""
+    for path in sorted(workspace.forgotten.glob("*.json")):
+        name = f"{key(workspace)}-{path.stem}"
+        moved[str(path)] = _move_record(path, name, to, batch)
 
 
 def _move_record(path: Path, name: str, to: int, batch: Path) -> str:
@@ -224,13 +226,13 @@ def _report(
     for course in courses:
         try:
             moved[str(course.directory)] = _move(course, to, batch)
-            forgotten.update(_move_forgotten(course, to, batch))
+            _move_forgotten(course, to, batch, forgotten)
         except (ValueError, OSError) as error:
             failed[str(course.directory)] = str(error)
     report: dict[str, Any] = {"to": to, "courses": moved}
     if forgotten:
         report["forgotten"] = forgotten
-    if "migrated" in (*moved.values(), *forgotten.values()):
+    if batch.exists():
         report["backup"] = str(batch)
     if failed:
         report["failed"] = failed

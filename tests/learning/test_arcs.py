@@ -1640,6 +1640,27 @@ def test_a_deleted_course_s_kept_record_moves_with_its_folder(
     assert kept.read_bytes() == up
 
 
+def test_a_kept_record_that_fails_leaves_the_ones_moved_before_it_reported(
+    tmp_path: Path,
+) -> None:
+    """A migration that stops at one kept record still names the ones it
+    rewrote before it and the backup that holds them, so ``restore`` can
+    find them."""
+    workspace = course(tmp_path, "calculus")
+    migrate.migrate(workspace)
+    records.forget(workspace, [], course=True)
+    records.save(workspace, {"title": "Calculus again"})
+    records.forget(workspace, [], course=True)
+    first, second = sorted(workspace.forgotten.glob("*.json"))
+    second.write_text(json.dumps({**json.loads(second.read_text()), "schema": 99}))
+
+    report = migrate.migrate(None, to=6)
+    assert report["forgotten"] == {str(first): "migrated"}
+    assert str(workspace.directory) in report["failed"]
+    backup = Path(report["backup"]) / f"{migrate.key(workspace)}-{first.stem}"
+    assert (backup / "course.json").is_file()
+
+
 def test_the_cli_migrates_on_purpose_only(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
