@@ -269,9 +269,13 @@ def first_day(
 
 
 def _solid_before(replayed: progress.Replay, day: date) -> bool:
-    """Solid on ``day``'s morning: the last verdict before it was ``solid``."""
-    before = [verdict for when, verdict in replayed.verdicts if when < day.isoformat()]
-    return bool(before) and before[-1] == "solid"
+    """Solid on ``day``'s morning: the last verdict before it was ``solid``,
+    a hinted or guessed right answer after it aside (``progress.held``)."""
+    before = [
+        (when, verdict) for when, verdict in replayed.verdicts if when < day.isoformat()
+    ]
+    kept = progress.held(replace(replayed, verdicts=before))
+    return bool(kept) and kept[-1][1] == "solid"
 
 
 def _reviews_left(

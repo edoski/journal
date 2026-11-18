@@ -685,3 +685,62 @@ def test_a_slip_on_the_eve_says_it_moved_this_morning_s_start_past_the_exam(
     moved = receipt["starts_moved"]["expectation"]
     assert moved["past_exam"] is True, receipt
     assert moved["moved"]["waits_on"] == ["Random variables and distributions"]
+
+
+R17 = json.loads(
+    (Path(__file__).parent / "golden" / "demo-world-r17.json").read_text(
+        encoding="utf-8"
+    )
+)
+
+
+def test_a_hinted_right_answer_settled_on_his_own_keeps_today_s_start(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 17, 1 M1: in the 8 Nov review he answered Random variables right
+    after a hint, then the review's second question right on his own and
+    sure. Expectation, which needs it, was planned today and moved to 15 Nov
+    "since Random variables is not solid yet". The second question is what
+    settles a hinted right answer, so the start keeps today."""
+    seeded = World(tmp_path, "seed", monkeypatch, capsys, R17)
+
+    def expectation() -> dict[str, Any]:
+        return next(
+            topic
+            for topic in seeded.run("probability", "map", day="2026-11-08")["topics"]
+            if topic["topic"] == "expectation"
+        )
+
+    assert expectation()["starts"] == "2026-11-08"
+    answers = [
+        {
+            "topics": ["random-variables"],
+            "text": "Wrote the distribution of the larger of two dice, "
+            "$P(X=k) = \\frac{2k-1}{36}$, counting an L-shape of cells in the grid",
+            "response": "P(X=k) = (2k-1)/36, k = 1..6",
+            "help": "Suggested a 6-by-6 grid and marking the cells where the "
+            "larger number is exactly 3",
+            "result": "correct",
+        },
+        {
+            "topics": ["random-variables"],
+            "text": "Found $P(X \\text{ even}) = \\frac{1}{3}$ for the number of "
+            "tosses until the first head",
+            "response": "1/3: P(X=2k) = (1/2)^(2k), sum (1/4)/(1-1/4)",
+            "help": "none",
+            "result": "correct",
+            "sure": "confident",
+        },
+    ]
+    for answer in answers:
+        monkeypatch.setenv("LEARNING_TODAY", "2026-11-08")
+        monkeypatch.setattr(
+            sys, "stdin", io.StringIO(json.dumps({"observations": [answer]}))
+        )
+        assert main(["--workspace", str(seeded.roots["probability"]), "save"]) == 0
+        receipt = json.loads(capsys.readouterr().out)
+    assert "expectation" not in receipt.get("starts_moved", {}), receipt
+    found = expectation()
+    assert (found["starts"], found.get("moved")) == ("2026-11-08", None), found
