@@ -17,7 +17,7 @@ import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, Sessi
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
-import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, savedAnswerTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, opensTurn, savedAnswerTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
 import { leftQuestionRepose, sessionEndOf } from "../core/session-end.ts";
 import { lessonTakenUp, openedAsReview } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
@@ -149,6 +149,7 @@ function listChats(): ChatSummary[] {
 						...((t) => (t ? { taskTitle: t } : {}))(sessionTaskTitleOf(messages)),
 						review: openedAsReview({ title: summary.title, topics: summary.topics, messages }),
 						studied: studiedIn(messages),
+						...inputTimes(messages),
 					};
 				} catch (err) {
 					console.error(`[chat ${summary.id}] summary projection failed:`, err);
@@ -160,6 +161,17 @@ function listChats(): ChatSummary[] {
 	} catch {
 		return [];
 	}
+}
+
+/** When his input in a session came: its newest, and every local day it
+ *  came on (`ChatSummary.studiedAt`, `studiedDays`). */
+function inputTimes(messages: readonly LhMessage[]): { studiedAt?: string; studiedDays: string[] } {
+	const at = messages.flatMap((m) => (opensTurn(m) && typeof m.timestamp === "number" ? [m.timestamp] : []));
+	const day = (ms: number) => {
+		const d = new Date(ms);
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+	};
+	return { ...(at.length > 0 ? { studiedAt: new Date(Math.max(...at)).toISOString() } : {}), studiedDays: [...new Set(at.map(day))].sort() };
 }
 
 /** Persist the full native message list (the record IS the agent state —

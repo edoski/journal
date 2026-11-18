@@ -94,3 +94,19 @@ describe("a review whose plan teaches another topic is that topic's lesson (roun
 		assert.deepEqual(listed(lesson.id).ownTopics, ["poisson"]);
 	});
 });
+
+describe("when he worked in a session (round 16, m8, m9)", () => {
+	it("is his input's time and days, never a write that was not his", () => {
+		const created = chatStore.createChat("Linear maps and their matrices lesson", course, ["linear-maps"]);
+		const at = (iso: string) => Date.parse(iso);
+		chatStore.saveMessages(created.id, [
+			{ ...newUserMessage("Linear maps and their matrices"), timestamp: at("2026-11-09T10:00:00") },
+			{ ...newUserMessage("the images of the basis"), timestamp: at("2026-11-10T11:00:00") },
+			// The app posing his left question again when he opened it, later that day: not his.
+			{ id: "again", role: "assistant", content: [{ type: "toolCall", id: "call_again_1", name: "explain", arguments: { type: "check", question: "Is T linear?" } }], api: "faux", provider: "test", model: "synthetic-repose", usage: USAGE, stopReason: "toolUse", timestamp: at("2026-11-10T16:00:00") },
+		] as never);
+		const item = listed(created.id);
+		assert.deepEqual(item.studiedDays, ["2026-11-09", "2026-11-10"]);
+		assert.equal(item.studiedAt, new Date(at("2026-11-10T11:00:00")).toISOString());
+	});
+});
