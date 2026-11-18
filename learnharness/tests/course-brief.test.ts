@@ -150,7 +150,7 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 
 	it("practice adds the current topic's review prompt, points and gap, and its wrongly chosen method", () => {
 		const { text } = projectCourseBrief(RESUME, "practice");
-		assert.match(text, /- rank \(attempted\)\n {2}prompt: Why is rank the dimension of the column space\?\n {2}points: span; independence\n {2}gap: counts vectors/);
+		assert.match(text, /- rank \(attempted\)\n {2}asked in its earlier reviews, newest first: "Rank of \[\[1,2\],\[2,4\]\]\?"\n {2}prompt: Why is rank the dimension of the column space\?\n {2}points: span; independence\n {2}gap: counts vectors/, "round 14, m5: the review lists what it asked before, so it asks another part");
 		assert.match(text, /wrongly chose pivots ×1/);
 	});
 
