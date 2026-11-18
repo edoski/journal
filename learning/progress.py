@@ -229,9 +229,9 @@ class Replay:
     """A topic's counted days replayed in order.
 
     ``verdicts`` holds one ``(day, grade)`` per counted day; ``days`` classifies
-    every attempted day as learning, probe or practice; ``guessed`` holds the
-    counted days whose ``helped`` came only from a right unaided answer he
-    marked a guess (``right_guess``); ``expected`` is the next
+    every attempted day as learning, probe or practice; ``shaky`` holds the
+    counted days whose ``helped`` came only from a right answer a hint or his
+    guess kept from ``solid`` (``shaky_right``); ``expected`` is the next
     expected review day after the last verdict, and ``due`` the date the engine
     stores for it: after the exam when that day is on or after an exam still
     ahead of the verdict. ``schedule`` keeps each ``(day, due)`` the replay set,
@@ -240,7 +240,7 @@ class Replay:
 
     verdicts: list[tuple[str, str]] = field(default_factory=list)
     days: dict[str, str] = field(default_factory=dict)
-    guessed: set[str] = field(default_factory=set)
+    shaky: set[str] = field(default_factory=set)
     expected: date | None = None
     due: date | None = None
     streak: int = 0
@@ -315,12 +315,17 @@ def grade(observation: dict[str, Any]) -> str:
     return "helped"
 
 
-def right_guess(observation: dict[str, Any]) -> bool:
-    """A right unaided answer that only his ``sure: guess`` keeps from
-    ``solid``: weaker evidence than a sure one, never evidence he lost it."""
+def shaky_right(observation: dict[str, Any]) -> bool:
+    """A right answer that only a hint during it or his ``sure: guess`` keeps
+    from ``solid``: weaker evidence than a sure one on his own, never
+    evidence he lost the topic. Help that showed the method or the answer
+    first (``shown``) and doubtful evidence (``uncertain``) are not such an
+    answer: what was shown is not his."""
     return (
-        observation.get("sure") == "guess"
-        and grade({**observation, "sure": "neutral"}) == "solid"
+        observation["result"] == "correct"
+        and "uncertain" not in observation
+        and not observation.get("shown")
+        and grade(observation) == "helped"
     )
 
 
@@ -336,9 +341,16 @@ def _unaided_miss(observation: dict[str, Any]) -> bool:
 
 
 def _probe(items: list[dict[str, Any]]) -> str:
-    """The first try's grade, lowered only by a later unaided incorrect."""
+    """The first try's grade, lowered only by a later unaided incorrect. A
+    first try right but shaky (``shaky_right``) is what the review's second
+    question is for (``reviews.md``): his next answer that day settles it, so
+    right on his own makes the day ``solid`` (round 17, 1 M1: a hinted right
+    Random variables answer, then a sure one on his own, left Random
+    variables not solid and moved Expectation's start that day a week)."""
     if any(_unaided_miss(item) for item in items[1:]):
         return "missed"
+    if shaky_right(items[0]) and len(items) > 1 and grade(items[1]) == "solid":
+        return "solid"
     return grade(items[0])
 
 
@@ -429,8 +441,8 @@ def replay(
             day not in learning and (day >= result.due.isoformat() or was_due)
         ):
             result.days[day], verdict = PROBE, _probe(items)
-            if verdict == "helped" and right_guess(items[0]):
-                result.guessed.add(day)
+            if verdict == "helped" and shaky_right(items[0]):
+                result.shaky.add(day)
         elif day in learning:
             result.days[day], verdict = LEARNING, _learned(items)
         else:
@@ -483,18 +495,24 @@ def _level(topic: dict[str, Any], attempts: list[Attempt], replayed: Replay) -> 
 
 
 def _lapsed(replayed: Replay) -> bool:
-    """Not solid on the last counted day after a solid one. A right answer he
-    marked a guess is no lapse: his flag may bring the review sooner, never
-    lower what the topic held (round 16, 1 M1: a right guess on the exam's
-    eve lapsed Random variables, and Expectation and Poisson, which need it,
-    left the exam)."""
-    grades = [verdict for _, verdict in replayed.verdicts]
-    return (
-        bool(grades)
-        and grades[-1] != "solid"
-        and replayed.verdicts[-1][0] not in replayed.guessed
-        and "solid" in grades[:-1]
-    )
+    """Not solid on the last counted day after a solid one. A right answer,
+    with a hint or marked a guess (``shaky_right``), is no lapse: the help or
+    his flag may bring the review sooner, never lower what the topic held
+    (round 16, 1 M1: a right guess on the exam's eve lapsed Random variables,
+    and Expectation and Poisson, which need it, left the exam; round 17, 1
+    M1: the same after a hint). Nor does it clear a lapse: the verdict that
+    counts is the last before such answers."""
+    grades = [verdict for day, verdict in held(replayed)]
+    return bool(grades) and grades[-1] != "solid" and "solid" in grades[:-1]
+
+
+def held(replayed: Replay) -> list[tuple[str, str]]:
+    """The counted verdicts but the shaky right answers at their end
+    (``shaky_right``), which neither lower what the topic held nor raise it."""
+    verdicts = list(replayed.verdicts)
+    while verdicts and verdicts[-1][0] in replayed.shaky:
+        verdicts.pop()
+    return verdicts
 
 
 def _relearn(replayed: Replay) -> bool:

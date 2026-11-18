@@ -265,7 +265,7 @@ before helping with it.
 5. Save once, at the end of the review or when the learner leaves. Record every
    attempt with `response`, `help` and `result`, plus `chose` for a wrong
    method. A confident error also rewrites `gap` and the `prompt`.
-6. Only the first try on a due day counts; retries are relearning. No recap:
+6. Only the first try on a due day counts, and the second question settles a hinted or guessed right one; retries are relearning. No recap:
    continue with the session.
 
 **Details:**

@@ -534,9 +534,12 @@ export const EXAM_GAP_TOPIC_WORDS: {
 		no_study_day: ", no study day is left in it",
 		not_ready: "",
 		full: " at your pace",
-		too_late: ", it starts too close to the exam",
+		too_late: "", // the start, not the room: TOO_LATE_FOR_A_REVIEW
 	},
 };
+
+/** A start whose first review would fall on the exam day or after. */
+export const TOO_LATE_FOR_A_REVIEW = "Too close to the exam for a review before it";
 
 /** The words for `topic` when the exam ahead has no room to start it
  *  (`doesNotFit`) or to review it (`unreviewed`); null otherwise. Pure. */
@@ -544,7 +547,11 @@ export function examGapTopicWords(topic: Pick<CourseMapTopic, "handle">, exam: P
 	if (!exam || exam.daysLeft < 0) return null;
 	const reason = exam.reasons?.[topic.handle] ?? "none";
 	if (exam.doesNotFit?.includes(topic.handle)) return EXAM_GAP_TOPIC_WORDS.start[reason];
-	if (exam.unreviewed?.includes(topic.handle)) return `No room in ${finalReviewName(exam, today)}${EXAM_GAP_TOPIC_WORDS.review[reason]}`;
+	// A start too near the exam has its review fall on it or after: the final
+	// review has room, his start comes too late for it (round 17, 3 m4: "Planned
+	// Wed 18 Nov · No room in the final review from 15 Nov, it starts too close
+	// to the exam" read as if it were not planned).
+	if (exam.unreviewed?.includes(topic.handle)) return reason === "too_late" ? TOO_LATE_FOR_A_REVIEW : `No room in ${finalReviewName(exam, today)}${EXAM_GAP_TOPIC_WORDS.review[reason]}`;
 	return null;
 }
 

@@ -94,7 +94,8 @@ SAVE_RULES = "\n".join(
         "request; a new exam date states exam.arcs (null for the whole course). "
         "The receipt's arcs_placed says which arc a new topic joined.",
         "Attempts schedule reviews; only the first try on a due day counts, retries "
-        "are relearning. Helper fields (revision, recorded, judged, updated, "
+        "are relearning, but a hinted or guessed right first try is settled by the "
+        "next answer that day. Helper fields (revision, recorded, judged, updated, "
         "created, by, standing, level) are rejected. An identical observation "
         "re-sent within 30 minutes is skipped, so a re-sent save is safe. The "
         "receipt needs no reread.",

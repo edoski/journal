@@ -34,7 +34,20 @@ export interface ReviewHeld {
  *  today (`answered`), no study yesterday, or yesterday's plan left
  *  unfinished. */
 export type TopicMoved =
-	| { from: string; by: "study"; courses: readonly string[]; day: "today" | "yesterday"; waitsOn?: readonly string[] }
+	| {
+			from: string;
+			by: "study";
+			courses: readonly string[];
+			day: "today" | "yesterday";
+			/** The topics it waits on that his study today left not solid. */
+			waitsOn?: readonly string[];
+			/** Each of `waitsOn` was right on his own today and waits only
+			 *  for its check on another day. */
+			anotherDay?: boolean;
+			/** On a day brought forward: the topics it waited on that his
+			 *  answers today made solid. */
+			ready?: readonly string[];
+	  }
 	| { from: string; by: "answered" }
 	| { from: string; by: "missed" | "left"; on?: string };
 

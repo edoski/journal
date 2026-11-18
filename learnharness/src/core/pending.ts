@@ -99,13 +99,38 @@ export const THINKING_LINE = "Thinking…";
  *  assessment, the hand-off, the plan's reasoning and its map. */
 export const PLANNING_LINE = "Planning the lesson…";
 
-/** Tools whose work is itself what he waits for: he will see it. */
+/** While a question is written, and until one reaches him. */
+export const QUESTION_LINE = "Writing a question…";
+
+/** Tools whose work is itself what he waits for: he will see it. The map
+ *  (`plan_init`) is the lesson's plan only from the probe's end to the
+ *  first step, which `planningLesson` reads; re-drawn later, or drawn for a
+ *  problem sheet's parts, it is the turn's own work (round 17, 2 m4:
+ *  "Planning the lesson…" in Problem sheet 4). */
 const WAIT_LINES: Record<string, string> = {
 	probe_done: PLANNING_LINE,
-	plan_init: PLANNING_LINE,
 	demo: "Building a demo…",
 	visual: "Making a visual…",
 };
+
+/** Whether the turn's newest question was refused and none has reached
+ *  him since: the tutor is writing it again, so the line stays on the
+ *  question instead of blinking back to Thinking… (round 17, 2 m4: six
+ *  phases in one sheet turn, the last two a refused question and its
+ *  re-ask). Pure. */
+function rewritingQuestion(messages: readonly UIMessage[]): boolean {
+	for (let m = messages.length - 1; m >= 0; m--) {
+		const message = messages[m]!;
+		if (message.role === "user") return false;
+		const parts = message.parts;
+		for (let p = parts.length - 1; p >= 0; p--) {
+			const part = parts[p]!;
+			if (part.type === "text" && typeof part.text === "string" && part.text.trim()) return false;
+			if (isToolUIPart(part) && (QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) return part.state === "output-error";
+		}
+	}
+	return false;
+}
 
 /** Whether the probe is ending or has ended and the lesson's first step
  *  has not yet reached him: no words of the tutor's and no question after
@@ -128,14 +153,15 @@ export function planningLesson(messages: readonly UIMessage[]): boolean {
 
 /** The line while nothing he will see is being written. Pure. */
 export function workingLine(messages: readonly UIMessage[]): string {
-	return planningLesson(messages) ? PLANNING_LINE : THINKING_LINE;
+	if (planningLesson(messages)) return PLANNING_LINE;
+	return rewritingQuestion(messages) ? QUESTION_LINE : THINKING_LINE;
 }
 
 /** The line for ONE running tool. A question being written is what he
  *  waits for; a tool whose work he will see names it; every other tool
  *  shows the turn's own line (`idle`, `workingLine`). */
 export function toolActivityLabel(tool: string, idle: string = THINKING_LINE): string {
-	if ((QUESTION_TOOLS as readonly string[]).includes(tool)) return "Writing a question…";
+	if ((QUESTION_TOOLS as readonly string[]).includes(tool)) return QUESTION_LINE;
 	return WAIT_LINES[tool] ?? idle;
 }
 
