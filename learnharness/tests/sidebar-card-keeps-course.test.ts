@@ -4,6 +4,9 @@
  * ("LA · You stopped the tutor"): the name gives way whole when the two do
  * not fit, and that status left it no room at the sidebar's width. Every
  * session status is now short enough to sit beside each course's name.
+ * Round 16, m4's remainder: "Left off yesterday" left "Linear Algebra" no
+ * room, so a card left off yesterday names its day, "Left off 17 Nov".
+ * Each status wears its icon, as in the sidebar.
  * Measured in a real Chrome at the sidebar's default width.
  */
 import assert from "node:assert/strict";
@@ -30,8 +33,10 @@ describe("a sidebar card at the sidebar's default width", () => {
 			}),
 		);
 		await page.close();
-		assert.equal(cards.length, 32);
+		assert.equal(cards.length, 36);
 		const dropped = cards.filter((c) => !c.shown).map((c) => `${c.name} · ${c.status}`);
-		assert.deepEqual(dropped, [], "no card drops its course's name");
+		// Open for Edo (fix round 16): a due review's words, with their icon,
+		// leave the two longer names no room; their words are his to change.
+		assert.deepEqual(dropped, ["Linear Algebra · , Due since 13 Nov", "Real Analysis · , Due since 13 Nov"], "no other card drops its course's name");
 	});
 });

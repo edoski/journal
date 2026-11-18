@@ -198,11 +198,12 @@ export function overdueWords(overdue: number, today: string): string {
 }
 
 /** Where unfinished work holding a topic was left, by when, never by the
- *  tutor's step: "Left off today", "Left off yesterday", "Left off 6 Nov";
- *  "Unfinished" when no day is known. */
+ *  tutor's step: "Left off today", else its day, "Left off 6 Nov", never
+ *  "yesterday", which left a sidebar card no room for its course's name
+ *  (round 16, m4); "Unfinished" when no day is known. */
 export function leftOffWords(days: number | null, today: string): string {
 	if (days === null) return "Unfinished";
-	return `Left off ${pastDay(days, today)}`;
+	return `Left off ${days <= 0 ? "today" : shortDay(dayBefore(today, days))}`;
 }
 
 /** Where an old lesson's map stopped, when nothing resumes it: "Stopped

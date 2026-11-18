@@ -2,9 +2,9 @@ import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-fact
 import { dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type StartsReason, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import type { ChatListItem, TopicRef } from "@/src/core";
 import { earlierSessions, trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
-import { leftWords } from "@/components/unit-inbox/units";
+import { daysBetween, leftWords } from "@/components/unit-inbox/units";
 import { continueHref, pausedWords } from "@/components/nav/session-state";
-import { FIRST_LESSON, TUTOR_WRITING, movedWords, overdueWords, pressWord, startsAfterWords, type PressWord } from "@/components/study-words";
+import { FIRST_LESSON, TUTOR_WRITING, leftOffWords, movedWords, overdueWords, pressWord, startsAfterWords, type PressWord } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -14,6 +14,9 @@ import { FIRST_LESSON, TUTOR_WRITING, movedWords, overdueWords, pressWord, start
  * is the rest of the history, by day. While Now starts a topic, Now says
  * the day the plan starts it, and the pane says why it comes now.
  */
+
+/** When a session was left, in the one words function's form ("Left off 6 Nov"). */
+const leftDayWords = (day: string, today: string) => leftOffWords(Math.max(0, daysBetween(day, today)), today);
 
 /** The fact Now leads with, in the one icon table's kinds (`FACT_ICON`):
  *  a turn that waits, the tutor writing, a review, an open task, or the
@@ -28,7 +31,7 @@ export interface NowItem {
 	/** What to pick up: the step a lesson stopped on, else the session's
 	 *  title, a task's title, or what to begin ("First lesson"). May hold TeX. */
 	words: string;
-	/** Where it stands: "Your turn", "Tutor writing", "Left off yesterday", a
+	/** Where it stands: "Your turn", "Tutor writing", "Left off 6 Nov", a
 	 *  task's "Part (c)"; null when the words say it all. */
 	note: string | null;
 	/** The press, the head button's word: "Resume", "Start"; null when
@@ -139,12 +142,12 @@ export function nowItem(facts: TopicFacts): NowItem {
 		case "continue": {
 			if ("chat" in action) {
 				const entry = facts.sessions.find((e) => e.chat.id === action.chat.id);
-				return { ...base, icon: action.task ? "task" : "standing", words: action.task?.title ?? sessionName(action.chat, facts), note: action.task?.step ?? (entry ? `Left off ${dayWords(entry.day, facts.today).toLowerCase()}` : null), chat: action.chat.id, href: continueHref(action.chat) };
+				return { ...base, icon: action.task ? "task" : "standing", words: action.task?.title ?? sessionName(action.chat, facts), note: action.task?.step ?? (entry ? leftDayWords(entry.day, facts.today) : null), chat: action.chat.id, href: continueHref(action.chat) };
 			}
 			if (action.task) return { ...base, icon: "task", words: action.task.title, note: action.task.step };
 			const last = facts.sessions.find((entry) => entry.own && isPlanned(entry));
 			return last
-				? { ...base, icon: "standing", words: sessionName(last.chat, facts), note: `Left off ${dayWords(last.day, facts.today).toLowerCase()}` }
+				? { ...base, icon: "standing", words: sessionName(last.chat, facts), note: leftDayWords(last.day, facts.today) }
 				: { ...base, icon: "standing", words: "Next lesson" };
 		}
 		case "start":

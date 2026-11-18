@@ -100,7 +100,7 @@ export function courseTitle(row: TodayRow): string {
  *  whatever its state, after "Continue" unless it is a review's ("Continue
  *  Linear maps and their matrices lesson" beside "Continue Problem sheet
  *  4"; round 16, m4: the lesson's row had no verb), its status saying it
- *  was left ("Left off yesterday"); else the course's next step ("Review
+ *  was left ("Left off 6 Nov"); else the course's next step ("Review
  *  A, B"). Home's line and its sidebar card read this one title. Pure. */
 export function lessonTitle(row: TodayRow): string {
 	if (row.kind === "course") return stepWords(row.step);

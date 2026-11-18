@@ -126,7 +126,7 @@ describe("Now", () => {
 				["review", "Due since 6 Nov", null, "Review", null],
 				["continue", "Problem sheet 4", "Part (c)", "Continue", null],
 				["start", "First lesson", null, "Start", null],
-				["continue", "Determinants as volume scaling", "Left off yesterday", "Continue", "chat_demo_det"],
+				["continue", "Determinants as volume scaling", "Left off 7 Nov", "Continue", "chat_demo_det"],
 				["study", "Nothing due today", null, null, null],
 			],
 		);

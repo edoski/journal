@@ -77,8 +77,8 @@ describe("needsYouNow", () => {
 			map: { ...LINALG.map, focus: "sheet", tasks: [{ key: "sheet", title: "Problem sheet 4", step: "At first, the owed rank retest: he needs the matrix", updated: "2026-11-07" }] },
 		};
 		const [taskLine] = needsYouNow([task], [], TODAY).lines;
-		assert.equal(taskLine!.why?.short, "Left off yesterday");
-		assert.equal(taskLine!.slot, "Left off yesterday");
+		assert.equal(taskLine!.why?.short, "Left off 7 Nov");
+		assert.equal(taskLine!.slot, "Left off 7 Nov");
 		const today: StudyCourse = { ...ANALYSIS, map: { ...ANALYSIS.map, topics: [topic("conv", "Convergent sequences", "independent", { review: due(0) })] }, due: ["conv"] as TopicHandle[] };
 		assert.equal(needsYouNow([today], [], TODAY).lines[0]!.slot, "Due today");
 		assert.equal(slotWords(null, null), null);

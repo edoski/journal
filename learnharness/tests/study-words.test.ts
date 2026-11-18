@@ -126,7 +126,7 @@ describe("why a review needs him", () => {
 	});
 
 	it("says the day work was left and the day he studied, never a count of days (round 9, 2 m5)", () => {
-		assert.deepEqual([0, 1, 2, null].map((days) => leftOffWords(days, "2026-11-08")), ["Left off today", "Left off yesterday", "Left off 6 Nov", "Unfinished"]);
+		assert.deepEqual([0, 1, 2, null].map((days) => leftOffWords(days, "2026-11-08")), ["Left off today", "Left off 7 Nov", "Left off 6 Nov", "Unfinished"]);
 		assert.deepEqual([0, 1, 4].map((days) => studiedDaysWords(days, "2026-11-08")), ["Studied today", "Studied yesterday", "Studied 4 Nov"]);
 		assert.deepEqual([0, 1, 13].map((days) => agoWords(days, "2026-11-08")), ["Today", "Yesterday", "26 Oct"]);
 	});

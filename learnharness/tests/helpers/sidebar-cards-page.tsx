@@ -11,15 +11,17 @@ import { TUTOR_WRITING, leftOffWords } from "@/components/study-words";
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
 export const COURSES = ["Linear Algebra", "Real Analysis", "Probability", "Calculus I"];
+/** Each status with the kind the sidebar gives it, so it wears its icon. */
 export const STATUSES: { kind: string; words: string }[] = [
 	{ kind: "stopped", words: pausedWords({ stopped: true }) },
-	{ kind: "failed", words: pausedWords({ failed: true }) },
-	{ kind: "cut", words: pausedWords({}) },
+	{ kind: "stopped", words: pausedWords({ failed: true }) },
+	{ kind: "stopped", words: pausedWords({}) },
 	{ kind: "your-turn", words: "Your turn" },
 	{ kind: "working", words: TUTOR_WRITING },
-	{ kind: "left", words: leftOffWords(8, "2026-11-18") },
-	{ kind: "due", words: "Due since 13 Nov" },
-	{ kind: "planned", words: "Planned today" },
+	{ kind: "task", words: leftOffWords(8, "2026-11-18") },
+	{ kind: "task", words: leftOffWords(1, "2026-11-18") },
+	{ kind: "review", words: "Due since 13 Nov" },
+	{ kind: "next", words: "Planned today" },
 ];
 
 createRoot(document.getElementById("root")!).render(
