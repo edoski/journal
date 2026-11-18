@@ -17,14 +17,16 @@ const SMALL = `text-muted-foreground ${SMALL_SIZE}`;
 
 /** The quiet mark that ends the tutor's message when it hands him the turn,
  *  over the question's words or choices; never over nothing. A question
- *  asked again after a hint or his side question has its words above, so
- *  its mark says where they are (round 8: after a direct answer the open
- *  question had no mark at all). */
+ *  asked again after his side question has its words above, so its mark
+ *  says where they are (round 8: after a direct answer the open question
+ *  had no mark at all). After a hint it is "Your turn" alone: his Hint
+ *  bubble under the question already shows which one he is on (Edo, 18 Nov
+ *  2026), and "above" would name a hint that ends in a question of its own
+ *  (round 12, 3 D11). */
 export function YourTurn({ above = false, afterHint = false }: { above?: boolean; afterHint?: boolean }) {
 	return (
 		<p data-slot="your-turn" className="mb-1 text-body text-muted-foreground">
-			{/* A hint may end in a question of its own, so "above" would name it (round 12, 3 D11). */}
-			{above ? (afterHint ? "Your turn, on the question you pressed Hint on" : "Your turn, on the question above") : "Your turn"}
+			{above && !afterHint ? "Your turn, on the question above" : "Your turn"}
 		</p>
 	);
 }

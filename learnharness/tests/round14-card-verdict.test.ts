@@ -4,8 +4,6 @@
  * opening that says it again only restates the card. The voice prompt
  * asked for it ("A wrong answer is named plainly (\"that's not right\")").
  * The guard refuses an opening that restates the verdict the turn saved.
- * "Your turn, on the question you pressed Hint on" stays (lens 3 counts it
- * as guidance); it is the app's line, never the tutor's.
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
