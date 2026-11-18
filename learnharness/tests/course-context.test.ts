@@ -25,6 +25,7 @@ import type { CourseMapLedger, MapSubmit } from "../src/core/course-map-build.ts
 import { citedSources, contextOf, freeHandle, webAddress } from "../src/core/course-context.ts";
 import { projectCourseBrief } from "../src/core/course-brief.ts";
 import { createCourseContexts, watchLinkedFolders } from "../src/server/course-context.ts";
+import { realEngineMissing } from "./helpers/real-engine.ts";
 
 describe("context from the record", () => {
 	const record = {
@@ -70,7 +71,6 @@ describe("context from the record", () => {
 	});
 });
 
-const realEngine = fs.existsSync(LEARNING_ENGINE.python);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-context-"));
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 /** The engine keeps paths with links resolved (macOS's /var is /private/var). */
@@ -110,7 +110,7 @@ function until(check: () => boolean): { tick: () => void; reached: Promise<void>
 	return { tick: () => check() && resolve(), reached };
 }
 
-describe("context on the real engine", { skip: !realEngine && "learning engine not installed" }, () => {
+describe("context on the real engine", { skip: realEngineMissing(LEARNING_ENGINE.python) }, () => {
 	const home = path.join(TMP, "home");
 	fs.mkdirSync(home, { recursive: true });
 	const env = { ...process.env, HOME: home, LEARNING_TODAY: "2026-11-07" };

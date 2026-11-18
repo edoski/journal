@@ -13,6 +13,7 @@ import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createFauxCore, fauxAssistantMessage, fauxText } from "@earendil-works/pi-ai";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
+import { realEngineMissing } from "./helpers/real-engine.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-brief-"));
@@ -47,7 +48,6 @@ after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 // `topics`, and a run-up that pushes the most overdue review past the five.
 const ENGINE_ROOT = path.resolve(HERE, "..", "..");
 const ENGINE_PYTHON = path.join(ENGINE_ROOT, ".venv", "bin", "python");
-const realEngine = fs.existsSync(ENGINE_PYTHON);
 
 type Resume = Record<string, unknown>;
 
@@ -99,8 +99,7 @@ function realResumes(): { open: Resume; focused: Resume; plan: Resume } {
 	return { open, focused: JSON.parse(engine("2026-11-07", ["resume"])) as Resume, plan };
 }
 
-// CI sets LH_REQUIRE_REAL_ENGINE, so a moved venv fails the gate instead of skipping these.
-describe("course brief projection of the real engine's resume", { skip: !realEngine && !process.env.LH_REQUIRE_REAL_ENGINE && "learning engine not installed" }, () => {
+describe("course brief projection of the real engine's resume", { skip: realEngineMissing(ENGINE_PYTHON) }, () => {
 	let RESUME: Resume = {};
 	let FOCUSED: Resume = {};
 	let PLAN: Resume = {};

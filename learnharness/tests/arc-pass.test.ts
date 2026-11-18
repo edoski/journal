@@ -60,6 +60,7 @@ import type { SdkEngine } from "../src/agent/models.ts";
 import { arcPassLedgersAt } from "../src/store/arc-pass-ledgers.ts";
 import { createCourseRecords } from "../src/store/course-records.ts";
 import type { ArcPassLedgers } from "../src/core/ports.ts";
+import { realEngineMissing } from "./helpers/real-engine.ts";
 
 const topic = (title: string, needs: string[] = [], over: Partial<ViewTopic> = {}): ViewTopic => ({ title, needs, contrasts: [], refs: [], aliases: [], ...over });
 
@@ -571,7 +572,6 @@ describe("the ledger", () => {
 
 // ─── runs, on the real engine ────────────────────────────────────────────────
 
-const realEngine = fs.existsSync(LEARNING_ENGINE.python);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-arc-pass-"));
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
@@ -649,7 +649,7 @@ function scriptedModel(
 	return Object.assign(state, fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple }));
 }
 
-describe("the grouping pass (real engine, scripted model)", { skip: !realEngine && "learning engine not installed" }, () => {
+describe("the grouping pass (real engine, scripted model)", { skip: realEngineMissing(LEARNING_ENGINE.python) }, () => {
 	const home = path.join(TMP, "home");
 	fs.mkdirSync(home, { recursive: true });
 	const env = { ...process.env, HOME: home, LEARNING_TODAY: "2026-11-14" };

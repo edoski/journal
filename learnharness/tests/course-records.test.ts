@@ -28,6 +28,7 @@ import { createFauxCore } from "@earendil-works/pi-ai";
 import type { CourseRecords } from "../src/core/ports.ts";
 import type { CourseVerb } from "../src/core/contracts/course.ts";
 import type { ChatStore, JobStore } from "../src/core/ports.ts";
+import { realEngineMissing } from "./helpers/real-engine.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-records-"));
@@ -543,10 +544,8 @@ describe("course composition into the agents", () => {
 });
 
 const { root: ENGINE_ROOT, python: ENGINE_PYTHON } = LEARNING_ENGINE;
-const realEngine = fs.existsSync(ENGINE_PYTHON) && fs.existsSync(path.join(ENGINE_ROOT, "learning", "cli.py"));
 
-// CI sets LH_REQUIRE_REAL_ENGINE, so a moved venv fails the gate instead of skipping these.
-describe("course records adapter (the real engine, throwaway course)", { skip: !realEngine && !process.env.LH_REQUIRE_REAL_ENGINE && "learning engine not installed" }, () => {
+describe("course records adapter (the real engine, throwaway course)", { skip: realEngineMissing(ENGINE_PYTHON) }, () => {
 	it("a save lands under the engine's own rules and a fresh resume reflects it", async () => {
 		const home = fs.mkdtempSync(path.join(TMP, "home-"));
 		const workspace = fs.mkdtempSync(path.join(TMP, "course-"));

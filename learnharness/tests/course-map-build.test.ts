@@ -21,6 +21,7 @@ import { abortRuns } from "../src/agent/subagents/background-runs.ts";
 import type { SdkEngine } from "../src/agent/models.ts";
 import type { CourseMapLedgers } from "../src/core/ports.ts";
 import type { ChatSummary } from "../src/core/contracts/chat.ts";
+import { realEngineMissing } from "./helpers/real-engine.ts";
 import {
 	answerProblems,
 	arcStandingOf,
@@ -346,7 +347,6 @@ describe("where he stands in the arcs", () => {
 
 // ─── the runner, on the real engine ─────────────────────────────────────────
 
-const realEngine = fs.existsSync(LEARNING_ENGINE.python);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-map-"));
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
@@ -387,7 +387,7 @@ function scriptedModel(answers: MapSubmit[], gate?: Promise<void>): SdkEngine & 
 	return Object.assign(fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple }), { reads, refusals });
 }
 
-describe("course map builder (real engine, scripted model)", { skip: !realEngine && "learning engine not installed" }, () => {
+describe("course map builder (real engine, scripted model)", { skip: realEngineMissing(LEARNING_ENGINE.python) }, () => {
 	const home = path.join(TMP, "home");
 	fs.mkdirSync(home, { recursive: true });
 	const env = { ...process.env, HOME: home, LEARNING_TODAY: "2026-11-07" };
