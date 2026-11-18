@@ -54,16 +54,10 @@ export function ReadyFact({ view, ready }: { view: CourseView; ready: ExamReady 
 	}
 	if (!ready) return null;
 	const Icon = ICON[ready.kind];
-	// Not ready, with every topic still fitting and nothing more to name: the fact alone, no press that only
-	// repeats it (round 16, m6: "Not ready yet in" over six of seven arcs, 25 days before the exam).
-	if (ready.kind === "notYet" && !ready.rest && !examGaps(map)) {
-		return (
-			<span data-slot="course-ready-fact" data-kind={ready.kind} className={FACT}>
-				<Icon aria-hidden className={MARK} />
-				{READY_FACT_WORDS.notYet}
-			</span>
-		);
-	}
+	// Not ready, with every topic still fitting and nothing more to name: no line, since a bare "Not ready for the
+	// exam yet" gives him nothing to act on (round 16, m6: "Not ready yet in" over six of seven arcs; round 17, m7:
+	// the bare fact 16 to 24 days out, opening nothing).
+	if (ready.kind === "notYet" && !ready.rest && !examGaps(map)) return null;
 	return (
 		<Popover>
 			{/* What won't fit wraps inside the head's column, its mark on the first line (round 17, M3: nine topics ran

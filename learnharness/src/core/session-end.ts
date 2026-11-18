@@ -46,7 +46,10 @@ export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | unde
 	const phase = phaseAt3Lh(messages);
 	if (phase === "plan") return "mid-lesson";
 	if (phase !== "teach" || !tree) return "closed";
-	const { current } = derivePlanStatusesLh(tree, messages);
+	const { current, done: taught } = derivePlanStatusesLh(tree, messages);
+	// Every step taught: an offer in words with no question ("practice problems… are ready whenever you are") is
+	// not his turn (round 17, m13: the card read "Your turn" with nothing to answer).
+	if (tree.nodes.length > 0 && tree.nodes.every((node) => taught.has(node.id))) return asks(last) ? "mid-lesson" : "closed";
 	if (current === null) return "mid-lesson";
 	return asks(last) && tree.edges.some((edge) => edge.from === current) ? "mid-lesson" : "closed";
 }

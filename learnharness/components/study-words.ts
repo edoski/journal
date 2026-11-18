@@ -824,6 +824,14 @@ export const READY_FACT_WORDS = {
 	none: "No exam",
 } as const;
 
+/** An arc not started whose topics the plan gives no day yet, on the road's line. */
+export const ARC_NOT_PLANNED = "Not planned yet";
+
+/** An arc under way, when the plan starts its next topic, on the road's line: "Planned 10 Dec". */
+export function arcPlannedWords(day: string): string {
+	return `Planned ${shortDay(day)}`;
+}
+
 /** When an arc's first new topic starts, on the road's line: "Starts 15 Nov". */
 export function arcStartsWords(day: string): string {
 	return `Starts ${shortDay(day)}`;
