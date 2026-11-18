@@ -6,7 +6,7 @@ import { lessonWords } from "@/components/unit-inbox/topic-page/steps/steps-fact
 import { TopicHead } from "@/components/unit-inbox/topic-page/topic-head";
 import type { TopicPageProps } from "@/components/unit-inbox/topic-page/topic-page";
 import type { Press, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
-import { isPlanned, mapLessonAtFirst } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
+import { isPlanned, mapLeftOff, mapLessonAtFirst } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { LessonMap } from "@/components/unit-inbox/topic-page/hybrid/lesson-map";
 import { LinkedColumns } from "@/components/linked-columns/linked-columns";
 import { SectionsPane } from "@/components/unit-inbox/topic-page/pickup/sections";
@@ -89,7 +89,12 @@ export function HybridTopic({ facts, busy, onAct, onTask }: TopicPageProps) {
 				list={side("flex-1")}
 				map={
 					shown ? (
-						<LessonMap key={shown.chat.id} entry={shown} label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")} />
+						<LessonMap
+							key={shown.chat.id}
+							entry={shown}
+							label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")}
+							leftOff={mapLeftOff(shown, facts.action, facts.today)}
+						/>
 					) : starting ? (
 						<BuildsOnMap map={starting} said={facts.said} topic={facts.topic.handle} lights={tie.lights} />
 					) : null

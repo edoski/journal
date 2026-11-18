@@ -22,7 +22,8 @@ import type { StudyCourse } from "../src/core/contracts/study.ts";
 import type { SessionPlan } from "../src/core/contracts/topic.ts";
 import { sessionPlanOf, topicRecordOf } from "../src/server/topic.ts";
 import { topicFacts, type TopicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
-import { hybridMarks, mapLessonAtFirst, nextSteps } from "../components/unit-inbox/topic-page/hybrid/hybrid-facts.ts";
+import { hybridMarks, mapLeftOff, mapLessonAtFirst, nextSteps } from "../components/unit-inbox/topic-page/hybrid/hybrid-facts.ts";
+import { stoppedHereWords } from "../components/study-words.ts";
 import { HybridTopic } from "../components/unit-inbox/topic-page/hybrid/hybrid-topic.tsx";
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "topic");
@@ -104,6 +105,16 @@ describe("the hybrid's facts", () => {
 			],
 		);
 		assert.equal(hybridMarks(DET_PLAN, false).get(DET_PLAN.current!)!.tag, "Left off here");
+	});
+
+	it("says Left off here only over a lesson the page resumes, else the day it stopped (round 16, m22)", () => {
+		const facts = factsOf(EIGEN, [EIGEN_LESSON, EIGEN_EARLIER], [EIGEN_PLAN, { ...DET_PLAN, id: "chat_eigen_before" }]);
+		const entry = (id: string) => facts.sessions.find((s) => s.chat.id === id)!;
+		assert.equal(mapLeftOff(entry("chat_demo_eigen"), facts.action, facts.today), "Left off here", "Now resumes it");
+		assert.equal(mapLeftOff(entry("chat_eigen_before"), facts.action, facts.today), "Stopped here on 6 Nov", "nothing resumes it");
+		assert.equal(hybridMarks({ ...DET_PLAN, id: "chat_eigen_before" }, false, "Stopped here on 6 Nov").get(DET_PLAN.current!)!.tag, "Stopped here on 6 Nov");
+		assert.equal(stoppedHereWords(0, "2026-11-08"), "Stopped here today");
+		assert.equal(stoppedHereWords(1, "2026-11-08"), "Stopped here yesterday");
 	});
 });
 
