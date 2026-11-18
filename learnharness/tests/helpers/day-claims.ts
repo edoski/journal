@@ -51,10 +51,10 @@ export function briefDays(brief: string, courses: ReadonlySet<string>, course: s
 		if (under !== course || !line.startsWith("- ")) continue;
 		const [day] = daysIn(line.slice(2, line.indexOf(":")), today);
 		if (!day || day < today) continue;
-		// Each note in parentheses is dropped whole, one inside another included ("since Homomorphisms (linear maps) is
-		// not solid yet"), once each title's own parentheses are set apart.
-		let body = titles.reduce((words, title) => words.replaceAll(title, unbracketed(title)), line.slice(line.indexOf(":") + 1));
-		while (/\([^()]*\)/.test(body)) body = body.replace(/\([^()]*\)/g, "");
+		// Each note in parentheses is dropped whole once each title's own parentheses are set apart, so a note naming a
+		// title ("since Homomorphisms (linear maps) is not solid yet") goes with it. Longest first, so a title inside a
+		// longer one never splits it.
+		const body = [...titles].sort((a, b) => b.length - a.length).reduce((words, title) => words.replaceAll(title, unbracketed(title)), line.slice(line.indexOf(":") + 1)).replace(/\([^()]*\)/g, "");
 		for (const title of titles) if (!found.has(title) && names(body, unbracketed(title))) found.set(title, day);
 	}
 	return found;
