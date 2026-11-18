@@ -430,11 +430,28 @@ function folderState(workspace: string): string {
 }
 
 /** The verbs whose every input is in `readState`, `map` among them, kept
- *  until it moves.
- *  `plan` also reads his Journal (the day's study table and schedule),
- *  which the app does not see change, so a plan is only shared while it
- *  runs; `sources --scan` walks the material folder and is never shared. */
+ *  until it moves. `plan` is kept too, keyed also on what it reads of his
+ *  Journal (`journalState`); `sources --scan` walks the material folder and
+ *  is never shared. */
 const KEPT_READS: ReadonlySet<string> = new Set(["show", "resume", "standing", "arcs", "search"]);
+
+/** The days of his Journal any plan reads at least: the engine's
+ *  `progress.WEEK_DAYS`, its week of recorded study. */
+export const JOURNAL_WEEK_DAYS = 7;
+
+/** What `plan --days N` reads of his Journal (`sync/study/context.py`,
+ *  `journal_summary`), as one key: the vault's `journal/PROTOCOL.md` (his
+ *  study schedule) and the day notes of the last `max(N, a week)` days up to
+ *  the study day, each by its stamp. The vault is the engine's: `VAULT_DIR`,
+ *  else his Obsidian vault in iCloud (`sync/config.py`). */
+function journalState(env: NodeJS.ProcessEnv, days: number): string {
+	const home = env.HOME ?? "";
+	const vault = (env.VAULT_DIR ?? path.join(home, "Library", "Mobile Documents", "iCloud~md~obsidian", "Documents", "the-vault")).replace(/^~(?=$|\/)/, home);
+	const journal = path.join(vault, "journal");
+	const today = Date.parse(`${studyDay(env)}T00:00:00Z`);
+	const notes = Array.from({ length: Math.max(days, JOURNAL_WEEK_DAYS) }, (_, back) => new Date(today - back * 86_400_000).toISOString().slice(0, 10));
+	return [stamp(path.join(journal, "PROTOCOL.md")), ...notes.map((day) => stamp(path.join(journal, `${day}.md`)))].join(" ");
+}
 
 /** The engine's kept reads, one set per engine (its interpreter and
  *  repository), on `globalThis` so every route's copy of this module shares
@@ -473,24 +490,27 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 	// the one run; a failed run is not kept.
 	const kept = engineReads(engine);
 	const { reads } = kept;
-	const shared = (workspace: string | null, args: string[], verbName: string, keep: boolean): Promise<CourseResult> => {
+	/** One read, kept while the records' state and its own further inputs
+	 *  (`also`: a plan's Journal) hold. */
+	const shared = (workspace: string | null, args: string[], verbName: string, also = ""): Promise<CourseResult> => {
 		const { key, listed } = readState(engine.env ?? process.env);
 		const state = `${kept.writes}\n${key}`;
 		if (state !== kept.current) {
 			kept.current = state;
 			for (const [read, entry] of reads) if (entry.state !== state) reads.delete(read);
 		}
-		const read = [...args, ...(workspace && !listed.has(workspace) ? [folderState(workspace)] : [])].join("\u0000");
+		const read = [...args, ...(workspace && !listed.has(workspace) ? [folderState(workspace)] : []), also].join("\u0000");
 		const found = reads.get(read);
 		// Each reader parses the output itself, so none sees another's edits.
 		if (found?.state === state) return found.exit.then((exit) => toResult(exit, verbName));
 		const exit = exec(engine, args, "");
 		reads.set(read, { state, exit });
 		void exit.then((e) => {
-			if ((!keep || !toResult(e, verbName).ok) && reads.get(read)?.exit === exit) reads.delete(read);
+			if (!toResult(e, verbName).ok && reads.get(read)?.exit === exit) reads.delete(read);
 		});
 		return exit.then((e) => toResult(e, verbName));
 	};
+	const journal = (days: number) => journalState(engine.env ?? process.env, days);
 	const written = <T>(result: T): T => {
 		kept.writes++;
 		return result;
@@ -498,7 +518,7 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 	return {
 		forgotten: courseRecordForgotten,
 		async list() {
-			const result = await shared(null, ["plan", "--all", "--days", "1"], "plan", false);
+			const result = await shared(null, ["plan", "--all", "--days", "1"], "plan", journal(1));
 			if (!result.ok) return { available: false, reason: result.message };
 			const entries = (result.json as { courses?: unknown }).courses;
 			const read = (Array.isArray(entries) ? entries : []).map(entryOf);
@@ -511,7 +531,8 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 		},
 		async run(workspace, verb) {
 			const { args, stdin } = argsFor(verb);
-			if (verb.verb === "plan" || KEPT_READS.has(verb.verb)) return shared(workspace, ["--workspace", workspace, ...args], verb.verb, verb.verb !== "plan");
+			if (verb.verb === "plan") return shared(workspace, ["--workspace", workspace, ...args], verb.verb, journal(verb.days ?? 1));
+			if (KEPT_READS.has(verb.verb)) return shared(workspace, ["--workspace", workspace, ...args], verb.verb);
 			const result = toResult(await exec(engine, ["--workspace", workspace, ...args], stdin), verb.verb);
 			// A save that timed out may have landed too: announce it.
 			if (isWrite(verb) && (result.ok || result.kind === "io")) {
@@ -521,7 +542,7 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 			return result;
 		},
 		async map(workspace, here) {
-			const result = await shared(workspace, ["--workspace", workspace, "map", ...(here ? ["--here", here] : [])], "map", true);
+			const result = await shared(workspace, ["--workspace", workspace, "map", ...(here ? ["--here", here] : [])], "map");
 			if (!result.ok) return result;
 			const map = courseMapOf(workspace, result.json);
 			return map ? { ok: true, map } : { ok: false, kind: "io", message: "map printed an unexpected shape" };

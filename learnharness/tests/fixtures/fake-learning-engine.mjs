@@ -7,7 +7,8 @@
 // io error. Topic "unknown" in a save is refused like the real engine
 // refuses an unknown topic; handle "slow" hangs; handle "garbled" prints
 // non-JSON. `sources --add` names each file; `forget --course` drops the
-// course from the plan file, as the real engine's listing does.
+// course from the plan file, as the real engine's listing does. With
+// FAKE_ENGINE_REGISTRY the registry at that path follows the plan file.
 import fs from "node:fs";
 
 const args = process.argv.slice(2);
@@ -36,6 +37,16 @@ function readPlan() {
 }
 function writePlan(plan) {
 	fs.writeFileSync(planFile, JSON.stringify(plan));
+	writeRegistry(plan.courses);
+}
+/** FAKE_ENGINE_REGISTRY: the registry a test's own HOME holds, kept to the
+ *  listing's courses as the real engine's registry is (the app keys its kept
+ *  reads on it). */
+function writeRegistry(courses) {
+	const registry = process.env.FAKE_ENGINE_REGISTRY;
+	if (!registry) return;
+	fs.mkdirSync(registry.slice(0, registry.lastIndexOf("/")), { recursive: true });
+	fs.writeFileSync(registry, JSON.stringify({ schema: 2, workspaces: Object.fromEntries(courses.map((c) => [c.workspace, {}])) }));
 }
 
 if (process.env.FAKE_ENGINE_FAIL === verb) fail(`${verb} could not write the record`, "io");

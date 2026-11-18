@@ -13,7 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { createCourseRecords } from "../src/store/course-records.ts";
+import { createCourseRecords, JOURNAL_WEEK_DAYS } from "../src/store/course-records.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-engine-reads-"));
@@ -73,12 +73,37 @@ describe("one engine run per read of one state of the records (round 13, N2)", (
 		assert.deepEqual(calls(), ["map", "save", "map", "map", "map", "map", "map"]);
 	});
 
-	it("the plan, which also reads his Journal, is shared only while it runs", async () => {
-		const { records, workspace, calls } = world();
+	it("the plan is kept until the records, the day or the Journal notes it reads change (round 15, P7)", async () => {
+		const { records, workspace, env, calls } = world();
+		const journal = path.join(env.HOME!, "vault", "journal");
+		fs.mkdirSync(journal, { recursive: true });
+		env.VAULT_DIR = path.dirname(journal);
 		await Promise.all([records.list(), records.list(), records.run(workspace, { verb: "plan" }), records.run(workspace, { verb: "plan" })]);
-		assert.deepEqual(calls().sort(), ["plan --all --days 1", "plan --days 1"]);
 		await records.list();
-		assert.equal(calls().length, 3, "a list after the first settled reads his Journal again");
+		await records.run(workspace, { verb: "plan" });
+		assert.deepEqual(calls().sort(), ["plan --all --days 1", "plan --days 1"], "every page's plan after the first is the kept one");
+		// A note older than the week the plan reads is not one of its inputs.
+		fs.writeFileSync(path.join(journal, "2026-11-01.md"), "# old");
+		await records.list();
+		assert.equal(calls().length, 2);
+		// Today's note (a Flow session logged) and his schedule are.
+		fs.writeFileSync(path.join(journal, "2026-11-10.md"), "# today");
+		await records.list();
+		fs.writeFileSync(path.join(journal, "PROTOCOL.md"), "# schedule");
+		await records.list();
+		await records.run(workspace, { verb: "save", changes: { focus: "rank" } });
+		await records.list();
+		assert.deepEqual(calls().slice(2), ["plan --all --days 1", "plan --all --days 1", "save", "plan --all --days 1"]);
+		// A longer plan reads further back: the old note is one of its inputs.
+		await records.run(workspace, { verb: "plan", days: 14 });
+		fs.writeFileSync(path.join(journal, "2026-11-01.md"), "# old, edited");
+		await records.run(workspace, { verb: "plan", days: 14 });
+		assert.deepEqual(calls().slice(6), ["plan --days 14", "plan --days 14"]);
+	});
+
+	it("the week of Journal a plan always reads is the engine's own", () => {
+		const progress = fs.readFileSync(path.join(HERE, "..", "..", "learning", "progress.py"), "utf-8");
+		assert.equal(Number(/^WEEK_DAYS = (\d+)$/m.exec(progress)?.[1]), JOURNAL_WEEK_DAYS);
 	});
 
 	it("a read that failed is not kept, so the next reader tries again", async () => {
