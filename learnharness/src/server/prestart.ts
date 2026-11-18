@@ -15,8 +15,19 @@ import type { PreparedProcess } from "../agent/sdk/agent.ts";
  */
 interface LhPrestartGlobal {
 	__lhPrestart?: { chatId: string; process: PreparedProcess };
+	__lhPrestartAsked?: Map<string, number>;
 }
 const g = globalThis as typeof globalThis & LhPrestartGlobal;
+const asked = (g.__lhPrestartAsked ??= new Map());
+
+/** Each ask and release for a lesson, in the order they arrive: a start
+ *  still reading the lesson when a later one arrived starts nothing, so a
+ *  page he left while its ask was on its way leaves no process behind. */
+export function askPrestart(chatId: string): () => boolean {
+	const n = (asked.get(chatId) ?? 0) + 1;
+	asked.set(chatId, n);
+	return () => asked.get(chatId) === n;
+}
 
 function end(process: PreparedProcess): void {
 	process.controller.abort();
@@ -61,6 +72,7 @@ export function claimPrestart(chatId: string, key: string): PreparedProcess | un
 
 /** Ends the process that waits, for this lesson only when one is named. */
 export function releasePrestart(chatId?: string): void {
+	if (chatId !== undefined) askPrestart(chatId);
 	const waiting = g.__lhPrestart;
 	if (!waiting || (chatId !== undefined && waiting.chatId !== chatId)) return;
 	g.__lhPrestart = undefined;

@@ -207,6 +207,8 @@ export async function openDemoApp(day = "2026-11-08") {
 			started.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
 			return Response.json({ error: "a look, not a start", code: "look" }, { status: 409 });
 		}
+		// Nor does the process of a turn: the next answer's prestart starts nothing here.
+		if (method === "POST" && /^\/api\/chats\/[^/]+\/prestart$/.test(url.pathname)) return Response.json({ ok: true });
 		if (method === "POST" && url.pathname === "/api/chat") {
 			const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
 			turns.push({ chatId: String(body.chatId ?? body.id ?? ""), body });

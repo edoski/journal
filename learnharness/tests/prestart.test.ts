@@ -78,6 +78,15 @@ describe("the next answer's process, started while he thinks", () => {
 		assert.equal(fake.live(), 0);
 	});
 
+	it("starts nothing when he left the lesson while its ask was on its way", async () => {
+		const started = fake.started.length;
+		const asking = prestartAnswerTurn(a, factory(a) as never);
+		releasePrestart(a);
+		await asking;
+		assert.equal(fake.started.length, started);
+		assert.equal(fake.live(), 0);
+	});
+
 	it("ends when he leaves the lesson", async () => {
 		await prestartAnswerTurn(a, factory(a) as never);
 		assert.equal(fake.live(), 1);

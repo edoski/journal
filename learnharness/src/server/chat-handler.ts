@@ -34,7 +34,7 @@ import { providerKeyMissing as providerKeyMissingEnvelope } from "../core/settin
 import { beginTurn, endTurn, isTurnRunning } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn } from "./turn-runs.ts";
-import { claimPrestart, prestart } from "./prestart.ts";
+import { askPrestart, claimPrestart, prestart } from "./prestart.ts";
 import { claimEarlyPlan, endEarlyPlan, startEarlyPlan } from "./early-plan.ts";
 import { EARLY_PLAN_SAVED_TEXT, EARLY_PLAN_TEXT } from "../core/contracts.ts";
 import { sdkInputBlocks } from "../core/sdk-session.ts";
@@ -369,6 +369,7 @@ const waitsOnAnswer = (messages: readonly LhMessage[]) => danglingQuestionOf(mes
  * every option the turn starts one with.
  */
 export async function prestartAnswerTurn(chatId: string, buildAgent?: TurnAgentFactory): Promise<void> {
+	const latest = askPrestart(chatId);
 	const waits = (id: string) => {
 		const record = stores.chatStore.getChat(id);
 		return record && !isTurnRunning(id) && !courseDeleted(id) && waitsOnAnswer(record.messages) ? record : undefined;
@@ -383,7 +384,7 @@ export async function prestartAnswerTurn(chatId: string, buildAgent?: TurnAgentF
 	if (!asked) return;
 	const courseArcs = await fetchCourseArcs(asked);
 	const record = waits(chatId);
-	if (!record) return;
+	if (!record || !latest()) return;
 	// His answer opens the turn: an input of his after the record, as the
 	// turn reads its effort.
 	const messages = [...record.messages, { id: "prestart", role: "user", content: "", timestamp: Date.now() } as LhMessage];

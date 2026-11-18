@@ -583,12 +583,19 @@ export function Chat({
 	useEffect(() => {
 		if (waitsOnHim) void fetch(`/api/chats/${chatId}/prestart`, { method: "POST" }).catch(() => undefined);
 	}, [chatId, waitsOnHim]);
+	// A release waits for the next task, so the effect's own remount (React's
+	// development check) takes it back: only leaving the lesson ends it.
+	const leaving = useRef<{ chatId: string; timer: number } | null>(null);
 	useEffect(() => {
-		const release = () => navigator.sendBeacon(`/api/chats/${chatId}/prestart`, new Blob([JSON.stringify({ release: true })], { type: "application/json" }));
+		if (leaving.current?.chatId === chatId) {
+			window.clearTimeout(leaving.current.timer);
+			leaving.current = null;
+		}
+		const release = () => void fetch(`/api/chats/${chatId}/prestart`, { method: "POST", body: JSON.stringify({ release: true }), keepalive: true }).catch(() => undefined);
 		window.addEventListener("pagehide", release);
 		return () => {
 			window.removeEventListener("pagehide", release);
-			release();
+			leaving.current = { chatId, timer: window.setTimeout(release, 0) };
 		};
 	}, [chatId]);
 	// The attach handoff (stream-reattach wave): the moment a resumed
