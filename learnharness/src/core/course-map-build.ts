@@ -456,6 +456,8 @@ export function answerProblems(submit: MapSubmit, view: MapCourseView): string |
 		problems.push("No topics: read the material and propose its topics, or list every source you could not read under unread.");
 	}
 	for (const h of submit.order) if (!known(h)) problems.push(`order lists "${h}", which is neither proposed nor in the course.`);
+	const unordered = submit.topics.filter((t) => !(t.handle in view.topics) && !submit.order.includes(t.handle)).map((t) => t.handle);
+	if (unordered.length > 0) problems.push(`order leaves out ${unordered.join(", ")}: list every new topic's handle in study order.`);
 	if (view.arcs.length > 0) problems.push(...arcProblems(submit, view, arcs));
 	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
 }

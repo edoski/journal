@@ -178,6 +178,14 @@ describe("duplicates by meaning", () => {
 	it("refuses two new topics that name the same idea", () => {
 		assert.match(answerProblems({ topics: [{ handle: "cv", title: "Cross-validation" }, { handle: "crossval", title: "Cross validation" }], order: [] }, view()) ?? "", /crossval and cv name the same topic/);
 	});
+
+	it("refuses an order that leaves out a new topic, which the merge would otherwise put last (demo world, 18 Nov 2026)", () => {
+		const topics = [{ handle: "limit-laws", title: "The limit laws" }, { handle: "limit", title: "The limit of a function", needs: ["limit-laws"] }, { handle: "chain-rule", title: "The chain rule" }];
+		assert.match(answerProblems({ topics, order: ["limit"] }, view()) ?? "", /order leaves out limit-laws, chain-rule: list every new topic's handle in study order/);
+		assert.equal(answerProblems({ topics, order: ["limit-laws", "limit", "chain-rule"] }, view()), null);
+		const existing = view({ topics: { limit: topic("The limit of a function") }, order: ["limit"] });
+		assert.equal(answerProblems({ topics: [{ handle: "limit", title: "The limit of a function", refs: [] }, { handle: "squeeze", title: "The squeeze theorem" }], order: ["squeeze"] }, existing), null, "an existing topic need not be listed");
+	});
 });
 
 describe("the material a build reads", () => {
