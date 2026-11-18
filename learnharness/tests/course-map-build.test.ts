@@ -178,12 +178,27 @@ describe("duplicates by meaning", () => {
 	it("a topic folded into another keeps the study order: what follows its second name is placed after it, never at the first (demo world, 18 Nov 2026)", () => {
 		const merged = mapChanges(
 			{
-				topics: [{ handle: "eigen", refs: [{ source: "sheet", locator: "Ex. 1" }] }, { handle: "char-poly", title: "Characteristic polynomial" }, { handle: "eigenvalues", title: "Eigenvalue" }, { handle: "diagonal", title: "Diagonalization" }],
+				topics: [{ handle: "eigen", title: "Eigenvalues", refs: [{ source: "sheet", locator: "Ex. 1" }] }, { handle: "char-poly", title: "Characteristic polynomial" }, { handle: "eigenvalues", title: "Eigenvalue" }, { handle: "diagonal", title: "Diagonalization" }],
 				order: ["eigen", "char-poly", "eigenvalues", "diagonal"],
 			},
 			view({ topics: { eigen: topic("Eigenvalues") }, order: ["eigen"] }),
 		);
 		assert.deepEqual(merged?.changes.path, { order: ["eigen", "char-poly", "diagonal"] });
+	});
+
+	it("two new topics that share an alias stay two topics, each with its own prerequisites (demo world, 18 Nov 2026)", () => {
+		const answer: MapSubmit = {
+			topics: [
+				{ handle: "limit", title: "The limit of a function", aliases: ["infinite limits"] },
+				{ handle: "graph-shape", title: "Derivatives and the shape of a graph" },
+				{ handle: "limits-infinity", title: "Limits at infinity and asymptotes", aliases: ["infinite limits"], needs: ["limit", "graph-shape"] },
+			],
+			order: ["limit", "graph-shape", "limits-infinity"],
+		};
+		assert.equal(answerProblems(answer, view()), null);
+		const merged = mapChanges(answer, view());
+		assert.deepEqual(Object.keys(merged?.changes.topics as object), ["limit", "graph-shape", "limits-infinity"]);
+		assert.equal((merged?.changes.topics as Record<string, { needs?: string[] }>).limit!.needs, undefined, "the limit gains no prerequisite of the topic beside it");
 	});
 
 	it("refuses two new topics that name the same idea", () => {

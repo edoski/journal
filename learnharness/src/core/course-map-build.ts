@@ -565,12 +565,13 @@ export function mapChanges(submit: MapSubmit, view: MapCourseView): { changes: J
 		while (taken.has(`${t.handle}-${n}`) || `${t.handle}-${n}` in view.topics) n++;
 		rename.set(t.handle, `${t.handle}-${n}`);
 	}
-	const kept: Record<string, ViewTopic> = { ...view.topics };
+	// Only into a topic the course has: two new topics the answer tells apart are two topics (a shared alias, as
+	// "Vector spaces" and "Vectors in space" or "Limits at infinity" and "The limit of a function" have, is no twin),
+	// and two with one name are refused before the merge.
 	for (const t of submit.topics) {
 		if (rename.has(t.handle) || t.handle in view.topics) continue;
-		const twin = duplicateOf(t, kept, twinWithin(t, submit, view, answerArcOrder));
+		const twin = duplicateOf(t, view.topics, twinWithin(t, submit, view, answerArcOrder));
 		if (twin) rename.set(t.handle, twin);
-		else kept[t.handle] = { title: t.title, needs: [], contrasts: [], refs: [], aliases: t.aliases ?? [] };
 	}
 	const h = (handle: string) => rename.get(handle) ?? handle;
 	const byHandle = new Map<string, MapTopic>();
