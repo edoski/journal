@@ -378,9 +378,9 @@ def tonight(
 
         def first(topic: str) -> bool:
             found = replays.get(topic)
-            return bool(found and found.verdicts) and (
-                found.days.get(found.verdicts[-1][0]) == progress.LEARNING
-            )
+            if found is None or not found.verdicts:
+                return False
+            return found.days.get(found.verdicts[-1][0]) == progress.LEARNING
 
         today = [item for item in today if first(item["topic"])] + [
             item for item in today if not first(item["topic"])
@@ -1461,18 +1461,19 @@ def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:
         exam = progress.exam_for(record, topic)
         return exam is not None and today < exam.day <= planned.starts[topic]
 
+    def titled(move: dict[str, Any]) -> dict[str, Any]:
+        """The move with the topics it names by title."""
+        named: dict[str, Any] = dict(move)
+        for field in ("waits_on", "ready"):
+            if field in move:
+                named[field] = [title(key) for key in move[field]]
+        return named
+
     starts_moved = {
         topic: {
             "title": title(topic),
             "starts": planned.starts[topic].isoformat(),
-            "moved": {
-                **move,
-                **{
-                    field: [title(key) for key in move[field]]
-                    for field in ("waits_on", "ready")
-                    if field in move
-                },
-            },
+            "moved": titled(move),
             **({"past_exam": True} if past_exam(topic) else {}),
         }
         for topic, move in moves.items()
