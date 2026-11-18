@@ -16,7 +16,7 @@ import {
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import { LiveToolCard } from "@/components/artifacts/live-tool-card";
-import { AnswerMarksProvider, DisputeDialog, type DisputeDraft } from "@/components/answer-mark";
+import { AnswerMarksProvider, DisputeDialog, disputedRows, type DisputeDraft, type DisputeTarget } from "@/components/answer-mark";
 import { useAnswerMarks } from "@/components/answer-marks-fetch";
 import { MalformedQuestion } from "@/components/malformed-question";
 import { artifactRenderers } from "@/components/artifacts";
@@ -49,7 +49,7 @@ import { GraphContextCard, type GraphContextData } from "@/components/graph-cont
 import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
 import type { ArtifactPartProps, Confidence, Photo, JobRecord, LessonPlace, PracticeRequest, PracticeRequestDetails, QuestionAnswerData } from "@/src/core";
-import type { AnswerMark, CourseLink, DisputeDetails, LhViewMessage, SessionMode } from "@/src/core";
+import type { CourseLink, DisputeDetails, LhViewMessage, MarkRow, SessionMode } from "@/src/core";
 import {
 	activeProblemOf,
 	pendingQuestionOf,
@@ -978,17 +978,22 @@ export function Chat({
 	// again whenever a turn settles, since a save or a re-mark may have
 	// landed. ⌘⇧M disputes the newest one.
 	const marks = useAnswerMarks(chatId, course?.workspace, busy ? null : nativeMessages.length);
-	const [disputing, setDisputing] = useState<string | null>(null);
+	const [disputing, setDisputing] = useState<DisputeTarget | null>(null);
 	const canDispute = !!course && !busy;
-	const disputeMark = marks[disputing ?? ""];
-	const sendDispute = (answerId: string, mark: AnswerMark, draft: DisputeDraft) => {
+	const disputeMark = disputing ? marks[disputing.answerId] : undefined;
+	// The try he disputes (round 16, m19): one row when he pressed Dispute
+	// beside it, else the answer's every row. Memoised: the dialog holds it.
+	const disputeRows = useMemo(() => (disputing && disputeMark ? disputedRows(disputeMark, disputing) : null), [disputing, disputeMark]);
+	const sendDispute = (answerId: string, rows: readonly MarkRow[], draft: DisputeDraft) => {
 		setDisputing(null);
-		void send({ type: "dispute", answerId, observations: mark.rows.map((row) => row.id), ...draft });
+		const row = rows.length === 1 ? rows[0]!.label : null;
+		void send({ type: "dispute", answerId, observations: rows.map((r) => r.id), ...(row ? { row } : {}), ...draft });
 	};
 	const disputeLatestRef = useRef(() => {});
 	disputeLatestRef.current = () => {
 		const latest = canDispute ? latestMarkedAnswer(nativeMessages, marks) : null;
-		if (latest) setDisputing(latest);
+		// ⌘⇧M on a card of several tries disputes the one that stands last.
+		if (latest) setDisputing({ answerId: latest, rowId: marks[latest]?.rows.at(-1)?.id });
 	};
 	useEffect(() => {
 		const onDispute = () => disputeLatestRef.current();
@@ -1580,7 +1585,7 @@ export function Chat({
 		>
 		<JobsContext.Provider value={jobs}>
 		<ActiveProblemContext.Provider value={activeProblemCallId}>
-		<AnswerMarksProvider value={{ marks, onDispute: setDisputing, canDispute }}>
+		<AnswerMarksProvider value={{ marks, onDispute: (answerId, rowId) => setDisputing({ answerId, rowId }), canDispute }}>
 		<ProseAnswerProvider value={proseAnswer}>
 		{/* The session surface: the transcript column (header + scroller) and
 		    the plan-tree panel as full-height SIBLINGS — the panel spans top to
@@ -1970,7 +1975,7 @@ export function Chat({
 					/>
 				)}
 				<AbortTurnDialog mode={abortAsk} onClose={() => setAbortAsk(null)} onConfirm={confirmAbort} busy={busy} />
-				<DisputeDialog mark={disputeMark ?? null} onClose={() => setDisputing(null)} onSend={(draft) => disputing && disputeMark && sendDispute(disputing, disputeMark, draft)} />
+				<DisputeDialog rows={disputeRows} onClose={() => setDisputing(null)} onSend={(draft) => disputing && disputeRows && sendDispute(disputing.answerId, disputeRows, draft)} />
 				</div>
 			</div>
 		</div>

@@ -107,8 +107,10 @@ export type ChatInput =
 	| { type: "task" }
 	/** His dispute of an answer's mark (Edo, 14 Nov 2026): the answer's
 	 *  call, the attempts that stood for it when he pressed Dispute, and
-	 *  what he said is wrong or the mark he thinks is right (at least one). */
-	| { type: "dispute"; answerId: string; observations: string[]; said?: string; proposed?: MarkResult; proposedHow?: DisputedHow };
+	 *  what he said is wrong or the mark he thinks is right (at least one).
+	 *  `row` names the one try he disputes on a card of several ("First
+	 *  try"), whose attempt alone `observations` holds (round 16, m19). */
+	| { type: "dispute"; answerId: string; observations: string[]; row?: string; said?: string; proposed?: MarkResult; proposedHow?: DisputedHow };
 
 /** A wake-pipeline steer delivery — same turn composition, server-origin.
  *  Wave C (2026-09-26): the idle wake carries EVERY queued marker as its
@@ -311,6 +313,7 @@ export function parseChatInput(input: unknown): ChatInput {
 			if (observations.length === 0 || !observations.every((id) => typeof id === "string" && /^o\d+$/.test(id))) {
 				throw new ChatInputError("dispute input requires the observation ids (o12) that stand for the answer");
 			}
+			if (i.row !== undefined && (typeof i.row !== "string" || !i.row.trim())) throw new ChatInputError("dispute input row must name the try");
 			if (i.said !== undefined && typeof i.said !== "string") throw new ChatInputError("dispute input said must be a string");
 			if (i.proposed !== undefined && !isMarkResult(i.proposed)) throw new ChatInputError(`dispute input proposed must be one of ${MARK_RESULTS.join(", ")}`);
 			if (i.proposedHow !== undefined && !(DISPUTED_HOWS as readonly unknown[]).includes(i.proposedHow)) throw new ChatInputError(`dispute input proposedHow must be one of ${DISPUTED_HOWS.join(", ")}`);
@@ -320,6 +323,7 @@ export function parseChatInput(input: unknown): ChatInput {
 				type: "dispute",
 				answerId: i.answerId,
 				observations: observations as string[],
+				...(typeof i.row === "string" ? { row: i.row.trim() } : {}),
 				...(said ? { said } : {}),
 				...(i.proposed !== undefined ? { proposed: i.proposed } : {}),
 				...(i.proposedHow !== undefined ? { proposedHow: i.proposedHow as DisputedHow } : {}),
@@ -449,8 +453,8 @@ export function disputeAppends(record: { messages: LhMessage[]; answerSaves?: An
 	if (question === null || !markLinks(record)[input.answerId]) {
 		throw new ChatInputError("dispute input targets no marked answer");
 	}
-	const { answerId, observations, said, proposed, proposedHow } = input;
-	return [...dismissalConclusion(record), newDisputeMessage({ answerId, observations, ...(said ? { said } : {}), ...(proposed ? { proposed } : {}), ...(proposedHow ? { proposedHow } : {}) }, question)];
+	const { answerId, observations, row, said, proposed, proposedHow } = input;
+	return [...dismissalConclusion(record), newDisputeMessage({ answerId, observations, ...(row ? { row } : {}), ...(said ? { said } : {}), ...(proposed ? { proposed } : {}), ...(proposedHow ? { proposedHow } : {}) }, question)];
 }
 
 /** Done for tonight's appends (pure). Every answerable question in the

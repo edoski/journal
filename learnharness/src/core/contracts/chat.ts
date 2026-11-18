@@ -367,13 +367,15 @@ const PROPOSED_HOW_WORDS: Readonly<Record<"ownWork" | "withHelp", string>> = {
 };
 
 export function disputeText(
-	dispute: { observations: readonly string[]; said?: string; proposed?: MarkResult; proposedHow?: "ownWork" | "withHelp" },
+	dispute: { observations: readonly string[]; row?: string; said?: string; proposed?: MarkResult; proposedHow?: "ownWork" | "withHelp" },
 	question: string,
 ): string {
 	const quoted = question.length > DISPUTE_QUOTE ? `${question.slice(0, DISPUTE_QUOTE)}…` : question;
 	return [
 		`[MARK DISPUTED] — the learner pressed Dispute on the mark recorded for his answer to: "${quoted}".`,
-		`The attempts that stand for it: ${dispute.observations.join(", ")}.`,
+		dispute.row
+			? `He disputes one try on its card, "${dispute.row}"; the attempt that stands for that try: ${dispute.observations.join(", ")}. Re-judge that try only.`
+			: `The attempts that stand for it: ${dispute.observations.join(", ")}.`,
 		dispute.said ? `What he says is wrong with the mark: "${dispute.said}"` : null,
 		dispute.proposed ? `The mark he thinks is right: ${PROPOSED_WORDS[dispute.proposed]}.` : null,
 		dispute.proposedHow ? `How he thinks it should count: ${PROPOSED_HOW_WORDS[dispute.proposedHow]}.` : null,

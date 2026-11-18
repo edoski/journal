@@ -682,9 +682,11 @@ export const MARK_WORDS = {
  *  what he picked, the mark and how it should count, "You think: Right,
  *  On your own". One rule for the lesson's row and practice's bubble
  *  (round 8: practice's stamp dropped a help pick). Pure. */
-export function disputeStampWords(dispute: { proposed?: MarkResult; proposedHow?: MarkHow & ("ownWork" | "withHelp") }): string {
+export function disputeStampWords(dispute: { row?: string; proposed?: MarkResult; proposedHow?: MarkHow & ("ownWork" | "withHelp") }): string {
 	const picked = [dispute.proposed && MARK_WORDS.result[dispute.proposed], dispute.proposedHow && MARK_HOW_WORDS[dispute.proposedHow]].filter(Boolean);
-	return picked.length > 0 ? `${MARK_WORDS.youDisputed} · ${MARK_WORDS.youThink}: ${picked.join(", ")}` : MARK_WORDS.youDisputed;
+	// The try he disputed, on a card of several (round 16, m19).
+	const disputed = dispute.row ? `${MARK_WORDS.youDisputed} · ${dispute.row}` : MARK_WORDS.youDisputed;
+	return picked.length > 0 ? `${disputed} · ${MARK_WORDS.youThink}: ${picked.join(", ")}` : disputed;
 }
 
 /** The lesson's mark for a helper he stopped, one sentence per kind;
