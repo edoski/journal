@@ -31,10 +31,14 @@ export function names(words: string, title: string): boolean {
 	return /^\s*($|[,;.:()]|and )/.test(words.slice(at + title.length)) || names(words.slice(at + title.length), title);
 }
 
-/** The day a topic page's Scheduled row draws. */
+/** The day a topic page's Scheduled row draws in its date column: its words run together ("ReviewTue 10 NovMoved from
+ *  9 Nov after your answer today"), and its note may name another day. */
 export function scheduledDay(row: Element | null, today: string): string | undefined {
-	return daysIn((row?.textContent ?? "").replace(/\s+/g, " ").trim(), today)[0];
+	return daysIn(row?.querySelector('[data-slot="topic-history-date"]')?.textContent ?? "", today)[0];
 }
+
+/** A title's own parentheses, set apart from a note's. */
+const unbracketed = (title: string) => title.replace(/\(/g, "\u2768").replace(/\)/g, "\u2769");
 
 /** The first day on or after `today` that the brief's plan lines under `course` review or start each of `titles`,
  *  by title. `courses` are every course's title, each of which heads its own plan lines. */
@@ -47,8 +51,11 @@ export function briefDays(brief: string, courses: ReadonlySet<string>, course: s
 		if (under !== course || !line.startsWith("- ")) continue;
 		const [day] = daysIn(line.slice(2, line.indexOf(":")), today);
 		if (!day || day < today) continue;
-		const body = line.slice(line.indexOf(":") + 1).replace(/\([^)]*\)/g, "");
-		for (const title of titles) if (!found.has(title) && names(body, title)) found.set(title, day);
+		// Each note in parentheses is dropped whole, one inside another included ("since Homomorphisms (linear maps) is
+		// not solid yet"), once each title's own parentheses are set apart.
+		let body = titles.reduce((words, title) => words.replaceAll(title, unbracketed(title)), line.slice(line.indexOf(":") + 1));
+		while (/\([^()]*\)/.test(body)) body = body.replace(/\([^()]*\)/g, "");
+		for (const title of titles) if (!found.has(title) && names(body, unbracketed(title))) found.set(title, day);
 	}
 	return found;
 }
