@@ -169,7 +169,9 @@ def _course(
     order = progress.path_order(record)
     levels = progress.standings(record)
     planned = together.when(name, today, bool(week.study_weekdays))
-    due, _ = tonight(progress.due(record, today, levels=levels, order=order), planned)
+    due, _ = tonight(
+        progress.due(record, today, levels=levels, order=order), planned, record
+    )
     key, task = selected_task(record)
     countdown = exam(record, today, planned)
     current = record.get("path", {}).get("current")

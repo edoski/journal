@@ -541,3 +541,29 @@ def test_a_right_guess_after_a_solid_day_spaces_the_review_but_is_no_lapse() -> 
     assert "lapsed" not in course.standing
     course.attempts(7, att("incorrect", text="then a miss"))
     assert course.standing["lapsed"] is True
+
+
+def test_today_s_list_puts_a_first_review_ahead_of_older_ones_before_its_cut() -> None:
+    """Round 17: on 9 Nov Eigen's first review, the day after its lesson, came
+    sixth of the six Linear Algebra reviews the plan put that day, past the
+    five the brief and Home list, so Home had no row for it. The plan ranks a
+    first review ahead of every older one, and so does today's list."""
+    from learning import agenda, retrieval
+
+    names = "abcdef"
+    topics = {"topics": {key: {"title": key.upper()} for key in [*names, "g"]}}
+    course = Course(
+        {**topics, "observations": [att("correct", topics=[key]) for key in names]}
+    )
+    course.attempts(
+        2, *(att("correct", topics=[key], sure="confident") for key in names)
+    )
+    course.attempts(6, att("correct", topics=["g"]))
+    today = on(7)
+    due = progress.due(course.record, today)
+    assert [item["topic"] for item in due][-1] == "g", (
+        "the newest review is the least overdue"
+    )
+    planned = agenda.When(today, {item["topic"]: today for item in due}, {}, True, [])
+    listed, _ = retrieval.tonight(due, planned, course.record)
+    assert "g" in [item["topic"] for item in listed[: progress.DUE_LIMIT]], listed

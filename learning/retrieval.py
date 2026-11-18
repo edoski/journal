@@ -362,11 +362,29 @@ def dated_topic(
 
 
 def tonight(
-    due: list[dict[str, Any]], planned: agenda.When
+    due: list[dict[str, Any]],
+    planned: agenda.When,
+    record: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Of the reviews memory asks for, those the plan puts today, and the
-    others with the later day it puts each on, soonest first."""
+    others with the later day it puts each on, soonest first. With the
+    ``record``, today's first reviews, the day after a topic was learned,
+    come first, as the plan ranks them (``agenda``): a list cut at
+    ``DUE_LIMIT`` never drops one (round 17: Eigen's first review came
+    sixth of six, and Home, which shows five, had no row for it)."""
     today = [item for item in due if planned.tonight(item["topic"])]
+    if record is not None:
+        replays = progress.replays(record)
+
+        def first(topic: str) -> bool:
+            found = replays.get(topic)
+            return bool(found and found.verdicts) and (
+                found.days.get(found.verdicts[-1][0]) == progress.LEARNING
+            )
+
+        today = [item for item in today if first(item["topic"])] + [
+            item for item in today if not first(item["topic"])
+        ]
     later = sorted(
         (
             {"topic": item["topic"], "planned": day.isoformat()}
@@ -460,7 +478,7 @@ def resume(
     knowledge, knowledge_omitted, knowledge_index = _knowledge(record, active)
     planned = when(workspace, record, today)
     due, later = tonight(
-        progress.due(record, today, levels=levels, order=order), planned
+        progress.due(record, today, levels=levels, order=order), planned, record
     )
     topics = {
         topic: {
@@ -1434,7 +1452,7 @@ def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:
         topic: {**review, "planned": planned.review(topic, review["due"])}
         for topic, review in receipt["reviews"].items()
     }
-    due, _ = tonight(progress.due(record, today), planned)
+    due, _ = tonight(progress.due(record, today), planned, record)
 
     def title(key: str) -> str:
         return str(record["topics"].get(key, {}).get("title") or key)
