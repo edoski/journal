@@ -5,6 +5,7 @@
  */
 
 import type { CourseMap, TopicHandle } from "../core/contracts/course-map.ts";
+import type { ChatSummary } from "../core/contracts/chat.ts";
 import { courseLabel, type CourseSummary, type UnreadableCourse } from "../core/contracts/course.ts";
 import type { StudyCourse, StudyListing } from "../core/contracts/study.ts";
 import { lessonTopics } from "../core/course-map-build.ts";
@@ -42,6 +43,12 @@ export function studyCourseOf(map: CourseMap, plan: unknown): StudyCourse {
 	return { map, unready, due, lastActiveDaysAgo: typeof daysAgo === "number" ? daysAgo : null, newToday };
 }
 
+/** A course's map as Home reads it, told the lesson in progress there
+ *  (`lessonTopics`), so every reader of it shares the engine's one kept map. */
+export function homeMap(workspace: string, chats: readonly ChatSummary[] = stores.chatStore.listChats()) {
+	return stores.courseRecords.map(workspace, lessonTopics(chats, workspace)[0]);
+}
+
 /** One readable course: its map and its plan's JSON (null when it failed). */
 type CourseRead = { map: CourseMap; plan: unknown };
 
@@ -63,7 +70,7 @@ export async function readCourses(
 	days: number | ((course: CourseSummary) => number) = 1,
 ): Promise<{ available: true; read: CourseRead[]; failed: UnreadableCourse[] } | { available: false; reason: string }> {
 	const chats = stores.chatStore.listChats();
-	const mapOf = (workspace: string) => stores.courseRecords.map(workspace, lessonTopics(chats, workspace)[0]);
+	const mapOf = (workspace: string) => homeMap(workspace, chats);
 	// Each registered course's map starts beside the listing's plan, not after
 	// it: each is the engine replaying every course, so one after the other
 	// doubled Home's wait (round 15, P7).

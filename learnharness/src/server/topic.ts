@@ -14,8 +14,10 @@ import { derivePlanStatusesLh, lhToolCalls } from "../core/contracts/plan.ts";
 import { POSITION_QUESTION_TOOLS } from "../core/question-core.ts";
 import type { SessionPlan, TopicAttempt, TopicReadResponse, TopicRecord, TopicRef } from "../core/contracts/topic.ts";
 import { planDays, plannedOf } from "./calendar.ts";
+import type { CourseResult } from "../core/contracts/course.ts";
 import { listCourses } from "./courses.ts";
 import { stores } from "./stores.ts";
+import { homeMap } from "./study.ts";
 
 /** The most sessions one read names. */
 export const TOPIC_READ_SESSIONS = 20;
@@ -154,6 +156,31 @@ export function firstReviewOf(plan: unknown, handle: string): string | null {
 	return plannedOf(plan, { topics: [{ handle } as never] }).find((day) => day.reviews.includes(handle as never))?.date ?? null;
 }
 
+/** Every topic of a course as the engine shows it, in one read kept until a
+ *  record changes; null when the course's map cannot be read or has no
+ *  topics. Showing a topic replays the course's plan, and a topic's item is
+ *  the same whatever else is shown beside it, so one read serves every topic
+ *  page of the course where each topic ran its own (round 15, P7). */
+export async function topicsShown(workspace: string): Promise<CourseResult | null> {
+	const map = await homeMap(workspace);
+	if (!map.ok || map.map.topics.length === 0) return null;
+	return stores.courseRecords.run(workspace, { verb: "show", handles: map.map.topics.map((t) => t.handle) });
+}
+
+/** The topic and the tasks that hold it, as one `show` prints them: the topic
+ *  from the course's kept read of every topic (`topicsShown`), the tasks
+ *  (no plan to replay) read beside it; one `show` of them all where that read
+ *  does not hold the topic. */
+async function shownFor(workspace: string, handle: string, taskKeys: readonly string[]): Promise<CourseResult> {
+	const alone = () => stores.courseRecords.run(workspace, { verb: "show", handles: [handle, ...taskKeys] });
+	const [every, tasks] = await Promise.all([topicsShown(workspace), taskKeys.length > 0 ? stores.courseRecords.run(workspace, { verb: "show", handles: [...taskKeys] }) : null]);
+	const topics = every?.ok ? record(every.json) : null;
+	if (!topics || !record(topics.items)?.[handle] || (tasks && !tasks.ok)) return alone();
+	const held = tasks?.ok ? (record(tasks.json) ?? {}) : {};
+	const merged = (key: string) => ({ ...record(topics[key]), ...record(held[key]) });
+	return { ok: true, json: { ...topics, items: merged("items"), evidence: merged("evidence"), sources: merged("sources") } };
+}
+
 /**
  * GET /api/topic's answer: the topic's record and the plans of the named
  * sessions that belong to the course, and for a lesson he began (`begun`)
@@ -181,7 +208,7 @@ export async function topicRead(
 		return { status: 404, body: { ok: false, code: "unknown_course", error: "No registered course has this folder" } };
 	}
 	const [shown, plan] = await Promise.all([
-		stores.courseRecords.run(workspace, { verb: "show", handles: [handle, ...taskKeys] }),
+		shownFor(workspace, handle, taskKeys),
 		begun ? stores.courseRecords.run(workspace, { verb: "plan", days: planDays(course) }) : null,
 	]);
 	const chats = sessionIds.flatMap((id) => {
