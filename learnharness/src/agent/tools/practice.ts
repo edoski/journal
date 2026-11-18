@@ -204,7 +204,9 @@ export const concludeInputObject = Type.Object({
 	firstTry: Type.Optional(
 		Type.Object(
 			{
-				result: attemptResult("REQUIRED — the result of his first answer."),
+				result: Type.Union([Type.Literal("partial"), Type.Literal("incorrect")], {
+					description: "REQUIRED — the result of his first answer: partial or incorrect, since a right first answer solved the problem and is the conclusion itself.",
+				}),
 				response: Type.String({ description: "REQUIRED — his first answer, in a short line, with math in `$…$` LaTeX." }),
 				record: Type.Optional(Type.String({ minLength: 1, description: RECORD_DESCRIPTION })),
 				sure: Type.Union([...CONFIDENCE_STATES.map((s) => Type.Literal(s)), Type.Null()], {
@@ -217,7 +219,7 @@ export const concludeInputObject = Type.Object({
 				brokeAt: brokeAtField(),
 				parts: partsField(),
 			},
-			{ description: "When the problem took more than one answer: his first unaided answer, its result and his confidence in it." },
+			{ description: "When the problem took more than one answer of his: his first unaided answer, which did not solve it, its result and his confidence in it. Never his final answer again; a question or a request is not an answer." },
 		),
 	),
 });
@@ -240,6 +242,17 @@ function explainedBeforeAnyWork(messages: readonly LhMessage[], problemCallId: s
 	const explained = onProblem.some((m) => m.customType === "practice-request" && (m.details as { request?: unknown }).request === "explain");
 	const worked = onProblem.some((m) => m.customType === "practice-thinking" || (m.customType === "practice-request" && typeof (m.details as { text?: unknown }).text === "string"));
 	return explained && !worked;
+}
+
+/** How many answers of his the session holds on this problem: his work,
+ *  and the work he had written when he asked for help. */
+function answersOn(messages: readonly LhMessage[], problemCallId: string): number {
+	return messages.filter((m) => {
+		if (m.role !== "custom") return false;
+		const details = m.details as { problemCallId?: unknown; text?: unknown } | null;
+		if (details?.problemCallId !== problemCallId) return false;
+		return m.customType === "practice-thinking" || (m.customType === "practice-request" && typeof details.text === "string");
+	}).length;
 }
 
 /** Save a concluded problem's attempts; a refusal names what to fix. An
@@ -274,6 +287,10 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 	};
 	const problem = conclusionProblem(conclusion, topics, pose.statement);
 	if (problem) return { refused: problem, text: "" };
+	// A first try is an answer of his before the final one, which the
+	// session holds, never the tutor's claim alone (round 16, M2: one answer
+	// after a hint was saved twice, once as a right first try).
+	if (answersOn(record.messages, active.toolCallId) < 2) delete conclusion.firstTry;
 	// His newest message came from Ask: a question, never his answer, and
 	// the confidence of an earlier note is not its (round 5).
 	const final = finalSubmissionOf(record.messages, active.toolCallId);
