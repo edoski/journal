@@ -211,7 +211,7 @@ describe("a compaction inside the turn names its wait (round 10, robustness mino
 		(m as unknown as { setStatus(s: string): void }).setStatus("ready");
 		assert.equal(m.getState().compacting, false, "a settled turn compacts nothing");
 		const chat = fs.readFileSync(path.join(import.meta.dirname, "..", "components", "chat.tsx"), "utf-8");
-		assert.match(chat, /label=\{compacting \? COMPACTING_LINE : idleLine\}/);
+		assert.match(chat, /label=\{compacting \? COMPACTING_LINE : \(streamingToolActivity\(messages\) \?\? idleLine\)\}/);
 	});
 });
 

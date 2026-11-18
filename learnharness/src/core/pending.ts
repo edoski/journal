@@ -87,10 +87,12 @@ export function findPendingToolCall(messages: UIMessage[], authority: PendingQue
  * The lesson's working line says what he waits for, or nothing more than
  * "Thinking…" (round 11, lesson reading n9: "Searching file contents…",
  * "Moving to teaching…" and "Moving to practice…" named the tutor's
- * machinery). A tool part sits in `input-streaming` for its whole
- * execution (the bridge defers `tool-input-available` to
- * tool_execution_end), so the live card carries the line while it runs;
- * chat.tsx gates the placeholder on `!pending`.
+ * machinery). It is one line per turn, its words replaced as the turn
+ * moves on (round 16, m1: a line per running tool stacked two or three
+ * "Thinking…" lines, and two "Planning the lesson…" at each hand-off).
+ * A tool part sits in `input-streaming` for its whole execution (the
+ * bridge defers `tool-input-available` to tool_execution_end), so the
+ * line names a running tool by `streamingToolActivity`.
  */
 export const THINKING_LINE = "Thinking…";
 /** From the probe's end until the lesson's first step reaches him: the
@@ -129,22 +131,23 @@ export function workingLine(messages: readonly UIMessage[]): string {
 	return planningLesson(messages) ? PLANNING_LINE : THINKING_LINE;
 }
 
-/** The line for ONE running tool: the live tool-input card carries it
- *  inline. A question being written is what he waits for; a tool whose work
- *  he will see names it; every other tool shows the turn's own line
- *  (`idle`, `workingLine`). */
+/** The line for ONE running tool. A question being written is what he
+ *  waits for; a tool whose work he will see names it; every other tool
+ *  shows the turn's own line (`idle`, `workingLine`). */
 export function toolActivityLabel(tool: string, idle: string = THINKING_LINE): string {
 	if ((QUESTION_TOOLS as readonly string[]).includes(tool)) return "Writing a question…";
 	return WAIT_LINES[tool] ?? idle;
 }
 
-export function streamingToolActivity(messages: UIMessage[]): string | null {
+/** The turn's line while its reply's tools run: the first of them that
+ *  names what he waits for (the plan, a demo, a visual, a question), else
+ *  the turn's own line; null when none runs. Pure. */
+export function streamingToolActivity(messages: readonly UIMessage[]): string | null {
 	const last = messages.at(-1);
 	if (!last || last.role !== "assistant") return null;
-	for (const part of last.parts) {
-		if (isToolUIPart(part) && part.state === "input-streaming") {
-			return toolActivityLabel(part.type.slice("tool-".length), workingLine(messages));
-		}
-	}
-	return null;
+	const idle = workingLine(messages);
+	const running = last.parts.filter((part) => isToolUIPart(part) && part.state === "input-streaming");
+	if (running.length === 0) return null;
+	const named = running.map((part) => toolActivityLabel(part.type.slice("tool-".length), idle)).find((line) => line !== idle);
+	return named ?? idle;
 }

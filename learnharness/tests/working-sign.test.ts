@@ -17,7 +17,10 @@ test("the line waits on his card until the reply starts", () => {
 
 test("the tutor's arriving words are the sign themselves", () => {
 	assert.equal(showsWorking([learner, tutor({ type: "text", text: "Row 3 equals" })], true), false);
-	assert.equal(showsWorking([learner, tutor({ type: "tool-figure", state: "input-streaming" })], true), false);
+});
+
+test("a tool still running draws no line of its own, so the turn's one line shows (round 16, m1)", () => {
+	assert.equal(showsWorking([learner, tutor({ type: "tool-figure", state: "input-streaming" })], true), true);
 });
 
 test("a tool running after the words shows the line again", () => {

@@ -559,3 +559,66 @@ def test_a_start_whose_need_comes_only_on_the_eve_is_not_ready(
     assert plan["does_not_fit"] == ["variance"]
     assert plan["reasons"]["variance"] == "not_ready"
     assert plan["reasons"]["conditional"] == "full"
+
+
+GUESS = json.loads(
+    (Path(__file__).parent / "golden" / "exam-eve-guess.json").read_text()
+)
+
+
+def test_a_right_guess_on_the_eve_keeps_the_starts_that_need_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 16, 1 M1: on 17 Nov, two days before the Probability exam, a
+    right Random variables answer marked Guessing (o23) moved Expectation's
+    start that day to 29 Nov and Poisson's next day to 26 Nov. A right
+    answer never lowers what a start stands on, so both keep their days."""
+    world = {"checkpoints": {"eve": GUESS}, "steady": GUESS}
+    plan = World(tmp_path, "eve", monkeypatch, capsys, world).plan("2026-11-17")
+    starts = {
+        topic: day["date"]
+        for day in plan["probability"]["plan"]["days"]
+        for topic in day["new"]
+    }
+    assert starts["expectation"] == "2026-11-17", starts
+    assert starts["poisson"] == "2026-11-18", starts
+
+
+def test_a_slip_on_the_eve_says_it_moved_this_morning_s_start_past_the_exam(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 16, 1 M1: after days off, the plan he was told this morning is
+    the one made afresh today. When his answer today is a real slip, the
+    start it moves moved from today, by his study, and its receipt says it
+    now falls after the exam; before, Expectation read "Moved from 14 Nov,
+    no study since 10 Nov" and the close said nothing."""
+    slipped = json.loads(json.dumps(GUESS))
+    answer = slipped["probability"]["observations"]["o23"]
+    answer["result"] = "incorrect"
+    del answer["sure"]
+    world = {"checkpoints": {"eve": slipped}, "steady": slipped}
+    eve = World(tmp_path, "eve", monkeypatch, capsys, world)
+    expectation = next(
+        topic
+        for topic in eve.run("probability", "map", day="2026-11-17")["topics"]
+        if topic["topic"] == "expectation"
+    )
+    assert expectation["starts"] > "2026-11-19", expectation
+    assert expectation["moved"] == {
+        "from": "2026-11-17",
+        "by": "study",
+        "courses": ["Probability"],
+        "day": "today",
+        "waits_on": ["random-variables"],
+    }, expectation
+    monkeypatch.setenv("LEARNING_TODAY", "2026-11-17")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"focus": None})))
+    assert main(["--workspace", str(eve.roots["probability"]), "save"]) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    moved = receipt["starts_moved"]["expectation"]
+    assert moved["past_exam"] is True, receipt
+    assert moved["moved"]["waits_on"] == ["Random variables and distributions"]

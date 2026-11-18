@@ -31,12 +31,12 @@ const refusal = `${CLAUDE_ACCOUNT_SIGNED_OUT} Sign in to it again in T3 Code, th
 const failed = { id: "f1", role: "assistant", content: [], stopReason: "error", errorMessage: refusal, api: "anthropic-messages", provider: "claude", model: "claude", usage: {}, timestamp: 3 };
 
 describe("a refused turn (round 14, 4 minor 6)", () => {
-	it("reads \"Couldn't reply\" where a session's state is worded, not \"Reply cut off\"", () => {
+	it("reads what to do, \"Try again\", where a session's state is worded, not \"Reply cut off\" (round 16, m3)", () => {
 		const chat = chatStore.createChat("Rank practice");
 		chatStore.saveMessages(chat.id, [newUserMessage("R3 - R1 - R2 = (0,0,0,0,0), so the rank is 2"), failed as never]);
 		const item = { ...chatStore.listChats().find((c) => c.id === chat.id)!, busy: false };
 		assert.equal(sessionState(item), "paused");
-		assert.equal(pausedWords(item), "Couldn't reply");
+		assert.equal(pausedWords(item), "Try again");
 		const cut = chatStore.createChat("Eigen lesson");
 		chatStore.saveMessages(cut.id, [newUserMessage("B - 2I has rows (2,1) and (2,1)")]);
 		assert.equal(pausedWords(chatStore.listChats().find((c) => c.id === cut.id)!), "Reply cut off", "a restart's cut keeps its words");

@@ -23,6 +23,7 @@ import {
 	type FauxResponseStep,
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
+import { newThinkingMessage } from "../src/core/native-messages.ts";
 import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
 import { fakeEngine, fakeFor, onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
@@ -364,6 +365,9 @@ describe("a course-linked turn", () => {
 			return createPracticeAgent({ chatId: id, chatStore }, { ...opts, ...onFake(engine, opts) });
 		};
 		await turn(id, { type: "text", text: "practice rank" }, factory);
+		// His first try and the nudge, which the conclude's firstTry names (round 16, M2: a first try is an answer of his the session holds).
+		const nudge = { id: "a_nudge", role: "assistant", content: [{ type: "text", text: "Not yet. What is row 2 minus twice row 1?" }], stopReason: "stop", timestamp: Date.now() };
+		chatStore.saveMessages(id, [...chatStore.getChat(id)!.messages, newThinkingMessage("p1", "2", "guessing"), nudge as never]);
 		await turn(id, { type: "thinking", problemCallId: "p1", text: "1, the rows are dependent", confidence: "confident" }, factory);
 
 		assert.deepEqual(seenCourse, { workspace: LINALG, title: "Linear Algebra" });

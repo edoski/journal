@@ -1,6 +1,6 @@
 # ActivityLine
 
-`<ActivityLine label="Thinking…" />`: the lesson's only working-state signal. `data-slot="activity-line"`, `role="status"`.
+`<ActivityLine label="Thinking…" />`: the lesson's only working-state signal, one per turn at the lesson's end (chat.tsx), its words replaced as the turn moves on; a running tool draws no line of its own (round 16, m1). The dispatch card uses it as the slot a background job fills. `data-slot="activity-line"`, `role="status"`.
 
 | Slot | Notes |
 |---|---|

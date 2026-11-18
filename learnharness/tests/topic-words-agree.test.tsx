@@ -73,7 +73,7 @@ describe("every Linear Algebra topic says one thing on the sidebar, the course p
 	});
 
 	/** Where a session on the topic stands: the sidebar's and the course page's, never a card's (round 15, m8). */
-	const SESSION = new Set(["Your turn", "Tutor writing", "You stopped the tutor", "Reply cut off", "Couldn't reply"]);
+	const SESSION = new Set(["Your turn", "Tutor writing", "You stopped the tutor", "Reply cut off", "Try again"]);
 	const sessionWords = (words: string) => SESSION.has(words) || /^Left off /.test(words);
 
 	it("a card says the sidebar's words when they are the topic's own and need him, else where he stands", () => {

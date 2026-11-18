@@ -35,10 +35,10 @@ describe("turnErrorText", () => {
 
 	it("says the tutor stopped when Claude Code failed inside the turn, naming Claude Code only in Details (round 15, m22, `101`)", () => {
 		const compaction = turnErrorText(CLAUDE_FAILED);
-		assert.deepEqual(compaction, { kind: "failed", sentence: "The tutor stopped before replying.", then: "retry", details: "Claude Code stopped with an error before it finished." });
+		assert.deepEqual(compaction, { kind: "failed", sentence: "The tutor stopped before replying.", details: "Claude Code stopped with an error before it finished." });
 		const { document } = parseHTML(`<html><body>${renderToStaticMarkup(<TurnError message={CLAUDE_FAILED} onRetry={() => {}} onOpenSettings={() => {}} />)}</body></html>`);
-		assert.equal(document.querySelector("[data-testid=turn-error-sentence]")?.textContent, "The tutor stopped before replying. Press Retry.");
-		assert.deepEqual([...document.querySelectorAll("button")].map((b) => b.textContent), ["Retry", "Details"], "one Retry");
+		assert.equal(document.querySelector("[data-testid=turn-error-sentence]")?.textContent, "The tutor stopped before replying.");
+		assert.deepEqual([...document.querySelectorAll("button")].map((b) => b.textContent), ["Try again", "Details"], "one Try again (round 16, m3)");
 		assert.doesNotMatch(document.body.textContent ?? "", /API key|Claude Code/);
 		const midway = turnErrorText("Claude Code ended the reply midway. Retry. No API key was used.");
 		assert.equal(midway.sentence, "The tutor stopped partway through its reply.");
@@ -64,16 +64,16 @@ describe("turnErrorText", () => {
 			const text = turnErrorText(raw);
 			assert.equal(text.kind, "signed-out", raw);
 			const { document } = parseHTML(renderToStaticMarkup(<TurnError message={raw} onRetry={() => {}} onOpenSettings={() => {}} />));
-			assert.equal(document.querySelector("[data-testid=turn-error-sentence]")?.textContent, "Claude isn't signed in, so the tutor couldn't reply. Sign in, then press Retry.");
+			assert.equal(document.querySelector("[data-testid=turn-error-sentence]")?.textContent, "Claude isn't signed in, so the tutor couldn't reply.");
 			assert.ok(document.querySelector("[data-testid=turn-error-sign-in]") === null, "the pill above the box is the one sign-in (round 15, M2)");
-			assert.equal(document.querySelector("[data-testid=retry-failed-turn]")?.textContent, "Retry");
+			assert.equal(document.querySelector("[data-testid=retry-failed-turn]")?.textContent, "Try again");
 			assert.doesNotMatch(document.body.textContent ?? "", /Refresh|token|T3 Code/);
 		}
 	});
 
 	it("a dropped connection offers Try again, the words the line for a reply that never came uses", () => {
 		// Round 7: after a restart the dropped line stood ~26 s with nothing to press.
-		const { document } = parseHTML(renderToStaticMarkup(<TurnError message="The connection dropped before the tutor finished replying." onRetry={() => {}} retryLabel="Try again" onOpenSettings={() => {}} />));
+		const { document } = parseHTML(renderToStaticMarkup(<TurnError message="The connection dropped before the tutor finished replying." onRetry={() => {}} onOpenSettings={() => {}} />));
 		assert.equal(document.querySelector("[data-testid=retry-failed-turn]")?.textContent, "Try again");
 	});
 
@@ -104,7 +104,7 @@ describe("TurnError", () => {
 		assert.equal(doc.querySelector('[data-testid="turn-error-sentence"]')?.textContent, "The provider rejected your API key.");
 		assert.doesNotMatch(doc.body.textContent ?? "", /x-api-key/);
 		const buttons = [...doc.querySelectorAll("button")].map((b) => b.textContent);
-		assert.deepEqual(buttons, ["Retry", "Open Settings", "Details"]);
+		assert.deepEqual(buttons, ["Try again", "Open Settings", "Details"]);
 		assert.equal(doc.querySelector('[data-testid="turn-error-details-toggle"]')?.getAttribute("aria-expanded"), "false");
 	});
 

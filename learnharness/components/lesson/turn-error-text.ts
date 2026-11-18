@@ -10,11 +10,9 @@ export type TurnErrorKind = "signed-out" | "key" | "busy" | "offline" | "gone" |
 
 export interface TurnErrorText {
 	kind: TurnErrorKind;
+	/** What happened; the line's own button, Try again, is what to do
+	 *  (round 16, m2: "Sign in, then press Retry." beside no sign-in). */
 	sentence: string;
-	/** What to do next names a button: Sign in, then Retry when the line
-	 *  offers it (round 7: a token failure said "press Refresh" beside a
-	 *  lone Retry); Retry alone, when the line offers it. */
-	then?: "sign-in-retry" | "retry";
 	/** The raw text, shown on demand; null when the sentence is the whole message. */
 	details: string | null;
 }
@@ -94,8 +92,8 @@ export function isCourseDeletedRefusal(message: string | undefined): boolean {
 export function turnErrorText(message: string, again = false, kept = false): TurnErrorText {
 	// The lesson's line never mentions an API key (round 15, m22).
 	const raw = message.trim().endsWith(NO_KEY.trim()) ? message.trim().slice(0, -NO_KEY.trim().length).trim() : message.trim();
-	if (CLAUDE_CODE_STOPPED.test(raw)) return { kind: "failed", sentence: "The tutor stopped before replying.", then: "retry", details: claudeCodeDetails(raw) };
-	if (CLAUDE_CODE_MIDWAY.test(raw)) return { kind: "failed", sentence: "The tutor stopped partway through its reply.", then: "retry", details: claudeCodeDetails(raw) };
+	if (CLAUDE_CODE_STOPPED.test(raw)) return { kind: "failed", sentence: "The tutor stopped before replying.", details: claudeCodeDetails(raw) };
+	if (CLAUDE_CODE_MIDWAY.test(raw)) return { kind: "failed", sentence: "The tutor stopped partway through its reply.", details: claudeCodeDetails(raw) };
 	if (UNREACHABLE.test(raw)) {
 		return { kind: "offline", sentence: `${again ? "Still can't" : "Couldn't"} reach the app. Check it's running, then try again.`, details: null };
 	}
@@ -103,7 +101,7 @@ export function turnErrorText(message: string, again = false, kept = false): Tur
 		return { kind: "signed-out", sentence: `Claude isn't signed in, so the tutor couldn't reply.${kept ? " What you wrote is still in the box." : ""}`, details: null };
 	}
 	if (CLAUDE_SIGNED_OUT_STARTS.some((start) => raw.startsWith(start))) {
-		return { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply.", then: "sign-in-retry", details: null };
+		return { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply.", details: null };
 	}
 	const route = routeError(raw);
 	if (route === UNKNOWN_CHAT) return { kind: "gone", sentence: "This lesson was deleted.", details: null };
@@ -112,7 +110,7 @@ export function turnErrorText(message: string, again = false, kept = false): Tur
 		return { kind: "key", sentence: "The provider rejected your API key.", details: raw };
 	}
 	if (BUSY_STATUSES.has(status) || BUSY.test(raw)) {
-		return { kind: "busy", sentence: "The provider is busy. Wait a moment, then retry.", details: raw };
+		return { kind: "busy", sentence: "The provider is busy. Wait a moment, then try again.", details: raw };
 	}
 	const text = route ?? raw;
 	if (isWritten(text)) return { kind: "written", sentence: text, details: null };

@@ -63,8 +63,9 @@ export interface PracticeConclusion extends Omit<GradedAnswer, "result"> {
 	 *  instead: a request is not an attempt, so nothing is recorded. */
 	result: AttemptResult | null;
 	rung: Rung | null;
-	/** His first unaided answer, when the problem took more than one, with
-	 *  the confidence he gave that answer (null when he gave none). */
+	/** His first unaided answer, when the problem took more than one and
+	 *  that one did not solve it, with the confidence he gave that answer
+	 *  (null when he gave none). */
 	firstTry?: GradedAnswer & { sure: Confidence | null };
 }
 
@@ -181,7 +182,9 @@ function sameResults(topics: readonly string[], a: GradedAnswer, b: GradedAnswer
 }
 
 /** The observations a concluded problem adds to the course record: the
- *  first unaided try when it differs from the final attempt, then the
+ *  first unaided try when it missed and differs from the final attempt
+ *  (a right first try solved the problem, so it is the final answer
+ *  itself: round 16, M2), then the
  *  final attempt with the help given, marked shown when the step was
  *  worked for him and given up when he surrendered; nothing when he
  *  claimed no answer. `lastConfidence` is the state of his last
@@ -196,6 +199,6 @@ export function practiceObservations(
 	const marks = { ...engineConfidence(lastConfidence), ...(c.rung === "R5" ? { shown: true as const } : {}), ...(c.outcome === "surrendered" ? { gave_up: true as const } : {}) };
 	const final = answerObservations(pose, answer, c.rung ? RUNG_HELP[c.rung] : "none", marks);
 	const first = c.firstTry;
-	if (!first || (c.rung === null && sameResults(pose.topics, first, answer))) return final;
+	if (!first || first.result === "correct" || (c.rung === null && sameResults(pose.topics, first, answer))) return final;
 	return [...answerObservations(pose, first, "none", engineConfidence(first.sure ?? undefined)), ...final];
 }
