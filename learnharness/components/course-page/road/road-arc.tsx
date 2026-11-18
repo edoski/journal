@@ -97,7 +97,7 @@ export function RoadArc({
 				{...rest}
 			>
 				<Rail bright={shown} />
-				<h2 className="flex h-7 min-w-0 items-center gap-2">
+				<h2 className="flex min-h-7 min-w-0 items-center gap-2">
 					<CollapsibleTrigger asChild>
 						<button
 							ref={headerRef}
@@ -109,13 +109,14 @@ export function RoadArc({
 							onFocus={() => {
 								if (!open) onOpenChange?.(true);
 							}}
-							className="group/arc flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							className="group/arc flex min-h-7 min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						>
 							<ArcLabel
 								number={number}
 								handle={arc.handle}
 								title={arc.title}
 								here={shown}
+								wrap
 								className={cn(past && !shown && "opacity-60")}
 							/>
 							{section.current && <span aria-hidden="true" data-slot="road-here" className="size-1.5 shrink-0 rounded-full bg-ring" />}
