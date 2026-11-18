@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
  *  words, muted at rest and in full ink under the pointer. */
 export const PRESS = "inline-flex h-5 min-w-0 items-center gap-1.5 whitespace-nowrap rounded-sm outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:text-foreground motion-reduce:transition-none";
 export const MARK = "size-4 shrink-0";
+/** A fact of the standing line with nothing more to open: its mark and words, muted. */
+export const FACT = "inline-flex h-5 min-w-0 items-center gap-1.5 whitespace-nowrap";
 
 /** Context, in the page's actions: a quiet button that opens the sheet
  *  with what the tutor and the map read about the course. A head that
@@ -66,12 +68,6 @@ export function ExamFact({ course, runup, words, ready, className }: { course: S
 					{ready && (
 						<p data-slot="course-exam-ready" data-kind={ready.kind} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-callout", ready.kind === "short" ? "text-warning" : "text-muted-foreground")}>
 							<ReadyWords ready={ready} workspace={map.workspace} />
-							{ready.kind === "notYet" &&
-								ready.arcs.map((arc) => (
-									<Link key={arc.handle} href={arcOnPage(map.workspace, arc.handle)} className="group/arc min-w-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
-										<ArcLabel {...arc} />
-									</Link>
-								))}
 						</p>
 					)}
 				</div>

@@ -120,7 +120,7 @@ function reading(handle: string, where: string) {
 }
 
 describe("an arc is named one way", () => {
-	it("reads the same in the map's arc list, the road, the mistakes, the readiness answer, the exam's run-up and the lesson's roadmap", async () => {
+	it("reads the same in the map's arc list, the road, the mistakes and the lesson's roadmap", async () => {
 		const view = viewOf(COURSE);
 		const ready = examReady(READINESS, COURSE.map, view.arcs, STANDING.mistakes);
 		assert.equal(ready.kind, "notYet");
@@ -135,11 +135,7 @@ describe("an arc is named one way", () => {
 		await mount(<MistakeList rows={mistakeRows(STANDING, COURSE, [], view.arcs)} />);
 		const mistakes = reading("maps", "the mistakes");
 
-		await mount(<ReadyFact view={view} ready={ready} />, '[data-slot="course-ready-fact"]');
-		const answer = reading("maps", "the readiness answer");
-
-		await mount(<ExamFact course={COURSE} runup={null} words="Exam in 25 days" ready={ready} />, '[data-slot="course-exam"]');
-		const runup = reading("maps", "the run-up");
+		// The readiness answer and the exam's run-up name no arcs while all of it fits (round 16, m6).
 
 		const step = { id: "s", title: "Rank", status: "current" as const, done: false, next: false, taught: true };
 		function Roadmap() {
@@ -151,7 +147,7 @@ describe("an arc is named one way", () => {
 		const roadmap = reading("maps", "the roadmap");
 
 		assert.deepEqual({ slot: list.slot, number: list.number, text: list.text, pill: list.pill, ring: list.ring }, { slot: "arc-label", number: "2", text: "2Linear maps", pill: false, ring: false });
-		for (const [where, seen] of Object.entries({ road, mistakes, answer, runup, roadmap })) {
+		for (const [where, seen] of Object.entries({ road, mistakes, roadmap })) {
 			// The mistakes give the topic the line: the arc's number, its name
 			// kept for a screen reader (round 15, 2 n2).
 			const inner = where === "mistakes" ? list.inner.map((c) => c?.replace(/\btruncate\b/, "sr-only") ?? null) : list.inner;
