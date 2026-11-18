@@ -125,7 +125,17 @@ export interface SidebarCard {
 /** What `lookAt` says of a press that starts a new session. */
 export const NEW_SESSION = "a new session";
 
-export const text = (el: Element | null | undefined) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
+/** An element's words, its typeset math read back as the TeX the record writes (`$\binom{n}{j}$`), so a drawn title
+ *  reads as its topic's title: KaTeX's own text is the glyphs and the source run together. */
+export function text(el: Element | null | undefined): string {
+	if (!el) return "";
+	const copy = el.cloneNode(true) as Element;
+	for (const math of copy.querySelectorAll(".katex")) {
+		const tex = math.querySelector('annotation[encoding="application/x-tex"]')?.textContent;
+		if (tex != null) math.replaceWith(copy.ownerDocument.createTextNode(`$${tex}$`));
+	}
+	return (copy.textContent ?? "").replace(/\s+/g, " ").trim();
+}
 
 export type DemoApp = Awaited<ReturnType<typeof openDemoApp>>;
 

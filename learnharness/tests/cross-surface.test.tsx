@@ -174,14 +174,17 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 		(page) => !!page.querySelector('[data-slot="course-topic-row"]'),
 		(page, pathname) => {
 			const course = courses.find((c) => courseHref(c.map.workspace) === pathname)!;
-			heads.set(course.map.workspace, text(page.querySelector('[data-slot="page-head"]')));
+			// Each of the head's facts on its own, so a title that ends one is not run into the next ("…variablesStudied yesterday").
+			const facts = [...page.querySelectorAll('[data-slot="page-head"] [data-slot]')].filter((el) => !el.querySelector("[data-slot]"));
+			heads.set(course.map.workspace, facts.map((el) => text(el)).filter(Boolean).join("; "));
 			needsYou.set(
 				course.map.workspace,
 				[...page.querySelectorAll('[data-slot="course-topic-row"][data-group="needs-you"]')].map((row) => ({ handle: row.getAttribute("data-topic") ?? "", text: text(row) })),
 			);
 			for (const row of page.querySelectorAll('[data-slot="course-topic-row"]')) {
-				const title = text(row.querySelector('[data-slot="course-topic-title"]')).replace(/, [^,]*$/, "");
-				const topic = course.map.topics.find((t) => t.title === title);
+				// By its handle: a title with a comma ("Permutations, $k$-permutations and factorials") lost its tail to the
+				// strip of the row's spoken standing.
+				const topic = course.map.topics.find((t) => t.handle === row.getAttribute("data-topic"));
 				if (topic) rows.set(keyOf(course.map.workspace, topic.handle), text(row.querySelector('[data-slot="course-topic-fact"]')));
 			}
 		},
