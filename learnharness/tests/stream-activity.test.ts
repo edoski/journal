@@ -36,7 +36,7 @@ describe("streamingToolActivity (the turn-activity label)", () => {
 	});
 
 	it("every line names what he waits for: a question, the lesson's plan, a demo or a visual", () => {
-		const lines = new Set(["recall", "explain", "ask_user_question", "probe_done", "plan_init", "demo", "visual", "Grep", "teach"].map((tool) => toolActivityLabel(tool)));
+		const lines = new Set(["recall", "explain", "ask_user_question", "probe_done", "demo", "visual", "Grep", "teach"].map((tool) => toolActivityLabel(tool)));
 		assert.deepEqual([...lines].sort(), ["Building a demo…", "Making a visual…", "Planning the lesson…", "Thinking…", "Writing a question…"]);
 	});
 
@@ -48,7 +48,7 @@ describe("streamingToolActivity (the turn-activity label)", () => {
 		assert.equal(workingLine([probeEnd]), "Planning the lesson…");
 		const searching = msg("assistant", [toolPart("Grep", "input-streaming")]);
 		assert.equal(streamingToolActivity([probeEnd, searching]), "Planning the lesson…");
-		assert.equal(toolActivityLabel("plan_init"), "Planning the lesson…");
+		assert.equal(streamingToolActivity([probeEnd, msg("assistant", [toolPart("plan_init", "input-streaming")])]), "Planning the lesson…");
 		const firstStep = msg("assistant", [toolPart("plan_init", "output-available"), { type: "text", text: "Picture the hour cut into slots." }]);
 		assert.equal(workingLine([probeEnd, firstStep]), "Thinking…", "once his first step arrives, the line is Thinking… again");
 		const asked = msg("assistant", [toolPart("explain", "input-available")]);
@@ -66,6 +66,25 @@ describe("streamingToolActivity (the turn-activity label)", () => {
 		assert.equal(workingLine([probeEnd, refusedPair, replanned]), "Planning the lesson…", "thinking between the saved plan and its first step");
 		const asked = msg("assistant", [toolPart("explain", "input-available")]);
 		assert.equal(planningLesson([probeEnd, refusedPair, replanned, asked]), false, "the question that reaches him ends the wait");
+	});
+
+	it("a problem sheet's turn says one phase at a time: its map of parts is no lesson plan, and a refused question is still being written (round 17, 2 m4)", () => {
+		const sheet = [msg("user", [{ type: "text", text: "dim ker A is 2" }]), msg("assistant", [toolPart("course_save", "output-available"), toolPart("send_to_user", "output-available")])];
+		const mapping = msg("assistant", [toolPart("lesson_progress", "output-available"), toolPart("plan_init", "input-streaming")]);
+		assert.equal(streamingToolActivity([...sheet, mapping]), "Thinking…", "a sheet's parts map is not Planning the lesson…");
+		const refused = msg("assistant", [toolPart("explain", "output-error")]);
+		assert.equal(workingLine([...sheet, refused]), "Writing a question…", "the refused question is written again");
+		const reasking = msg("assistant", [toolPart("explain", "input-streaming")]);
+		assert.equal(streamingToolActivity([...sheet, refused, reasking]), "Writing a question…");
+		const posed = msg("assistant", [toolPart("explain", "input-available")]);
+		assert.equal(workingLine([...sheet, refused, posed]), "Thinking…", "a question that reached him ends the wait");
+		const lines: string[] = [];
+		for (const step of [[], [mapping], [refused], [refused, reasking]]) {
+			const view = [...sheet, ...step];
+			const line = streamingToolActivity(view) ?? workingLine(view);
+			if (line !== lines.at(-1)) lines.push(line);
+		}
+		assert.deepEqual(lines, ["Thinking…", "Writing a question…"]);
 	});
 
 	it("no activity once the call settles or the turn ends", () => {
