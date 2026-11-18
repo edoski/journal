@@ -44,40 +44,12 @@ import { sessionState } from "../components/nav/session-state.ts";
 import type { CalendarEntry } from "../components/calendar/calendar-facts.ts";
 import type { CalendarCourse, ChatListItem, CourseMapTask, CourseMapTopic } from "../src/core/index.ts";
 import type { HomeLine, SidebarCard } from "./helpers/demo-app.tsx";
+import { addDays, briefDays, daysIn, names, scheduledDay, short } from "./helpers/day-claims.ts";
 
 const missing = demoWorldMissing();
 // CI sets LH_REQUIRE_REAL_ENGINE, so a missing engine fails the gate instead of skipping this. The seed is the
 // Logbook's, outside this repository, so CI never has it and skips.
 const skip = missing && (!process.env.LH_REQUIRE_REAL_ENGINE || !hasDemoSeed()) ? missing : false;
-
-// ─── days in words ──────────────────────────────────────────────────────────
-
-const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-const DAY_WORDS = /\b(today|tomorrow|(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,? (\d{1,2}) (jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)\b/gi;
-
-function addDays(day: string, n: number): string {
-	return new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
-}
-
-/** Every day `words` names, in order, as ISO days ("today", "tomorrow", "Tue 10 Nov", "Tuesday 10 November"). */
-function daysIn(words: string, today: string): string[] {
-	return [...words.matchAll(DAY_WORDS)].map((m) => {
-		const word = m[1]!.toLowerCase();
-		if (word === "today") return today;
-		if (word === "tomorrow") return addDays(today, 1);
-		const month = MONTHS.indexOf(m[3]!.toLowerCase());
-		return `2026-${String(month + 1).padStart(2, "0")}-${m[2]!.padStart(2, "0")}`;
-	});
-}
-
-const short = (day: string) => new Date(`${day}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "");
-
-/** Whether `title` stands whole in `words`, not as a part of a longer title. */
-function names(words: string, title: string): boolean {
-	const at = words.indexOf(title);
-	if (at < 0) return false;
-	return /^\s*($|[,;.:()]|and )/.test(words.slice(at + title.length)) || names(words.slice(at + title.length), title);
-}
 
 // ─── the survey: what each surface draws ───────────────────────────────────
 
@@ -88,6 +60,8 @@ interface TopicPage {
 	note: string;
 	press: string;
 	scheduled: string;
+	/** The day Scheduled draws, read from its row. */
+	scheduledOn: string | undefined;
 	text: string;
 	opens: string | null;
 }
@@ -161,6 +135,7 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 				note: text(page.querySelector('[data-slot="pickup-now-note"]')),
 				press: text(press),
 				scheduled: text(page.querySelector('[data-slot="pickup-scheduled"]')),
+				scheduledOn: scheduledDay(page.querySelector('[data-slot="pickup-scheduled"]'), today),
 				text: `${text(page.querySelector('[data-slot="page-head"]'))} ${text(page.querySelector('[data-slot="topic-panes"]'))}`,
 				opens: press ? await app.lookAt(press) : null,
 			});
@@ -249,24 +224,15 @@ function dayClaims(s: Survey): Claims {
 			// ("Left off today" is when he last worked, not the plan); Scheduled by its own day.
 			const now = page.press === "Review" || /^(Due|Planned) today/.test(page.now) ? s.today : /^Planned/.test(page.note) ? daysIn(page.note, s.today)[0] : undefined;
 			claim(keyOf(ws, topic.handle), "its topic page's Now", now);
-			claim(keyOf(ws, topic.handle), "its topic page's Scheduled", daysIn(page.scheduled, s.today)[0]);
+			claim(keyOf(ws, topic.handle), "its topic page's Scheduled", page.scheduledOn);
 			const fact = s.rows.get(keyOf(ws, topic.handle));
 			if (fact && /^(Planned|Review|Due today)/.test(fact)) claim(keyOf(ws, topic.handle), "course page", daysIn(fact, s.today)[0]);
 		}
 		// The brief: the first plan line on or after today that reviews or starts it, under its course's name.
 		const brief = s.briefs.get(ws);
 		if (brief) {
-			const titles = new Set(s.courses.map((c) => c.map.title));
-			let under: string | null = null;
-			for (const line of brief.split("\n")) {
-				const head = line.split(" · ")[0]!.replace(/ \(this course\)$/, "");
-				if (titles.has(head)) under = head;
-				if (under !== course.map.title || !line.startsWith("- ")) continue;
-				const [day] = daysIn(line.slice(2, line.indexOf(":")), s.today);
-				if (!day || day < s.today) continue;
-				const body = line.slice(line.indexOf(":") + 1).replace(/\([^)]*\)/g, "");
-				for (const topic of titled) if (names(body, topic.title)) claim(keyOf(ws, topic.handle), "course brief", day);
-			}
+			const days = briefDays(brief, new Set(s.courses.map((c) => c.map.title)), course.map.title, titled.map((t) => t.title), s.today);
+			for (const topic of titled) claim(keyOf(ws, topic.handle), "course brief", days.get(topic.title));
 		}
 	}
 	return claims;
@@ -917,6 +883,21 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		await holds("Tue 17 Nov, after the review that took up a lesson", (s) => {
 			const page = s.pages.get(keyOf(course.workspace, other.handle));
 			assert.ok(page?.opens?.split("?")[0] === `/chat/${id}`, `${other.title}'s page resumes its lesson: "${page?.now} · ${page?.press} · ${page?.note}" opens ${page?.opens}`);
+		});
+	});
+
+	it("Tue 17 Nov, Linear Algebra reviews answered before the plan's day for them (18 Nov: the 8 Nov review that also answered two the plan had moved to 9 Nov)", async () => {
+		const { courses } = (await (await fetch("/api/calendar")).json()) as { courses: CalendarCourse[] };
+		const course = courses.find((c) => c.map.title === "Linear Algebra")!;
+		const ahead = course.planned.find((d) => d.date > course.map.today && d.reviews.length > 0);
+		assert.ok(ahead, "the plan reviews Linear Algebra after today");
+		const early = ahead.reviews.slice(0, 2);
+		const res = await fetch("/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Linear Algebra review", course: { workspace: course.map.workspace }, topics: early }) });
+		const { id } = (await res.json()) as { id: string };
+		await app.save(id, { observations: early.map((topic, i) => ({ topics: [topic], text: `Early review question ${i + 1}`, result: "correct", help: "hint" })) });
+		app.doneForToday(id);
+		await holds("Tue 17 Nov, after Linear Algebra reviews answered early", (s) => {
+			for (const topic of early) assert.ok(s.pages.has(keyOf(course.map.workspace, topic)), `${topic}'s page is among those read`);
 		});
 	});
 });
