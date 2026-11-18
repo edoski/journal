@@ -319,6 +319,22 @@ export function layoutCanvas(
 	node: NodeSize = CANVAS_NODE,
 ): TopicMapLayout {
 	const needs = edges.filter((e): e is Need => e.kind === "needs");
+	// A drawing is made once per window for its cards, needs and size: the
+	// layered layout's solver was most of a visit to Home, which drew every
+	// course's map afresh each time (round 15, P7). A layout is never changed
+	// after it is made.
+	const key = JSON.stringify([cards.map((c) => c.handle), needs.map((n) => [n.prerequisite, n.topic]), [...top], node.width, node.height]);
+	const kept = DRAWN.get(key);
+	if (kept) return kept;
+	const layout = drawn(cards, edges, needs, top, node);
+	DRAWN.set(key, layout);
+	return layout;
+}
+
+/** Every layout this window made, by what it was made from. */
+const DRAWN = new Map<string, TopicMapLayout>();
+
+function drawn(cards: readonly { handle: TopicHandle }[], edges: readonly CourseMapEdge[], needs: readonly Need[], top: ReadonlySet<TopicHandle>, node: NodeSize): TopicMapLayout {
 	if (needs.length === 0) return layoutTopicMap(cards, edges, node, top);
 	const drawing = layeredDrawing(
 		cards.map((t) => ({ id: t.handle, ...node })),
