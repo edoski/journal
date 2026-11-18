@@ -175,6 +175,17 @@ describe("duplicates by meaning", () => {
 		assert.deepEqual(merged?.changes.path, { order: ["eigen", "power"] });
 	});
 
+	it("a topic folded into another keeps the study order: what follows its second name is placed after it, never at the first (demo world, 18 Nov 2026)", () => {
+		const merged = mapChanges(
+			{
+				topics: [{ handle: "eigen", refs: [{ source: "sheet", locator: "Ex. 1" }] }, { handle: "char-poly", title: "Characteristic polynomial" }, { handle: "eigenvalues", title: "Eigenvalue" }, { handle: "diagonal", title: "Diagonalization" }],
+				order: ["eigen", "char-poly", "eigenvalues", "diagonal"],
+			},
+			view({ topics: { eigen: topic("Eigenvalues") }, order: ["eigen"] }),
+		);
+		assert.deepEqual(merged?.changes.path, { order: ["eigen", "char-poly", "diagonal"] });
+	});
+
 	it("refuses two new topics that name the same idea", () => {
 		assert.match(answerProblems({ topics: [{ handle: "cv", title: "Cross-validation" }, { handle: "crossval", title: "Cross validation" }], order: [] }, view()) ?? "", /crossval and cv name the same topic/);
 	});

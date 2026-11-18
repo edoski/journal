@@ -652,7 +652,8 @@ export function mapChanges(submit: MapSubmit, view: MapCourseView): { changes: J
 
 	const order = [...view.order];
 	const placed = new Set(order);
-	const wanted = submit.order.map(h).filter((k) => exists.has(k));
+	// A topic folded into another names it twice: its first place counts, so what follows is never spliced in there.
+	const wanted = [...new Set(submit.order.map(h).filter((k) => exists.has(k)))];
 	for (const t of proposed) if (exists.has(t.handle) && !wanted.includes(t.handle)) wanted.push(t.handle);
 	for (const [i, k] of wanted.entries()) {
 		if (placed.has(k)) continue;
