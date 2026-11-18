@@ -125,7 +125,7 @@ export function LessonMap({ entry, label, leftOff }: { entry: PlannedEntry; labe
 		() => ({
 			edges: drawing.needs,
 			current: ring,
-			caption: `${label}: ${steps.length} steps, each below the steps it rests on.${current ? ` ${waits ? "Your turn" : leftOff}: ${mathPlain(current.title)}.` : ""}`,
+			caption: `${label}: ${steps.length} steps, each below the steps it rests on.${current ? ` ${waits ? `Your turn on ${mathPlain(current.title)}` : `${leftOff}: ${mathPlain(current.title)}`}.` : ""}`,
 		}),
 		[drawing.needs, ring, label, steps.length, current, waits, leftOff],
 	);
