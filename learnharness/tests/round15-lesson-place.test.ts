@@ -63,3 +63,16 @@ describe("a lesson opens on the map Home read (round 15, P7)", () => {
 		assert.deepEqual(place?.arc, { number: 1, handle: "spaces", title: "Spaces" }, "the course's own current arc, as before");
 	});
 });
+
+describe("a lesson its review took up sits on that lesson's topic (round 16, M4)", () => {
+	it("names the topic its plan teaches, not the review's, in the top bar", async () => {
+		world([{ handle: "kernel", title: "Kernel", arc: "spaces" }, { handle: "eigen", title: "Eigen", arc: "spectra" }] as unknown as CourseMap["topics"], "kernel");
+		const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+		const plan = [
+			{ id: "a1", role: "assistant", content: [{ type: "toolCall", id: "p1", name: "plan_init", arguments: { mermaid: "graph TD\n  a[Why] --> b[How]", goal: { title: "Eigen", topic: "eigen" } } }], api: "faux", provider: "test", model: "test", usage, stopReason: "toolUse", timestamp: 1 },
+			{ id: "r1", role: "toolResult", toolCallId: "p1", toolName: "plan_init", content: [{ type: "text", text: "{}" }], details: {}, isError: false, timestamp: 1 },
+		];
+		const place = await lessonPlace({ course: { workspace: W, title: "Algebra" }, topics: ["kernel"], messages: plan as never });
+		assert.deepEqual(place?.topic, { handle: "eigen", title: "Eigen" });
+	});
+});

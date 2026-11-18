@@ -10,16 +10,20 @@ import type { ChatRecord } from "../core/contracts/chat.ts";
 import { lessonTopics } from "../core/course-map-build.ts";
 import { lessonPlaceOf, type LessonPlace } from "../core/lesson-place.ts";
 import { sessionTopicsOf } from "../core/native-messages.ts";
+import { lessonTakenUp } from "../core/session-opening.ts";
 import { stores } from "./stores.ts";
 
 /** How long the page waits for the course map before it opens without it. */
 export const LESSON_PLACE_WAIT_MS = 1500;
 
 /** The lesson's candidate topics, as the session list reads them: the
- *  ones it was started on, then those its transcript worked on. */
+ *  lesson its plan took up (round 16, M4: a review asked for Poisson is
+ *  the Poisson lesson, never under Binomial's crumb), the ones it was
+ *  started on, then those its transcript worked on. */
 export async function lessonPlace(chat: Pick<ChatRecord, "course" | "topics" | "messages">, waitMs = LESSON_PLACE_WAIT_MS): Promise<LessonPlace | null> {
 	const workspace = chat.course?.workspace;
-	const topics = [...new Set([...(chat.topics ?? []), ...sessionTopicsOf(chat.messages)])];
+	const taken = lessonTakenUp(chat);
+	const topics = [...new Set([...(taken ? [taken] : []), ...(chat.topics ?? []), ...sessionTopicsOf(chat.messages)])];
 	if (!workspace || topics.length === 0) return null;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	const late = new Promise<null>((resolve) => {
