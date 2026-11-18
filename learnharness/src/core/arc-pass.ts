@@ -653,6 +653,10 @@ export interface ArcPassView extends MapCourseView {
 	/** Needs this pass's edge step added and saved, by topic: in the topic's
 	 *  `needs`, and the cut may withdraw them. */
 	added?: Readonly<Record<string, readonly string[]>>;
+	/** Needs this pass's readers found and the edge step set aside as
+	 *  implied, reached through another need: one comes back when the cut
+	 *  withdraws the only path it was reached through. */
+	implied?: readonly EdgeAdd[];
 }
 
 /** The edges a cut may withdraw: the ones this pass added or proposes. */
@@ -661,15 +665,39 @@ function withdrawable(view: Pick<ArcPassView, "proposed" | "added">): Set<string
 }
 
 /** The view without the edges the answer withdraws: out of each topic's
- *  needs and of `proposed` and `added`. Pure. */
+ *  needs and of `proposed` and `added`. An implied need the withdrawal
+ *  leaves unreached comes back, in `proposed` when the pass proposes and
+ *  in `added` when it adds (restoredNeeds). Pure. */
 export function withoutWithdrawn<V extends ArcPassView>(view: V, submit: Pick<ArcSubmit, "withdraw">): V {
 	const can = withdrawable(view);
 	const out = new Set((submit.withdraw ?? []).map((w) => edgeKey(w.topic, w.need)).filter((k) => can.has(k)));
 	if (out.size === 0) return view;
 	const keep = (t: string) => (n: string) => !out.has(edgeKey(t, n));
-	const less = (by: V["proposed"]) => (by ? Object.fromEntries(Object.entries(by).map(([t, needs]) => [t, needs.filter(keep(t))])) : by);
-	const topics = Object.fromEntries(Object.entries(view.topics).map(([k, t]) => [k, { ...t, needs: t.needs.filter(keep(k)) }]));
-	return { ...view, topics, ...(view.proposed ? { proposed: less(view.proposed) } : {}), ...(view.added ? { added: less(view.added) } : {}) };
+	const topics: ArcPassView["topics"] = Object.fromEntries(Object.entries(view.topics).map(([k, t]) => [k, { ...t, needs: t.needs.filter(keep(k)) }]));
+	const back: Record<string, string[]> = {};
+	const needs = new Map(Object.entries(topics).map(([k, t]) => [k, t.needs]));
+	for (const i of view.implied ?? []) {
+		if (!(i.topic in topics) || !(i.need in topics) || out.has(edgeKey(i.topic, i.need)) || reaches(needs, i.topic, i.need)) continue;
+		topics[i.topic] = { ...topics[i.topic]!, needs: [...topics[i.topic]!.needs, i.need] };
+		needs.set(i.topic, topics[i.topic]!.needs);
+		(back[i.topic] ??= []).push(i.need);
+	}
+	const less = (by: V["proposed"], more: Record<string, string[]>) =>
+		Object.fromEntries([...new Set([...Object.keys(by ?? {}), ...Object.keys(more)])].map((t) => [t, [...(by?.[t] ?? []).filter(keep(t)), ...(more[t] ?? [])]]));
+	return {
+		...view,
+		topics,
+		...(view.proposed ? { proposed: less(view.proposed, back) } : {}),
+		...(view.added || (!view.proposed && Object.keys(back).length > 0) ? { added: less(view.added, view.proposed ? {} : back) } : {}),
+	};
+}
+
+/** The implied needs a cut's withdrawals bring back: each one the edges
+ *  left after the withdrawal no longer reach, with its reader's step.
+ *  Pure. */
+export function restoredNeeds(view: ArcPassView, submit: Pick<ArcSubmit, "withdraw">): EdgeAdd[] {
+	const after = withoutWithdrawn(view, submit);
+	return (view.implied ?? []).filter((i) => i.topic in view.topics && !view.topics[i.topic]!.needs.includes(i.need) && (after.topics[i.topic]?.needs ?? []).includes(i.need));
 }
 
 /** The view, from the record and the topics he has studied. */
@@ -868,6 +896,7 @@ export function arcPassChanges(submit: ArcSubmit, given: ArcPassView, extra: { e
 	const view = withoutWithdrawn(given, submit);
 	const added = new Set(Object.entries(given.added ?? {}).flatMap(([t, needs]) => needs.map((n) => edgeKey(t, n))));
 	const dropped = (submit.withdraw ?? []).filter((w) => added.has(edgeKey(w.topic, w.need)) && w.topic in view.topics);
+	const restored = given.proposed ? [] : restoredNeeds(given, submit);
 	const exists = (t: string) => t in view.topics;
 	const arcs = submit.arcs.map((a) => ({ ...a, topics: a.topics.filter(exists) }));
 	const gone = [...new Set(submit.arcs.flatMap((a) => a.topics.filter((t) => !exists(t))))];
@@ -880,7 +909,7 @@ export function arcPassChanges(submit: ArcSubmit, given: ArcPassView, extra: { e
 	for (const a of arcs) {
 		for (const t of a.topics) {
 			const title = stripped[t] ?? titles.get(t);
-			topics[t] = { ...(title ? { title } : {}), ...(dropped.some((w) => w.topic === t) ? { needs: view.topics[t]!.needs } : {}), arc: a.handle };
+			topics[t] = { ...(title ? { title } : {}), ...(dropped.some((w) => w.topic === t) || restored.some((r) => r.topic === t) ? { needs: view.topics[t]!.needs } : {}), arc: a.handle };
 		}
 	}
 	const index = new Map(view.order.map((t, i) => [t, i]));
@@ -914,7 +943,12 @@ export function arcPassChanges(submit: ArcSubmit, given: ArcPassView, extra: { e
 			reason,
 			// A withdrawn added need is dropped in this save, logged as its own edges event, which the formation then refers to.
 			...(dropped.length > 0
-				? { edges: dropped.map((w) => ({ topic: w.topic, need: w.need, change: "drop", reason: `withdrawn by the cut: ${w.reason.trim()}` })) }
+				? {
+						edges: [
+							...dropped.map((w) => ({ topic: w.topic, need: w.need, change: "drop", reason: `withdrawn by the cut: ${w.reason.trim()}` })),
+							...restored.map((r) => ({ topic: r.topic, need: r.need, change: "add", reason: `implied until the cut withdrew the need it was reached through: ${r.reason.trim()}` })),
+						],
+					}
 				: extra.edgesEntry !== undefined
 					? { edges_entry: extra.edgesEntry }
 					: {}),

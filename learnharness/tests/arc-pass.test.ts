@@ -41,6 +41,7 @@ import {
 	mergeMisses,
 	purposeAnswerProblems,
 	purposeProblems,
+	restoredNeeds,
 	purposeQuiz,
 	sortAnswerProblems,
 	sortMisses,
@@ -347,6 +348,27 @@ describe("the cut's shape rules", () => {
 		assert.deepEqual(changes.arc_change.edges, [{ topic: "limits", need: "chain", change: "drop", reason: "withdrawn by the cut: only one example uses it" }]);
 		assert.equal("edges_entry" in changes.arc_change, false, "the formation refers to its own edges event");
 		assert.equal("needs" in (arcPassChanges(withdrawn, proposed)!.changes as { topics: Record<string, object> }).topics.limits!, false, "a withdrawn proposal changes no stored need");
+	});
+
+	it("a need set aside as implied through an add the cut withdraws comes back, saved with the formation and logged as an add; one still reached stays aside", () => {
+		const implied = [
+			{ topic: "riemann", need: "derivative", reason: "Exercise 4 differentiates the integrand" },
+			{ topic: "chain", need: "limits", reason: "the derivative is a limit" },
+		];
+		const added = view(CALC, { added: { riemann: ["chain"] }, implied });
+		const withdrawn: ArcSubmit = { ...good, withdraw: [{ topic: "riemann", need: "chain", reason: "one example composes" }] };
+		assert.deepEqual(restoredNeeds(added, withdrawn), [implied[0]], "chain still reaches limits through derivative");
+		assert.deepEqual(withoutWithdrawn(added, withdrawn).topics.riemann!.needs, ["limits", "derivative"]);
+		assert.deepEqual(restoredNeeds(added, good), [], "nothing withdrawn, nothing back");
+		const changes = arcPassChanges(withdrawn, added)!.changes as { topics: Record<string, { needs?: string[] }>; arc_change: { edges: unknown[] } };
+		assert.deepEqual(changes.topics.riemann!.needs, ["limits", "derivative"]);
+		assert.deepEqual(changes.arc_change.edges, [
+			{ topic: "riemann", need: "chain", change: "drop", reason: "withdrawn by the cut: one example composes" },
+			{ topic: "riemann", need: "derivative", change: "add", reason: "implied until the cut withdrew the need it was reached through: Exercise 4 differentiates the integrand" },
+		]);
+		const proposed = view(CALC, { proposed: { riemann: ["chain"] }, implied });
+		assert.deepEqual(withoutWithdrawn(proposed, withdrawn).proposed, { riemann: ["derivative"] }, "when the pass proposes, the need comes back as a proposal");
+		assert.equal("needs" in (arcPassChanges(withdrawn, proposed)!.changes as { topics: Record<string, object> }).topics.riemann!, false, "and changes no stored need");
 	});
 
 	it("R1: every topic, left-out ones too, in exactly one arc", () => {
