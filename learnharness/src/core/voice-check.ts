@@ -72,7 +72,8 @@ export type VoiceRule =
 	| "arrival"
 	| "own-words"
 	| "mark-case"
-	| "not-yet";
+	| "not-yet"
+	| "due-reviews";
 
 export interface VoiceBreak {
 	rule: VoiceRule;

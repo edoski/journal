@@ -268,6 +268,10 @@ const HARD: ReadonlySet<VoiceRule> = new Set(["questions", "compound", "verdict"
 
 const SAVE_TOOL = "course_save";
 
+/** Words that tell him reviews are due: "your Binomial distribution
+ *  review is still due today", "due today: your Kernel review". */
+const DUE_REVIEWS = /\breviews?\b[^.?!]{0,40}?\b(?:still )?(?:over)?due\b|\b(?:over)?due (?:today|now)\b[^.?!]{0,60}?\breviews?\b/i;
+
 /** The session called a lesson, which a review never is (round 9, 2 m4:
  *  the Binomial review closed on "the binomial lesson"). */
 const SESSION_AS_LESSON = /\b(?:this|today'?s|the|our|your)(?: [a-z]+)? lesson\b/i;
@@ -579,6 +583,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `A prediction asks for his guess, and this question asks him to work something out: ${quoted(b.excerpt)}. ${PREDICT_RULE} So pose it as \`type: check\`, counted; only a question he cannot yet work out is a prediction, and its words then ask for his guess ("What do you expect…").`;
 		case "unbuilt":
 			return `The demo you called for this turn is still being built, so it is not on his screen: ${quoted(b.excerpt)}. It appears where you called for it once it is built, and a message tells you then. Until that message, say nothing of it and ask nothing that needs it: teach the step in words now, and point him at the demo, and ask what needs it, once it has arrived.`;
+		case "due-reviews":
+			return `A lesson opens on its first step, and his reviews due today are already on Home: ${quoted(b.excerpt)}. Leave the reviews out and open on the lesson.`;
 		case "review-lesson":
 			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
@@ -857,8 +863,10 @@ export class VoiceGuard {
 	 *  the turn asks it again before any other, unless his message was
 	 *  his answer (a save names it), asked to guess first (a prediction
 	 *  goes through) or asked to be taught instead. Held once a turn. */
-	private readonly setAside: { tool: string; question: string; key: string } | null;
+	private setAside: { tool: string; question: string; key: string } | null;
 	private heldSetAside = false;
+	/** The turn opens a lesson: nothing was said in the session before it. */
+	private readonly opening: boolean;
 	/** Ordinary text this turn took out of a reply, and whether the turn
 	 *  posed a question he can answer, and was already told at its end. */
 	private plain = false;
@@ -911,6 +919,7 @@ export class VoiceGuard {
 		this.input = turnInputOf(messages);
 		this.standing = standingQuestion(messages);
 		this.firstTry = review ? null : firstTryAtCheck(messages);
+		this.opening = !review && !messages.slice(0, messages.findLastIndex(opensTurn)).some((m) => m.role === "assistant");
 		const aside = setAsideOf(messages);
 		this.setAside = aside && !(this.input.words && TAUGHT_INSTEAD.test(this.input.words)) ? aside : null;
 		this.posedLast = posedLast(messages);
@@ -1263,6 +1272,11 @@ export class VoiceGuard {
 		if (below) out.push({ rule: "below", excerpt: below });
 		const pointer = this.posedLast && this.sent === 0 ? sentences(text).map((s) => s.trim()).find((s) => /\b(?:still )?open above\b|\babove,? (?:still )?open\b|\bis (?:still )?(?:waiting|there) above\b/i.test(s)) : undefined;
 		if (pointer) out.push({ rule: "pointer", excerpt: pointer });
+		// A lesson's opening teaches: the reviews due today are Home's to
+		// offer (round 17, m15: every new lesson, a Linear Algebra one
+		// included, opened by listing four due Probability reviews).
+		const dueSaid = this.opening && kind !== "close" && !asksPlan ? DUE_REVIEWS.exec(text) : null;
+		if (dueSaid) out.push({ rule: "due-reviews", excerpt: sentences(text).find((s) => DUE_REVIEWS.test(s))?.trim() ?? dueSaid[0] });
 		const asLesson = this.review ? SESSION_AS_LESSON.exec(text) : null;
 		if (asLesson) out.push({ rule: "review-lesson", excerpt: asLesson[0] });
 		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;

@@ -367,50 +367,10 @@ function studiedLine({ date, daysAgo }: LastStudied): string {
 	return `He last studied this course ${when}: the only day to tell him he last studied, never a moved day's note.`;
 }
 
-/** "A", "A and B", "A, B and C". */
-const listedWords = (names: readonly string[]) => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
-
-/** The reviews today's plan still holds, in any course: what starting
- *  `topic` early puts off. A new topic planned today is not due, and
- *  what it builds on is the probe's to show (round 15, m12: the opener
- *  grew to the plan's day, shaky prerequisites and today's other starts,
- *  and taught nothing). Empty when nothing is due. */
-function displacedReviews(plans: CoursePlans): string[] {
-	return plans.courses.flatMap(({ map: m, days }) => {
-		const today = days.find((d) => d.date === m.today);
-		return (today?.reviews ?? []).map((h) => `your ${m.topics.find((t) => t.handle === h)?.title ?? h} review`);
-	});
-}
-
-/** A topic he started today, from its page or a row, that his plan starts
- *  on a later day, while a review is still due today: the lesson's first
- *  words say that review is still due, in one short clause, and nothing
- *  else of the plan (round 13, 1 n7: a start 11 days early opened on a
- *  bare probe; round 14, m1: the line opened every lesson, a lesson he had
- *  begun, and the Ask-the-tutor reply; round 15, m12: it grew to three
- *  clauses that offered nothing). With nothing due today it says nothing.
- *  `opening` is the session's first words: a start opens with the topic's
- *  title ("Start" and it, or it alone); a continue, a question and a free
- *  message never do. */
-function aheadOfPlanLines(plans: CoursePlans | undefined, opened: readonly string[], opening: string | null): string[] {
-	const map = plans?.courses.find((c) => c.map.workspace === plans.workspace)?.map;
-	if (!plans || !map || !opening) return [];
-	const words = opening.trim().replace(/^Start\s+/, "").toLowerCase();
-	return opened.flatMap((handle) => {
-		const topic = map.topics.find((t) => t.handle === handle);
-		if (!topic || topic.level !== "new" || !topic.starts || topic.starts <= map.today || lessonBegun(topic)) return [];
-		if (words !== topic.title.toLowerCase()) return [];
-		const due = displacedReviews(plans);
-		if (due.length === 0) return [];
-		const clause = `${listedWords(due)} ${due.length > 1 ? "are" : "is"} still due today`;
-		return [`Started early: his plan starts ${topic.title} on a later day, and he starts it today while ${clause}. Your first message says so in one short clause before its question ("${clause[0]!.toUpperCase()}${clause.slice(1)}."), and nothing else about his plan: never its day, what ${topic.title} builds on, or a reason.`];
-	});
-}
-
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
-	{ runup, arcCheck, plan, opened = [], opening = null, live = [], review = false, takenUp = null, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; opening?: string | null; live?: readonly string[]; review?: boolean; takenUp?: string | null; studied?: LastStudied | null } = {},
+	{ runup, arcCheck, plan, opened = [], live = [], review = false, takenUp = null, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; live?: readonly string[]; review?: boolean; takenUp?: string | null; studied?: LastStudied | null } = {},
 ): { key: string; text: string } {
 	const r = obj(resume);
 	const course = obj(r.course);
@@ -428,7 +388,6 @@ export function projectCourseBrief(
 	if (opened.length > 0 && takenUp) lines.push(`Opened on: ${opened.join(", ")}, as its review; its plan then took up ${takenUp}, so the session is now the ${takenUp} lesson, a lesson like any other: what is left of it at its close is that lesson's task, and the close calls it the lesson, never a review.`);
 	else if (opened.length > 0 && review) lines.push(`Opened on: ${opened.join(", ")}, as its review. He pressed its button, and the app posted his first message. The session is his review, whatever it re-teaches.`);
 	else if (opened.length > 0) lines.push(`Opened on: ${opened.join(", ")}. He pressed the action on its page, and the app posted his first message.`);
-	if (!review) lines.push(...aheadOfPlanLines(plan, opened, opening));
 	const topics = list(path.topics)
 		.map((t) => (Array.isArray(t) ? `${String(t[0])} (${String(t[1])})` : undefined))
 		.filter(Boolean);
