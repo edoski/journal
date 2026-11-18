@@ -19,6 +19,9 @@ From the goal, what will the lesson depend on? Each dependency is a strand — b
 - Correct but hesitant (guessing, or thin reasoning) → fragile: step up gently and characterize the shakiness.
 - A strand that never breaks escalates, up to the height the goal needs; holding there, it is done.
 
+- **What today already measured is measured.** Read each topic the lesson stands on with `course_show` before its first question. One whose `standing.last` is dated today was answered today, in another session or in this one: read that answer (`course_show` with its id) and the topic's `gap`. A right answer on his own brackets the strand at that height, and a miss or a gap written today is its ceiling, which the teacher repairs as it teaches. Never ask what those answers show again, in any words.
+- **Stop once he is placed.** A right answer on his own, with its reasoning sound, at the height the lesson starts from places every strand under it: conclude then, and say so in the summary, so the teacher starts above it. A strand that held is never confirmed with a second question.
+
 Every question should move an edge somewhere — no filler, never descending into already-bracketed territory. Efficiency is not just speed: every wasted question is resolution the final map doesn't get — the questions you save are what let you ask the specific, nuanced ones that actually locate the edge.
 
 ## 3. Conclude — `probe_done`
