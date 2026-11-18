@@ -18,7 +18,7 @@ import { MaterialField } from "@/components/new-course-fields";
 import { addMaterialForm, type MaterialPick } from "@/components/new-course-facts";
 import { courseLabel, type CourseSummary } from "@/src/core";
 
-type Course = Pick<CourseSummary, "workspace" | "title">;
+type Course = Pick<CourseSummary, "workspace" | "title"> & Partial<Pick<CourseSummary, "exam">>;
 
 interface CourseDialogProps {
 	/** The course it acts on; null = closed. */
@@ -109,7 +109,8 @@ function RenameCourse({ open, course, onClose, onRenamed, fetchLike = fetch }: O
 }
 
 /** Delete, after asking: the engine forgets the course, so it leaves every
- *  list. What stays is said in the question. */
+ *  list. What stays is said in the question, and its exam day only when it
+ *  has one (round 17, m25: Calculus I, with no exam, read "exam day"). */
 export function DeleteCourseDialog({ course, ...props }: CourseDialogProps & { onDeleted: () => void }) {
 	const { open, shown, opening } = useDialogSubject(course);
 	return shown && <DeleteCourse key={opening} open={open} course={shown} {...props} />;
@@ -133,7 +134,7 @@ function DeleteCourse({ open, course, onClose, onDeleted, fetchLike = fetch }: O
 				<AlertDialogHeader>
 					<AlertDialogTitle>Delete {courseLabel(course)}?</AlertDialogTitle>
 					<AlertDialogDescription>
-						Its topics, plan and exam day leave Home and the calendar. What you studied in it still counts toward your pace, its lessons
+						{course.exam ? "Its topics, plan and exam day leave" : "Its topics and plan leave"} Home and the calendar. What you studied in it still counts toward your pace, its lessons
 						stay in your history, and the files in its folder stay on your Mac.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
