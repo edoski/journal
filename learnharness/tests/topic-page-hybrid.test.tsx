@@ -113,6 +113,9 @@ describe("the hybrid's facts", () => {
 		assert.equal(mapLeftOff(entry("chat_demo_eigen"), facts.action, facts.today), "Left off here", "Now resumes it");
 		assert.equal(mapLeftOff(entry("chat_eigen_before"), facts.action, facts.today), "Stopped here on 6 Nov", "nothing resumes it");
 		assert.equal(hybridMarks({ ...DET_PLAN, id: "chat_eigen_before" }, false, "Stopped here on 6 Nov").get(DET_PLAN.current!)!.tag, "Stopped here on 6 Nov");
+		const det = factsOf(DET, [DET_LESSON], [DET_PLAN]);
+		assert.equal(det.action.kind, "continue");
+		assert.equal(mapLeftOff(det.sessions[0]!, det.action, det.today), "Stopped here yesterday", "Continue carries on a task elsewhere, never where the plan stopped");
 		assert.equal(stoppedHereWords(0, "2026-11-08"), "Stopped here today");
 		assert.equal(stoppedHereWords(1, "2026-11-08"), "Stopped here yesterday");
 	});

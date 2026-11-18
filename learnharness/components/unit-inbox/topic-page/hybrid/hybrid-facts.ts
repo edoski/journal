@@ -33,11 +33,13 @@ export function mapLessonAtFirst(sessions: readonly SessionEntry[], action: Topi
 }
 
 /** The words over the step a lesson stopped on: "Left off here" when the
- *  page's action opens that lesson, else the day it stopped, "Stopped here
- *  on 6 Nov" (round 16, m22: the 5 and 6 Nov lessons' maps said "Left off
- *  at A worked example" while Now resumed nothing of them). */
+ *  page's action resumes that lesson where it stopped, else the day it
+ *  stopped, "Stopped here on 6 Nov" (round 16, m22: the 5 and 6 Nov
+ *  lessons' maps said "Left off at A worked example" while Now resumed
+ *  nothing of them, or continued a task at part (c), elsewhere). */
 export function mapLeftOff(entry: SessionEntry, action: TopicAction, today: string): string {
-	return "chat" in action && action.chat.id === entry.chat.id ? LEFT_OFF_HERE : stoppedHereWords(daysBetween(entry.day, today), today);
+	const resumes = (action.kind === "resume" || action.kind === "open") && action.chat.id === entry.chat.id;
+	return resumes ? LEFT_OFF_HERE : stoppedHereWords(daysBetween(entry.day, today), today);
 }
 
 /** The step after the one the lesson stopped on, as the lesson's ⌘K
