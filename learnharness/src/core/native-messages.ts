@@ -1224,6 +1224,25 @@ export function sessionPlanTopicOf(messages: readonly LhMessage[]): string | nul
 	return null;
 }
 
+/** When the session's saved answers on each topic came: the time of the
+ *  newest message whose save went through with an answer on it, by topic.
+ *  Pure. */
+export function savedAnswerTimesOf(messages: readonly LhMessage[]): Map<string, number> {
+	const clean = cleanToolCallIds(messages);
+	const at = new Map<string, number>();
+	for (const m of messages) {
+		if (m.role !== "assistant" || typeof m.timestamp !== "number") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const changes = saveChanges(block.arguments as Record<string, unknown>);
+			for (const o of Array.isArray(changes?.observations) ? changes.observations : []) {
+				for (const t of strings((o as { topics?: unknown } | null)?.topics)) at.set(t, Math.max(at.get(t) ?? 0, m.timestamp));
+			}
+		}
+	}
+	return at;
+}
+
 /** The topics the session's saved answers were on: each observation's
  *  `topics` in the saves that went through, in order. Pure. */
 export function savedAnswerTopicsOf(messages: readonly LhMessage[]): string[] {

@@ -743,7 +743,18 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 			],
 		});
 		app.doneForToday(id, "Binomial distribution comes back for review another day.");
-		await holds("Sun 8 Nov, after the Probability review");
+		// Round 17, M4 (3 N2, 1 m4): the review's other topics got no answer today, so Home keeps their line, which
+		// picks up the review he left, as the calendar still lists them today.
+		await holds("Sun 8 Nov, after the Probability review", (s) => {
+			const prob = s.courses.find((c) => c.map.title === "Probability")!;
+			const rest = (prob.due ?? []).filter((h) => h !== "binomial").map((h) => prob.map.topics.find((t) => t.handle === h)!);
+			assert.ok(rest.length > 0, "the seeded Probability review holds topics beside Binomial");
+			const line = s.home.find((l) => l.course === "Probability" && l.title.startsWith("Review "));
+			assert.ok(line, `Home keeps the review of the topics he did not answer today (${rest.map((t) => t.title).join(", ")}): ${s.home.map((l) => l.title).join(" | ")}`);
+			assert.ok(opensChat(line.opens, id), `the line picks up the review he left: it opens ${line.opens}`);
+			for (const topic of rest.filter((t) => !t.title.includes("$"))) assert.ok(names(line.title, topic.title), `the line names ${topic.title}: "${line.title}"`);
+			assert.ok(!names(line.title, "Binomial distribution"), `the line leaves out Binomial, answered today: "${line.title}"`);
+		});
 	});
 
 	it("Mon 9 Nov, overnight", async () => {
