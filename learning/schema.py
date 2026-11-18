@@ -773,6 +773,13 @@ _THIRD_PERSON = re.compile(
     r"\b(?:he|him|his|himself|she|her|hers|herself|learners?|the\s+students?)\b",
     re.IGNORECASE,
 )
+# A gap opening with an instruction to a later session ("Check on a fresh map
+# that you find..."): the learner reads a gap as what goes wrong for them, so
+# what to check next goes in the topic's review prompt (round 16, m24).
+_INSTRUCTION = re.compile(
+    r"^\s*(?:check|test|retest|ask|verify|confirm|make\s+sure|see\s+(?:if|whether)|have\s+(?:you|them))\b",
+    re.IGNORECASE,
+)
 # A dash used as punctuation: any em dash, or an en dash with space on both
 # sides. A name or a range keeps its unspaced en dash (Cauchy–Schwarz, 1–5).
 _PROSE_DASH = re.compile(r"\u2014|\s\u2013\s")
@@ -803,6 +810,13 @@ def _learner_reads(kind: str, item: dict[str, Any], path: str) -> None:
             raise ValueError(
                 f'{where} speaks of the learner as "{found[0]}", but {reads}: '
                 'write it to them, as "you", and save again'
+            )
+        if kind == "topic" and name == "gap" and (found := _INSTRUCTION.search(text)):
+            raise ValueError(
+                f'{where} opens with "{found[0].strip()}", an instruction to a '
+                f"later session, but {reads} as what goes wrong for them: say "
+                'what goes wrong ("You find the columns as..."), put what to '
+                "check next in the topic's review prompt, and save again"
             )
         if name in WRITTEN_TO_LEARNER.get(kind, ()) and _PROSE_DASH.search(text):
             raise ValueError(

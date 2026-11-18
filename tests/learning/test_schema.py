@@ -881,6 +881,20 @@ def test_text_the_learner_reads_is_written_to_them() -> None:
         "topics.rank.gap",
         "uses a dash as punctuation",
     )
+    # Round 16, m24: the topic page showed "Check on a fresh map that you find
+    # an inverse's columns as..." under his topic's title.
+    fails(
+        schema.empty(),
+        {
+            "topics": {
+                "inv": {
+                    "gap": "Check on a fresh map that you find an inverse's columns"
+                }
+            }
+        },
+        "topics.inv.gap",
+        'opens with "Check"',
+    )
     fails(
         schema.empty(),
         {"tasks": {"rank": {"title": "Rank", "step": "Part (c) \u2013 the kernel"}}},
@@ -902,6 +916,8 @@ def test_text_the_learner_reads_is_written_to_them() -> None:
         }
     )
     assert record["topics"]["walks"]["gap"] == "You stop one step early"
+    checks = course({"topics": {"r": {"title": "R", "gap": "Checks only one column"}}})
+    assert checks["topics"]["r"]["gap"] == "Checks only one column"
     named = course(
         {
             "topics": {
