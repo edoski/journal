@@ -40,7 +40,7 @@ import { normalizeQuestionType, PREDICT_RULE } from "../core/question-core.ts";
 import { sameQuestionKey } from "../core/shown-help.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
-import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
+import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, HIS_MESSAGE, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
 import { adviceSentences, partialDay, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, recordMarkWords, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
@@ -268,6 +268,25 @@ const HARD: ReadonlySet<VoiceRule> = new Set(["questions", "compound", "verdict"
 
 const SAVE_TOOL = "course_save";
 
+/** Words about a mark he did not dispute: that it looks wrong, that it
+ *  could change, or how to dispute it (round 17, m18: "I can't change
+ *  those two card marks myself, but disputing them from the cards gets
+ *  them re-marked."). */
+const MARK_TALK = /\bre-mark(?:ed|ing|s)?\b|\bdisput(?:e|ed|es|ing)\b|\b(?:change|fix|correct)(?:s|ed|ing)? (?:(?:those|these|the|its|their|your|that|this|two|both|earlier|card)\s+)*marks?\b|\bmarks? (?:are|is|was|were|look|looks) (?:wrong|off|mistaken)\b|\bkeeps? (?:their|its) marks?\b/i;
+/** His words about a mark: then a reply may answer them. */
+const HIS_MARK_WORDS = /\b(?:mark(?:s|ed)?|dispute|re-?mark|card)\b/i;
+/** A reply that says how his answer was judged. */
+const VERDICT_SAID = /\b(?:right|correct|wrong|incorrect)\b/i;
+
+/** Words that start the lesson he is closing (round 17, m19: "…waits
+ *  for you in Linear maps and their matrices, which you start tomorrow"
+ *  closing a lesson he began that morning). */
+const STARTS_IT = /\b(?:which|that) you (?:start|begin)\b|\byou (?:start|begin) (?:it|this(?: lesson)?|the lesson)\b/i;
+
+/** Words that tell him reviews are due: "your Binomial distribution
+ *  review is still due today", "due today: your Kernel review". */
+const DUE_REVIEWS = /\breviews?\b[^.?!]{0,40}?\b(?:still )?(?:over)?due\b|\b(?:over)?due (?:today|now)\b[^.?!]{0,60}?\breviews?\b/i;
+
 /** The session called a lesson, which a review never is (round 9, 2 m4:
  *  the Binomial review closed on "the binomial lesson"). */
 const SESSION_AS_LESSON = /\b(?:this|today'?s|the|our|your)(?: [a-z]+)? lesson\b/i;
@@ -324,6 +343,61 @@ function firstTryAtCheck(messages: readonly LhMessage[]): { id: string; question
 	for (const [id, other] of answered) if (id !== input.toolCallId && other.tool === "explain" && other.asked === answer.asked) return null;
 	return { id: input.toolCallId, question: answer.asked };
 }
+
+/** His answer opening this turn, when it is a later try at a lesson's
+ *  check he had answered before: the check's call and its right answer
+ *  (`correctAnswer`). Null for a first try, a prediction or a Show me. */
+function retryAtCheck(messages: readonly LhMessage[]): { id: string; correct: string; question: string } | null {
+	const input = messages[messages.findLastIndex(opensTurn)];
+	if (input?.role !== "toolResult" || input.isError || input.toolName !== "explain" || !isRealAnswer(input.details)) return null;
+	const answered = answeredQuestionsOf(messages);
+	const answer = answered.get(input.toolCallId);
+	if (!answer?.asked || answer.predicted || answer.showMe) return null;
+	if (![...answered].some(([id, other]) => id !== input.toolCallId && other.tool === "explain" && other.asked === answer.asked)) return null;
+	for (const m of messages) {
+		if (m.role !== "assistant") continue;
+		const call = m.content.find((b): b is ToolCall => b.type === "toolCall" && b.id === input.toolCallId);
+		const correct = call && isRecord(call.arguments) ? call.arguments.correctAnswer : undefined;
+		if (call) return typeof correct === "string" && correct.trim() ? { id: input.toolCallId, correct, question: questionText(call) ?? "" } : null;
+	}
+	return null;
+}
+
+const INLINE_OR_DISPLAY = /\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\$([^$\n]+)\$/g;
+/** TeX read for its content: spacing, sizing and the matrix's bracket aside. */
+const texKey = (tex: string) => tex.replace(/\\(?:left|right|big|Big|,|;|!|quad|qquad)(?![a-zA-Z])/g, "").replace(/\\(?:dfrac|tfrac)/g, "\\frac").replace(/[pbvBV]?matrix\}/g, "matrix}").replace(/\s+/g, "");
+const mathsOf = (text: string) => [...text.matchAll(INLINE_OR_DISPLAY)].map((m) => texKey(m[1] ?? m[2] ?? m[3] ?? "")).filter(Boolean);
+
+/** Whether `said` writes out a right answer's maths: one of its matrices
+ *  the question did not already show, or the value its last relation
+ *  gives (the side after its last "="), as a whole side of a relation he
+ *  reads. True when the right answer has no maths to look for. */
+function writesAnswer({ correct, question }: { correct: string; question: string }, said: readonly string[]): boolean {
+	const maths = mathsOf(correct);
+	if (maths.length === 0) return true;
+	const given = new Set(mathsOf(question).flatMap((t) => [...t.matchAll(MATRIX)].map((m) => texKey(m[0]))));
+	const matrices = maths.flatMap((t) => [...t.matchAll(MATRIX)].map((m) => texKey(m[0]))).filter((m) => !given.has(m));
+	const wanted = matrices.length > 0 ? matrices : maths.map((t) => t.split("=").at(-1)!).filter(Boolean);
+	const shown = said.flatMap(mathsOf);
+	const sides = new Set(shown.flatMap((t) => [t, ...t.split("=")]));
+	return wanted.some((w) => (w.length >= 6 ? shown.some((t) => t.includes(w)) : sides.has(w)));
+}
+
+/** A question posed after a second miss whose repair never wrote the
+ *  right answer (round 17, m16: "What is A⁻¹?" got a break, a rule and a
+ *  twin, never (0 1; −1 0)). */
+const REPAIRED = (correct: string): AgentToolResult<unknown> => ({
+	content: [
+		{
+			type: "text",
+			text: `Not posed: his second try at your check was not right either, and your repair never writes its right answer. Send him with send_to_user the repair ending on the right answer, written out in its maths: ${JSON.stringify(correct)}. Then ask your next question.`,
+		},
+	],
+	isError: true,
+	details: { withheld: "repaired" },
+});
+const VERDICT_NOTE = "His answer's save failed, so his card shows no mark, and nothing you sent says how his answer was judged. Send him the verdict in words, opening on it (\"Right, …\", \"Not right: …\").";
+const REPAIRED_NOTE = "His second try at your check was not right either, and nothing you sent writes its right answer. Send the repair ending on the right answer, written out in its maths.";
 
 /** The rulings a save records on a dispute (`ruling` on each re-mark). */
 function savedRulings(args: unknown): string[] {
@@ -579,6 +653,16 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `A prediction asks for his guess, and this question asks him to work something out: ${quoted(b.excerpt)}. ${PREDICT_RULE} So pose it as \`type: check\`, counted; only a question he cannot yet work out is a prediction, and its words then ask for his guess ("What do you expect…").`;
 		case "unbuilt":
 			return `The demo you called for this turn is still being built, so it is not on his screen: ${quoted(b.excerpt)}. It appears where you called for it once it is built, and a message tells you then. Until that message, say nothing of it and ask nothing that needs it: teach the step in words now, and point him at the demo, and ask what needs it, once it has arrived.`;
+		case "due-reviews":
+			return `A lesson opens on its first step, and his reviews due today are already on Home: ${quoted(b.excerpt)}. Leave the reviews out and open on the lesson.`;
+		case "undisputed":
+			return `He disputed no mark, so say nothing of one, nor of how to dispute it: ${quoted(b.excerpt)}. Leave it out; every mark he has not disputed stands as recorded.`;
+		case "verdict-words":
+			return `His answer's save failed, so his card shows no mark, and this reply never says how his answer was judged: ${quoted(b.excerpt)}. Open on the verdict in words ("Right, …", "Not right: …", "Partly right: …"), then the rest.`;
+		case "begun":
+			return `This lesson began today, so at its close it continues, never starts: ${quoted(b.excerpt)}. Say it continues on its day ("which you continue tomorrow, Monday 9 November").`;
+		case "vector":
+			return `A short vector goes inline as a tuple, $(1,1)$, or $(1,1)^{\\mathsf T}$ when it is a column, never as a column matrix in a sentence or a display of its own, which stacks it over several lines: ${quoted(b.excerpt)}. Keep display maths for matrices and equations.`;
 		case "review-lesson":
 			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
@@ -712,6 +796,46 @@ const RETRY = (question: string): AgentToolResult<unknown> => ({
 });
 const RETRY_NOTE = "His first try at your check was not right, and he has not tried it again. Ask the check again with explain, its question word for word, after one nudge toward his next move, never the correction.";
 
+/** The question he set aside to ask something from Ask, when this turn
+ *  answers that message: its tool, its words and their key. It is still
+ *  open above, so the turn asks it again word for word (round 17, 3 N1:
+ *  after "why does RS = I not force SR = I here…" the tutor posed a new
+ *  check on the same step, the screen drew it as "Your turn, on the
+ *  question above" over the SR question, and his SR answer was filed
+ *  under the hidden one). */
+function setAsideOf(messages: readonly LhMessage[]): { tool: string; question: string; key: string } | null {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "user" || m.role === "custom") continue;
+		if (m.role !== "toolResult" || !GRADED_QUESTION_TOOLS.includes(m.toolName) || !isRecord(m.details) || m.details.dismissed !== true || m.details.reason !== "asked") return null;
+		for (let j = i - 1; j >= 0; j--) {
+			const a = messages[j]!;
+			if (a.role !== "assistant") continue;
+			const call = a.content.find((b): b is ToolCall => b.type === "toolCall" && b.id === m.toolCallId);
+			const question = call ? questionText(call) : undefined;
+			if (call && question) return { tool: call.name, question, key: sameQuestionKey(question) };
+		}
+		return null;
+	}
+	return null;
+}
+
+/** His message asks to be taught or told instead of asked: the question
+ *  he set aside is set aside for good (ASKED_INSTEAD_TEXT). */
+const TAUGHT_INSTEAD = /\b(?:stop (?:quizzing|asking|testing)|no more (?:questions|quizzing)|just (?:explain|tell|teach|show)|teach (?:me|it) instead|explain (?:it )?instead|skip (?:it|this|the question))\b/i;
+
+/** A question other than the one he set aside to ask something. */
+const SET_ASIDE = (tool: string, question: string): AgentToolResult<unknown> => ({
+	content: [
+		{
+			type: "text",
+			text: `Not posed: he set the open question aside only to ask you something, and it is still open above, as he left it. Answer his message, then ask it again with ${tool}, its question word for word: ${JSON.stringify(question)}. A new question comes after he has answered that one.`,
+		},
+	],
+	isError: true,
+	details: { withheld: "set-aside" },
+});
+
 /** A question posed straight after an unsure answer, with no words. */
 const UNSURE = (why: string): AgentToolResult<unknown> => ({
 	content: [
@@ -813,6 +937,23 @@ export class VoiceGuard {
 	private readonly firstTry: { id: string; question: string } | null;
 	private retryOwed = false;
 	private heldRetry = false;
+	/** His answer opening the turn is a later try at a check, with the
+	 *  check's right answer, and whether this turn saved it not right: the
+	 *  repair then writes the right answer before any next question. */
+	private readonly secondTry: { id: string; correct: string; question: string } | null;
+	private repairOwed = false;
+	private heldRepair = false;
+	/** The question he set aside to ask the message this turn answers:
+	 *  the turn asks it again before any other, unless his message was
+	 *  his answer (a save names it), asked to guess first (a prediction
+	 *  goes through) or asked to be taught instead. Held once a turn. */
+	private setAside: { tool: string; question: string; key: string } | null;
+	private heldSetAside = false;
+	/** A save of his answer failed this turn, and no message has said its
+	 *  verdict: his card shows no mark while the record can't be read. */
+	private verdictOwed = false;
+	/** The turn opens a lesson: nothing was said in the session before it. */
+	private readonly opening: boolean;
 	/** Ordinary text this turn took out of a reply, and whether the turn
 	 *  posed a question he can answer, and was already told at its end. */
 	private plain = false;
@@ -865,6 +1006,11 @@ export class VoiceGuard {
 		this.input = turnInputOf(messages);
 		this.standing = standingQuestion(messages);
 		this.firstTry = review ? null : firstTryAtCheck(messages);
+		this.secondTry = review ? null : retryAtCheck(messages);
+		this.opening = !review && !messages.slice(0, messages.findLastIndex(opensTurn)).some((m) => m.role === "assistant");
+		const aside = setAsideOf(messages);
+		// A guess he asks to make first is the guess rule's: it is posed as a prediction.
+		this.setAside = aside && !this.input.guess && !(this.input.words && TAUGHT_INSTEAD.test(this.input.words)) ? aside : null;
 		this.posedLast = posedLast(messages);
 		this.stepsAhead = stepsNotDone(messages);
 		this.unsaved = saves ? unsavedAnswerOf(messages) : null;
@@ -927,7 +1073,12 @@ export class VoiceGuard {
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
 		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
-		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.retryOwed ? RETRY_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
+		if (this.verdictOwed && !this.noted.has(VERDICT_NOTE)) {
+			this.noted.add(VERDICT_NOTE);
+			return VERDICT_NOTE;
+		}
+		const unrepaired = this.repairOwed && !writesAnswer(this.secondTry!, this.toldNow);
+		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.retryOwed ? RETRY_NOTE : unrepaired ? REPAIRED_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
 		if (!note || this.noted.has(note)) return undefined;
 		this.noted.add(note);
 		return note;
@@ -946,6 +1097,8 @@ export class VoiceGuard {
 				const result = await tool.execute(toolCallId, params, signal, onUpdate);
 				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
 				if (tool.name === LESSON_PROGRESS_TOOL && !result.isError) this.dayItems = dayItemsIn(result) ?? this.dayItems;
+				if (this.saveFailed(tool.name, params, result)) this.verdictOwed = !this.toldNow.some((t) => VERDICT_SAID.test(t));
+				else if (tool.name === SAVE_TOOL && !result.isError && savedObservations(isRecord(params) ? params : {}).length > 0) this.verdictOwed = false;
 				if (this.kept?.call.id === toolCallId) {
 					if (result.isError) this.letGo();
 					else { this.kept.ran = true; return KEPT(tool.name); }
@@ -977,6 +1130,8 @@ export class VoiceGuard {
 		// names his answer keeps it, so the question after it goes through.
 		if (call.name === SAVE_TOOL && this.unsaved && savedQuestionsOf(call.arguments).includes(this.unsaved)) this.unsaved = null;
 		if (call.name === SAVE_TOOL && this.firstTry && savedNotRight(call.arguments, this.firstTry.id)) this.retryOwed = true;
+		if (call.name === SAVE_TOOL && this.secondTry && savedNotRight(call.arguments, this.secondTry.id)) this.repairOwed = true;
+		if (call.name === SAVE_TOOL && this.setAside && savedQuestionsOf(call.arguments).includes(HIS_MESSAGE)) this.setAside = null;
 		if (this.unsaved && !this.heldUnsaved && (this.endsTurn(call.name) || call.name === PROBE_DONE_TOOL)) {
 			this.heldUnsaved = true;
 			return UNSAVED(call.name);
@@ -1010,6 +1165,7 @@ export class VoiceGuard {
 			this.lengthDraft = null;
 			if (this.kept || this.waiting.size > 0) this.releasing = call.id;
 			this.toldNow.push(text);
+			if (VERDICT_SAID.test(text)) this.verdictOwed = false;
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
 			this.said.push(text);
 			this.asked.push(...sentences(text).filter((s) => s.trim().endsWith("?")));
@@ -1067,6 +1223,10 @@ export class VoiceGuard {
 			this.heldUnsure = true;
 			return UNSURE(this.input.unsure);
 		}
+		if (this.repairOwed && !this.heldRepair && !writesAnswer(this.secondTry!, this.toldNow)) {
+			this.heldRepair = true;
+			return REPAIRED(this.secondTry!.correct);
+		}
 		if (this.retryOwed && !this.heldRetry && !(call.name === "explain" && sameQuestionKey(text) === this.firstTry?.question)) {
 			this.heldRetry = true;
 			return RETRY(this.firstTry!.question);
@@ -1076,6 +1236,14 @@ export class VoiceGuard {
 			this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 			return refusal("question", call.name, text, breaks, undefined);
 		}
+		// A prediction he is invited to make is the guess rule's: it never counts.
+		const asksAside = !!this.setAside && GRADED_QUESTION_TOOLS.includes(call.name) && sameQuestionKey(text) === this.setAside.key;
+		const predicts = normalizeQuestionType(isRecord(call.arguments) ? call.arguments.type : undefined) === "predict";
+		if (this.setAside && GRADED_QUESTION_TOOLS.includes(call.name) && !asksAside && !predicts && !this.heldSetAside) {
+			this.heldSetAside = true;
+			return SET_ASIDE(this.setAside.tool, this.setAside.question);
+		}
+		if (asksAside) this.setAside = null;
 		if (keeps && parseQuestionInput(call.name, call.arguments)) {
 			this.letGo();
 			this.kept = { call, text, ran: false };
@@ -1113,6 +1281,14 @@ export class VoiceGuard {
 		this.posedUnder = this.releasing;
 		this.kept = null;
 		this.releasing = null;
+	}
+
+	/** A save of his answer that did not go through: a `course_save` of
+	 *  his attempts refused, or a problem's conclude whose attempts were
+	 *  kept unsaved (the record could not be read). */
+	private saveFailed(name: string, params: unknown, result: AgentToolResult<unknown>): boolean {
+		if (name === PRACTICE_CONCLUDE_TOOL) return isRecord(result.details) && Array.isArray(result.details.unsaved) && result.details.unsaved.length > 0;
+		return name === SAVE_TOOL && result.isError === true && savedObservations(isRecord(params) ? params : {}).some((o) => typeof o.result === "string");
 	}
 
 	/** Lets go of the kept question. One whose tool refused it goes back
@@ -1207,6 +1383,16 @@ export class VoiceGuard {
 		if (below) out.push({ rule: "below", excerpt: below });
 		const pointer = this.posedLast && this.sent === 0 ? sentences(text).map((s) => s.trim()).find((s) => /\b(?:still )?open above\b|\babove,? (?:still )?open\b|\bis (?:still )?(?:waiting|there) above\b/i.test(s)) : undefined;
 		if (pointer) out.push({ rule: "pointer", excerpt: pointer });
+		// A lesson's opening teaches: the reviews due today are Home's to
+		// offer (round 17, m15: every new lesson, a Linear Algebra one
+		// included, opened by listing four due Probability reviews).
+		const markTalk = !this.input.ruling && !HIS_MARK_WORDS.test(this.input.words ?? "") ? sentences(text).find((s) => MARK_TALK.test(s)) : undefined;
+		if (markTalk) out.push({ rule: "undisputed", excerpt: markTalk.trim() });
+		if (this.verdictOwed && !VERDICT_SAID.test(text)) out.push({ rule: "verdict-words", excerpt: first });
+		const startsBegun = kind === "close" && !this.review && this.earlier.length > this.told.length ? sentences(text).find((s) => STARTS_IT.test(s)) : undefined;
+		if (startsBegun) out.push({ rule: "begun", excerpt: startsBegun.trim() });
+		const dueSaid = this.opening && kind !== "close" && !asksPlan ? DUE_REVIEWS.exec(text) : null;
+		if (dueSaid) out.push({ rule: "due-reviews", excerpt: sentences(text).find((s) => DUE_REVIEWS.test(s))?.trim() ?? dueSaid[0] });
 		const asLesson = this.review ? SESSION_AS_LESSON.exec(text) : null;
 		if (asLesson) out.push({ rule: "review-lesson", excerpt: asLesson[0] });
 		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;

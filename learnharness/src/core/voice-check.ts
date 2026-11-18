@@ -72,7 +72,12 @@ export type VoiceRule =
 	| "arrival"
 	| "own-words"
 	| "mark-case"
-	| "not-yet";
+	| "not-yet"
+	| "due-reviews"
+	| "undisputed"
+	| "verdict-words"
+	| "begun"
+	| "vector";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -139,7 +144,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// Its own earlier words are nothing he acts on: what is true is said
 	// as itself (round 15, m17: "My earlier line saying the set was done
 	// was wrong, since one problem is not a set.").
-	{ rule: "own-words", re: /\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b/i },
+	// Round 17, m18: "A correction to what I said earlier: …", pointing at
+	// a turn end he never saw.
+	{ rule: "own-words", re: /\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b|\b(?:a )?correction to what I (?:said|wrote|told you)\b|\b(?:correcting|to correct) what I (?:said|wrote)\b|\bwhat I (?:said|wrote|told you) (?:earlier|before|above)\b/i },
 	// What he has not done yet is no step for him: it reads as a reproach
 	// (round 16, m13: "You still haven't started Linear maps and their
 	// matrices." closing a lesson under his half answer).
@@ -148,6 +155,31 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// (round 15, m18: "The mark stands as With help").
 	{ rule: "mark-case", re: /(?<=[a-z0-9,;)]\s+)(?:With help|On your own|Partly right|Not right|Gave up|Not yet confirmed|Prediction, not counted|Guessing|Confident)\b/ },
 ];
+
+const MATHS_SPANS = /\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\$([^$\n]+)\$/g;
+const ONE_COLUMN = /\\begin\{([pbvBV]?matrix)\}([^&]*?)\\end\{\1\}/;
+
+/** A short vector set as a column matrix in a sentence, or as a display
+ *  of its own: each stacks its entries on lines of their own, so "sends
+ *  (1,1) to (2,0) and (1,−1) to (0,4)" spans six lines, with "to" and
+ *  "and" alone between them (round 17, m20). Written inline as a tuple,
+ *  $(1,1)$, it reads as one line; display maths is for matrices and
+ *  equations. The vector's maths, or null. */
+export function columnVector(text: string): string | null {
+	for (const m of text.matchAll(MATHS_SPANS)) {
+		const inline = m[3];
+		const display = m[1] ?? m[2];
+		const tex = (inline ?? display ?? "").trim();
+		const column = ONE_COLUMN.exec(tex);
+		if (!column) continue;
+		const entries = column[2]!.split(/\\\\/).filter((e) => e.trim()).length;
+		if (entries > 4) continue;
+		// A display is a vector alone when nothing but the column (and a
+		// closing mark) is in it.
+		if (inline !== undefined || tex.replace(column[0], "").replace(/[.,;\s]/g, "") === "") return tex;
+	}
+	return null;
+}
 
 /** A sentence that puts a question or his answer to it below the message
  *  ("…the question about P is ready for your answer below."). Right only
@@ -327,6 +359,8 @@ export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	if (lone) out.push({ rule: "operand", excerpt: lone[0] });
 	const words = mathsWords(text);
 	if (words) out.push({ rule: "maths-words", excerpt: words });
+	const vector = columnVector(text);
+	if (vector) out.push({ rule: "vector", excerpt: vector });
 	if (!kind) return out;
 	const load = sentenceLoad(said);
 	if (load > SENTENCE_BUDGETS[kind]) out.push({ rule: "length", excerpt: `${load} sentences, budget ${SENTENCE_BUDGETS[kind]}` });
