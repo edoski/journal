@@ -562,7 +562,7 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `His answer card already says "${card}" above your reply, and your opening says it again: ${quoted(said)}. Open on where it broke, the fact itself, never on the verdict, and never soften it.`;
 		}
 		case "contrast":
-			return `"You held that…, whereas…" reads as a formula after the break is already said: ${quoted(b.excerpt)}. Leave it out; say one plain sentence of contrast only when it adds something the break did not.`;
+			return `"You …, whereas …" reads as a formula after the break is already said: ${quoted(b.excerpt)}. Leave it out; say one plain sentence of contrast only when it adds something the break did not, never one that opens on what he did.`;
 		case "hint-question":
 			return `A hint gives him what the question did not, said as a statement: the next move ("Subtract row 1 from row 3 and look at what is left") or a fact the question left out. This one asks him a question instead: ${quoted(b.excerpt)}. Say the move or the fact; his question is asked again after it.`;
 		case "credit": {

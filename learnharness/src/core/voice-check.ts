@@ -318,8 +318,17 @@ export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	if (kind === "right" && said[0] && /\b(?:is|are|was|were) (?:right|correct)\b|^(?:right|correct|yes)\b/i.test(said[0])) {
 		out.push({ rule: "feedback", excerpt: said[0] });
 	}
+	const formula = kind === "wrong" || kind === "close" ? said.find((s) => CONTRAST_FORMULA.test(s.trim())) : undefined;
+	if (formula && !out.some((b) => b.rule === "contrast")) out.push({ rule: "contrast", excerpt: formula.trim() });
 	return out;
 }
+
+/** A reply to his answer that sets what he did against what is true in
+ *  one "You …, whereas …" sentence: the formula round 14 removed for "You
+ *  held that", back with any verb after the break was already said (round
+ *  16, m10: "You counted one arrangement for one head, whereas the binomial
+ *  coefficient counts all six."). Teaching may contrast two cases freely. */
+const CONTRAST_FORMULA = /^you\b[^.?!]*\b(?:whereas|when in fact|but in fact|while in fact)\b/i;
 
 /** Each relation a display line can state, by kind: a chain of one kind
  *  ("a = b = c", "0 < x < 1") states one relation, a mix ("= … → … =")
