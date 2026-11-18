@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MathText } from "@/components/ui/math-text";
-import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords, pressWord } from "@/components/study-words";
+import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords, finalReviewGapWords, pressWord } from "@/components/study-words";
+import { misfitWords } from "@/components/calendar/calendar-facts";
 import { examGapAskCreation, topicPress } from "@/components/unit-inbox/start-unit";
 import { useStartScope } from "@/components/start/start-scope";
 import { examGaps } from "@/components/course-page/course-head/head-facts";
@@ -33,12 +35,16 @@ const PRESS = "h-auto min-h-6 min-w-0 shrink justify-start px-0 has-[>svg]:px-0 
 export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: readonly ChatListItem[] }) {
 	const router = useRouter();
 	const { start, starting } = useStartScope();
+	const [listed, setListed] = useState(false);
 	const gaps = examGaps(course.map);
 	if (!gaps) return null;
 	const { workspace } = course.map;
 	const titles = (topics: readonly CourseMapTopic[]) => topics.map((t) => t.title);
 	const reasoned = (topics: readonly CourseMapTopic[]) => topics.map((t) => ({ title: t.title, reason: course.map.exam?.reasons?.[t.handle] }));
-	const why = examGapWhyWords(reasoned(gaps.start), reasoned(gaps.review));
+	// The one consequence, naming no topic; the topics themselves are behind Which topics (round 17, m6: a
+	// 90-word paragraph listing 11 topics on the exam eve).
+	const why = examGapWhyWords(reasoned(gaps.start), reasoned(gaps.review), false);
+	const which = [...(misfitWords(titles(gaps.start)) ? [misfitWords(titles(gaps.start))!] : []), ...finalReviewGapWords(reasoned(gaps.review))];
 	const { ways } = gaps;
 	const named = [...gaps.start, ...gaps.review];
 	const press = (topic: CourseMapTopic) => topicPress(topic, course.map, chats);
@@ -63,6 +69,20 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 					<MathText>{why}</MathText>
 				</span>
 			)}
+			{why && (
+				<Button variant="quiet" size="xs" data-slot="exam-gaps-which-press" aria-expanded={listed} className={PRESS} onClick={() => setListed((open) => !open)}>
+					{EXAM_GAP_WORDS.which}
+				</Button>
+			)}
+			{listed && (
+				<span data-slot="exam-gaps-which" className="flex w-full flex-col gap-1 text-foreground">
+					{which.map((line) => (
+						<span key={line}>
+							<MathText>{line}</MathText>
+						</span>
+					))}
+				</span>
+			)}
 			{ways.length === 0 ? null : only ? (
 				<Button variant="quiet" size="xs" className={PRESS} disabled={starting !== null} onClick={() => open(only.topic)}>
 					{EXAM_GAP_WORDS[verb(only)]}
@@ -80,11 +100,20 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start">
-						{others.map((way) => (
-							<DropdownMenuItem key={way.topic.handle} onSelect={() => open(way.topic)}>
-								<MathText>{`${pressWord(verb(way))} ${way.topic.title}`}</MathText>
-							</DropdownMenuItem>
-						))}
+						{/* Marked by what they are: the plan's own for today, then the topics it leaves out (round 17, m6:
+						    16 options with none marked). */}
+						{[{ label: EXAM_GAP_WORDS.planned, ways: others.filter((way) => way.planned) }, { label: EXAM_GAP_WORDS.leftOut, ways: others.filter((way) => !way.planned) }].map((group) =>
+							group.ways.length === 0 ? null : (
+								<DropdownMenuGroup key={group.label} data-slot="exam-gaps-group">
+									<DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+									{group.ways.map((way) => (
+										<DropdownMenuItem key={way.topic.handle} onSelect={() => open(way.topic)}>
+											<MathText>{`${pressWord(verb(way))} ${way.topic.title}`}</MathText>
+										</DropdownMenuItem>
+									))}
+								</DropdownMenuGroup>
+							),
+						)}
 					</DropdownMenuContent>
 				</DropdownMenu>
 				)}

@@ -80,7 +80,7 @@ const eve: StudyCourse = {
 	...course,
 	map: {
 		...course.map,
-		exam: { ...course.map.exam!, doesNotFit: LOST.map((_, i) => h(`lost-${i}`)) },
+		exam: { ...course.map.exam!, doesNotFit: LOST.map((_, i) => h(`lost-${i}`)), reasons: Object.fromEntries(LOST.map((_, i) => [`lost-${i}`, i < 5 ? "full" : "not_ready"])) as never },
 		current: h("perms"),
 		topics: [
 			topic("perms", "Permutations, $k$-permutations and factorials", { level: "assisted", introduced: "2026-11-02", review: { kind: "due", date: "2026-11-09", overdue: 8 } as CourseMapTopic["review"] }),

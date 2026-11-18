@@ -136,8 +136,15 @@ describe("the exam eve at the new world's size (round 17, M3)", () => {
 			const lineOf = (c: number) => lines.findLastIndex((l) => c >= l - 0.5);
 			return { words: press.textContent, order: centres.map(lineOf) };
 		});
-		await page.close();
 		assert.match(pick.words ?? "", /^Review Permutations, .*-permutations and factorials today$/);
+		// Round 17, m6 (1 m6): the answer states the one consequence, naming no topic; the topics are behind Which topics.
+		const why = await page.evaluate(() => document.querySelector('[data-slot="exam-gaps-why"]')?.textContent ?? "");
+		assert.ok(why.split(/\s+/).length <= 30, `the why is short: "${why}"`);
+		assert.doesNotMatch(why, /Variance|Martingales|Geometric/, "it lists no topic");
+		await page.click('[data-slot="exam-gaps-which-press"]');
+		const which = await page.evaluate(() => document.querySelector('[data-slot="exam-gaps-which"]')?.textContent ?? "");
+		assert.match(which, /Geometric distribution.*Variance of sums/, "Which topics names them all");
+		await page.close();
 		assert.ok(pick.order.every((line, i) => i === 0 || line >= pick.order[i - 1]!), `the pick's words read in order, line by line, never in columns: ${pick.order.join(" ")}`);
 	});
 });
