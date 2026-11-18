@@ -105,8 +105,11 @@ export interface PreparedProcess {
  *  its hooks by the events they answer, and the folder its sessions live in
  *  with them. */
 export function processKey(options: Options, tools: readonly AgentTool<any>[], configDir: string, { session = true }: { session?: boolean } = {}): string {
-	const { abortController: _abort, spawnClaudeCodeProcess: _spawn, mcpServers: _servers, hooks, resume, resumeSessionAt, forkSession: _fork, ...rest } = options;
-	return JSON.stringify({ ...rest, ...(session ? { resume, resumeSessionAt } : {}), configDir, hooks: Object.keys(hooks ?? {}), tools: tools.map((tool) => [tool.name, tool.description, tool.parameters]) });
+	const { abortController: _abort, spawnClaudeCodeProcess: _spawn, mcpServers: _servers, hooks, resume, resumeSessionAt, forkSession: _fork, env, ...rest } = options;
+	// The SDK writes its version into this server's environment on its first
+	// call, and into every process's either way: the same value, never ours.
+	const { CLAUDE_AGENT_SDK_VERSION: _sdk, ...own } = env ?? {};
+	return JSON.stringify({ ...rest, env: own, ...(session ? { resume, resumeSessionAt } : {}), configDir, hooks: Object.keys(hooks ?? {}), tools: tools.map((tool) => [tool.name, tool.description, tool.parameters]) });
 }
 
 /** A turn's input: its first message, then each steer, until it closes. */

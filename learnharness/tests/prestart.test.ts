@@ -26,6 +26,7 @@ const { chatStore } = await import("../src/store/chats.ts");
 const { createProberAgent } = await import("../src/agent/teacher-agent.ts");
 const { claudeAccountStatuses } = await import("../src/server/claude-connection-http.ts");
 const { PUT: putSettings } = await import("../app/api/settings/[section]/route.ts");
+const { processKey } = await import("../src/agent/sdk/agent.ts");
 const { signInTestClaude, TEST_MODEL } = await import("./claude-fixture.ts");
 await signInTestClaude();
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
@@ -142,5 +143,12 @@ describe("the next answer's process, started while he thinks", () => {
 		} as never);
 		assert.equal(fake.live(), 0);
 		await signInTestClaude();
+	});
+
+	it("matches though the SDK wrote its version into this server's environment in between, as its first call does (live, 18 Nov)", () => {
+		const before = processKey({ env: { PATH: "/usr/bin" }, model: "m" }, [], "/config");
+		const after = processKey({ env: { PATH: "/usr/bin", CLAUDE_AGENT_SDK_VERSION: "0.3.319" }, model: "m" }, [], "/config");
+		assert.equal(after, before, "every process gets the SDK's version either way");
+		assert.notEqual(processKey({ env: { PATH: "/bin" }, model: "m" }, [], "/config"), before, "any other variable of ours still counts");
 	});
 });
