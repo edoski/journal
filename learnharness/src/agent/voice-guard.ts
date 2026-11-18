@@ -329,6 +329,60 @@ function firstTryAtCheck(messages: readonly LhMessage[]): { id: string; question
 	return { id: input.toolCallId, question: answer.asked };
 }
 
+/** His answer opening this turn, when it is a later try at a lesson's
+ *  check he had answered before: the check's call and its right answer
+ *  (`correctAnswer`). Null for a first try, a prediction or a Show me. */
+function retryAtCheck(messages: readonly LhMessage[]): { id: string; correct: string; question: string } | null {
+	const input = messages[messages.findLastIndex(opensTurn)];
+	if (input?.role !== "toolResult" || input.isError || input.toolName !== "explain" || !isRealAnswer(input.details)) return null;
+	const answered = answeredQuestionsOf(messages);
+	const answer = answered.get(input.toolCallId);
+	if (!answer?.asked || answer.predicted || answer.showMe) return null;
+	if (![...answered].some(([id, other]) => id !== input.toolCallId && other.tool === "explain" && other.asked === answer.asked)) return null;
+	for (const m of messages) {
+		if (m.role !== "assistant") continue;
+		const call = m.content.find((b): b is ToolCall => b.type === "toolCall" && b.id === input.toolCallId);
+		const correct = call && isRecord(call.arguments) ? call.arguments.correctAnswer : undefined;
+		if (call) return typeof correct === "string" && correct.trim() ? { id: input.toolCallId, correct, question: questionText(call) ?? "" } : null;
+	}
+	return null;
+}
+
+const INLINE_OR_DISPLAY = /\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\$([^$\n]+)\$/g;
+/** TeX read for its content: spacing, sizing and the matrix's bracket aside. */
+const texKey = (tex: string) => tex.replace(/\\(?:left|right|big|Big|,|;|!|quad|qquad)(?![a-zA-Z])/g, "").replace(/\\(?:dfrac|tfrac)/g, "\\frac").replace(/[pbvBV]?matrix\}/g, "matrix}").replace(/\s+/g, "");
+const mathsOf = (text: string) => [...text.matchAll(INLINE_OR_DISPLAY)].map((m) => texKey(m[1] ?? m[2] ?? m[3] ?? "")).filter(Boolean);
+
+/** Whether `said` writes out a right answer's maths: one of its matrices
+ *  the question did not already show, or the value its last relation
+ *  gives (the side after its last "="), as a whole side of a relation he
+ *  reads. True when the right answer has no maths to look for. */
+function writesAnswer({ correct, question }: { correct: string; question: string }, said: readonly string[]): boolean {
+	const maths = mathsOf(correct);
+	if (maths.length === 0) return true;
+	const given = new Set(mathsOf(question).flatMap((t) => [...t.matchAll(MATRIX)].map((m) => texKey(m[0]))));
+	const matrices = maths.flatMap((t) => [...t.matchAll(MATRIX)].map((m) => texKey(m[0]))).filter((m) => !given.has(m));
+	const wanted = matrices.length > 0 ? matrices : maths.map((t) => t.split("=").at(-1)!).filter(Boolean);
+	const shown = said.flatMap(mathsOf);
+	const sides = new Set(shown.flatMap((t) => [t, ...t.split("=")]));
+	return wanted.some((w) => (w.length >= 6 ? shown.some((t) => t.includes(w)) : sides.has(w)));
+}
+
+/** A question posed after a second miss whose repair never wrote the
+ *  right answer (round 17, m16: "What is A⁻¹?" got a break, a rule and a
+ *  twin, never (0 1; −1 0)). */
+const REPAIRED = (correct: string): AgentToolResult<unknown> => ({
+	content: [
+		{
+			type: "text",
+			text: `Not posed: his second try at your check was not right either, and your repair never writes its right answer. Send him with send_to_user the repair ending on the right answer, written out in its maths: ${JSON.stringify(correct)}. Then ask your next question.`,
+		},
+	],
+	isError: true,
+	details: { withheld: "repaired" },
+});
+const REPAIRED_NOTE = "His second try at your check was not right either, and nothing you sent writes its right answer. Send the repair ending on the right answer, written out in its maths.";
+
 /** The rulings a save records on a dispute (`ruling` on each re-mark). */
 function savedRulings(args: unknown): string[] {
 	if (!isRecord(args)) return [];
@@ -859,6 +913,12 @@ export class VoiceGuard {
 	private readonly firstTry: { id: string; question: string } | null;
 	private retryOwed = false;
 	private heldRetry = false;
+	/** His answer opening the turn is a later try at a check, with the
+	 *  check's right answer, and whether this turn saved it not right: the
+	 *  repair then writes the right answer before any next question. */
+	private readonly secondTry: { id: string; correct: string; question: string } | null;
+	private repairOwed = false;
+	private heldRepair = false;
 	/** The question he set aside to ask the message this turn answers:
 	 *  the turn asks it again before any other, unless his message was
 	 *  his answer (a save names it), asked to guess first (a prediction
@@ -919,6 +979,7 @@ export class VoiceGuard {
 		this.input = turnInputOf(messages);
 		this.standing = standingQuestion(messages);
 		this.firstTry = review ? null : firstTryAtCheck(messages);
+		this.secondTry = review ? null : retryAtCheck(messages);
 		this.opening = !review && !messages.slice(0, messages.findLastIndex(opensTurn)).some((m) => m.role === "assistant");
 		const aside = setAsideOf(messages);
 		this.setAside = aside && !(this.input.words && TAUGHT_INSTEAD.test(this.input.words)) ? aside : null;
@@ -984,7 +1045,8 @@ export class VoiceGuard {
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
 		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
-		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.retryOwed ? RETRY_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
+		const unrepaired = this.repairOwed && !writesAnswer(this.secondTry!, this.toldNow);
+		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.retryOwed ? RETRY_NOTE : unrepaired ? REPAIRED_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
 		if (!note || this.noted.has(note)) return undefined;
 		this.noted.add(note);
 		return note;
@@ -1034,6 +1096,7 @@ export class VoiceGuard {
 		// names his answer keeps it, so the question after it goes through.
 		if (call.name === SAVE_TOOL && this.unsaved && savedQuestionsOf(call.arguments).includes(this.unsaved)) this.unsaved = null;
 		if (call.name === SAVE_TOOL && this.firstTry && savedNotRight(call.arguments, this.firstTry.id)) this.retryOwed = true;
+		if (call.name === SAVE_TOOL && this.secondTry && savedNotRight(call.arguments, this.secondTry.id)) this.repairOwed = true;
 		if (call.name === SAVE_TOOL && this.setAside && savedQuestionsOf(call.arguments).includes(HIS_MESSAGE)) this.setAside = null;
 		if (this.unsaved && !this.heldUnsaved && (this.endsTurn(call.name) || call.name === PROBE_DONE_TOOL)) {
 			this.heldUnsaved = true;
@@ -1132,6 +1195,10 @@ export class VoiceGuard {
 			return SET_ASIDE(this.setAside.tool, this.setAside.question);
 		}
 		if (asksAside) this.setAside = null;
+		if (this.repairOwed && !this.heldRepair && !writesAnswer(this.secondTry!, this.toldNow)) {
+			this.heldRepair = true;
+			return REPAIRED(this.secondTry!.correct);
+		}
 		if (this.retryOwed && !this.heldRetry && !(call.name === "explain" && sameQuestionKey(text) === this.firstTry?.question)) {
 			this.heldRetry = true;
 			return RETRY(this.firstTry!.question);
