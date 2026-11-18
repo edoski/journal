@@ -73,7 +73,9 @@ export type VoiceRule =
 	| "own-words"
 	| "mark-case"
 	| "not-yet"
-	| "due-reviews";
+	| "due-reviews"
+	| "undisputed"
+	| "verdict-words";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -140,7 +142,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// Its own earlier words are nothing he acts on: what is true is said
 	// as itself (round 15, m17: "My earlier line saying the set was done
 	// was wrong, since one problem is not a set.").
-	{ rule: "own-words", re: /\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b/i },
+	// Round 17, m18: "A correction to what I said earlier: …", pointing at
+	// a turn end he never saw.
+	{ rule: "own-words", re: /\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b|\b(?:a )?correction to what I (?:said|wrote|told you)\b|\b(?:correcting|to correct) what I (?:said|wrote)\b|\bwhat I (?:said|wrote|told you) (?:earlier|before|above)\b/i },
 	// What he has not done yet is no step for him: it reads as a reproach
 	// (round 16, m13: "You still haven't started Linear maps and their
 	// matrices." closing a lesson under his half answer).

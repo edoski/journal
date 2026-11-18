@@ -268,6 +268,16 @@ const HARD: ReadonlySet<VoiceRule> = new Set(["questions", "compound", "verdict"
 
 const SAVE_TOOL = "course_save";
 
+/** Words about a mark he did not dispute: that it looks wrong, that it
+ *  could change, or how to dispute it (round 17, m18: "I can't change
+ *  those two card marks myself, but disputing them from the cards gets
+ *  them re-marked."). */
+const MARK_TALK = /\bre-mark(?:ed|ing|s)?\b|\bdisput(?:e|ed|es|ing)\b|\b(?:change|fix|correct)(?:s|ed|ing)? (?:(?:those|these|the|its|their|your|that|this|two|both|earlier|card)\s+)*marks?\b|\bmarks? (?:are|is|was|were|look|looks) (?:wrong|off|mistaken)\b|\bkeeps? (?:their|its) marks?\b/i;
+/** His words about a mark: then a reply may answer them. */
+const HIS_MARK_WORDS = /\b(?:mark(?:s|ed)?|dispute|re-?mark|card)\b/i;
+/** A reply that says how his answer was judged. */
+const VERDICT_SAID = /\b(?:right|correct|wrong|incorrect)\b/i;
+
 /** Words that tell him reviews are due: "your Binomial distribution
  *  review is still due today", "due today: your Kernel review". */
 const DUE_REVIEWS = /\breviews?\b[^.?!]{0,40}?\b(?:still )?(?:over)?due\b|\b(?:over)?due (?:today|now)\b[^.?!]{0,60}?\breviews?\b/i;
@@ -381,6 +391,7 @@ const REPAIRED = (correct: string): AgentToolResult<unknown> => ({
 	isError: true,
 	details: { withheld: "repaired" },
 });
+const VERDICT_NOTE = "His answer's save failed, so his card shows no mark, and nothing you sent says how his answer was judged. Send him the verdict in words, opening on it (\"Right, …\", \"Not right: …\").";
 const REPAIRED_NOTE = "His second try at your check was not right either, and nothing you sent writes its right answer. Send the repair ending on the right answer, written out in its maths.";
 
 /** The rulings a save records on a dispute (`ruling` on each re-mark). */
@@ -639,6 +650,10 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `The demo you called for this turn is still being built, so it is not on his screen: ${quoted(b.excerpt)}. It appears where you called for it once it is built, and a message tells you then. Until that message, say nothing of it and ask nothing that needs it: teach the step in words now, and point him at the demo, and ask what needs it, once it has arrived.`;
 		case "due-reviews":
 			return `A lesson opens on its first step, and his reviews due today are already on Home: ${quoted(b.excerpt)}. Leave the reviews out and open on the lesson.`;
+		case "undisputed":
+			return `He disputed no mark, so say nothing of one, nor of how to dispute it: ${quoted(b.excerpt)}. Leave it out; every mark he has not disputed stands as recorded.`;
+		case "verdict-words":
+			return `His answer's save failed, so his card shows no mark, and this reply never says how his answer was judged: ${quoted(b.excerpt)}. Open on the verdict in words ("Right, …", "Not right: …", "Partly right: …"), then the rest.`;
 		case "review-lesson":
 			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
@@ -925,6 +940,9 @@ export class VoiceGuard {
 	 *  goes through) or asked to be taught instead. Held once a turn. */
 	private setAside: { tool: string; question: string; key: string } | null;
 	private heldSetAside = false;
+	/** A save of his answer failed this turn, and no message has said its
+	 *  verdict: his card shows no mark while the record can't be read. */
+	private verdictOwed = false;
 	/** The turn opens a lesson: nothing was said in the session before it. */
 	private readonly opening: boolean;
 	/** Ordinary text this turn took out of a reply, and whether the turn
@@ -1045,6 +1063,10 @@ export class VoiceGuard {
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
 		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
+		if (this.verdictOwed && !this.noted.has(VERDICT_NOTE)) {
+			this.noted.add(VERDICT_NOTE);
+			return VERDICT_NOTE;
+		}
 		const unrepaired = this.repairOwed && !writesAnswer(this.secondTry!, this.toldNow);
 		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.retryOwed ? RETRY_NOTE : unrepaired ? REPAIRED_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
 		if (!note || this.noted.has(note)) return undefined;
@@ -1065,6 +1087,8 @@ export class VoiceGuard {
 				const result = await tool.execute(toolCallId, params, signal, onUpdate);
 				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
 				if (tool.name === LESSON_PROGRESS_TOOL && !result.isError) this.dayItems = dayItemsIn(result) ?? this.dayItems;
+				if (this.saveFailed(tool.name, params, result)) this.verdictOwed = !this.toldNow.some((t) => VERDICT_SAID.test(t));
+				else if (tool.name === SAVE_TOOL && !result.isError && savedObservations(isRecord(params) ? params : {}).length > 0) this.verdictOwed = false;
 				if (this.kept?.call.id === toolCallId) {
 					if (result.isError) this.letGo();
 					else { this.kept.ran = true; return KEPT(tool.name); }
@@ -1131,6 +1155,7 @@ export class VoiceGuard {
 			this.lengthDraft = null;
 			if (this.kept || this.waiting.size > 0) this.releasing = call.id;
 			this.toldNow.push(text);
+			if (VERDICT_SAID.test(text)) this.verdictOwed = false;
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
 			this.said.push(text);
 			this.asked.push(...sentences(text).filter((s) => s.trim().endsWith("?")));
@@ -1247,6 +1272,14 @@ export class VoiceGuard {
 		this.releasing = null;
 	}
 
+	/** A save of his answer that did not go through: a `course_save` of
+	 *  his attempts refused, or a problem's conclude whose attempts were
+	 *  kept unsaved (the record could not be read). */
+	private saveFailed(name: string, params: unknown, result: AgentToolResult<unknown>): boolean {
+		if (name === PRACTICE_CONCLUDE_TOOL) return isRecord(result.details) && Array.isArray(result.details.unsaved) && result.details.unsaved.length > 0;
+		return name === SAVE_TOOL && result.isError === true && savedObservations(isRecord(params) ? params : {}).some((o) => typeof o.result === "string");
+	}
+
 	/** Lets go of the kept question. One whose tool refused it goes back
 	 *  where it was asked, beside its refusal; one never posed is only gone
 	 *  (its clean result is the question's placeholder, never a record fact). */
@@ -1342,6 +1375,9 @@ export class VoiceGuard {
 		// A lesson's opening teaches: the reviews due today are Home's to
 		// offer (round 17, m15: every new lesson, a Linear Algebra one
 		// included, opened by listing four due Probability reviews).
+		const markTalk = !this.input.ruling && !HIS_MARK_WORDS.test(this.input.words ?? "") ? sentences(text).find((s) => MARK_TALK.test(s)) : undefined;
+		if (markTalk) out.push({ rule: "undisputed", excerpt: markTalk.trim() });
+		if (this.verdictOwed && !VERDICT_SAID.test(text)) out.push({ rule: "verdict-words", excerpt: first });
 		const dueSaid = this.opening && kind !== "close" && !asksPlan ? DUE_REVIEWS.exec(text) : null;
 		if (dueSaid) out.push({ rule: "due-reviews", excerpt: sentences(text).find((s) => DUE_REVIEWS.test(s))?.trim() ?? dueSaid[0] });
 		const asLesson = this.review ? SESSION_AS_LESSON.exec(text) : null;
