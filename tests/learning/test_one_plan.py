@@ -326,6 +326,24 @@ def test_deleting_a_course_moves_no_day_of_another(
         } == {}
 
 
+def test_deleting_a_course_with_an_exam_leaves_every_list(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A deleted course whose exam is still ahead leaves the plan of every
+    course, which still reads (fix round 16: its kept record reached the
+    replay with no final review, and ``plan --all`` failed, so the app's
+    course list was gone)."""
+    world = World(tmp_path, "seed", monkeypatch, capsys)
+    world.run("probability", "forget", "--course", day="2026-11-08")
+    assert set(world.plan("2026-11-09")) == {
+        "calculus",
+        "linear-algebra",
+        "real-analysis",
+    }
+
+
 R14 = json.loads(
     (Path(__file__).parent / "golden" / "demo-world-r14.json").read_text("utf-8")
 )

@@ -716,25 +716,27 @@ def final_reviews(
     are what sizes them, so they must not hang on the lengths they size, and
     a final review not yet begun holds no day gone. An exam that has passed
     with no start on record had no answer in its final review (a save in it
-    keeps its start), so its shortest form changes nothing.
+    keeps its start), so its shortest form changes nothing. A deleted course
+    holds nothing in the plan, and nothing after its deletion counts
+    (``_kept``), so its final review is its shortest form too.
     """
-    unplanned = [
-        name
-        for name, record in records.items()
-        if progress.unplanned(record) and not gone(record)
-    ]
-    if not unplanned:
-        return dict(records)
 
     def exam_day(name: Name) -> date:
         return date.fromisoformat(records[name]["exam"]["date"])
 
     result = {
         name: progress.with_final_review(record, exam_day(name))
-        if name in unplanned
+        if progress.unplanned(record)
         else record
         for name, record in records.items()
     }
+    unplanned = [
+        name
+        for name, record in records.items()
+        if progress.unplanned(record) and not gone(record)
+    ]
+    if not unplanned:
+        return result
     week = of(result.values(), today)
     for name in sorted(unplanned, key=exam_day):
         record = records[name]
