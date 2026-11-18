@@ -15,6 +15,7 @@ import { PAGE_COLUMN } from "@/components/page-frame/page-frame";
 import type { TopicHandle } from "@/src/core";
 import { useMapTie, type PointBy } from "@/components/course-map/use-map-tie";
 import { useListWalk } from "@/components/list-walk/use-list-walk";
+import { HomeComposer } from "@/components/course-page/course-composer";
 
 /** The map's share of the column while Today shows: enough to see where
  *  the current topic sits, so Today's rows lead (Edo, 12 Nov 2026). */
@@ -22,7 +23,8 @@ const MAP_SHARE = "basis-1/2";
 
 /**
  * The agenda study home (spec: study-home.md): what to study now, in one
- * window. A course's map on top behind course tabs, then Today, a line per step of today's plan. The
+ * window. A course's map on top behind course tabs, then Today, a line per step of today's plan, then the
+ * course composer, whose course starts on the map's. The
  * map follows Today: it shows the course of the line he points at, with
  * that line's topics lit and, in a course with arcs, the arc they lie in
  * shown on the map (home-map.md); while he points at the line, its first
@@ -124,6 +126,10 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 					/>
 				</div>
 			)}
+			{/* Hidden, never unmounted, while the map is enlarged: the course his words started in stays with them. */}
+			<div className={enlarged ? "hidden" : "contents"}>
+				<HomeComposer shown={{ workspace, title: courses.find((c) => c.map.workspace === workspace)?.map.title ?? "" }} />
+			</div>
 		</>
 	);
 }

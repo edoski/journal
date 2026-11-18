@@ -182,7 +182,7 @@ function CourseTabs({ courses, workspace, onSelect }: { courses: readonly StudyC
 						>
 							{/* On the label, not the tab: a tooltip trigger writes its own data-state over the tab's. */}
 							{chosen ? (
-								<Hint label={`${mathPlain(c.map.title)}'s course page`} binding="c" side="bottom">
+								<Hint label={`${mathPlain(c.map.title)}'s course page`} binding="mod+enter" side="bottom">
 									<span>{title}</span>
 								</Hint>
 							) : (

@@ -70,8 +70,9 @@ spec `components/list-walk/list-walk.md`):
   never reaches (Edo, 15 Nov 2026, N3), so there ↑ keeps the first line.
 - With nothing focused, ↓ or Home enters at the first row, ↑ or End at
   the last (window capture phase, ahead of the page's spatial arrows).
-- A page's own keys sit on top: Home's ← →, f, o and c
-  (`study-home/home-keys.ts`); the road's ← → on a header and → on a row.
+- A page's own keys sit on top: Home's ← →, ⌘E and ⌘↵
+  (`study-home/home-keys.ts`; its letters type into its composer); the
+  road's ← → on a header and → on a row.
 
 ## Model menu keyboard machine (owner polish, 2026-09-17)
 

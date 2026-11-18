@@ -1,7 +1,9 @@
 /**
  * Today's row keys (Edo's notes, 15 Nov 2026, N3): ↑ ↓ walk only Today's
- * rows, never the tabs or the map above them; o opens the focused row as a
- * click does, and c opens its course page. No key fires while he types.
+ * rows, never the tabs or the map above them; ⌘↵ opens the focused row's
+ * course page (c until Home's composer took letters, Edo, 18 Nov 2026; o is
+ * gone, since Enter opens a row as on every page). No key fires while he
+ * types: there ⌘↵ is the composer's send.
  */
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
@@ -30,7 +32,7 @@ describe("Today's row keys (N3)", () => {
 		assert.ok(document.activeElement!.closest('[data-slot="today-also"]'));
 	});
 
-	it("o opens the focused row as a click does, and c opens its course page", async () => {
+	it("⌘↵ opens the focused row's course page; o and c no longer act", async () => {
 		await mount();
 		await press("ArrowDown", document.body);
 		const first = lineOf(document.activeElement) as HTMLElement;
@@ -40,19 +42,20 @@ describe("Today's row keys (N3)", () => {
 			e.preventDefault();
 		});
 		await press("o");
-		assert.equal(clicked, 1);
 		await press("c");
+		assert.equal(clicked, 0);
+		assert.deepEqual(pushed, []);
+		await press("Enter", document.activeElement!, { metaKey: true });
 		const workspace = rows[0]!.course!.map.workspace;
 		assert.deepEqual(pushed, [courseHref(workspace)]);
 	});
 
-	it("o and c do nothing while he types", async () => {
+	it("⌘↵ does nothing while he types: in a field it is the field's", async () => {
 		await mount();
 		const field = document.createElement("textarea");
 		document.body.appendChild(field);
 		field.focus();
-		await press("o", field);
-		await press("c", field);
+		await press("Enter", field, { metaKey: true });
 		assert.deepEqual(pushed, []);
 		field.remove();
 	});

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { PageNotice, PageReading } from "@/components/page-frame/page-frame";
 import { WindowPage } from "@/components/page-frame/window-page";
 import { CoursesUnavailable } from "@/components/course-picker";
-import { SetupDialog } from "@/components/setup-dialog";
+import { StartScope } from "@/components/start/start-scope";
 import { takeLine, useLessonStart, type TakeLine } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import { doneToday, nearExam, type NearExam } from "@/components/study-home/day-record";
@@ -36,7 +36,8 @@ export interface HomeReady {
 
 /**
  * What every study home shares (spec: lessons.md): the page chrome, the
- * read of the courses with its states, and the lesson start. A home gives
+ * read of the courses with its states, and the lesson start, the one its
+ * lines and its composer share (`StartScope`). A home gives
  * its column's classes and draws the ready state; `quiet` leaves out the
  * lines that name an unreadable course, while a map fills the page.
  */
@@ -54,27 +55,28 @@ export function HomeFrame({
 
 	return (
 		<WindowPage>
-			<main data-slot="study-home" className="min-h-0 flex-1 overflow-hidden">
-				<HomeBody state={state} onRetry={retry}>
-					{({ courses, chats, failed, readAt }) => (
-						<div className={className}>
-							{courses.length > 0 &&
-								children({
-									...homeOf(courses, chats, readAt),
-									busy: lesson.busy,
-									onContinue: takeLine(lesson.take, courses, chats),
-								})}
-							{(!quiet || courses.length === 0) && <UnreadableLines courses={failed} />}
-							{lesson.error && (
-								<p role="alert" className="shrink-0 text-body text-danger">
-									{lesson.error}
-								</p>
-							)}
-						</div>
-					)}
-				</HomeBody>
-			</main>
-			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
+			<StartScope lesson={lesson}>
+				<main data-slot="study-home" className="min-h-0 flex-1 overflow-hidden">
+					<HomeBody state={state} onRetry={retry}>
+						{({ courses, chats, failed, readAt }) => (
+							<div className={className}>
+								{courses.length > 0 &&
+									children({
+										...homeOf(courses, chats, readAt),
+										busy: lesson.busy,
+										onContinue: takeLine(lesson.take, courses, chats),
+									})}
+								{(!quiet || courses.length === 0) && <UnreadableLines courses={failed} />}
+								{lesson.error && (
+									<p role="alert" className="shrink-0 text-body text-danger">
+										{lesson.error}
+									</p>
+								)}
+							</div>
+						)}
+					</HomeBody>
+				</main>
+			</StartScope>
 		</WindowPage>
 	);
 }

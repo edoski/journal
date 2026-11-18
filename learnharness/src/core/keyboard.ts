@@ -59,7 +59,6 @@ export type KeyAction =
 	| "home-arc-down"
 	| "home-here"
 	| "home-rows"
-	| "home-open"
 	| "home-course-page";
 
 /** Where Settings and the cheat sheet group an action (display only —
@@ -146,14 +145,14 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "pick-course", label: "Pick a course", scope: "lesson", binding: "mod+o" },
 	// Home owns its keys (components/study-home/home-keys.ts), so they never leak to other pages.
 	{ id: "home-course", label: "The course left or right on the map", scope: "global", binding: "arrows-lr", displayOnly: true, group: "home" },
-	{ id: "home-map-enlarge", label: "Enlarge the map, and back", scope: "global", binding: "f", displayOnly: true, group: "home" },
+	{ id: "home-map-enlarge", label: "Enlarge the map, and back", scope: "global", binding: "mod+e", displayOnly: true, group: "home" },
 	// The map's arcs (components/course-map/arc-keys.ts).
 	{ id: "home-arc-up", label: "The arc above on the map", scope: "global", binding: "shift+arrowup", displayOnly: true, group: "home" },
 	{ id: "home-arc-down", label: "The arc below on the map", scope: "global", binding: "shift+arrowdown", displayOnly: true, group: "home" },
 	{ id: "home-here", label: "Go to You are here on the map", scope: "global", binding: "mod+j", displayOnly: true, group: "home" },
 	{ id: "home-rows", label: "Move between Today's rows", scope: "global", binding: "arrows-ud", displayOnly: true, group: "home" },
-	{ id: "home-open", label: "Open the row", scope: "global", binding: "o", displayOnly: true, group: "home" },
-	{ id: "home-course-page", label: "Open the row's course page, else the map's", scope: "global", binding: "c", displayOnly: true, group: "home" },
+	// Letters type into Home's composer (Edo, 18 Nov 2026): Enter opens the row, as on every page, and the rest are ⌘ chords.
+	{ id: "home-course-page", label: "Open the row's course page, else the map's", scope: "global", binding: "mod+enter", displayOnly: true, group: "home" },
 ];
 
 const STORAGE_KEY = "lh:keymap";

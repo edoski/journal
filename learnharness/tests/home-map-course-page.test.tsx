@@ -2,7 +2,7 @@
  * The way from Home's map to a course page (Edo's notes, 15 Nov 2026, N4:
  * "honestly i just dont like this", of the header's "Course page →"
  * link): the link is gone; pressing the course tab already chosen opens
- * its course page, pressing another only shows its map, and c with no
+ * its course page, pressing another only shows its map, and ⌘↵ with no
  * Today row focused opens the shown course's page.
  */
 import assert from "node:assert/strict";
@@ -48,10 +48,10 @@ describe("Home's map header and the course page (N4)", () => {
 		assert.notEqual(first, second);
 	});
 
-	it("c with no Today row focused opens the shown course's page", async () => {
+	it("⌘↵ with no Today row focused opens the shown course's page (c until 18 Nov 2026)", async () => {
 		await mount();
 		await press("ArrowRight", document.body);
-		await press("c", document.body);
+		await press("Enter", document.body, { metaKey: true });
 		assert.deepEqual(pushed, [courseHref(workspaceOf(tab()!))]);
 	});
 });

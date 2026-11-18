@@ -11,6 +11,7 @@ import { dom } from "./radix-dom.ts";
 import { createRoot, type Root } from "./app-render.tsx";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { HomeBody } from "../../components/study-home/study-home.tsx";
+import { ServerEventsProvider } from "../../components/server-events.tsx";
 import { lessonOf } from "../../components/study-home/lesson-facts.ts";
 import { needsYouNow } from "../../components/study-home/needs-you.ts";
 import { todayCourses } from "../../components/study-home/study-facts.ts";
@@ -44,18 +45,20 @@ export async function mount() {
 	await act(async () =>
 		root!.render(
 			<AppRouterContext.Provider value={router as never}>
-				<main data-slot="study-home">
-					<Home />
-				</main>
+				<ServerEventsProvider connect={() => ({ close() {}, onOpen() {}, onEvent() {} })}>
+					<main data-slot="study-home">
+						<Home />
+					</main>
+				</ServerEventsProvider>
 			</AppRouterContext.Provider>,
 		),
 	);
 }
 
-/** One keydown on `target` (the focused element by default), as a browser sends it. */
-export async function press(key: string, target: EventTarget = document.activeElement ?? document.body) {
+/** One keydown on `target` (the focused element by default), as a browser sends it; `metaKey` for a ⌘ chord. */
+export async function press(key: string, target: EventTarget = document.activeElement ?? document.body, { metaKey = false }: { metaKey?: boolean } = {}) {
 	const event = new dom.window.Event("keydown", { bubbles: true, cancelable: true });
-	Object.assign(event, { key, altKey: false, metaKey: false, ctrlKey: false, shiftKey: false });
+	Object.assign(event, { key, altKey: false, metaKey, ctrlKey: false, shiftKey: false });
 	await act(async () => {
 		target.dispatchEvent(event as unknown as Event);
 	});

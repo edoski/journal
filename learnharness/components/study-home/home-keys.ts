@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { isTypingSurface } from "@/src/core";
+import { bindingForAction, eventBinding, isTypingSurface } from "@/src/core";
 import { overlayOpen } from "@/components/spatial-arrows";
 
 /** What Home does on its own keys (spec: study-home.md, "Keys"). */
@@ -47,40 +47,42 @@ function focusedLine(): HTMLElement | null {
 
 /**
  * Home's own keys, window-wide while Home is mounted: ← → move the map to
- * the neighbouring course, f presses its enlarge button (Edo's notes, 15
- * Nov 2026, N2); o opens the focused Today line as a click does and c
- * opens its course page (N3), or with no line focused the page of the
- * course whose map shows (N4). ↑ ↓ Home End are Today's list walk, every
- * page's (`useListWalk`). Capture phase, so they run before the page's
- * arrows (`useSpatialArrows`); no key fires while he types in a field,
- * holds a modifier or has a dialog, menu or popover open.
+ * the neighbouring course (Edo's notes, 15 Nov 2026, N2); ⌘E presses the
+ * map's enlarge button, from the composer too, since a ⌘ chord types
+ * nothing; ⌘↵ opens the focused Today line's course page (N3), or with no
+ * line focused the page of the course whose map shows (N4). Enter opens a
+ * line, as on every page. Letters type into Home's composer (Edo, 18 Nov
+ * 2026: f, o and c moved), so none is Home's. ↑ ↓ Home End are Today's
+ * list walk, every page's (`useListWalk`). Capture phase, so they run
+ * before the page's arrows (`useSpatialArrows`); no key fires while a
+ * dialog, menu or popover is open, and only ⌘E while he types in a field.
+ * The chords are the registry's (`home-map-enlarge`, `home-course-page`).
  */
 export function useHomeKeys(handlers: HomeKeyHandlers) {
 	const latest = useRef(handlers);
 	latest.current = handlers;
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-			if (isTypingSurface(e) || overlayOpen()) return;
+			if (e.defaultPrevented || overlayOpen()) return;
 			const on = latest.current;
-			if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-				if (arrowsBelongElsewhere()) return;
-				if (on.moveCourse(e.key === "ArrowLeft" ? -1 : 1)) e.preventDefault();
-				return;
-			}
-			if (e.key === "f") {
+			const chord = eventBinding(e);
+			if (chord === bindingForAction("home-map-enlarge")) {
 				e.preventDefault();
 				on.enlarge();
 				return;
 			}
-			const line = focusedLine();
-			if (e.key === "o" && line) {
+			if (isTypingSurface(e)) return;
+			if (chord === bindingForAction("home-course-page")) {
 				e.preventDefault();
-				line.click();
-			} else if (e.key === "c") {
-				e.preventDefault();
+				const line = focusedLine();
 				if (line) on.openCoursePage(line.dataset.line!);
 				else on.openShownCoursePage();
+				return;
+			}
+			if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+			if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+				if (arrowsBelongElsewhere()) return;
+				if (on.moveCourse(e.key === "ArrowLeft" ? -1 : 1)) e.preventDefault();
 			}
 		};
 		window.addEventListener("keydown", onKeyDown, { capture: true });

@@ -1,8 +1,9 @@
 /**
  * Home's map keys (Edo's notes, 15 Nov 2026, N2): ← → move the map to the
- * course left or right of the chosen one, from anywhere on Home, and f
- * presses the map's enlarge button. No key fires while he types or while a
- * dialog is open.
+ * course left or right of the chosen one, from anywhere on Home, and ⌘E
+ * presses the map's enlarge button (f until Home's composer took letters,
+ * Edo, 18 Nov 2026). No arrow fires while he types, and no key while a
+ * dialog is open; ⌘E types nothing, so it fires from a field too.
  */
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
@@ -28,29 +29,29 @@ describe("Home's map keys (N2)", () => {
 		assert.equal(tab(), titles[0], "a focused Today row does not keep ← from the map");
 	});
 
-	it("f presses the enlarge button, and again brings the map back", async () => {
+	it("⌘E presses the enlarge button, and again brings the map back; f does nothing", async () => {
 		await mount();
-		await press("f");
+		await press("f", document.body);
+		assert.ok(document.querySelector('[data-slot="home-map"][data-enlarged]') === null);
+		await press("e", document.body, { metaKey: true });
 		assert.ok(document.querySelector('[data-slot="home-map"][data-enlarged]'));
-		await press("f");
+		await press("e", document.body, { metaKey: true });
 		assert.ok(document.querySelector('[data-slot="home-map"][data-enlarged]') === null);
 	});
 
-	it("never fires while he types in a field or while a dialog is open", async () => {
+	it("no arrow fires while he types in a field, and no key while a dialog is open", async () => {
 		await mount();
 		const resting = tab();
 		const field = document.createElement("input");
 		document.body.appendChild(field);
 		field.focus();
 		await press("ArrowRight", field);
-		await press("f", field);
 		assert.equal(tab(), resting);
-		assert.ok(document.querySelector('[data-slot="home-map"][data-enlarged]') === null);
 		field.remove();
 		const dialog = document.createElement("div");
 		dialog.setAttribute("role", "dialog");
 		document.body.appendChild(dialog);
-		await press("f", document.body);
+		await press("e", document.body, { metaKey: true });
 		assert.ok(document.querySelector('[data-slot="home-map"][data-enlarged]') === null);
 		dialog.remove();
 	});
