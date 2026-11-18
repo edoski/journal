@@ -1,14 +1,17 @@
 """One read of the daily plan stays cheap: L1's replay (64a55b02) made
 ``resume`` and ``plan`` about four times slower, and every tutor turn waits on
 them (round 12, M4). The cost is counted in plans made afresh on the same
-records, in the same process, so a busy machine slows both sides alike; the
-line is the ratio this fix reached, recorded beside the ratios before and
-after 64a55b02 (``golden/replay-cost.json``), never a number of seconds."""
+records: the Python calls a read makes over the calls of one fresh plan, a
+count no machine changes. CPU time did change with the machine: on 18 Nov 2026
+CI's runner and a Mac's efficiency cores read 22 to 24 fresh plans where its
+performance cores read 16 to 18, on the same code. The line is the cost this
+fix reached, recorded beside the cost after 64a55b02
+(``golden/replay-cost.json``)."""
 
 from datetime import date
 import json
 from pathlib import Path
-import time
+import sys
 from typing import Any
 
 import pytest
@@ -20,15 +23,25 @@ COST = json.loads((GOLDEN / "replay-cost.json").read_text(encoding="utf-8"))
 COURSES = ("calculus", "linear-algebra", "probability", "real-analysis")
 
 
-def best(read: Any) -> float:
-    """The least CPU time of a few reads: the read's own cost, with the
-    machine's other work left out as far as one process can."""
-    spent = []
-    for _ in range(3):
-        start = time.process_time()
+def calls(read: Any) -> int:
+    """The Python functions one read starts: its own work, the same on any
+    machine and under any load."""
+    started = 0
+
+    def count(code: object, offset: int) -> None:
+        nonlocal started
+        started += 1
+
+    tool = sys.monitoring.PROFILER_ID
+    sys.monitoring.use_tool_id(tool, "replay-cost")
+    sys.monitoring.register_callback(tool, sys.monitoring.events.PY_START, count)
+    sys.monitoring.set_events(tool, sys.monitoring.events.PY_START)
+    try:
         read()
-        spent.append(time.process_time() - start)
-    return min(spent)
+    finally:
+        sys.monitoring.set_events(tool, 0)
+        sys.monitoring.free_tool_id(tool)
+    return started
 
 
 @pytest.mark.parametrize("world", sorted(COST["worlds"]))
@@ -45,7 +58,7 @@ def test_a_read_of_the_plan_costs_no_more_than_the_fix_reached(world: str) -> No
     stored = {
         course: progress.begun(record, day) for course, record in readable.items()
     }
-    ratio = best(lambda: agenda.replay(stored, day, agenda.MAX_DAYS)) / best(
+    ratio = calls(lambda: agenda.replay(stored, day, agenda.MAX_DAYS)) / calls(
         lambda: agenda.afresh(readable, day, agenda.MAX_DAYS)
     )
     seen = COST["worlds"][world]
@@ -53,5 +66,5 @@ def test_a_read_of_the_plan_costs_no_more_than_the_fix_reached(world: str) -> No
     assert ratio <= line, (
         f"{world}: a read costs {ratio:.1f} fresh plans, past {line:.1f}, halfway "
         f"back to 64a55b02's {seen['after']} from the {seen['reached']} its fix "
-        f"reached (before it: {seen['pre']})"
+        "reached"
     )
