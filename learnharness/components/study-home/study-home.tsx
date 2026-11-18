@@ -128,7 +128,11 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 			)}
 			{/* Hidden, never unmounted, while the map is enlarged: the course his words started in stays with them. */}
 			<div className={enlarged ? "hidden" : "contents"}>
-				<HomeComposer shown={{ workspace, title: courses.find((c) => c.map.workspace === workspace)?.map.title ?? "" }} />
+				<HomeComposer
+					shown={{ workspace, title: courses.find((c) => c.map.workspace === workspace)?.map.title ?? "" }}
+					// Esc in the box hands the keys back to Today, on its first line (round 16, m26).
+					onLeave={() => today.current?.querySelector<HTMLElement>("[data-line]")?.focus({ preventScroll: true })}
+				/>
 			</div>
 		</>
 	);

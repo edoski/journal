@@ -52,7 +52,7 @@ Home owns its keys (`home-keys.ts`, `useHomeKeys`), window-wide while it is moun
 | ⌘E | presses the map's enlarge button: the map takes Home, and ⌘E again brings it back (N2; f until 18 Nov 2026), from the composer too |
 | ↑ ↓ | walk only Today's lines, the lessons Also today folds in included, never the tabs or the map above them: with nothing focused ↓ takes the first and ↑ the last, and at either end focus stays, ↑ on the first line included (N3) |
 | Home End | jump to Today's first or last line, as on every page's list |
-| Esc | leaves the walk |
+| Esc | leaves the walk; in the composer, hands the keys back to Today's first line, his words kept (round 16, m26) |
 | ↵ | opens the focused line, as a click does, as on every page (o until 18 Nov 2026) |
 | ⌘↵ | opens the focused line's course page (N3); with no line focused, the page of the course whose map shows (N4; c until 18 Nov 2026); in the composer it sends |
 
