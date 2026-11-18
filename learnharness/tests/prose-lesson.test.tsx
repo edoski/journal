@@ -94,9 +94,10 @@ describe("the Prose question in the tutor's message", () => {
 		assert.doesNotMatch(html, /Skipped|prose-question-left|by 3|The answer/);
 	});
 
-	it("says a question left by Done for today is left, and never shows its answer", () => {
+	it("keeps a question left by Done for today as asked, and never shows its answer", () => {
 		const html = renderToStaticMarkup(<ProseQuestion tool="explain" toolCallId="c1" input={check} output={dismissedAnswer("explain", check.question, "tonight")} open={false} />);
-		assert.match(html, /Left for next time/);
+		assert.match(html, /stretch\?/);
+		assert.doesNotMatch(html, /Left for next time/, "nothing typed: no bare label (round 16, m16)");
 		assert.doesNotMatch(html, /by 3|The answer/);
 	});
 });

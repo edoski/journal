@@ -63,9 +63,11 @@ describe("Left for next time", () => {
 		}
 	});
 
-	it("with nothing typed, is the line alone", () => {
-		assert.doesNotMatch(card(true), /left-draft/);
-		assert.match(card(true), /Left for next time/);
+	it("with nothing typed, shows nothing: a bare label kept nothing (round 16, m16)", () => {
+		for (const below of [false, true]) {
+			assert.doesNotMatch(card(below), /left-draft|Left for next time/, `asked again below: ${below}`);
+		}
+		assert.match(card(false), /Is F invertible\? Say why\./, "the question stays as asked");
 	});
 
 	it("a practice problem Done for today closed says it was set aside, never an empty Left for next time", () => {

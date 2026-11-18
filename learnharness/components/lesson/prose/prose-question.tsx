@@ -152,12 +152,19 @@ export function ChoiceRows({ options, multi, selected, onPick, compact = false }
 	);
 }
 
-/** A question Done for today set aside: "Left for next time", and inside
- *  it what he had typed, as his bubble (round 15, 3 m1: the line stood
- *  empty, his half answer gone). With nothing typed, the line alone. */
+/** A question Done for today set aside with his half answer: "Left for
+ *  next time", and inside it what he had typed, as his bubble (round 15,
+ *  3 m1: his half answer was gone). With nothing typed there is nothing to
+ *  keep, so nothing shows: the Done for today line under it already says
+ *  he stopped (round 16, m16: a bare label sat under the question, and on
+ *  Resume above the close). */
 function LeftForNextTime({ draft }: { draft?: LeftDraft }) {
-	if (!draft?.text.trim()) return <p className="text-body text-muted-foreground">{LESSON_WORDS.leftForTonight}</p>;
-	return <LearnerBubble testId="left-draft" icon={BookmarkIcon} label={LESSON_WORDS.leftForTonight} text={draft.text} />;
+	if (!draft?.text.trim()) return null;
+	return (
+		<div data-testid="prose-question-left">
+			<LearnerBubble testId="left-draft" icon={BookmarkIcon} label={LESSON_WORDS.leftForTonight} text={draft.text} />
+		</div>
+	);
 }
 
 function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor, repeat, askedBelow }: {
@@ -172,8 +179,12 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor,
 }) {
 	const answer = answerForPresentation(output, input);
 	if (answer.dismissed && answer.reason === "tonight" && askedBelow) {
+		// Its words are drawn below; here only his half answer, if any, and
+		// the roadmap's anchor for the step it first taught.
+		const kept = !!answer.draft?.text.trim();
+		if (!kept && !stepAnchor) return null;
 		return (
-			<div data-testid="prose-question-left" data-slot="prose-question" data-asked-below="" data-step-anchor={stepAnchor} className="mt-2">
+			<div data-slot="prose-question" data-asked-below="" data-step-anchor={stepAnchor} className={kept ? "mt-2" : undefined}>
 				<LeftForNextTime draft={answer.draft} />
 			</div>
 		);
@@ -190,9 +201,13 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor,
 		return (
 			<>
 				{question}
-				<div data-testid="prose-question-left">
-					{answer.reason === "tonight" ? <LeftForNextTime draft={answer.draft} /> : <p className="text-body text-muted-foreground">{LESSON_WORDS.skippedQuestion}</p>}
-				</div>
+				{answer.reason === "tonight" ? (
+					<LeftForNextTime draft={answer.draft} />
+				) : (
+					<p data-testid="prose-question-left" className="text-body text-muted-foreground">
+						{LESSON_WORDS.skippedQuestion}
+					</p>
+				)}
 			</>
 		);
 	}
