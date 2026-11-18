@@ -82,9 +82,25 @@ describe("the engine's show as the topic's record", () => {
 		};
 		assert.deepEqual(topicRecordOf(show, "poisson", [])!.refs, [
 			{ source: "Blitzstein and Hwang", locator: "Section 4.7" },
-			{ source: "notes", locator: null },
+			{ source: "Notes", locator: null },
 		]);
 		assert.deepEqual(topicRecordOf(SHOW_MANY, "matmul", [])!.refs, [], "a topic its record points nowhere for");
+	});
+
+	it("names a source in words, never by its bare file name (round 17, m24)", () => {
+		// The seeded Linear Algebra course, as the New course flow writes it: each title its file's stem.
+		const show = {
+			items: { invertibility: { kind: "topic", title: "Invertible matrices", observations: [], refs: [{ source: "hefferon-linear-algebra", locator: "Three.IV.4, PDF pp. 264–271" }, { source: "hefferon-answers", locator: "Three.IV.4, PDF pp. 226–233" }, { source: "problem-sheets", locator: "Sheet 6" }, { source: "syllabus", locator: "Week 8" }] } },
+			sources: {
+				"hefferon-answers": { path: "material/hefferon-answers.pdf", title: "hefferon-answers" },
+				"hefferon-linear-algebra": { path: "material/hefferon-linear-algebra.pdf", title: "hefferon-linear-algebra" },
+				"problem-sheets": { path: "material/problem-sheets.md", title: "problem-sheets" },
+				syllabus: { path: "material/syllabus.md", title: "syllabus" },
+			},
+		};
+		const named = (topicRecordOf(show, "invertibility", [])?.refs ?? []).map((r) => r.source);
+		assert.deepEqual(named, ["Hefferon linear algebra", "Hefferon answers", "Problem sheets", "Syllabus"]);
+		for (const [handle, source] of Object.entries(show.sources)) assert.ok(!named.includes(source.title) && !named.includes(handle), `${handle} is said in words`);
 	});
 
 	it("names the method he reached for in the topic's place", () => {

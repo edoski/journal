@@ -68,16 +68,29 @@ function attemptOf(id: string, entry: unknown): { attempt: TopicAttempt; correct
 }
 
 /** The topic's `refs` as places in his material: each source named by
- *  the title `show` gives it under `sources` (its handle when it has
- *  none), with its locator; a ref to no listed source is left out. Pure. */
+ *  its title (`sourceName`), with its locator; a ref to no listed source
+ *  is left out. Pure. */
 function refsOf(topic: Record<string, unknown>, sources: Record<string, unknown>): TopicRef[] {
 	const refs = Array.isArray(topic.refs) ? topic.refs : [];
 	return refs.flatMap((entry) => {
 		const ref = record(entry);
 		const key = str(ref?.source);
 		const source = key ? record(sources[key]) : null;
-		return key && source ? [{ source: str(source.title) ?? key, locator: str(ref?.locator) }] : [];
+		return key && source ? [{ source: sourceName(key, source), locator: str(ref?.locator) }] : [];
 	});
+}
+
+/** A source as he reads it: the title `show` gives it, unless that title
+ *  is only its file's name or its handle, as a course made from files gets
+ *  ("hefferon-linear-algebra"); that name is then said in words
+ *  ("Hefferon linear algebra"), so the book and its answers still read
+ *  apart (round 17, m24). Pure. */
+export function sourceName(handle: string, source: Record<string, unknown>): string {
+	const title = str(source.title);
+	const file = str(source.path)?.split("/").pop()?.replace(/\.[^.]+$/, "");
+	if (title && title !== file && title !== handle) return title;
+	const words = (title ?? file ?? handle).replace(/[-_]+/g, " ").trim();
+	return words ? words[0]!.toLocaleUpperCase() + words.slice(1) : handle;
 }
 
 /** Which session saved each observation, from the sessions' transcripts:

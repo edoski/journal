@@ -436,6 +436,17 @@ export function hintsAsked(messages: readonly LhMessage[], problemCallId: string
 	}).length;
 }
 
+/** Whether he gave this problem up: he pressed Show me or Explain
+ *  instead on it. Both end it (`PRACTICE_REQUEST_TEXT`), so nothing is
+ *  left for him to answer while the tutor concludes it. */
+export function gaveUpOn(messages: readonly LhMessage[], problemCallId: string): boolean {
+	return messages.some((m) => {
+		if (m.role !== "custom" || m.customType !== "practice-request") return false;
+		const d = m.details as Partial<PracticeRequestDetails> | null;
+		return d?.problemCallId === problemCallId && (d.request === "show" || d.request === "explain");
+	});
+}
+
 /** The learner's thinking submission (ONE send lane, owner round
  *  2026-10-05): the register is no longer declared by a button — the
  *  model READS the text to tell working traces from claimed answers. The
