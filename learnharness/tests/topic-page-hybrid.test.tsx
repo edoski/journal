@@ -148,9 +148,12 @@ describe("the hybrid page drawn", () => {
 		assert.ok(attempts.every((row) => row.querySelector("a, button") === null));
 	});
 
-	it("gives the history the whole width when no lesson planned, with no map and no toggle", () => {
+	it("keeps the history in its column when no lesson planned, with no map and no toggle (round 16, m21: Earlier ran the page's width, each date at the far edge)", () => {
 		const document = page(factsOf(RANK, RANK_SESSIONS, [], RANK_RECORD));
-		assert.ok(document.querySelector('[data-slot="topic-panes"]') === null);
+		const panes = document.querySelector('[data-slot="topic-panes"]');
+		assert.ok(panes, "the two columns stand without a map");
+		assert.match(panes!.className, /grid-cols-\[minmax\(0,24rem\)_minmax\(0,1fr\)\]/, "the history keeps the list's width");
+		assert.ok(panes!.querySelector('[data-slot="topic-history"]'), "the history is the left column");
 		assert.ok(document.querySelector('[data-slot="topic-lesson-map"]') === null);
 		assert.equal(document.querySelectorAll('[data-slot="topic-map-toggle"]').length, 0);
 		assert.ok(document.querySelector('[data-slot="topic-history"]'));
