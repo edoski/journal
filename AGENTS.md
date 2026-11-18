@@ -61,7 +61,9 @@ aliases.
   `learning/schema.py`; derived standings and review scheduling to
   `learning/progress.py`; publication and receipts to `learning/records.py`;
   `resume`/`show`/`map`/`standing`/`search` to `learning/retrieval.py` on the single packer in
-  `learning/packing.py`; the CLI verb table to `learning/cli.py`.
+  `learning/packing.py`; the CLI verb table to `learning/cli.py`; the plan
+  kept between reads (the plan as each study day ended) to `learning/told.py`,
+  and nothing else keeps a plan.
 - `learnharness` reaches the engine only by running `python -m learning` (its
   `CourseRecords` adapter, from the repository root's `.venv/bin/python` unless
   `LH_LEARNING_ENGINE`/`LH_LEARNING_PYTHON` say otherwise) and by composing, per agent, the

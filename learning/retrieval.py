@@ -25,6 +25,7 @@ from learning import (
     progress,
     records,
     schema,
+    told,
 )
 from learning.workspace import Workspace
 
@@ -1260,9 +1261,14 @@ def daily(readable: Mapping[str, dict[str, Any]], today: date) -> agenda.Replay:
     with today's week, ``map`` with each day's own, and the topic page said
     Eigen Thu 12 Nov while the calendar and the close said Mon 16). The
     replay reads each day's final review as that day did, so it is given
-    each course as stored (``progress.begun``)."""
+    each course as stored (``progress.begun``). It begins from the plan as
+    the last day he studied ended, kept by that day's last read, and keeps
+    today's for tomorrow (``learning.told``)."""
     stored = {name: progress.begun(record, today) for name, record in readable.items()}
-    return agenda.replay(stored, today, agenda.MAX_DAYS)
+    ended = told.load(stored, today, agenda.MAX_DAYS)
+    replayed = agenda.replay(stored, today, agenda.MAX_DAYS, ended=ended)
+    told.keep(stored, today, agenda.MAX_DAYS, replayed)
+    return replayed
 
 
 def when(workspace: Workspace, record: dict[str, Any], today: date) -> agenda.When:
@@ -1306,10 +1312,11 @@ def moved(
     day is done, not moved). A day that moved for none of these has no
     cause in his study, so it is not listed as moved: a told day that moves
     otherwise is a fault the tests catch, never a reason to give him.
-    Nothing is stored: the replay makes the days he was told again from the
-    records. ``record`` is this course read with the plan."""
+    The days he was told are the plan as the last day he studied ended,
+    kept by that day's read or made again from the records (``daily``).
+    ``record`` is this course read with the plan."""
     told, studied = replayed.told, replayed.studied
-    if told is None or studied is None:
+    if told is None or studied is None or name not in told.days:
         return {}
     now = replayed.now.when(name, today, True)
     was = told.when(name, studied, True)
