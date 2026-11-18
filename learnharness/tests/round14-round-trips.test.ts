@@ -27,5 +27,6 @@ test("the plan and the first step are one reply", () => {
 });
 
 test("a demo goes after the reply to his work, before its question", () => {
-	assert.match(read("src/agent/prompts/teacher/50-demos.md"), /In a turn that answers his work, the demo goes after your message to him and before its question/);
+	// Round 16, M5: after the reply that grades his work (round16-grade-first.test.ts).
+	assert.match(read("src/agent/prompts/teacher/50-demos.md"), /In a turn that answers his work, the demo goes in the reply after the one that grades it, before its question/);
 });
