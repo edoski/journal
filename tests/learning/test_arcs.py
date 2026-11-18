@@ -1404,13 +1404,14 @@ def test_after_a_schema_bump_migrate_still_moves_only_6_and_7(
     eight = {**json.loads(workspace.record.read_text()), "schema": 8}
     workspace.record.write_text(storage.encode(eight), encoding="utf-8")
     before = workspace.record.read_bytes()
-    monkeypatch.setattr(schema, "SCHEMA", 8)
-    try:
-        bumped = importlib.reload(migrate)
-        report = bumped.migrate(workspace, to=7)
-    finally:
-        monkeypatch.undo()
-        importlib.reload(migrate)
+    with monkeypatch.context() as patch:
+        patch.setattr(schema, "SCHEMA", 8)
+        try:
+            bumped = importlib.reload(migrate)
+            report = bumped.migrate(workspace, to=7)
+        finally:
+            patch.undo()
+            importlib.reload(migrate)
     assert (
         "this engine moves schema 6 to 7" in report["failed"][str(workspace.directory)]
     )
