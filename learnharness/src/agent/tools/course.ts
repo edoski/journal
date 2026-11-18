@@ -412,7 +412,7 @@ export function courseTools(ctx: CourseToolContext): Record<string, AgentTool<an
 			description:
 				`Record into ${course}'s shared study record. Applies one merge patch and returns a receipt: new observation ids, the reviews it set, ` +
 				"level changes, the focus and current path topic, the due count, and notes worth acting on. " +
-				"Its `starts_moved` lists each first lesson his study today moved off a day he was told: your closing words say it, its new day and its `moved` cause as written. " +
+				"Its `starts_moved` lists each first lesson his study today moved off a day he was told: your closing words say it, its new day and its `moved` cause as written, and, with `past_exam`, that it now comes after the exam. " +
 				"A refused patch saved nothing; " +
 				"the error names the field and the fix. Resending a save that failed is safe; an answer already saved is refused.",
 			parameters: saveInput,

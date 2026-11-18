@@ -1325,16 +1325,23 @@ def moved(
     result: dict[str, dict[str, Any]] = {}
     for kind, days in (("review", now.reviews), ("starts", now.starts)):
         for key, day in days.items():
+            # This morning's plan is the day he was last told: after days off
+            # it is made afresh, and a save today moves a day from it (round
+            # 16, 1 M1: a slip on the eve moved Expectation off today, and the
+            # page said "no study since 10 Nov" while the close said nothing).
+            morning = told_on(began, kind, key)
             before = told_on(was, kind, key)
-            if before is None or before == day:
-                continue
             if key in mine:
-                if before > today:
+                if before is not None and today < before != day:
                     result[key] = {"from": before.isoformat(), "by": "answered"}
+                continue
+            if morning is not None and morning != day:
+                before = morning
+            if before is None or before == day:
                 continue
             if before < today == day:
                 continue  # a day gone by, and it is today's: due, not moved
-            if told_on(began, kind, key) == before:
+            if morning == before:
                 courses = sorted(
                     str(course.get("title") or Path(key_).name)
                     for key_, course in readable.items()
@@ -1380,8 +1387,11 @@ def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:
     today: the days the learner is told are the days every view shows.
     ``starts_moved`` lists each first lesson his study today moved off a
     day he was told, by title, with its new day and why (``moved``, the
-    topics it waits on by title), so the close that follows can say so (round 15, m2: a partly right Binomial review
-    moved Poisson's start from tomorrow to 13 Nov, and nothing said it)."""
+    topics it waits on by title), and ``past_exam`` when the exam that
+    examines it now comes first, so the close that follows can say so (round 15, m2: a partly right Binomial review
+    moved Poisson's start from tomorrow to 13 Nov, and nothing said it;
+    round 16, 1 M1: a save on the eve moved Expectation past the exam in
+    silence)."""
     record = records.load(workspace)
     today = clock.today()
     planned, moves = _planned_and_moves(workspace, record, today)
@@ -1394,6 +1404,10 @@ def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:
     def title(key: str) -> str:
         return str(record["topics"].get(key, {}).get("title") or key)
 
+    def past_exam(topic: str) -> bool:
+        exam = progress.exam_for(record, topic)
+        return exam is not None and today < exam.day <= planned.starts[topic]
+
     starts_moved = {
         topic: {
             "title": title(topic),
@@ -1401,6 +1415,7 @@ def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:
             "moved": {**move, "waits_on": [title(key) for key in move["waits_on"]]}
             if "waits_on" in move
             else move,
+            **({"past_exam": True} if past_exam(topic) else {}),
         }
         for topic, move in moves.items()
         if move["by"] == "study" and topic in planned.starts
