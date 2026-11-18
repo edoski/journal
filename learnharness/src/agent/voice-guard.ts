@@ -1009,7 +1009,8 @@ export class VoiceGuard {
 		this.secondTry = review ? null : retryAtCheck(messages);
 		this.opening = !review && !messages.slice(0, messages.findLastIndex(opensTurn)).some((m) => m.role === "assistant");
 		const aside = setAsideOf(messages);
-		this.setAside = aside && !(this.input.words && TAUGHT_INSTEAD.test(this.input.words)) ? aside : null;
+		// A guess he asks to make first is the guess rule's: it is posed as a prediction.
+		this.setAside = aside && !this.input.guess && !(this.input.words && TAUGHT_INSTEAD.test(this.input.words)) ? aside : null;
 		this.posedLast = posedLast(messages);
 		this.stepsAhead = stepsNotDone(messages);
 		this.unsaved = saves ? unsavedAnswerOf(messages) : null;
@@ -1222,13 +1223,6 @@ export class VoiceGuard {
 			this.heldUnsure = true;
 			return UNSURE(this.input.unsure);
 		}
-		const asksAside = !!this.setAside && GRADED_QUESTION_TOOLS.includes(call.name) && sameQuestionKey(text) === this.setAside.key;
-		const guessFirst = !!this.input.guess && normalizeQuestionType(isRecord(call.arguments) ? call.arguments.type : undefined) === "predict";
-		if (this.setAside && GRADED_QUESTION_TOOLS.includes(call.name) && !asksAside && !guessFirst && !this.heldSetAside) {
-			this.heldSetAside = true;
-			return SET_ASIDE(this.setAside.tool, this.setAside.question);
-		}
-		if (asksAside) this.setAside = null;
 		if (this.repairOwed && !this.heldRepair && !writesAnswer(this.secondTry!, this.toldNow)) {
 			this.heldRepair = true;
 			return REPAIRED(this.secondTry!.correct);
@@ -1242,6 +1236,14 @@ export class VoiceGuard {
 			this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 			return refusal("question", call.name, text, breaks, undefined);
 		}
+		// A prediction he is invited to make is the guess rule's: it never counts.
+		const asksAside = !!this.setAside && GRADED_QUESTION_TOOLS.includes(call.name) && sameQuestionKey(text) === this.setAside.key;
+		const predicts = normalizeQuestionType(isRecord(call.arguments) ? call.arguments.type : undefined) === "predict";
+		if (this.setAside && GRADED_QUESTION_TOOLS.includes(call.name) && !asksAside && !predicts && !this.heldSetAside) {
+			this.heldSetAside = true;
+			return SET_ASIDE(this.setAside.tool, this.setAside.question);
+		}
+		if (asksAside) this.setAside = null;
 		if (keeps && parseQuestionInput(call.name, call.arguments)) {
 			this.letGo();
 			this.kept = { call, text, ran: false };
