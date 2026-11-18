@@ -95,7 +95,7 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 				size="xs"
 				className={PRESS}
 				disabled={starting !== null}
-				onClick={() => start(examGapAskCreation(workspace, titles(named), named.map((t) => t.handle)), { key: "gap:ask" })}
+				onClick={() => start(examGapAskCreation(workspace, titles(named)), { key: "gap:ask" })}
 			>
 				{EXAM_GAP_WORDS.ask}
 			</Button>

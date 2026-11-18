@@ -410,7 +410,7 @@ function aheadOfPlanLines(plans: CoursePlans | undefined, opened: readonly strin
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
-	{ runup, arcCheck, plan, opened = [], opening = null, live = [], review = false, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; opening?: string | null; live?: readonly string[]; review?: boolean; studied?: LastStudied | null } = {},
+	{ runup, arcCheck, plan, opened = [], opening = null, live = [], review = false, takenUp = null, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; opening?: string | null; live?: readonly string[]; review?: boolean; takenUp?: string | null; studied?: LastStudied | null } = {},
 ): { key: string; text: string } {
 	const r = obj(resume);
 	const course = obj(r.course);
@@ -424,7 +424,9 @@ export function projectCourseBrief(
 	lines.push(`[Course record] ${str(course.title) ?? "Untitled course"} · today ${dayWithWeekday(str(r.today))}${examLine}`);
 	if (str(course.goal)) lines.push(`About the course, in his words: ${course.goal}`);
 	if (studied) lines.push(studiedLine(studied));
-	if (opened.length > 0 && review) lines.push(`Opened on: ${opened.join(", ")}, as its review. He pressed its button, and the app posted his first message. The session is his review, whatever it re-teaches.`);
+	// A review whose plan teaches another topic is that topic's lesson from then on (round 16, M4).
+	if (opened.length > 0 && takenUp) lines.push(`Opened on: ${opened.join(", ")}, as its review; its plan then took up ${takenUp}, so the session is now the ${takenUp} lesson, a lesson like any other: what is left of it at its close is that lesson's task, and the close calls it the lesson, never a review.`);
+	else if (opened.length > 0 && review) lines.push(`Opened on: ${opened.join(", ")}, as its review. He pressed its button, and the app posted his first message. The session is his review, whatever it re-teaches.`);
 	else if (opened.length > 0) lines.push(`Opened on: ${opened.join(", ")}. He pressed the action on its page, and the app posted his first message.`);
 	if (!review) lines.push(...aheadOfPlanLines(plan, opened, opening));
 	const topics = list(path.topics)

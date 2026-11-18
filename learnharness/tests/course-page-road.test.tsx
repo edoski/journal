@@ -133,6 +133,14 @@ describe("the course head", () => {
 		}
 	});
 
+	it("with all of it still fitting, is the fact alone: no press that opens a list of arcs not ready (round 16, m6)", () => {
+		const head = render(<CourseHead {...columns(view, SOME_READY)} />);
+		const fact = head.querySelector('[data-slot="course-ready-fact"]')!;
+		assert.equal(fact.tagName, "SPAN", "not a press");
+		assert.equal(fact.getAttribute("aria-haspopup"), null, "opens nothing");
+		assert.doesNotMatch(text(head.querySelector('[data-slot="page-head"]')), /Not ready yet in/);
+	});
+
 	it("takes one line's room under the title", () => {
 		assert.match(render(<CourseHead {...columns(view, NOT_READY)} />).querySelector('[data-slot="page-lines"]')!.className, /\bmin-h-5\b/);
 	});

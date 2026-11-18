@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import type { TopicHandle } from "@/src/core";
 import { CourseGroup } from "@/components/course-page/course-group";
-import type { CourseArcSection, CourseGroup as Group, CourseTopic } from "@/components/course-page/course-model";
+import { offersCheck, type CourseArcSection, type CourseGroup as Group, type CourseTopic } from "@/components/course-page/course-model";
 import type { ArcLineProps } from "@/components/course-page/road/road-arc";
 import { CourseTopicRow } from "@/components/course-page/course-topic-row";
 import { cn } from "@/lib/utils";
@@ -81,7 +81,7 @@ export function SplitList({
 	/** Each stop's element: a header's button, a row's link. */
 	const stopsEl = useRef(new Map<string, HTMLElement>());
 	const sections = useMemo<ListSection[]>(
-		() => (arcs ? arcs.map((a) => ({ id: a.arc.handle, topics: a.topics, checkable: a.arc.state === "ready" && onCheck !== undefined })) : [...groups]),
+		() => (arcs ? arcs.map((a) => ({ id: a.arc.handle, topics: a.topics, checkable: offersCheck(a) && onCheck !== undefined })) : [...groups]),
 		[arcs, groups, onCheck],
 	);
 	const stops = useMemo(() => walkStops(sections, open), [sections, open]);

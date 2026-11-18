@@ -52,8 +52,10 @@ export async function POST(req: Request) {
 	// opened it ("Start Poisson distribution" is "Poisson distribution");
 	// a review keeps its words (`openingTitle`).
 	// A start named apart from its opening asks his question in his words
-	// (Ask the tutor), which shows as his message (round 13, 1 n8).
-	const chat = createChat(titleFromPrompt(name ?? (openingTitle(title, topics) || "Untitled session")), course, topics, arcCheck, name !== null);
+	// (Ask the tutor), which shows as his message (round 13, 1 n8). It is
+	// opened on no topic: it belongs to those its work is on (round 16, M3).
+	const named = name !== null;
+	const chat = createChat(titleFromPrompt(name ?? (openingTitle(title, topics, !practice && !arcCheck) || "Untitled session")), course, named ? [] : topics, arcCheck, named);
 	const opening: LhMessage[] = practice ? [newSessionModeMessage("practice") as LhMessage] : [];
 	if (resumed) {
 		// The lesson's plan carries over as this session's plan map, so the

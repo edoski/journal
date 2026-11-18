@@ -34,10 +34,12 @@ export interface ChatStore {
 	 *  registered course for its whole life. A session's mode lives in its
 	 *  transcript (a session-mode marker, then the agents' handoffs).
 	 *  `arcCheck` is the arc a Check it session checks. */
-	/** `asked`: its opening is his question, which the app words for him
-	 *  (Ask the tutor), so it shows as his message, never as the app's
-	 *  opening on its topics. */
-	createChat(title: string, course?: CourseLink, topics?: readonly string[], arcCheck?: string, asked?: boolean): ChatRecord;
+	/** `topics`: the topics a press on them opened it on, its first
+	 *  message the app's opening. `named`: the app named it apart from its
+	 *  opening, which is his question in words the app gave him (Ask the
+	 *  tutor), so nothing renames it, and it belongs to no topic his
+	 *  question names, only to those its work is on (round 16, M3). */
+	createChat(title: string, course?: CourseLink, topics?: readonly string[], arcCheck?: string, named?: boolean): ChatRecord;
 	/** The full record, or null if unknown id / corrupt file. */
 	getChat(id: string): ChatRecord | null;
 	/** All sessions, newest activity first (the sidebar's list view). */
@@ -73,6 +75,11 @@ export interface ChatStore {
 	 *  already, the goal's title. A no-op for a session started on a topic.
 	 *  Announced like a rename; never conversation activity. */
 	nameSession(id: string, goal: SessionGoal): void;
+	/** A session whose first plan teaches a topic it was not opened on
+	 *  takes up that topic's lesson (`lessonTakenUp`): it is named after it,
+	 *  unless the learner renamed it. Announced like a rename; never
+	 *  conversation activity. */
+	takeUpLesson(id: string, title: string): void;
 	/** Delete the session record entirely (session-deletion wave 6, owner
 	 *  2026-09-22). False when the id is unknown. Job cleanup is the
 	 *  caller's choreography (server/chats.ts), not the store's. */

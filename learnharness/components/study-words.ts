@@ -789,12 +789,10 @@ export function moreWords(hidden: number, page: number): string {
 	return hidden <= page ? "Show the rest" : "Show more";
 }
 /** How ready he is for the exam, in the engine's own sorting (its
- *  `standing`): every part solid, not yet, or not all of it fits. "Not
- *  ready yet in" leads the names of the arcs that are not (`ArcLabel`). */
+ *  `standing`): every part solid, not yet, or not all of it fits. */
 export const READY_WORDS = {
 	ready: "Ready for the exam",
 	notYet: "Not ready for the exam yet",
-	notYetIn: "Not ready yet in",
 	/** After the least ready topics, the press that shows them all. */
 	rest: "and the rest",
 } as const;
@@ -810,9 +808,6 @@ export const READY_FACT_WORDS = {
 	notYet: "Not ready for the exam yet",
 	none: "No exam",
 } as const;
-
-/** The arcs not ready yet, heading their list under the head's fact. */
-export const NOT_READY_ARCS_WORDS = "Not ready yet in";
 
 /** When an arc's first new topic starts, on the road's line: "Starts 15 Nov". */
 export function arcStartsWords(day: string): string {

@@ -1,11 +1,13 @@
 /**
  * An arc is named one way (components/course-map/arc-label.md): its number
  * in study order and its whole name, muted, never a pill and no ring. The
- * same arc reads the same in the map's arc list, the course page's road,
- * the readiness answer, the exam's run-up and the lesson's roadmap (round
- * 14's finding 5: the mistakes showed a pill with a ring, the roadmap a
- * ringless pill, the readiness answer a ring and a title). The open
- * mistakes name no arc (round 16, m18: its bare number meant nothing). Mounted on the real Radix layers, so the popovers open.
+ * same arc reads the same in the map's arc list, the course page's road
+ * and the lesson's roadmap (round 14's finding 5: the mistakes showed a
+ * pill with a ring, the roadmap a ringless pill, the readiness answer a
+ * ring and a title). The open mistakes name no arc (round 16, m18: its
+ * bare number meant nothing), nor do the readiness answer and the exam's
+ * run-up while all of it fits (round 16, m6). Mounted on the real Radix
+ * layers, so the popovers open.
  */
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -24,8 +26,6 @@ import { SplitList } from "../components/course-page/split/split-list.tsx";
 import { RoadArc, type ArcLineProps } from "../components/course-page/road/road-arc.tsx";
 import { MistakeList } from "../components/course-page/standing/mistake-list.tsx";
 import { examReady, mistakeRows } from "../components/course-page/standing/standing-model.ts";
-import { ReadyFact } from "../components/course-page/course-head/ready-fact.tsx";
-import { ExamFact } from "../components/course-page/course-head/head-parts.tsx";
 import { LessonRoadmap } from "../components/lesson/lesson-roadmap.tsx";
 
 const h = (handle: string) => handle as TopicHandle;
@@ -120,7 +120,7 @@ function reading(handle: string, where: string) {
 }
 
 describe("an arc is named one way", () => {
-	it("reads the same in the map's arc list, the road, the mistakes, the readiness answer, the exam's run-up and the lesson's roadmap", async () => {
+	it("reads the same in the map's arc list, the road and the lesson's roadmap", async () => {
 		const view = viewOf(COURSE);
 		const ready = examReady(READINESS, COURSE.map, view.arcs, STANDING.mistakes);
 		assert.equal(ready.kind, "notYet");
@@ -135,11 +135,7 @@ describe("an arc is named one way", () => {
 		await mount(<MistakeList rows={mistakeRows(STANDING, COURSE, [])} />);
 		assert.ok(document.querySelector('[data-slot="arc-label"]') === null, "the mistakes name no arc (round 16, m18)");
 
-		await mount(<ReadyFact view={view} ready={ready} />, '[data-slot="course-ready-fact"]');
-		const answer = reading("maps", "the readiness answer");
-
-		await mount(<ExamFact course={COURSE} runup={null} words="Exam in 25 days" ready={ready} />, '[data-slot="course-exam"]');
-		const runup = reading("maps", "the run-up");
+		// The readiness answer and the exam's run-up name no arcs while all of it fits (round 16, m6).
 
 		const step = { id: "s", title: "Rank", status: "current" as const, done: false, next: false, taught: true };
 		function Roadmap() {
@@ -151,7 +147,7 @@ describe("an arc is named one way", () => {
 		const roadmap = reading("maps", "the roadmap");
 
 		assert.deepEqual({ slot: list.slot, number: list.number, text: list.text, pill: list.pill, ring: list.ring }, { slot: "arc-label", number: "2", text: "2Linear maps", pill: false, ring: false });
-		for (const [where, seen] of Object.entries({ road, answer, runup, roadmap })) {
+		for (const [where, seen] of Object.entries({ road, roadmap })) {
 			const inner = list.inner;
 			assert.deepEqual({ slot: seen.slot, number: seen.number, text: seen.text, inner: seen.inner, pill: seen.pill, ring: seen.ring }, { slot: list.slot, number: list.number, text: list.text, inner, pill: false, ring: false }, `${where} names the arc as the arc list does`);
 			assert.deepEqual(list.classes.filter((c) => !seen.classes.includes(c)), [], `${where} wears the label's own look`);

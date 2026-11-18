@@ -4,7 +4,7 @@ What the course page's head says about the exam and the mistakes still open (Edo
 
 | | What it shows |
 |---|---|
-| readiness | one fact in the head (`ReadyFact`, `../course-head/ready-fact.tsx`): "Ready for the exam", "Not ready yet", "Not all of it fits", "No exam"; pressed, its answer: the words below (`ReadyWords`, `ready-line.tsx`), the arcs not ready as a list, each showing its arc on the page |
+| readiness | one fact in the head (`ReadyFact`, `../course-head/ready-fact.tsx`): "Ready for the exam", "Not ready yet", "Not all of it fits", "No exam"; pressed, its answer: the words below (`ReadyWords`, `ready-line.tsx`); the fact alone when it has nothing more to say (round 16, m6) |
 | mistakes | Mistakes, a quiet press before Context, opens a popover of the rows under the whole head (`mistakes-press.tsx`, `MistakesHead`), covering none of its lines |
 
 Topics with no room before the exam lead the words in the warning ink, in the run-up's words ("No room before the exam to start Kernel"); a course the page shows without arcs names the topics not yet solid ("Not yet solid for the exam: Basis and Rank"), else those still to start, and with more than four only the three least ready, then "and the rest", a press that lists them all (`leastReadyFirst`: open mistake, newest first; engine level; weak; path order); without an exam, what the plan does with its reviews (`noExamWords`); nothing when the engine cannot say.

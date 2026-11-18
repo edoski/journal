@@ -59,8 +59,12 @@ export function examGaps(map: Pick<CourseMap, "exam" | "topics" | "edges" | "tod
 	return start.length > 0 || review.length > 0 ? { start, review, why: { start: why(start), review: why(review) }, ways } : null;
 }
 
-/** His latest session in the course, the one "Studied" opens. */
+/** The session in the course he last worked in, the one "Studied" opens:
+ *  by his newest input, never a write that was not his (round 16, m9: the
+ *  Eigen lesson, its left question posed again on opening it, beside the
+ *  Rank practice he had just studied). */
 export function lastSessionOf(workspace: string, chats: readonly ChatListItem[]): { id: string; title: string } | null {
-	const mine = chats.filter((c) => c.course?.workspace === workspace).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+	const at = (c: ChatListItem) => c.studiedAt ?? c.updatedAt;
+	const mine = chats.filter((c) => c.course?.workspace === workspace).sort((a, b) => at(b).localeCompare(at(a)));
 	return mine[0] ? { id: mine[0].id, title: mine[0].title } : null;
 }

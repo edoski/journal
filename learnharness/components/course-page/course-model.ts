@@ -151,6 +151,13 @@ export interface CourseArcSection {
 	current: boolean;
 }
 
+/** Whether an arc's line offers its check: it is ready for one, and it
+ *  does not need him, so the line ends in one chip (round 16, m5: "Needs
+ *  you" beside "Test this arc"). Pure. */
+export function offersCheck(section: Pick<CourseArcSection, "arc" | "needsYou">): boolean {
+	return section.arc.state === "ready" && !section.needsYou;
+}
+
 /**
  * The course's arcs in study order (spec: course-page.md, "Arcs"), each
  * with its topics as the page's rows (the groups' words and facts),

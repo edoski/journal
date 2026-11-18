@@ -1,18 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
 import { CalendarOffIcon, CircleCheckIcon, CircleDotDashedIcon, TriangleAlertIcon } from "lucide-react";
 import type { CourseStanding } from "@/src/core";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Hint } from "@/components/ui/hint";
 import { MathText } from "@/components/ui/math-text";
-import { ArcLabel } from "@/components/course-map/arc-label";
-import { NOT_READY_ARCS_WORDS, READY_FACT_WORDS, noExamWords } from "@/components/study-words";
+import { READY_FACT_WORDS, noExamWords } from "@/components/study-words";
 import type { CourseView } from "@/components/course-page/course-model";
-import { arcOnPage } from "@/components/course-page/course-head/course-head";
-import { MARK, PRESS } from "@/components/course-page/course-head/head-parts";
+import { FACT, MARK, PRESS } from "@/components/course-page/course-head/head-parts";
 import { ExamGapLine } from "@/components/course-page/course-head/exam-gaps";
+import { examGaps } from "@/components/course-page/course-head/head-facts";
 import { ReadyWords } from "@/components/course-page/standing/ready-line";
 import { examReady, mistakeRows, type ExamReady } from "@/components/course-page/standing/standing-model";
 import { cn } from "@/lib/utils";
@@ -35,9 +33,9 @@ export function useHeadStanding(view: CourseView, standing: CourseStanding | nul
  * of it, what it loses in the warning ink ("No room before the exam to
  * start Geometric distribution and Variance"; round 15, M7: "Not all of it
  * fits" hid the loss behind a click). Pressed, it opens the whole answer under it: the readiness
- * words the run-up says (`ReadyWords`), the arcs not ready as a list, each
- * showing its arc on the page, and what the exam's plan leaves out with
- * its way in (`ExamGapLine`). A course without an exam says "No exam",
+ * words the run-up says (`ReadyWords`) and what the exam's plan leaves out
+ * with its way in (`ExamGapLine`); not ready with nothing more to say, it
+ * is the fact alone. A course without an exam says "No exam",
  * what the plan does with its reviews in its hint. Nothing while the
  * engine cannot say.
  */
@@ -56,7 +54,16 @@ export function ReadyFact({ view, ready }: { view: CourseView; ready: ExamReady 
 	}
 	if (!ready) return null;
 	const Icon = ICON[ready.kind];
-	const arcs = ready.kind === "notYet" ? ready.arcs : [];
+	// Not ready, with every topic still fitting and nothing more to name: the fact alone, no press that only
+	// repeats it (round 16, m6: "Not ready yet in" over six of seven arcs, 25 days before the exam).
+	if (ready.kind === "notYet" && !ready.rest && !examGaps(map)) {
+		return (
+			<span data-slot="course-ready-fact" data-kind={ready.kind} className={FACT}>
+				<Icon aria-hidden className={MARK} />
+				{READY_FACT_WORDS.notYet}
+			</span>
+		);
+	}
 	return (
 		<Popover>
 			<PopoverTrigger data-slot="course-ready-fact" data-kind={ready.kind} className={cn(PRESS, ready.kind === "short" && "text-warning hover:text-warning data-[state=open]:text-warning")}>
@@ -65,21 +72,9 @@ export function ReadyFact({ view, ready }: { view: CourseView; ready: ExamReady 
 			</PopoverTrigger>
 			<PopoverContent data-slot="course-ready-detail" align="start" collisionPadding={12} className="flex flex-col gap-3">
 				{ready.kind !== "short" && (
-					<p className="text-callout text-foreground">{arcs.length > 0 ? NOT_READY_ARCS_WORDS : <ReadyWords ready={ready} workspace={map.workspace} />}</p>
-				)}
-				{arcs.length > 0 && (
-					<ul className="-mx-1 -mt-2 flex flex-col">
-						{arcs.map((arc) => (
-							<li key={arc.handle}>
-								<Link
-									href={arcOnPage(map.workspace, arc.handle)}
-									className="group/arc flex h-8 min-w-0 items-center rounded-md px-1 outline-none hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring"
-								>
-									<ArcLabel {...arc} />
-								</Link>
-							</li>
-						))}
-					</ul>
+					<p className="text-callout text-foreground">
+						<ReadyWords ready={ready} workspace={map.workspace} />
+					</p>
 				)}
 				<ExamGapLine course={course} chats={chats} />
 			</PopoverContent>

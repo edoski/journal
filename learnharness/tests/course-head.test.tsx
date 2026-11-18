@@ -71,6 +71,13 @@ describe("his last session", () => {
 		assert.deepEqual(lastSessionOf(WS, chats), { id: "b", title: "Session b" });
 		assert.equal(lastSessionOf(WS, []), null);
 	});
+
+	it("is the one he last worked in, never one a later write that was not his touched (round 16, m9)", () => {
+		// The Eigen lesson's left question was posed again when he opened it, after the Rank practice he studied.
+		const eigen = { ...chat("eigen", "2026-11-08T15:00:00Z"), studiedAt: "2026-11-08T10:00:00Z" };
+		const rank = { ...chat("rank", "2026-11-08T12:00:00Z"), studiedAt: "2026-11-08T12:00:00Z" };
+		assert.deepEqual(lastSessionOf(WS, [eigen, rank]), { id: "rank", title: "Session rank" });
+	});
 });
 
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };

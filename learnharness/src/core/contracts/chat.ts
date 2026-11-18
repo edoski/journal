@@ -529,6 +529,14 @@ export interface ChatSummary {
 	 *  after its opening. The list always sets it; a summary made elsewhere
 	 *  may leave it out, which reads as not studied. */
 	studied?: boolean;
+	/** When his newest input in it came (`opensTurn`: a message, an
+	 *  answer, a handoff), ISO; absent before any. A write that was not his
+	 *  (a left question posed again on opening it) never moves it. */
+	studiedAt?: string;
+	/** The local days, YYYY-MM-DD and in order, on which his input came:
+	 *  every day he worked in it, a lesson begun one day and left the next
+	 *  included (round 16, m8). */
+	studiedDays?: readonly string[];
 }
 
 /** The sidebar's session row: a summary + live liveness. The chats list

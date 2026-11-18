@@ -35,14 +35,14 @@ describe("a lesson left for next time keeps its one name, its status saying it w
 		assert.deepEqual(morning.map(label), ["Continue Eigenvalues and eigenvectors lesson"], "the task's own line, when no session holds it, is a step");
 		const rows = todayRows([course], openSessions([lesson]), TODAY);
 		assert.equal(rows[0]?.kind, "session", "the lesson takes the task's row");
-		assert.deepEqual(rows.map(label), ["Eigenvalues and eigenvectors lesson"]);
-		assert.deepEqual(needsYouNow([course], [lesson], TODAY).lines.map((l) => l.title), ["Eigenvalues and eigenvectors lesson"], "the sidebar's card the same");
+		assert.deepEqual(rows.map(label), ["Continue Eigenvalues and eigenvectors lesson"], "the session's one name after its verb (round 16, m4)");
+		assert.deepEqual(needsYouNow([course], [lesson], TODAY).lines.map((l) => l.title), ["Continue Eigenvalues and eigenvectors lesson"], "the sidebar's card the same");
 	});
 
 	it("reads its own title when it holds no task", () => {
 		const continuity = chat({ id: "cont", title: "Continuity", ended: "left", topics: ["continuity"], ownTopics: ["continuity"], updatedAt: "2026-11-07T10:00:00.000Z" });
 		const rows = todayRows([{ ...course, map: { ...course.map, tasks: [], focus: null } }], openSessions([continuity]), TODAY);
-		assert.ok(rows.map(label).includes("Continuity"), rows.map(label).join(" | "));
+		assert.ok(rows.map(label).includes("Continue Continuity"), rows.map(label).join(" | "));
 	});
 
 	it("never doubles the verb of a task titled with it", () => {

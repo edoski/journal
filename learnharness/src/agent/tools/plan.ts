@@ -9,6 +9,7 @@ import type { CourseToolContext } from "./course.ts";
 import { sessionTopicsOf } from "../../core/native-messages.ts";
 import { topicsToIntroduce, type CourseMap } from "../../core/contracts/course-map.ts";
 import { plannedDayWords } from "../../core/day-words.ts";
+import { planTakesUp } from "../../core/session-opening.ts";
 
 /** The binding-id reminder riding plan_init's slim content (owner,
  *  2026-10-09): plan_init is the exact moment the node ids become
@@ -177,6 +178,15 @@ export function doneBeforeNeeds(tree: PlanTree, messages: Parameters<typeof deri
 	});
 }
 
+/** A lesson's name, as its task is titled: its topic's title and
+ *  "lesson" ("Poisson distribution lesson"); the handle when the course's
+ *  map cannot be read. */
+async function lessonName(course: CourseToolContext | undefined, topic: string): Promise<string> {
+	const mapped = course ? await course.records.map(course.course.workspace).catch(() => null) : null;
+	const title = mapped?.ok ? mapped.map.topics.find((t) => t.handle === topic)?.title : undefined;
+	return `${title ?? topic} lesson`;
+}
+
 export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> {
 	return {
 		[LESSON_PROGRESS_TOOL]: {
@@ -242,12 +252,16 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 					// edge endpoints, self-loops, cycles → PlanTreeError).
 					const next = createTree(parsed.plan.nodes, parsed.plan.edges);
 					// Every problem at once, so one rewrite fixes them all.
-					const lesson = { topic: goal?.topic, titles: [goal?.title, record.title].filter((t): t is string => typeof t === "string") };
+					// A lesson is named "<topic> lesson" (`openingTitle`): a step named after its topic is the lesson too.
+					const lesson = { topic: goal?.topic, titles: [goal?.title, record.title, record.title?.replace(/\s+lesson$/i, "")].filter((t): t is string => typeof t === "string") };
 					const taught = record.tree ? derivePlanStatusesLh(record.tree, record.messages) : null;
 					const problems = [planMapTooBig(next), planTitlesGiveAway(next), planStepIsTheTopic(next, lesson), planDropsSteps(record.tree, next, (taught?.visited.size ?? 0) > 0 || taught?.current != null, taught?.done ?? new Set())].filter((p): p is string => p !== null);
 					if (problems.length > 0) return { ok: false, error: problems.join("\n") };
 					chatStore.saveTree(chatId, next);
 					if (goal && !record.tree) chatStore.nameSession(chatId, goal);
+					// A session whose first plan teaches a topic it was not opened on is that topic's lesson from here (round 16, M4).
+					const taken = record.tree ? null : planTakesUp(record, goal?.topic);
+					if (taken) chatStore.takeUpLesson(chatId, await lessonName(ctx.course, taken));
 					// Context diet: content = the validated nodeIds + the reminder (the
 				// ids just became binding for every explain call); details =
 					// the full tree for the record/UI — the plan popup's latestTree

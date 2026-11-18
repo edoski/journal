@@ -95,14 +95,17 @@ export function courseTitle(row: TodayRow): string {
 	return row.kind === "session" && row.chat.course ? courseLabel(row.chat.course) : "No course";
 }
 
-/** A line's lesson in words: the session's one name (`sessionName`, the
- *  title of the task it holds), whatever its state, as the sidebar, the
- *  calendar and the chat's head name it (round 15, m5: "Continue Linear maps
- *  and their matrices lesson" on Home, "Linear maps and their matrices
- *  lesson" on its card); its status says it was left ("Left off
- *  yesterday"). Else the course's next step ("Review A, B"). Pure. */
+/** A line's lesson in words, its verb first as every line's is: a
+ *  session's one name (`sessionName`, the title of the task it holds),
+ *  whatever its state, after "Continue" unless it is a review's ("Continue
+ *  Linear maps and their matrices lesson" beside "Continue Problem sheet
+ *  4"; round 16, m4: the lesson's row had no verb), its status saying it
+ *  was left ("Left off yesterday"); else the course's next step ("Review
+ *  A, B"). Home's line and its sidebar card read this one title. Pure. */
 export function lessonTitle(row: TodayRow): string {
-	return row.kind === "course" ? stepWords(row.step) : sessionName(row.chat, row.course?.map.tasks ?? []);
+	if (row.kind === "course") return stepWords(row.step);
+	const name = sessionName(row.chat, row.course?.map.tasks ?? []);
+	return /^(?:Review|Start)\s/.test(name) ? name : continueWords(name);
 }
 
 /** Why a line is on Today: its kind (which picks its icon) and the few

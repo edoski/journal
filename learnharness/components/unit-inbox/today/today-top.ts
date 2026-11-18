@@ -39,9 +39,15 @@ export function claimedKeys(item: NowItem): string[] {
  *  lesson's, a review's), never one its lesson only touched on the way
  *  (round 14, m28: the course page's Needs you listed Random variables
  *  beside the Poisson lesson that reviewed it, which no Today line asks);
- *  any other line's own key. Pure. */
+ *  every topic a course's review or start names (round 16, m5: "Review
+ *  Independent events, Random variables" left Random variables' arc
+ *  without its "Needs you"); any other line's own key. Pure. */
 export function askedKeys(item: NowItem): string[] {
 	const { row, topics } = item.line;
+	if (row.kind === "course" && (row.step.kind === "review" || row.step.kind === "topic")) {
+		const { workspace } = row.course.map;
+		return [itemKey(item), ...topics.map((t) => unitKey(workspace, t.handle))];
+	}
 	if (item.kind !== "session" || !row.course) return [itemKey(item)];
 	const { workspace } = row.course.map;
 	const own = new Set<string>(item.chat.ownTopics ?? []);

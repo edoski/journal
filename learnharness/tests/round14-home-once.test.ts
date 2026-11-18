@@ -82,8 +82,8 @@ describe("one session, one name (round 14, m29)", () => {
 		const waiting = lessonTitle({ kind: "session", chat: sheet({ ended: "mid-lesson", pendingQuestion: true }), course });
 		const left = lessonTitle({ kind: "session", chat: sheet({ ended: "left" }), course });
 		const studied = doneToday([sheet({ ended: "left" })], new Date(), [course]);
-		assert.equal(waiting, "Problem sheet 4: rank and nullity");
-		assert.equal(left, "Problem sheet 4: rank and nullity", "left, the same name: its status says it was left (round 15, m5)");
+		assert.equal(waiting, "Continue Problem sheet 4: rank and nullity");
+		assert.equal(left, "Continue Problem sheet 4: rank and nullity", "left, the same name: its status says it was left (round 15, m5)");
 		assert.deepEqual(studied, ["Problem sheet 4: rank and nullity"]);
 	});
 });

@@ -47,7 +47,7 @@ describe("NowCard", () => {
 		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
-			["Eigenvalues lesson", "Rank practice", "Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence"],
+			["Continue Eigenvalues lesson", "Continue Rank practice", "Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
@@ -55,7 +55,7 @@ describe("NowCard", () => {
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="row-action"]')?.getAttribute("aria-label")),
-			["Resume: Eigenvalues lesson", "Resume: Rank practice", "Review: Review Random variables and distributions, Law of total probability, Bayes' rule", "Review: Review Linear independence"],
+			["Resume: Continue Eigenvalues lesson", "Resume: Continue Rank practice", "Review: Review Random variables and distributions, Law of total probability, Bayes' rule", "Review: Review Linear independence"],
 		);
 		assert.equal(cards[0]!.querySelector('[data-slot="row-action"]')?.getAttribute("href"), "/chat/chat_eigen");
 		assert.equal(cards[0]!.querySelector('[data-testid="unit-row"]')?.getAttribute("href"), "/chat/chat_eigen", "a click resumes the session, as Home's line does, not the topic's page");

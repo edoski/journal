@@ -144,10 +144,10 @@ describe("plan_init names a lesson once, by its goal", () => {
 		assert.deepEqual([named.title, named.ownTopics], ["Eigenvalues by hand", ["eigen"]]);
 	});
 
-	it("leaves a session started on a topic as it was opened, and a renamed one its own title", async () => {
+	it("leaves a session started on the topic its plan teaches as it was opened, and a renamed one its own title", async () => {
 		const onTopic = chatStore.createChat("Review Rank and the column space", undefined, ["rank"]);
 		createdChats.push(onTopic.id);
-		await exec(planTools({ chatId: onTopic.id, chatStore }), "plan_init", { mermaid: PLAN, goal: GOAL });
+		await exec(planTools({ chatId: onTopic.id, chatStore }), "plan_init", { mermaid: PLAN, goal: { title: "Rank again", topic: "rank" } });
 		const kept = chatStore.listChats().find((c) => c.id === onTopic.id)!;
 		assert.deepEqual([kept.title, kept.ownTopics], ["Review Rank and the column space", ["rank"]]);
 		const renamed = newChat("first words");
@@ -155,6 +155,13 @@ describe("plan_init names a lesson once, by its goal", () => {
 		await exec(planTools({ chatId: renamed, chatStore }), "plan_init", { mermaid: PLAN, goal: GOAL });
 		const own = chatStore.listChats().find((c) => c.id === renamed)!;
 		assert.deepEqual([own.title, own.ownTopics], ["My eigen night", ["eigen"]]);
+	});
+
+	it("gives a session started on another topic the lesson its plan takes up, named after it (round 16, M4)", async () => {
+		const review = chatStore.createChat("Review Rank and the column space", undefined, ["rank"]);
+		createdChats.push(review.id);
+		await exec(planTools({ chatId: review.id, chatStore }), "plan_init", { mermaid: PLAN, goal: GOAL });
+		assert.equal(chatStore.getChat(review.id)!.title, "eigen lesson", "with no course map, the lesson is named by its handle");
 	});
 });
 
