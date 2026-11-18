@@ -59,6 +59,12 @@ export interface NearExam {
 	date: string;
 	/** Days from the engine's today: 0 is today. */
 	daysLeft: number;
+	/** The course's workspace, for Ask the tutor. */
+	workspace?: string;
+	/** The titles of the topics its plan has no room to start before the
+	 *  exam (the engine's `does_not_fit`), in the plan's order (round 17,
+	 *  M2). */
+	wontFit?: readonly string[];
 }
 
 const WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "UTC" });

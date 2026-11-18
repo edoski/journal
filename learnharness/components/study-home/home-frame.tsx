@@ -90,7 +90,7 @@ function homeOf(courses: readonly StudyCourse[], chats: readonly ChatListItem[],
 		courses: todayCourses(rows, courses),
 		chats,
 		done: doneToday(chats, new Date(), courses),
-		exam: nearExam(courses.flatMap(({ map }) => (map.exam ? [{ course: map.title, date: map.exam.date, daysLeft: map.exam.daysLeft }] : []))),
+		exam: nearExam(courses.flatMap(({ map }) => (map.exam ? [{ course: map.title, date: map.exam.date, daysLeft: map.exam.daysLeft, workspace: map.workspace, wontFit: (map.exam.doesNotFit ?? []).flatMap((h) => map.topics.find((t) => t.handle === h)?.title ?? []) }] : []))),
 	};
 }
 
