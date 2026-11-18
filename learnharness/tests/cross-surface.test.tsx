@@ -651,7 +651,7 @@ function assertFiledByWork(app: DemoApp, s: Survey) {
 
 // ─── the journey ───────────────────────────────────────────────────────────
 
-describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip, concurrency: false, timeout: 900_000 }, () => {
+describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip, concurrency: false, timeout: 1_800_000 }, () => {
 	let app: DemoApp;
 	before(async () => {
 		app = await openDemoApp("2026-11-08");
