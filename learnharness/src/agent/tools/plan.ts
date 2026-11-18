@@ -162,6 +162,21 @@ const planInitInput = Type.Object({
 	),
 });
 
+/** The steps in `done` that rest on a step not taught yet: neither done
+ *  before nor in this call, nor asked about. The map draws a step below
+ *  what it rests on, so marking one done ahead of its needs drew a taught
+ *  step under one still to come (round 16, m23: "Eigenvalues of a 2×2
+ *  matrix by hand" under "Finding every eigenvector for one eigenvalue",
+ *  taught after it). Pure. */
+export function doneBeforeNeeds(tree: PlanTree, messages: Parameters<typeof derivePlanStatusesLh>[1], done: readonly string[]): Array<{ step: string; needs: string[] }> {
+	const statuses = derivePlanStatusesLh(tree, messages);
+	const taught = new Set([...statuses.done, ...statuses.visited, ...(statuses.current ? [statuses.current] : []), ...done]);
+	return done.flatMap((step) => {
+		const needs = tree.edges.filter((edge) => edge.to === step && !taught.has(edge.from)).map((edge) => edge.from);
+		return needs.length > 0 ? [{ step, needs }] : [];
+	});
+}
+
 export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> {
 	return {
 		[LESSON_PROGRESS_TOOL]: {
@@ -180,6 +195,13 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 				const unknown = done.filter((id) => !ids.has(id));
 				if (unknown.length > 0) {
 					return { ok: false, error: `Not node ids of this session's plan: ${unknown.join(", ")}. Valid ids: ${[...ids].join(", ") || "(no plan yet)"}` };
+				}
+				const early = record.tree ? doneBeforeNeeds(record.tree, record.messages, done) : [];
+				if (early.length > 0) {
+					return {
+						ok: false,
+						error: `${early.map(({ step, needs }) => `${step} rests on ${needs.join(", ")}`).join("; ")}, not taught yet, so his map would draw it above a step taught after it. Mark ${early.length === 1 && early[0]!.needs.length === 1 ? "it" : "them"} done in the same call if he holds ${early.length === 1 && early[0]!.needs.length === 1 ? "it" : "them"}, or re-call plan_init so the map rests each step on what you taught before it, then mark it done.`,
+					};
 				}
 				if (!close || !ctx.course) return { ok: true };
 				const topics = [...new Set([...(record.topics ?? []), ...sessionTopicsOf(record.messages)])];

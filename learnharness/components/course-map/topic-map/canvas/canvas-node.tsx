@@ -2,7 +2,7 @@
 
 import { useContext } from "react";
 import Link from "next/link";
-import { CornerLeftUpIcon } from "lucide-react";
+import { CheckIcon, CornerLeftUpIcon } from "lucide-react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import type { ArcHandle, PlanNodeStatus, TopicHandle } from "@/src/core";
 import { cn } from "@/lib/utils";
@@ -71,8 +71,9 @@ export function CardContent({ data, whole = false }: { data: CardData; whole?: b
 	}
 	return (
 		<BaseNodeContent className="min-h-0 flex-1 py-3">
-			<span aria-hidden className="flex size-4 shrink-0 items-center justify-center">
-				<span className={cn("size-2 rounded-full", STEP_MARK[data.status])} />
+			<span aria-hidden data-slot="step-mark" data-done={data.done || undefined} className="flex size-4 shrink-0 items-center justify-center">
+				{/* A step taught and shown held: a check, never the dot of a step ahead (round 16, m23). */}
+				{data.done && data.status !== "current" ? <CheckIcon className="size-3.5 text-muted-foreground" /> : <span className={cn("size-2 rounded-full", STEP_MARK[data.status])} />}
 			</span>
 			{/* KaTeX's fonts have no medium face, so a hairline stroke sets the math at the title's weight. */}
 			<span data-slot="card-title" className="min-w-0 text-pretty text-body text-foreground [&_.katex]:[-webkit-text-stroke:0.015em_currentcolor]">

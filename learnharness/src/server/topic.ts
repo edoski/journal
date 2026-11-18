@@ -136,7 +136,7 @@ export function askedStep(tree: NonNullable<ChatRecord["tree"]>, messages: ChatR
 export function sessionPlanOf(chat: ChatRecord): SessionPlan | null {
 	const { tree } = chat;
 	if (!tree || tree.nodes.length === 0) return null;
-	const { current, visited } = derivePlanStatusesLh(tree, chat.messages);
+	const { current, visited, done } = derivePlanStatusesLh(tree, chat.messages);
 	const asked = askedStep(tree, chat.messages);
 	return {
 		id: chat.id,
@@ -147,6 +147,7 @@ export function sessionPlanOf(chat: ChatRecord): SessionPlan | null {
 		current,
 		visited: [...visited],
 		...(asked !== current ? { asked } : {}),
+		...(done.size > 0 ? { done: [...done] } : {}),
 	};
 }
 
