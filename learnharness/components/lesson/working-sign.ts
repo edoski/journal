@@ -26,15 +26,21 @@ export function showsWorking(messages: readonly LhViewMessage[], busy: boolean, 
 	// problem's closing words).
 	if (part.type === "text") return !part.text?.trim() || part.state === "done";
 	if (posed(part)) return rewriteOwed(last.parts);
+	// A question is drawn once it is posed, so one still being written shows
+	// nothing of itself (round 15, 3 m37: 2.8 s with Stop alone).
+	if (isQuestion(part)) return true;
 	return !(part.type.startsWith("tool-") && part.state === "input-streaming");
+}
+
+function isQuestion(part: LhViewMessage["parts"][number]): boolean {
+	return (QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length));
 }
 
 /** A question he can answer (its call cleared the boundary) or a posed
  *  problem. */
 function posed(part: LhViewMessage["parts"][number]): boolean {
-	const tool = part.type.startsWith("tool-") ? part.type.slice("tool-".length) : "";
-	if ((QUESTION_TOOLS as readonly string[]).includes(tool)) return part.state === "input-available";
-	return tool === PRACTICE_PROBLEM_TOOL && part.state === "output-available";
+	if (isQuestion(part)) return part.state === "input-available";
+	return part.type === `tool-${PRACTICE_PROBLEM_TOOL}` && part.state === "output-available";
 }
 
 /** The reply's last message to him was refused and its rewrite has not
