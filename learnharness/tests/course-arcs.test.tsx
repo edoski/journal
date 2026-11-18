@@ -19,7 +19,7 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ArcHandle, CourseMapEdge, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { CHATS, LINALG, LINALG_ARCS, PROB, arc } from "./fixtures/now-demo.ts";
-import { courseArcs, courseGroups, openingArc, pickUpLine, shownArcs } from "../components/course-page/course-model.ts";
+import { courseArcs, courseGroups, offersCheck, openingArc, pickUpLine, shownArcs } from "../components/course-page/course-model.ts";
 import { CHECK_WORDS, RoadArc, type ArcLineProps } from "../components/course-page/road/road-arc.tsx";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
 import { OPEN_AT_FIRST, shownGroups, walkStops } from "../components/course-page/split/split-tie.ts";
@@ -98,6 +98,13 @@ describe("the course page's arcs", () => {
 		assert.equal(needs.eigenvalues, false);
 	});
 
+	it("says Needs you on every arc a review line of Today names, not only the arc of its first topic (round 16, m5)", () => {
+		// Today's first line reviews Linear independence and Rank together: both arcs need him.
+		const both: StudyCourse = { ...ARCS, due: [h("independence"), h("rank")], map: { ...ARCS.map, topics: ARCS.map.topics.map((t) => (t.handle === "rank" ? { ...t, weak: false, review: { kind: "due" as const, date: ARCS.map.today, overdue: 1 } } : t)) } };
+		const needs = Object.fromEntries(courseArcs(both)!.map((s) => [s.arc.handle, s.needsYou]));
+		assert.deepEqual([needs.spaces, needs.systems], [true, true]);
+	});
+
 	it("says which arcs the exam leaves out only when it leaves some out", () => {
 		assert.ok(courseArcs(ARCS)!.every((s) => s.exam === null), "an exam over the whole course says nothing");
 		const scoped = (exam: object) => courseArcs({ ...ARCS, map: { ...ARCS.map, exam: { ...ARCS.map.exam!, ...exam } } })!.map((s) => s.exam);
@@ -139,9 +146,20 @@ describe("the road's arc lines", () => {
 		assert.match(document.querySelector('[data-slot="course-arc-state"][data-kind="needs-you"]')!.className, /text-warning/);
 	});
 
+	it("ends a ready arc that needs him in Needs you alone, its check waiting (round 16, m5)", () => {
+		const document = draw({});
+		const spaces = document.querySelector('[data-arc="spaces"]')!;
+		assert.equal(text(spaces.querySelector('[data-slot="course-arc-state"]')), "Needs you");
+		assert.equal(spaces.querySelectorAll('[data-slot="course-arc-check"]').length, 0, "one chip per arc");
+		const stops = walkStops(sections.map((s) => ({ id: s.arc.handle, topics: s.topics, checkable: offersCheck(s) })), {}).map((s) => `${s.kind}:${"id" in s ? s.id : ""}`);
+		assert.ok(!stops.includes("check:spaces"), `the walk stops on no hidden check: ${stops}`);
+	});
+
 	it("offers Check it on a ready arc only, folded or open", () => {
+		const ready = sections.map((s) => ({ ...s, needsYou: false }));
+		const drawReady = (open: Record<string, boolean>) => render(<SplitList groups={[]} arcs={ready} open={open} onOpenChange={noop} onCheck={noop} marked={null} onPoint={noop} onEnterMap={noop} onWalkKey={noop} arcLine={(props) => <RoadArc {...props} number={ready.indexOf(props.section) + 1} starts={null} />} />);
 		for (const open of [{}, { spaces: true }] as Record<string, boolean>[]) {
-			const checks = [...draw(open).querySelectorAll('[data-slot="course-arc-check"]')];
+			const checks = [...drawReady(open).querySelectorAll('[data-slot="course-arc-check"]')];
 			assert.deepEqual(
 				checks.map((c) => [c.closest('[data-slot="course-arc"]')?.getAttribute("data-arc"), text(c)]),
 				[["spaces", CHECK_WORDS]],
@@ -155,10 +173,10 @@ describe("the road's arc lines", () => {
 
 	it("walks each line, then a ready arc's Check it, then the open arc's rows", () => {
 		const stops = walkStops(
-			sections.map((s) => ({ id: s.arc.handle, topics: s.topics, checkable: s.arc.state === "ready" })),
+			sections.map((s) => ({ id: s.arc.handle, topics: s.topics, checkable: s.arc.state === "ready" && !s.needsYou })),
 			{ systems: true },
 		).map((s) => (s.kind === "row" ? s.handle : `${s.kind}:${s.id}`));
-		assert.deepEqual(stops, ["group:spaces", "check:spaces", "group:systems", "rank", "det", "group:eigenvalues"]);
+		assert.deepEqual(stops, ["group:spaces", "group:systems", "rank", "det", "group:eigenvalues"]);
 	});
 
 	it("keeps the four groups for a course without arcs", () => {

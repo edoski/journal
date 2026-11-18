@@ -7,7 +7,7 @@ import { Hint } from "@/components/ui/hint";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ArcLabel } from "@/components/course-map/arc-label";
 import { ARC_STATE_WORDS } from "@/components/study-words";
-import { GROUP_WORDS, type CourseArcSection, type CourseTopic } from "@/components/course-page/course-model";
+import { GROUP_WORDS, offersCheck, type CourseArcSection, type CourseTopic } from "@/components/course-page/course-model";
 import { cn } from "@/lib/utils";
 
 /** The words the arc's check says: what to do, literally (round 15, m10:
@@ -82,7 +82,7 @@ export function RoadArc({
 }: ArcLineProps & { number: number; starts: string | null; shown?: boolean; past?: boolean }) {
 	const headerId = React.useId();
 	const { arc } = section;
-	const checkable = Boolean(arc.state === "ready" && onCheck);
+	const checkable = Boolean(onCheck && offersCheck(section));
 	const fact = section.needsYou ? null : arc.state === "checked" ? ARC_STATE_WORDS.checked : starts;
 	return (
 		<Collapsible asChild open={open} onOpenChange={onOpenChange}>
