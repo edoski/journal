@@ -659,9 +659,13 @@ export interface ArcPassView extends MapCourseView {
 	implied?: readonly EdgeAdd[];
 }
 
-/** The edges a cut may withdraw: the ones this pass added or proposes. */
-function withdrawable(view: Pick<ArcPassView, "proposed" | "added">): Set<string> {
-	return new Set([view.added, view.proposed].flatMap((by) => Object.entries(by ?? {}).flatMap(([t, needs]) => needs.map((n) => edgeKey(t, n)))));
+/** The edges a cut may withdraw: the ones this pass added or proposes,
+ *  and the implied ones a withdrawal would bring back. */
+function withdrawable(view: Pick<ArcPassView, "proposed" | "added" | "implied">): Set<string> {
+	return new Set([
+		...[view.added, view.proposed].flatMap((by) => Object.entries(by ?? {}).flatMap(([t, needs]) => needs.map((n) => edgeKey(t, n)))),
+		...(view.implied ?? []).map((i) => edgeKey(i.topic, i.need)),
+	]);
 }
 
 /** The view without the edges the answer withdraws: out of each topic's
@@ -717,7 +721,7 @@ export function arcPassProblems(submit: ArcSubmit, given: ArcPassView): string |
 	const problems: string[] = [];
 	const can = withdrawable(given);
 	for (const w of submit.withdraw ?? []) {
-		if (!can.has(edgeKey(w.topic, w.need))) problems.push(`withdraw names "${w.topic}" needs "${w.need}", which this pass did not add: withdraw only an added or proposed need; a stored one you think false goes under doubts.`);
+		if (!can.has(edgeKey(w.topic, w.need))) problems.push(`withdraw names "${w.topic}" needs "${w.need}", which this pass did not add: withdraw only an added, proposed or implied need; a stored one you think false goes under doubts.`);
 		else if (!w.reason?.trim()) problems.push(`withdraw gives no reason for "${w.topic}" needs "${w.need}": say why an exercise on it can be worked without it.`);
 	}
 	const view = withoutWithdrawn(given, submit);

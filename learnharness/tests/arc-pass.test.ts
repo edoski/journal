@@ -360,6 +360,10 @@ describe("the cut's shape rules", () => {
 		assert.deepEqual(restoredNeeds(added, withdrawn), [implied[0]], "chain still reaches limits through derivative");
 		assert.deepEqual(withoutWithdrawn(added, withdrawn).topics.riemann!.needs, ["limits", "derivative"]);
 		assert.deepEqual(restoredNeeds(added, good), [], "nothing withdrawn, nothing back");
+		const both: ArcSubmit = { ...good, withdraw: [...withdrawn.withdraw!, { topic: "riemann", need: "derivative", reason: "only Exercise 4 differentiates" }] };
+		assert.equal(arcPassProblems(both, added), null, "an implied need may be withdrawn with the need that led to it");
+		assert.deepEqual(restoredNeeds(added, both), [], "and then it does not come back");
+		assert.deepEqual(withoutWithdrawn(added, both).topics.riemann!.needs, ["limits"]);
 		const changes = arcPassChanges(withdrawn, added)!.changes as { topics: Record<string, { needs?: string[] }>; arc_change: { edges: unknown[] } };
 		assert.deepEqual(changes.topics.riemann!.needs, ["limits", "derivative"]);
 		assert.deepEqual(changes.arc_change.edges, [

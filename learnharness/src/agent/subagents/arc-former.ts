@@ -282,7 +282,7 @@ export const ARC_CUT_INSTRUCTIONS = `You group a course's topics into arcs, foll
 
 How this differs from the text below:
 - The prerequisites are settled and you cannot change them: your answer has no field for needs. A stored edge you think false goes under doubts with its reason; it is recorded and kept.
-- A topic's added and proposed needs are ones the edge step found just now, each from a reader's step on one exercise or example. Test each added need of the topics you place with the prerequisite test: could the learner work the exercises the material sets for the topic without it? When only a one-off brings it in (one example, a checkpoint, an odd exercise or two) while the topic's method and its standard exercises are worked without it, list it under withdraw with that reason; it is dropped and the cut need not hold it. A need the topic's readers found that was set aside only because the withdrawn one led to it comes back as a need of its own, and the cut holds it. Judge it by the test alone, never by the order it would force; never withdraw a stored need.
+- A topic's added and proposed needs are ones the edge step found just now, each from a reader's step on one exercise or example. Test each added need of the topics you place with the prerequisite test: could the learner work the exercises the material sets for the topic without it? When only a one-off brings it in (one example, a checkpoint, an odd exercise or two) while the topic's method and its standard exercises are worked without it, list it under withdraw with that reason; it is dropped and the cut need not hold it. A topic's implied needs are ones its readers found that were set aside because another of its needs leads to them: one comes back as a need of its own when you withdraw the only need that led to it, and the cut then holds it, unless it fails the same test: then list it under withdraw too. Judge it by the test alone, never by the order it would force; never withdraw a stored need.
 - A topic's proposed needs are prerequisites the edge step found, waiting for the learner's yes. Cut as if they were stored: no topic sits in an arc before the arc holding one of its needs, stored or proposed, so the arcs hold whichever proposals the learner accepts.
 - Read the material's units before you cut: the sources' tables of contents with read_material, headings with search_material, and the unit each topic's reference locator names. A source the course cannot open is listed as such; then the locators are the material you have.
 - List the arcs in study order, and each arc's topics in study order. Every topic listed below, left-out ones too, goes in exactly one arc's topics.
@@ -401,17 +401,19 @@ function courseHead(title: string, record: unknown, material: PassMaterial): str
 }
 
 /** The topics in path order, each with what the step reads of it. */
-function topicLines(view: MapCourseView & Pick<ArcPassView, "proposed" | "added">, withNeeds: boolean): string[] {
+function topicLines(view: MapCourseView & Pick<ArcPassView, "proposed" | "added" | "implied">, withNeeds: boolean): string[] {
 	const listed = [...view.order.filter((k) => k in view.topics), ...Object.keys(view.topics).filter((k) => !view.order.includes(k))];
 	return listed.map((handle) => {
 		const t = view.topics[handle]!;
 		const proposed = view.proposed?.[handle] ?? [];
 		const added = view.added?.[handle] ?? [];
 		const stored = t.needs.filter((n) => !proposed.includes(n) && !added.includes(n));
+		const implied = (view.implied ?? []).filter((i) => i.topic === handle).map((i) => i.need);
 		const facts = [
 			withNeeds && stored.length > 0 ? `needs ${stored.join(", ")}` : "",
 			withNeeds && added.length > 0 ? `added needs ${added.join(", ")}` : "",
 			withNeeds && proposed.length > 0 ? `proposed needs ${proposed.join(", ")}` : "",
+			withNeeds && implied.length > 0 ? `implied needs ${implied.join(", ")}` : "",
 			t.contrasts.length > 0 ? `contrasts ${t.contrasts.join(", ")}` : "",
 			t.refs.length > 0 ? `refs ${refWords(t.refs)}` : "",
 			t.aliases.length > 0 ? `also called ${t.aliases.join(", ")}` : "",
@@ -875,7 +877,8 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		const now = await settled();
 		if (recordHasArcs(now.record)) return { status: "failed", reason: "the course got arcs while the pass read it", edges, answer };
 		const out = new Set((answer.withdraw ?? []).map((w) => `${w.topic}\u0000${w.need}`));
-		edges.withdrawn = edges.diffs.filter((d) => d.change === "add" && out.has(`${d.topic}\u0000${d.need}`)).map((d) => ({ ...d, reason: answer.withdraw!.find((w) => w.topic === d.topic && w.need === d.need)!.reason.trim() }));
+		const withdrawnAs = (d: EdgeAdd): EdgeDiff => ({ ...d, change: "add", reason: answer.withdraw!.find((w) => w.topic === d.topic && w.need === d.need)!.reason.trim() });
+		edges.withdrawn = [...edges.diffs.filter((d) => d.change === "add"), ...edges.implied].filter((d) => out.has(`${d.topic}\u0000${d.need}`)).map(withdrawnAs);
 		edges.restored = restoredNeeds(now.view, answer);
 		if (options.edges === "propose") edges.diffs = [...edges.diffs.filter((d) => !edges.withdrawn.some((w) => w.topic === d.topic && w.need === d.need)), ...edges.restored.map((r) => ({ ...r, change: "add" as const }))];
 		const formation = arcPassChanges(answer, now.view, { edgesEntry, asked: options.asked, reason: options.reason });
