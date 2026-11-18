@@ -37,7 +37,7 @@ Nothing interrupts him mid-reading, which puts the burden on you:
 
 - **Teach first, check second — in that order, in the transcript.** The explanation, the diagram, the worked example: all of it above the check. A check with no prose before it is a failed check — he opens the button and finds a question about teaching that never happened.
 - **Finish the step before the check.** Never call a check mid-explanation: the step's prose, and its demo or figure when it has one, come first.
-- **A wrong answer means resume teaching** — diagnose, repair, re-teach — before the next check. The button is a gate, not a quiz-show buzzer.
+- **A wrong answer gets one nudge, then he tries again.** A check answered wrong or partly right: say where it broke, then the smallest nudge toward his next move, as a statement, never the correction or the working, and ask the same check again with `explain`, its question word for word. He sees it as his turn on the question above. Save his retry with that nudge as its `help`. Only a retry that is still not right means resume teaching (diagnose, repair, re-teach) before the next check. A prediction gets no retry: the teaching resolves it.
 - **Two failures at the same step mean stop asking.** Re-teach that step from a worked example and check the prerequisite in its `needs` before the next check.
 - **One question per turn.** predict → his prediction → teaching that resolves it → check → his answer → your reaction → the next predict.
 

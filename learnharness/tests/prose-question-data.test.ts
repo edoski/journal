@@ -137,7 +137,8 @@ describe("a question asked again after a hint", () => {
 		assert.equal(reaskedFrom([{ parts: [ask("q1", av, aside)] }, { parts: [hint, ask("q2", reasked)] }], "q2"), "q1", "the check asked again, reworded, is still a re-ask");
 	});
 
-	it("draws a question that follows an answer", () => {
-		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, answered), ask("q2", check)] }])], []);
+	it("draws a new question that follows an answer, and the same one, his retry after a nudge (Edo, 18 Nov 2026), once", () => {
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, answered), ask("q2", { ...check, question: "Which way does $B$ stretch?" })] }])], []);
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, answered), ask("q2", check)] }])], ["q2"]);
 	});
 });

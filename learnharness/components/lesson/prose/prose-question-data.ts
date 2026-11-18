@@ -201,14 +201,15 @@ function sameQuestionWords(a: QuestionPart, b: QuestionPart): boolean {
 	return typeof x === "string" && typeof y === "string" && sameQuestionKey(x) === sameQuestionKey(y);
 }
 
-/** Whether `next` asks again, in the same words, a question he answered
- *  with a question of his own, sent in Answer mode by mistake: the tutor
- *  answers it and asks the question again as it was, whose words are on
- *  screen above already (round 10, 2 m7: printed in full a second time).
- *  A question after a real answer is drawn in full. */
+/** Whether `next` asks again, in the same words, a question he answered:
+ *  his first try at a lesson's check was not right, and after one nudge he
+ *  tries it again (Edo, 18 Nov 2026), or he answered with a question of
+ *  his own, sent in Answer mode by mistake, and the tutor answered it.
+ *  Its words are on screen above already (round 10, 2 m7: printed in full
+ *  a second time). A new question after his answer is drawn in full. */
 function sameWords(left: QuestionPart, next: QuestionPart): boolean {
 	const answer = left.output as Partial<QuestionAnswerData> | undefined;
-	if (!answer || answer.dismissed === true || answer.hintRequested === true || !answer.text?.trim().endsWith("?")) return false;
+	if (!answer || answer.dismissed === true || answer.hintRequested === true) return false;
 	return questionKindOf(left) === questionKindOf(next) && sameQuestionWords(left, next);
 }
 

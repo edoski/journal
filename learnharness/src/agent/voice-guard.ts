@@ -37,6 +37,7 @@ import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { LESSON_PROGRESS_TOOL } from "../core/contracts/plan.ts";
 import { normalizeQuestionType, PREDICT_RULE } from "../core/question-core.ts";
+import { sameQuestionKey } from "../core/shown-help.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
@@ -283,10 +284,8 @@ const RESTATED_VERDICT: Readonly<Record<string, { card: string; re: RegExp }>> =
 	partial: { card: "Partly right", re: /^(?:(?:that|this|it|your answer)(?:'s| is) )?(?:only )?(?:partly|partially|half) (?:right|correct)\b/i },
 };
 
-/** The results a save or a conclude records for his answers. */
-function savedResults(name: string, args: unknown): string[] {
-	if (!isRecord(args)) return [];
-	if (name === PRACTICE_CONCLUDE_TOOL) return typeof args.result === "string" ? [args.result] : [];
+/** The observations a save writes for his answers, corrections aside. */
+function savedObservations(args: Record<string, unknown>): Record<string, unknown>[] {
 	let changes: unknown = args.changes;
 	if (typeof changes === "string") {
 		try {
@@ -296,7 +295,34 @@ function savedResults(name: string, args: unknown): string[] {
 		}
 	}
 	const listed = isRecord(changes) && Array.isArray(changes.observations) ? changes.observations : [];
-	return listed.flatMap((o) => (isRecord(o) && typeof o.result === "string" && !("corrects" in o) ? [o.result] : []));
+	return listed.filter((o): o is Record<string, unknown> => isRecord(o) && !("corrects" in o));
+}
+
+/** The results a save or a conclude records for his answers. */
+function savedResults(name: string, args: unknown): string[] {
+	if (!isRecord(args)) return [];
+	if (name === PRACTICE_CONCLUDE_TOOL) return typeof args.result === "string" ? [args.result] : [];
+	return savedObservations(args).flatMap((o) => (typeof o.result === "string" ? [o.result] : []));
+}
+
+/** Whether a save records the answer `question` names as not right. */
+function savedNotRight(args: unknown, question: string): boolean {
+	if (!isRecord(args)) return false;
+	return savedObservations(args).some((o) => o.question === question && (o.result === "incorrect" || o.result === "partial"));
+}
+
+/** His answer opening this turn, when it is his first try at a lesson's
+ *  check: a real answer, not a Show me, to an `explain` that is no
+ *  prediction, whose words he had not answered before. Only the teacher
+ *  asks with `explain` (the probe asks with `recall`). */
+function firstTryAtCheck(messages: readonly LhMessage[]): { id: string; question: string } | null {
+	const input = messages[messages.findLastIndex(opensTurn)];
+	if (input?.role !== "toolResult" || input.isError || input.toolName !== "explain" || !isRealAnswer(input.details)) return null;
+	const answered = answeredQuestionsOf(messages);
+	const answer = answered.get(input.toolCallId);
+	if (!answer?.asked || answer.predicted || answer.showMe) return null;
+	for (const [id, other] of answered) if (id !== input.toolCallId && other.tool === "explain" && other.asked === answer.asked) return null;
+	return { id: input.toolCallId, question: answer.asked };
 }
 
 /** The rulings a save records on a dispute (`ruling` on each re-mark). */
@@ -667,6 +693,21 @@ function unsavedAnswerOf(messages: readonly LhMessage[]): string | null {
 	return answeredQuestionsOf(messages).get(input.toolCallId)?.recorded === false ? input.toolCallId : null;
 }
 
+/** A question other than the check his first try at missed (Edo, 18 Nov
+ *  2026: "yes def want nudge where i try myself again first"; round 15,
+ *  2 free: "By 1", confident and wrong, got the whole working at once). */
+const RETRY = (question: string): AgentToolResult<unknown> => ({
+	content: [
+		{
+			type: "text",
+			text: `Not posed: his first try at your check was not right, so he tries it again before any working, as on a practice problem. Send him with send_to_user where it broke and the smallest nudge toward his next move, as a statement, never the correction; then ask the check again with explain, its question word for word: ${JSON.stringify(question)}. Save his retry with that nudge as its help. Only a second try that is still not right gets the working.`,
+		},
+	],
+	isError: true,
+	details: { withheld: "retry" },
+});
+const RETRY_NOTE = "His first try at your check was not right, and he has not tried it again. Ask the check again with explain, its question word for word, after one nudge toward his next move, never the correction.";
+
 /** A question posed straight after an unsure answer, with no words. */
 const UNSURE = (why: string): AgentToolResult<unknown> => ({
 	content: [
@@ -761,6 +802,13 @@ export class VoiceGuard {
 	private releasing: string | null = null;
 	private posedUnder: string | null = null;
 	private heldUnsure = false;
+	/** His answer opening the turn is his first try at a lesson's check,
+	 *  and whether this turn saved it as not right: he tries the same
+	 *  check again after one nudge, and a different question is held back
+	 *  once a turn. */
+	private readonly firstTry: { id: string; question: string } | null;
+	private retryOwed = false;
+	private heldRetry = false;
 	/** Ordinary text this turn took out of a reply, and whether the turn
 	 *  posed a question he can answer, and was already told at its end. */
 	private plain = false;
@@ -812,6 +860,7 @@ export class VoiceGuard {
 	) {
 		this.input = turnInputOf(messages);
 		this.standing = standingQuestion(messages);
+		this.firstTry = review ? null : firstTryAtCheck(messages);
 		this.posedLast = posedLast(messages);
 		this.stepsAhead = stepsNotDone(messages);
 		this.unsaved = saves ? unsavedAnswerOf(messages) : null;
@@ -874,7 +923,7 @@ export class VoiceGuard {
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
 		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
-		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
+		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.retryOwed ? RETRY_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
 		if (!note || this.noted.has(note)) return undefined;
 		this.noted.add(note);
 		return note;
@@ -923,6 +972,7 @@ export class VoiceGuard {
 		// A save read as it streams, before the calls after it: one that
 		// names his answer keeps it, so the question after it goes through.
 		if (call.name === SAVE_TOOL && this.unsaved && savedQuestionsOf(call.arguments).includes(this.unsaved)) this.unsaved = null;
+		if (call.name === SAVE_TOOL && this.firstTry && savedNotRight(call.arguments, this.firstTry.id)) this.retryOwed = true;
 		if (this.unsaved && !this.heldUnsaved && (this.endsTurn(call.name) || call.name === PROBE_DONE_TOOL)) {
 			this.heldUnsaved = true;
 			return UNSAVED(call.name);
@@ -1012,6 +1062,10 @@ export class VoiceGuard {
 		if (this.input.unsure && this.sent === 0 && !this.owed && !this.heldUnsure) {
 			this.heldUnsure = true;
 			return UNSURE(this.input.unsure);
+		}
+		if (this.retryOwed && !this.heldRetry && !(call.name === "explain" && sameQuestionKey(text) === this.firstTry?.question)) {
+			this.heldRetry = true;
+			return RETRY(this.firstTry!.question);
 		}
 		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text)]);
 		if (breaks.length > 0) {
