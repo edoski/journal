@@ -65,6 +65,10 @@ export interface SdkAgentConfig {
 	 *  was started with every option this turn starts one with (`key`,
 	 *  `processKey`); taken once (prestart.ts). */
 	claim?: (key: string) => PreparedProcess | undefined;
+	/** The turn started early on a fork of the probe's session, when one
+	 *  was started with every option of this turn but its session (`key`);
+	 *  taken once (early-plan.ts). */
+	claimEarly?: (key: string) => EarlyRun | undefined;
 }
 
 /** What a turn binds into the Claude Code process it runs on: its tools and
@@ -100,9 +104,88 @@ export interface PreparedProcess {
  *  the same key are the same process. Its tools are read by their schemas,
  *  its hooks by the events they answer, and the folder its sessions live in
  *  with them. */
-export function processKey(options: Options, tools: readonly AgentTool<any>[], configDir: string): string {
-	const { abortController: _abort, spawnClaudeCodeProcess: _spawn, mcpServers: _servers, hooks, ...rest } = options;
-	return JSON.stringify({ ...rest, configDir, hooks: Object.keys(hooks ?? {}), tools: tools.map((tool) => [tool.name, tool.description, tool.parameters]) });
+export function processKey(options: Options, tools: readonly AgentTool<any>[], configDir: string, { session = true }: { session?: boolean } = {}): string {
+	const { abortController: _abort, spawnClaudeCodeProcess: _spawn, mcpServers: _servers, hooks, resume, resumeSessionAt, forkSession: _fork, ...rest } = options;
+	return JSON.stringify({ ...rest, ...(session ? { resume, resumeSessionAt } : {}), configDir, hooks: Object.keys(hooks ?? {}), tools: tools.map((tool) => [tool.name, tool.description, tool.parameters]) });
+}
+
+/** A turn's input: its first message, then each steer, until it closes. */
+class InputChannel {
+	private readonly pending: SDKUserMessage[];
+	private closed = false;
+	private wake: (() => void) | undefined;
+	constructor(first: SDKUserMessage) {
+		this.pending = [first];
+	}
+	push(message: SDKUserMessage): void {
+		this.pending.push(message);
+		this.wake?.();
+	}
+	close(): void {
+		this.closed = true;
+		this.wake?.();
+	}
+	async *messages(): AsyncGenerator<SDKUserMessage> {
+		while (true) {
+			while (this.pending.length) yield this.pending.shift()!;
+			if (this.closed) return;
+			await new Promise<void>((resolve) => (this.wake = resolve));
+			this.wake = undefined;
+		}
+	}
+}
+
+/** A query read as it streams, before the turn that takes it reads it: the
+ *  turn then reads everything from its start. Whether it failed before it
+ *  was taken is known first. */
+class ReadAhead implements SdkQuery {
+	private readonly said: SDKMessage[] = [];
+	private done = false;
+	private wake: (() => void) | undefined;
+	failed = false;
+	constructor(private readonly query: SdkQuery) {
+		void this.read();
+	}
+	private async read(): Promise<void> {
+		try {
+			for await (const message of this.query) {
+				this.said.push(message);
+				if (message.type === "result" && (message.is_error || message.subtype !== "success")) this.failed = true;
+				if (message.type === "system" && message.subtype === "init" && (message.apiKeySource !== "none" || !message.mcp_servers.some((s) => s.name === SDK_TOOL_SERVER && s.status === "connected"))) this.failed = true;
+				this.wake?.();
+			}
+		} catch {
+			this.failed = true;
+		} finally {
+			this.done = true;
+			this.wake?.();
+		}
+	}
+	async *[Symbol.asyncIterator](): AsyncGenerator<SDKMessage> {
+		for (let i = 0; ; ) {
+			while (i < this.said.length) yield this.said[i++]!;
+			if (this.done) return;
+			await new Promise<void>((resolve) => (this.wake = resolve));
+			this.wake = undefined;
+		}
+	}
+	interrupt(): Promise<void> {
+		return this.query.interrupt();
+	}
+	close(): void {
+		this.query.close();
+	}
+}
+
+/** A turn started before it was asked for, on a fork of another turn's
+ *  session (early-plan.ts): its tools wait for the turn that takes it. */
+export interface EarlyRun {
+	/** Its options, but for the session it forked (`processKey`). */
+	key: string;
+	binding: TurnBinding;
+	controller: AbortController;
+	input: InputChannel;
+	query: ReadAhead;
 }
 
 type Listener = (event: AgentEvent | CompactionEvent) => void;
@@ -140,6 +223,7 @@ export class SdkAgent {
 	private aborted = false;
 	private end: SessionTurnEnd | undefined;
 	private seeded: ChatSession | undefined;
+	private replyFrom: { session: string; at: string } | undefined;
 
 	constructor(private readonly config: SdkAgentConfig) {
 		this.state = { messages: [...config.messages], model: config.engine.model, systemPrompt: config.systemPrompt, tools: config.tools };
@@ -257,19 +341,55 @@ export class SdkAgent {
 
 	/** The turn's query: on the process started for it when there is one
 	 *  started with these very options, else on a process of its own. */
-	private async startQuery(options: Options, configDir: string, input: AsyncIterable<SDKUserMessage>, run: RunBinding): Promise<SdkQuery> {
+	private async startQuery(options: Options, configDir: string, input: InputChannel, run: RunBinding): Promise<SdkQuery> {
+		const early = this.config.claimEarly?.(processKey(options, this.config.tools, configDir, { session: false }));
+		if (early && !early.query.failed) {
+			this.controller.signal.addEventListener("abort", () => early.controller.abort(), { once: true });
+			early.binding.bind(run);
+			input.close();
+			this.push = (message) => early.input.push(message);
+			this.closeInput = () => early.input.close();
+			return early.query;
+		}
+		if (early) {
+			early.controller.abort();
+			early.query.close();
+		}
 		const prepared = this.config.claim?.(processKey(options, this.config.tools, configDir));
 		if (prepared) {
 			this.controller.signal.addEventListener("abort", () => prepared.controller.abort(), { once: true });
 			try {
 				const warm = await prepared.warm;
 				prepared.binding.bind(run);
-				return warm.query(input);
+				return warm.query(input.messages());
 			} catch (error) {
 				console.info("[sdk] the process started for this turn could not take it; starting one:", (error as Error).message);
 			}
 		}
-		return this.config.engine.query({ prompt: input, options });
+		return this.config.engine.query({ prompt: input.messages(), options });
+	}
+
+	/**
+	 * Starts this turn before it is asked for, on a fork of `fork`, the
+	 * session and its last entry before the reply that is being written there,
+	 * reading `blocks` (early-plan.ts). What it says waits, read but unseen,
+	 * and its tools wait, until the turn takes it; the turn then reads it from
+	 * its start. Undefined when the engine cannot start.
+	 */
+	startEarly(fork: { session: string; at: string }, blocks: SdkInputBlock[]): EarlyRun | undefined {
+		let launch: SdkLaunch;
+		try { launch = this.config.engine.launch(); } catch { return undefined; }
+		const binding = new TurnBinding();
+		const controller = new AbortController();
+		const options: Options = { ...this.processOptions(launch, { resume: fork.session, at: fork.at }, binding), forkSession: true, abortController: controller };
+		const input = new InputChannel(userMessage(blocks, randomUUID()));
+		return { key: processKey(options, this.config.tools, launch.configDir, { session: false }), binding, controller, input, query: new ReadAhead(this.config.engine.query({ prompt: input.messages(), options })) };
+	}
+
+	/** Where the reply being written began: the turn's session and its last
+	 *  entry before the reply; undefined before the session is known. */
+	replyStart(): { session: string; at: string } | undefined {
+		return this.replyFrom;
 	}
 
 	private async run(): Promise<void> {
@@ -334,19 +454,9 @@ export class SdkAgent {
 		};
 
 
-		let closed = false;
-		const pending: SDKUserMessage[] = [prompt];
-		let wake: (() => void) | undefined;
-		this.push = (message) => { pending.push(message); wake?.(); };
-		this.closeInput = () => { closed = true; wake?.(); };
-		const input = async function* (): AsyncGenerator<SDKUserMessage> {
-			while (true) {
-				while (pending.length) yield pending.shift()!;
-				if (closed) return;
-				await new Promise<void>((resolve) => (wake = resolve));
-				wake = undefined;
-			}
-		};
+		const input = new InputChannel(prompt);
+		this.push = (message) => input.push(message);
+		this.closeInput = () => input.close();
 
 		const instructions = this.config.compactionInstructions;
 		// Claude Code's summary of a compaction, read by its PostCompact hook,
@@ -452,7 +562,10 @@ export class SdkAgent {
 				case "stream_event": {
 					if (message.parent_tool_use_id) return true;
 					const event = record(message.event);
-					if (event?.type === "message_start") stream = new AssistantStream(this.state.model);
+					if (event?.type === "message_start") {
+						stream = new AssistantStream(this.state.model);
+						this.replyFrom = sessionId && anchor ? { session: sessionId, at: anchor } : undefined;
+					}
 					if (stream) endStream(stream.feed(event));
 					return true;
 				}
@@ -514,7 +627,7 @@ export class SdkAgent {
 			}
 		};
 
-		const query = await this.startQuery(options, launch.configDir, input(), run);
+		const query = await this.startQuery(options, launch.configDir, input, run);
 		this.query = query;
 		const failedBefore = this.state.messages.length;
 		let idle: ReturnType<typeof setTimeout> | undefined;

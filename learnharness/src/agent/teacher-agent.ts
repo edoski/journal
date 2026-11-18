@@ -101,6 +101,8 @@ export interface AgentBuildOptions {
 	course?: CourseToolContext;
 	/** The process started for this turn while he thought (prestart.ts). */
 	claim?: SdkAgentConfig["claim"];
+	/** The plan begun while the probe wrote its assessment (early-plan.ts). */
+	claimEarly?: SdkAgentConfig["claimEarly"];
 }
 
 /**
@@ -191,6 +193,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 		compactionInstructions: opts.compactionInstructions,
 		onUsage: opts.onUsage,
 		claim: opts.claim,
+		claimEarly: opts.claimEarly,
 	});
 }
 
