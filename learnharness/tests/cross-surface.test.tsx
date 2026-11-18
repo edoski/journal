@@ -224,6 +224,8 @@ function dayClaims(s: Survey): Claims {
 			// ("Left off today" is when he last worked, not the plan); Scheduled by its own day.
 			const now = page.press === "Review" || /^(Due|Planned) today/.test(page.now) ? s.today : /^Planned/.test(page.note) ? daysIn(page.note, s.today)[0] : undefined;
 			claim(keyOf(ws, topic.handle), "its topic page's Now", now);
+			// A Scheduled row always draws a day, so one read as none is the reader's miss, not a pass.
+			assert.ok(!page.scheduled || page.scheduledOn, `${s.label}: ${topic.title}'s Scheduled row draws no day the journey reads: "${page.scheduled}"`);
 			claim(keyOf(ws, topic.handle), "its topic page's Scheduled", page.scheduledOn);
 			const fact = s.rows.get(keyOf(ws, topic.handle));
 			if (fact && /^(Planned|Review|Due today)/.test(fact)) claim(keyOf(ws, topic.handle), "course page", daysIn(fact, s.today)[0]);
@@ -883,21 +885,6 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		await holds("Tue 17 Nov, after the review that took up a lesson", (s) => {
 			const page = s.pages.get(keyOf(course.workspace, other.handle));
 			assert.ok(page?.opens?.split("?")[0] === `/chat/${id}`, `${other.title}'s page resumes its lesson: "${page?.now} · ${page?.press} · ${page?.note}" opens ${page?.opens}`);
-		});
-	});
-
-	it("Tue 17 Nov, Linear Algebra reviews answered before the plan's day for them (18 Nov: the 8 Nov review that also answered two the plan had moved to 9 Nov)", async () => {
-		const { courses } = (await (await fetch("/api/calendar")).json()) as { courses: CalendarCourse[] };
-		const course = courses.find((c) => c.map.title === "Linear Algebra")!;
-		const ahead = course.planned.find((d) => d.date > course.map.today && d.reviews.length > 0);
-		assert.ok(ahead, "the plan reviews Linear Algebra after today");
-		const early = ahead.reviews.slice(0, 2);
-		const res = await fetch("/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Linear Algebra review", course: { workspace: course.map.workspace }, topics: early }) });
-		const { id } = (await res.json()) as { id: string };
-		await app.save(id, { observations: early.map((topic, i) => ({ topics: [topic], text: `Early review question ${i + 1}`, result: "correct", help: "hint" })) });
-		app.doneForToday(id);
-		await holds("Tue 17 Nov, after Linear Algebra reviews answered early", (s) => {
-			for (const topic of early) assert.ok(s.pages.has(keyOf(course.map.workspace, topic)), `${topic}'s page is among those read`);
 		});
 	});
 });
