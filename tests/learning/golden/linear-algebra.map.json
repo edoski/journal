@@ -30,7 +30,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-28",
-      "review": "2026-11-09",
+      "review": "2026-11-16",
       "held": true,
       "due": "2026-10-12",
       "weak": false,
@@ -45,7 +45,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-30",
-      "review": "2026-11-11",
+      "review": "2026-11-09",
       "held": true,
       "due": "2026-10-12",
       "weak": false,
@@ -60,7 +60,7 @@
       "contrasts": [],
       "level": "independent",
       "introduced": "2026-10-05",
-      "review": "2026-11-23",
+      "review": "2026-11-25",
       "held": true,
       "due": "2026-10-28",
       "weak": true,
@@ -81,7 +81,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-07",
-      "review": "2026-11-13",
+      "review": "2026-11-12",
       "held": true,
       "due": "2026-10-29",
       "weak": false,
@@ -98,7 +98,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-12",
-      "review": "2026-11-12",
+      "review": "2026-11-11",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -115,7 +115,7 @@
       ],
       "level": "retained",
       "introduced": "2026-10-15",
-      "review": "2026-11-27",
+      "review": "2026-11-13",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -197,7 +197,7 @@
       ],
       "level": "introduced",
       "introduced": "2026-11-05",
-      "review": "2026-11-20",
+      "review": "2026-11-27",
       "held": true,
       "due": "2026-11-06",
       "weak": false,
@@ -232,7 +232,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-19",
+      "starts": "2026-11-18",
       "starts_why": {
         "kind": "after",
         "needs": [
@@ -270,11 +270,11 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-25",
+      "starts": "2026-11-20",
       "starts_why": {
         "kind": "after",
         "needs": [
-          "change-basis"
+          "eigen"
         ]
       },
       "weak": false,
@@ -288,7 +288,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-18",
+      "starts": "2026-11-19",
       "starts_why": {
         "kind": "early"
       },
@@ -304,7 +304,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-20",
+      "starts": "2026-11-23",
       "starts_why": {
         "kind": "after",
         "needs": [

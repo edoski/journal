@@ -1721,11 +1721,17 @@ def replay(
     (round 11: a day whose plan was all done moved 36 dates overnight, and
     the pages called it unfinished). An unfinished day that also showed
     where he stops (``capacity.Done``'s ``reviews_short`` or ``new_short``),
-    or a day he studies gone by with no study, is his own study moving the
-    days, so the next begins with a plan made afresh from the record as it
-    began, which spreads what he left within his limit. So the replay
-    reaches back through the days he finished, to the day after one he did
-    not.
+    and lowered the new topics he starts on a weekday, or the weekdays he
+    studies (``_moved_week``), or a day he studies gone by with no study, is
+    his own study moving the days, so the next begins with a plan made
+    afresh from the record as it began, which spreads what he left within
+    his limit. An unfinished day that moved neither moves only what it left,
+    into the room the days he was told leave, as a finished day's night does
+    (round 17, 1 M2: a day that left one start and a review was planned
+    afresh, and two exam topics that had fitted fell after the exam with no
+    new answer). So the replay reaches back through the days he finished,
+    and the days that left work without lowering his week, to the day after
+    one that did.
 
     ``week`` is his week on every day the plan is made; by default, what the
     records showed as each day began (``capacity.of``). Today's allowance is
@@ -1804,7 +1810,8 @@ def _day(
         for name in live
     }
     done = capacity.activity(morning.values(), day).get(studied, capacity.Done())
-    if any(left.values()) and (done.reviews_short or done.new_short):
+    short = any(left.values()) and (done.reviews_short or done.new_short)
+    if short and _moved_week(records, studied, until, weekly, week):
         return replace(
             _afresh(
                 records,
@@ -1847,6 +1854,29 @@ def _day(
         left,
         finals,
         before,
+    )
+
+
+def _moved_week(
+    records: Mapping[str, dict[str, Any]],
+    studied: date,
+    until: date,
+    weekly: Capacity,
+    week: Capacity | None,
+) -> bool:
+    """Whether the day he studied last showed he starts fewer new topics on
+    some weekday (a lower limit, or a limit where he had shown none), or
+    studies on fewer weekdays, than the week that day began with: only then
+    can the days he was told hold more starts than his week gives, so the
+    next day is planned afresh (``replay``). A lower review limit moves only
+    the reviews he left, which take the room the days he was told leave; a
+    higher limit leaves room past them."""
+    if week is not None:
+        return False
+    began = capacity.of(_at(records, studied, None, until).values(), studied)
+    return not weekly.study_weekdays >= began.study_weekdays or any(
+        now.new.value < then.new.value or (now.new.shown and not then.new.shown)
+        for now, then in zip(weekly.weekdays, began.weekdays, strict=True)
     )
 
 

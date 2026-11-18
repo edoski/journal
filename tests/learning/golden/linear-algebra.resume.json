@@ -18,7 +18,7 @@
   },
   "due_later": [
     {
-      "topic": "vectors",
+      "topic": "span",
       "planned": "2026-11-09"
     },
     {
@@ -26,25 +26,25 @@
       "planned": "2026-11-09"
     },
     {
-      "topic": "span",
+      "topic": "matmul",
       "planned": "2026-11-11"
     },
     {
-      "topic": "matmul",
+      "topic": "basis",
       "planned": "2026-11-12"
     },
     {
-      "topic": "basis",
+      "topic": "elimination",
       "planned": "2026-11-13"
     }
   ],
   "due_later_more": 4,
   "starts": {
     "invertibility": "2026-11-13",
-    "inner-product": "2026-11-18",
-    "change-basis": "2026-11-19",
-    "projection": "2026-11-20",
-    "diagonalization": "2026-11-25"
+    "change-basis": "2026-11-18",
+    "inner-product": "2026-11-19",
+    "diagonalization": "2026-11-20",
+    "projection": "2026-11-23"
   },
   "starts_why": {
     "invertibility": {
@@ -53,25 +53,25 @@
         "rank"
       ]
     },
-    "inner-product": {
-      "kind": "early"
-    },
     "change-basis": {
       "kind": "after",
       "needs": [
         "invertibility"
       ]
     },
-    "projection": {
-      "kind": "after",
-      "needs": [
-        "inner-product"
-      ]
+    "inner-product": {
+      "kind": "early"
     },
     "diagonalization": {
       "kind": "after",
       "needs": [
-        "change-basis"
+        "eigen"
+      ]
+    },
+    "projection": {
+      "kind": "after",
+      "needs": [
+        "inner-product"
       ]
     }
   },
@@ -223,7 +223,7 @@
       "review": {
         "due": "2026-10-28",
         "by": "engine",
-        "planned": "2026-11-23"
+        "planned": "2026-11-25"
       },
       "judged": "2026-10-22",
       "standing": {
@@ -262,7 +262,7 @@
       "review": {
         "due": "2026-10-29",
         "by": "engine",
-        "planned": "2026-11-13"
+        "planned": "2026-11-12"
       },
       "standing": {
         "level": "retained",
@@ -292,7 +292,7 @@
       "review": {
         "due": "2026-11-06",
         "by": "engine",
-        "planned": "2026-11-27"
+        "planned": "2026-11-13"
       },
       "standing": {
         "level": "retained",

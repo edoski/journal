@@ -191,20 +191,30 @@ def test_a_day_whose_plan_he_finished_moves_nothing_overnight(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """On 9 Nov he did every item its plan held, and closed each lesson with
-    Done for today on an open question: the next morning keeps every day he
-    was told (round 11: 36 dates moved, each "yesterday's plan was not
-    finished")."""
+    """On 9 Nov he did every item the plan he was shown held, and closed each
+    lesson with Done for today on an open question: the next morning keeps
+    every day he was told but what that day left (round 11: 36 dates moved,
+    each "yesterday's plan was not finished"). The world was recorded under
+    a plan that spread the reviews 8 Nov left anew; the plan now keeps the
+    days he was told, so they took 9 Nov's room, and he left those three
+    (round 17, 1 M2)."""
     world = World(tmp_path, "day-done", monkeypatch, capsys)
     evening, morning = world.maps("2026-11-09"), world.maps("2026-11-10")
     told, now = map_days(evening), map_days(morning)
-    assert {key: when for key, when in now.items() if told.get(key) != when} == {}
-    assert [
-        (name, topic["topic"])
+    moved = {key for key, when in now.items() if told.get(key) != when}
+    assert {key: told[key] for key in moved} == {
+        ("linear-algebra", "reviews", "determinant"): "2026-11-09",
+        ("probability", "reviews", "independence"): "2026-11-09",
+        ("probability", "reviews", "total-probability"): "2026-11-09",
+    }
+    assert {
+        (name, "reviews", topic["topic"]): topic["moved"]
         for name, shown in morning.items()
         for topic in shown["topics"]
         if topic.get("moved")
-    ] == []
+    } == {
+        key: {"from": "2026-11-09", "by": "left", "on": "2026-11-09"} for key in moved
+    }
 
 
 def test_a_moved_day_names_the_day_he_was_told(
@@ -744,3 +754,35 @@ def test_a_hinted_right_answer_settled_on_his_own_keeps_today_s_start(
     assert "expectation" not in receipt.get("starts_moved", {}), receipt
     found = expectation()
     assert (found["starts"], found.get("moved")) == ("2026-11-08", None), found
+
+
+def test_a_day_his_answers_left_without_a_start_keeps_his_pace_and_the_exam(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 17, 1 M2: on 9 Nov his Linear Algebra review left Homomorphisms
+    not solid, which moved Linear maps, the day's one start, to 11 Nov. With
+    no new answer, the next morning read the day as one he stopped short of
+    a start: Monday's pace fell from 1.5 to 1.0, the plan was made afresh,
+    and Variance, then planned before the exam, fell after it. A day his own
+    answers left without a start says nothing of his pace, and the night
+    moves only what it left, so the exam keeps every topic it held."""
+    world = World(tmp_path, "d9-end", monkeypatch, capsys, R17)
+    evening = world.run(
+        "probability", "plan", "--all", "--days", "30", day="2026-11-09"
+    )
+    morning = world.run(
+        "probability", "plan", "--all", "--days", "30", day="2026-11-10"
+    )
+
+    def lost(found: dict[str, Any]) -> list[str]:
+        return next(
+            course["plan"].get("does_not_fit", [])
+            for course in found["courses"]
+            if Path(course["workspace"]).name == "probability"
+        )
+
+    assert "variance" not in lost(evening)
+    assert lost(morning) == lost(evening)
+    assert morning["capacity"]["new_per_day"] == evening["capacity"]["new_per_day"]
