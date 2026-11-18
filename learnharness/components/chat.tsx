@@ -51,6 +51,7 @@ import type { ArtifactPartProps, Confidence, Photo, JobRecord, LessonPlace, Prac
 import type { CourseLink, DisputeDetails, LhViewMessage, MarkRow, SessionMode } from "@/src/core";
 import {
 	activeProblemOf,
+	gaveUpOn,
 	pendingQuestionOf,
 	malformedQuestionsOf,
 	dismissedAnswer,
@@ -545,7 +546,12 @@ export function Chat({
 	// same dock-ownership rule as a pending question — an active problem
 	// replaces the composer. Computed from the NATIVE record (the fold is
 	// the gate the tools themselves read), not the projected view.
-	const activeProblem = activeProblemOf(nativeMessages);
+	// The problem the dock holds: none once he gave it up with Show me or
+	// Explain instead while the tutor concludes it, so the dock shows that
+	// turn at work, never his draft and Answer (round 17, m22). If the turn
+	// ends with it still open, the dock holds it again.
+	const openProblem = activeProblemOf(nativeMessages);
+	const activeProblem = openProblem && busy && gaveUpOn(nativeMessages, openProblem.toolCallId) ? null : openProblem;
 	const mode = sessionModeOf(nativeMessages, startedIn);
 	const activeProblemRef = useRef(activeProblem);
 	activeProblemRef.current = activeProblem;
