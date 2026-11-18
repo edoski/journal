@@ -138,13 +138,13 @@ const shown = {
 };
 
 describe("the mark that stands", () => {
-	it("follows a re-mark to the attempt that corrects it and keeps the ruling", () => {
+	it("follows a re-mark to the attempt that corrects it, and says the dispute changed it", () => {
 		assert.deepEqual(correctorsToRead({ o4: shown.o4 }, ["o4"]), ["o6"]);
 		assert.deepEqual(answerMarksOf({ q1: ["o4"] }, shown), {
 			q1: {
 				rows: [{ id: "o6", topics: ["rank"], label: null, result: "correct", grade: "solid", helped: false, predicted: false, gaveUp: false, uncertain: false, sure: "confident" }],
 				disputed: true,
-				ruling: "You are right: the pivots give rank 2.",
+				changed: true,
 			},
 		});
 	});
@@ -154,7 +154,7 @@ describe("the mark that stands", () => {
 		const mark = answerMarksOf({ q1: ["o4"] }, held).q1!;
 		assert.equal(mark.rows[0]!.result, "incorrect");
 		assert.equal(mark.disputed, true);
-		assert.equal(mark.ruling, "The sign is wrong.");
+		assert.equal(mark.changed, false, "the ruling's words are the reply; the mark says only that it stands (round 16, m20)");
 	});
 
 	it("a first try and a final attempt read as two rows", () => {

@@ -82,38 +82,6 @@ export function useAnswerMarkActions(): Pick<AnswerMarks, "onDispute" | "canDisp
 	return { onDispute, canDispute };
 }
 
-/** The card's foot: the mark, whether it was disputed, and Dispute. Null
- *  until the engine holds an attempt for the answer. */
-export function AnswerMarkLine({ answerId }: { answerId: string }) {
-	const { marks, onDispute, canDispute } = useContext(AnswerMarksContext);
-	const mark = marks[answerId];
-	if (!mark) return null;
-	return (
-		<div data-testid="answer-mark" className="mt-3 flex items-start gap-3 border-t pt-3 text-body text-muted-foreground">
-			<div className="flex min-w-0 flex-1 flex-col gap-1">
-				{mark.rows.map((row) => (
-					<RowFacts key={row.id} row={row} />
-				))}
-				{mark.disputed && (
-					<span data-testid="mark-disputed" className="flex min-w-0 items-start gap-1.5">
-						<ScaleIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-						<span className="min-w-0">
-							{MARK_WORDS.disputed}
-							{mark.ruling && <span className="text-muted-foreground/80">: <MathText>{mark.ruling}</MathText></span>}
-						</span>
-					</span>
-				)}
-			</div>
-			<Hint label={MARK_WORDS.disputeTitle} action="dispute-mark">
-				<Button variant="quiet" size="row" data-testid="dispute-mark" disabled={!canDispute} onClick={() => onDispute(answerId)} className="-my-1.5 -mr-2 shrink-0">
-					<FlagIcon aria-hidden className="size-3.5" />
-					{MARK_WORDS.dispute}
-				</Button>
-			</Hint>
-		</div>
-	);
-}
-
 /** What the dialog sends: his words, the mark he picked, how he thinks it
  *  should count, or any of them. */
 export type DisputeDraft = Pick<DisputeDetails, "said" | "proposed" | "proposedHow">;

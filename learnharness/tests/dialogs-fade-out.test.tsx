@@ -74,7 +74,7 @@ async function endExit(node: Element) {
 const MARK: AnswerMark = {
 	rows: [{ id: "o1", topics: ["rank"], label: null, result: "partial", grade: "helped", helped: false, predicted: false, gaveUp: false, uncertain: false, sure: null }],
 	disputed: false,
-	ruling: null,
+	changed: false,
 };
 const COURSE = { workspace: "/study/smm", title: "SMM" };
 

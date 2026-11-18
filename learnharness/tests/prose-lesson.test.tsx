@@ -30,7 +30,7 @@ const answerState = (over: Partial<ProseAnswer> = {}): ProseAnswer => ({
 	setMode: noop,
 	...over,
 });
-const mark = { rows: [{ id: "r1", result: "correct", grade: "unaided", helped: false, sure: "confident", label: null }], disputed: false, ruling: null } as unknown as AnswerMark;
+const mark = { rows: [{ id: "r1", result: "correct", grade: "unaided", helped: false, sure: "confident", label: null }], disputed: false, changed: false } as unknown as AnswerMark;
 const withMarks = (node: React.ReactNode) =>
 	renderToStaticMarkup(<AnswerMarksProvider value={{ marks: { c1: mark }, onDispute: noop, canDispute: true }}>{node}</AnswerMarksProvider>);
 

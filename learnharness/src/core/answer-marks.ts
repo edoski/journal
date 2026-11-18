@@ -18,7 +18,7 @@
 import { answeredQuestionsOf, HIS_MESSAGE, savedQuestionsOf, type LhMessage } from "./native-messages.ts";
 import type { AnswerSaves } from "./contracts/chat.ts";
 import type { AnswerMark, MarkGrade, MarkRow } from "./contracts/marks.ts";
-import { chosenSure, isMarkResult } from "./contracts/marks.ts";
+import { chosenSure, isMarkResult, markHow } from "./contracts/marks.ts";
 
 const GRADES: readonly MarkGrade[] = ["solid", "helped", "missed"];
 /** The conclude result's receipt line (tools/practice.ts). */
@@ -235,9 +235,15 @@ export function answerMarksOf(
 		const leaves = [...new Set(found.flatMap((f) => f.leaves))];
 		const rows = leaves.flatMap((id) => rowOf(observations, id) ?? []);
 		if (rows.length === 0) continue;
-		const disputes = [...new Set(found.flatMap((f) => f.chain))].map((id) => item(observations, id)).filter((o) => typeof o?.disputed === "string");
-		const ruling = disputes.map((o) => o?.ruling).filter((r): r is string => typeof r === "string").at(-1) ?? null;
-		marks[key] = { rows: labelled(rows, titles), disputed: disputes.length > 0, ruling };
+		const disputed = [...new Set(found.flatMap((f) => f.chain))].some((id) => typeof item(observations, id)?.disputed === "string");
+		const changed = disputed && ids.some((id, i) => {
+			const before = rowOf(observations, id);
+			return before !== null && found[i]!.leaves.some((leaf) => {
+				const after = rowOf(observations, leaf);
+				return after !== null && (after.result !== before.result || markHow(after) !== markHow(before) || after.sure !== before.sure);
+			});
+		});
+		marks[key] = { rows: labelled(rows, titles), disputed, changed };
 	}
 	return marks;
 }

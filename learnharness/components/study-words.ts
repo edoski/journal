@@ -665,6 +665,10 @@ export const MARK_WORDS = {
 	result: { correct: "Right", partial: "Partly right", incorrect: "Not right" } satisfies Record<MarkResult, string>,
 	sure: { guess: "Guessing", confident: "Confident" } satisfies Record<NonNullable<MarkRow["sure"]>, string>,
 	disputed: "Disputed",
+	/** After the ruling, whose words are the tutor's reply (round 16, m20:
+	 *  the stamp printed the whole ruling the reply had just said). */
+	markStands: "the mark stands",
+	markChanged: "the mark changed",
 	dispute: "Dispute",
 	disputeTitle: "Dispute this mark",
 	disputeLine: "Say what's wrong, or pick the mark or how it should count. The tutor looks at your answer again.",
