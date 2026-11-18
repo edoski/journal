@@ -586,6 +586,51 @@ def test_a_right_guess_on_the_eve_keeps_the_starts_that_need_it(
     assert starts["poisson"] == "2026-11-18", starts
 
 
+FIRST_GUESS = json.loads(
+    (Path(__file__).parent / "golden" / "exam-eve-first-guess.json").read_text()
+)
+
+
+def test_a_right_guess_on_a_topic_never_solid_keeps_tomorrow_s_start(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 16, 1 M1, on the seeded world: two days before the exam, a right
+    Random variables answer marked Guessing on a topic he had only ever got
+    right with help. Its review after help fell on the exam day and went past
+    it, so Random variables could not be solid in time and Expectation's
+    start, told for 18 Nov, left the plan. A helped answer comes back before
+    the exam, on its eve, so the start keeps its day."""
+    world = {"checkpoints": {"eve": FIRST_GUESS}, "steady": FIRST_GUESS}
+    eve = World(tmp_path, "eve", monkeypatch, capsys, world)
+
+    def starts() -> dict[str, str]:
+        return {
+            topic: day["date"]
+            for day in eve.plan("2026-11-17")["probability"]["plan"]["days"]
+            for topic in day["new"]
+        }
+
+    assert starts().get("expectation") == "2026-11-18"
+    answer = {
+        "topics": ["random-variables"],
+        "text": "Found P(X=4) for the larger of two dice as P(X<=4)-P(X<=3)",
+        "response": "16/36-9/36=7/36",
+        "result": "correct",
+        "help": "none",
+        "sure": "guess",
+    }
+    monkeypatch.setenv("LEARNING_TODAY", "2026-11-17")
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO(json.dumps({"observations": [answer]}))
+    )
+    assert main(["--workspace", str(eve.roots["probability"]), "save"]) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    assert "expectation" not in receipt.get("starts_moved", {}), receipt
+    assert starts().get("expectation") == "2026-11-18"
+
+
 def test_a_slip_on_the_eve_says_it_moved_this_morning_s_start_past_the_exam(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

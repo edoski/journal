@@ -361,6 +361,23 @@ def test_after_the_final_review_the_next_review_is_after_the_exam(days: int) -> 
     assert progress.kept(base, expected, exam(date(2026, 10, 1))) == expected
 
 
+@pytest.mark.parametrize("verdict", ["helped", "missed"])
+def test_in_the_final_review_a_weak_answer_comes_back_on_the_eve(verdict: str) -> None:
+    """Round 16, 1 M1: a helped answer two days before the exam fell due on
+    the exam day and went past it, so the topic could never be solid in time
+    and the starts that need it left the plan. A miss or a helped answer
+    comes back before the exam while a day is left; a solid one goes after."""
+    base = date(2026, 11, 17)
+    soon = progress.Exam(date(2026, 11, 19), base)
+    expected = progress.review_day(base, progress.interval(verdict, 0), soon)
+    assert progress.kept(base, max(expected, date(2026, 11, 19)), soon) == date(
+        2026, 11, 18
+    )
+    assert progress.kept(base, date(2026, 11, 20), soon, solid=True) == date(
+        2026, 11, 20
+    )
+
+
 def test_a_miss_after_the_final_review_is_relearned_then_settles() -> None:
     record = schema.apply_patch(
         course(introduced=day(-20)),

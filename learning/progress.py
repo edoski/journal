@@ -381,11 +381,18 @@ def review_day(base: date, days: int, exam: Exam | None) -> date:
 
 def kept(base: date, expected: date, exam: Exam | None, *, solid: bool = False) -> date:
     """The review the engine stores. With an exam still ahead of ``base``, a
-    review on or after the exam, or after a ``solid`` answer from the final
-    review on, goes to its spaced date after the exam, the day after it at the
-    earliest; a miss or a helped answer still comes back before the exam."""
+    review after a ``solid`` answer from the final review on goes to its
+    spaced date after the exam, the day after it at the earliest; a miss or a
+    helped answer still comes back before the exam, on its eve when its step
+    lands on the exam day or after and the eve is still ahead (round 16, 1
+    M1: a right guess two days before the exam fell due on the exam day, so
+    its topic could not be solid in time and the starts that need it left
+    the plan). Any other review on or after the exam goes after it."""
     if exam is None or base >= exam.day:
         return expected
+    eve = exam.day - timedelta(days=1)
+    if not solid and expected >= exam.day and eve > base:
+        return eve
     if (solid and base >= exam.final) or expected >= exam.day:
         return max(expected, exam.day + timedelta(days=1))
     return expected
