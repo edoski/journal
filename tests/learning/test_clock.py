@@ -10,10 +10,10 @@ from learning import clock
 
 @pytest.fixture
 def rome(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    monkeypatch.setenv("TZ", "Europe/Rome")
-    time.tzset()
-    yield
-    monkeypatch.undo()
+    with monkeypatch.context() as patch:
+        patch.setenv("TZ", "Europe/Rome")
+        time.tzset()
+        yield
     time.tzset()
 
 

@@ -9,8 +9,9 @@ kind of work: then it takes as many as his limit on that weekday, the
 fractions carried from day to day within the calendar week, so a date's room
 does not depend on the day the plan is made. Nothing lands on a weekday he does not
 study. Planned reviews are assumed ``solid``, so a later day's reviews are the
-ladder's next steps; what does not fit stays due. The plan never stores
-anything; the next save and the next plan start again from what happened.
+ladder's next steps; what does not fit stays due. The plan is made from the
+records; the only thing kept between reads is the plan as each day he studies
+ended (``learning.told``), so the next day begins from what he was told.
 
 Reviews, when there are more than fit:
   0. a topic's first review, the day after it was taught, and the review of a
@@ -151,8 +152,9 @@ never started included.
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
+import json
 import math
 from typing import Any, Literal, TypedDict
 
@@ -1025,7 +1027,7 @@ def _told_before_exam(course: _Course, day: date, told: _Told) -> set[str]:
     assert course.exam is not None
     return {
         topic
-        for planned in told.plan.days[course.name][
+        for planned in told.plan.days.get(course.name, [])[
             (day - told.on).days : (course.exam.day - told.on).days
         ]
         for topic in planned["reviews"]
@@ -1551,8 +1553,16 @@ class _Told:
     def kept(self, name: str, day: date, kind: str) -> list[str]:
         """The ``kind`` items the plan before put on ``day``, of topics the
         step does not touch."""
-        held: list[str] = self.plan.days[name][(day - self.on).days][kind]
+        days = self.plan.days.get(name, [])
+        at = (day - self.on).days
+        held: list[str] = days[at][kind] if at < len(days) else []
         return [topic for topic in held if topic not in self.touched.get(name, ())]
+
+    def covers(self, day: date) -> bool:
+        """Whether the plan before reached ``day``. A plan reaches ``days``
+        from the day it was made; past that he was told nothing, so the
+        module's rules place everything there (``Ended``)."""
+        return any((day - self.on).days < len(days) for days in self.plan.days.values())
 
     def untouched(self, name: str, found: Mapping[str, Any]) -> dict[str, Any]:
         """Of a mapping by this course's topics in the plan before, those the
@@ -1592,6 +1602,70 @@ class Replay:
     plan was made with: read from his pace on the day the run began
     (``since``), and held through the days he finished since, as the days
     he was told are."""
+    ended: Ended | None = None
+    """The plan as ``studied`` ended, kept or replayed, with its run's
+    ``since`` and ``finals``: what a later read begins from
+    (``learning.told``)."""
+
+
+@dataclass(frozen=True)
+class Ended:
+    """The plan as a day he studied ended (``day``), kept from that day's
+    last read (``learning.told``), with the ``since`` and ``finals`` of the
+    run it belongs to and each course's ``structure`` as it stood then. A
+    later day begins from it (``replay``) instead of replaying that day and
+    every one before it. It is what that day's read told him: an edit that
+    carries no time, made since, applies from the next night on, and a
+    topic or course whose structure changed since, or that it never held,
+    moves that night, since nothing he was told placed it as it now is."""
+
+    day: date
+    plan: Plan
+    since: date | None
+    finals: Mapping[str, tuple[str, str]]
+    known: Mapping[str, Mapping[str, str]]
+
+
+_STRUCTURE = ("needs", "contrasts", "arc", "excluded")
+
+
+def structure(record: dict[str, Any]) -> dict[str, str]:
+    """What of a course places its topics, apart from his study: by topic,
+    its prerequisites, competing methods, arc, exclusion and a review day a
+    tutor set; under ``""`` its exam, path and preferences. His answers,
+    starts and lessons are dated and replayed (``as_of``), and a topic's
+    words move nothing."""
+    exam = {k: v for k, v in record.get("exam", {}).items() if k != "final_review"}
+    path = {k: v for k, v in record.get("path", {}).items() if k != "current"}
+    found = {
+        "": json.dumps(
+            [exam, path, record.get("preferences", {})], sort_keys=True, default=str
+        )
+    }
+    for key, topic in record["topics"].items():
+        review = topic.get("review", {})
+        pinned = review.get("due") if review.get("by", "engine") != "engine" else None
+        found[key] = json.dumps(
+            [[topic.get(name) for name in _STRUCTURE], pinned], default=str
+        )
+    return found
+
+
+def _changed(
+    ended: Ended, records: Mapping[str, dict[str, Any]]
+) -> dict[str, set[str]]:
+    """By course, the topics whose structure differs from the one ``ended``
+    was made with, that it never held, or that are gone since; every topic
+    of a course whose own structure changed or that it never held."""
+    changed: dict[str, set[str]] = {}
+    for name, record in records.items():
+        now = structure(record)
+        was = ended.known.get(name, {})
+        if was.get("") != now[""]:
+            changed[name] = set(now) - {""}
+        else:
+            changed[name] = {t for t in set(now) | set(was) if was.get(t) != now.get(t)}
+    return changed
 
 
 def plan(
@@ -1622,12 +1696,13 @@ def replay(
     today: date,
     days: int,
     week: Capacity | None = None,
+    ended: Ended | None = None,
 ) -> Replay:
     """Every course's plan for ``days`` days from today, made again from the
     records as he was told it.
 
-    A day he was told stays until his own study moves it (Edo, 15 Nov), and
-    the plan stores nothing, so it is replayed. Each of a day's saves, in
+    A day he was told stays until his own study moves it (Edo, 15 Nov), so
+    the plan is made again from the plan before it. Each of a day's saves, in
     the order he made them, moves only the topics it touched (an answer that
     counts, or a start), and every other topic keeps the days the plan
     before it gave it: so a later save never moves a day an earlier one told
@@ -1658,9 +1733,16 @@ def replay(
     held for today: a review he chose beyond them, one it had put on a later
     day, is study past the plan, and takes no place from a review still
     planned today.
+
+    ``ended``, the plan as the last day he studied ended, kept from a read
+    that day (``Ended``), stands in for replaying that day and every day
+    before it, so a read makes the night's plan and today's saves whatever
+    the days he has studied (round 16: replaying them took 4.7 s a read
+    after 56 study days and 17 s after 400). A day past the year that plan
+    reached was never told, so the rules place it (``_Told.covers``).
     """
     with memo.scope():
-        return _day(records, today, days, week, today, told=True)
+        return _day(records, today, days, week, today, told=True, ended=ended)
 
 
 def _day(
@@ -1671,14 +1753,15 @@ def _day(
     until: date,
     *,
     told: bool,
+    ended: Ended | None = None,
 ) -> Replay:
     """The plan of ``day`` as its saves through ``until`` leave it, for
     ``days`` days, and the plans it was made from (``replay``); with
     ``told`` false, the plan the last day he studied ended with only where
-    this day began from it."""
+    this day began from it. ``ended``, when it is that day's, is that plan."""
     morning = _at(records, day, None, until)
     weekly = week or capacity.of(morning.values(), day)
-    studied = _last_studied(records, day)
+    studied = last_studied(records, day)
     if studied is None:
         return _afresh(records, day, days, (weekly, morning), until, None)
     missed = any(
@@ -1686,27 +1769,53 @@ def _day(
         for n in range(1, (day - studied).days)
     )
     span = days + (day - studied).days
+    kept = ended if ended is not None and ended.day == studied else None
+
+    def last() -> Ended:
+        """The plan as the last day he studied ended: kept, or replayed."""
+        if kept is not None:
+            return kept
+        found = _day(records, studied, span, week, until, told=False)
+        known = {name: structure(record) for name, record in records.items()}
+        return Ended(studied, found.now, found.since, found.finals, known)
+
     if missed:
-        ended = (
-            _day(records, studied, span, week, until, told=False).now if told else None
+        if not told:
+            return _afresh(
+                records, day, days, (weekly, morning), until, (None, studied)
+            )
+        before = last()
+        return replace(
+            _afresh(
+                records, day, days, (weekly, morning), until, (before.plan, studied)
+            ),
+            ended=before,
         )
-        return _afresh(records, day, days, (weekly, morning), until, (ended, studied))
-    before = _day(records, studied, span, week, until, told=False)
-    ended = before.now
-    kept = [name for name, record in morning.items() if not capacity.gone(record)]
+    before = last()
+    ended_plan = before.plan
+    live = [name for name, record in morning.items() if not capacity.gone(record)]
     left = {
         name: {
             topic
-            for planned in ended.days.get(name, [])[: (day - studied).days]
+            for planned in ended_plan.days.get(name, [])[: (day - studied).days]
             for topic in (*planned["reviews"], *planned["new"])
             if studied.isoformat() not in _lessons(morning[name]).get(topic, {})
         }
-        for name in kept
+        for name in live
     }
     done = capacity.activity(morning.values(), day).get(studied, capacity.Done())
     if any(left.values()) and (done.reviews_short or done.new_short):
-        return _afresh(
-            records, day, days, (weekly, morning), until, (ended, studied), left
+        return replace(
+            _afresh(
+                records,
+                day,
+                days,
+                (weekly, morning),
+                until,
+                (ended_plan, studied),
+                left,
+            ),
+            ended=before,
         )
     finals = before.finals
     morning = _at(records, day, None, until, finals)
@@ -1714,17 +1823,31 @@ def _day(
     unstudied = {
         name: {
             topic
-            for planned in ended.days.get(name, [])[(day - studied).days :]
+            for planned in ended_plan.days.get(name, [])[(day - studied).days :]
             if not weekly.studies(date.fromisoformat(planned["date"]))
             for topic in (*planned["reviews"], *planned["new"])
         }
-        for name in kept
+        for name in live
     }
-    moving = {name: left[name] | unstudied[name] for name in kept}
-    night = _Told(ended, moving, studied, None, yields=True)
+    changed = _changed(kept, morning) if kept else {}
+    moving = {
+        name: left[name] | unstudied[name] | changed.get(name, set()) for name in live
+    }
+    night = _Told(ended_plan, moving, studied, None, yields=True)
     began = _planned(morning, day, days, weekly, night)
     now = _saved(records, day, days, weekly, began, until, finals)
-    return Replay(now, began, ended, studied, False, False, before.since, left, finals)
+    return Replay(
+        now,
+        began,
+        ended_plan,
+        studied,
+        False,
+        False,
+        before.since,
+        left,
+        finals,
+        before,
+    )
 
 
 def _afresh(
@@ -1839,7 +1962,7 @@ def _standing(record: dict[str, Any], day: date, stamp: Stamp | None) -> dict[st
     return {**record, capacity.GONE: gone}
 
 
-def _last_studied(records: Mapping[str, dict[str, Any]], today: date) -> date | None:
+def last_studied(records: Mapping[str, dict[str, Any]], today: date) -> date | None:
     """The last day before today he studied, in any course: he answered
     with an answer that counts, started a topic, or worked in a lesson,
     whether its answers were predictions or it is taught since
@@ -1965,6 +2088,10 @@ def _planned(
         )
     for offset in range(days):
         day = today + timedelta(days=offset)
+        beyond = told is not None and not told.covers(day)
+        if beyond:
+            for course in courses:
+                course.moving = None
         rates = week.on(day)
         reviews_room: float = 0
         new_room: float = 0
@@ -1984,7 +2111,7 @@ def _planned(
                 course.missed = course.scoped
         reviews = (
             _reviews(courses, day, reviews_room, week)
-            if told is None
+            if told is None or beyond
             else _kept_reviews(courses, day, reviews_room, week, told)
         )
         for course in courses:
@@ -1993,7 +2120,7 @@ def _planned(
                 course.reviewed(topic, day)
         starts = _continued(courses, day, week, today)
         passed = 0
-        if told is not None:
+        if told is not None and not beyond:
             for course in courses:
                 assert course.moving is not None
                 for topic in told.kept(course.name, day, "new"):
@@ -2009,7 +2136,9 @@ def _planned(
                         course.moving.add(topic)
         new = (
             _new(courses, day, max(new_room, 0), week, begun, passed)
-            if told is None or any(course.starts_moving() for course in courses)
+            if told is None
+            or beyond
+            or any(course.starts_moving() for course in courses)
             else _kept_new(courses, day, week)
         )
         for course in courses:

@@ -52,7 +52,7 @@ const LINALG = course(
 		due: ["span" as TopicHandle, "basis" as TopicHandle],
 		finalReview: "2026-11-23",
 		planned: [
-			{ date: TODAY, reviews: ["span" as TopicHandle, "basis" as TopicHandle, "rank" as TopicHandle], new: [] },
+			{ date: TODAY, reviews: ["span" as TopicHandle, "basis" as TopicHandle], new: [] },
 			{ date: "2026-11-09", reviews: [], new: ["eigen" as TopicHandle] },
 			{ date: "2026-11-13", reviews: ["vectors" as TopicHandle], new: [] },
 		],
@@ -115,9 +115,20 @@ describe("calendar entries", () => {
 		]);
 	});
 
-	it("shows only the reviews plan makes for today, and no stored date the plan does not propose", () => {
+	it("shows every review plan makes today, past the five its due list names, and no stored date the plan does not propose", () => {
+		// 17 Nov in the demo world: eight Probability reviews planned today, `due` naming five; the sixth's first entry
+		// was its next review after the exam, while its topic page and the tutor's brief said today.
+		const handles = ["a", "b", "c", "d", "e", "f"] as TopicHandle[];
+		const many = course(
+			"/study/many",
+			"Many",
+			{ topics: handles.map((h) => topic(h, { title: h.toUpperCase(), review: { kind: "due", date: TODAY, overdue: 4 } })) },
+			{ due: handles.slice(0, 5), planned: [{ date: TODAY, reviews: handles, new: [] }, { date: "2026-12-12", reviews: ["f" as TopicHandle], new: [] }] },
+		);
+		const f = calendarEntries({ courses: [many], chats: [], scope: null }).filter((e) => e.title === "F");
+		assert.deepEqual(f.map((e) => `${e.day} ${lookOf(e)}`), ["2026-11-08 overdue", "2026-12-12 review"]);
 		const titles = calendarEntries({ courses: [LINALG, PROB], chats: [], scope: null }).map((e) => e.title);
-		assert.ok(!titles.includes("Rank"), "Rank is due but not in today's review");
+		assert.ok(!titles.includes("Rank"), "Rank's stored date is due, but the plan reviews it on no day: no entry");
 		assert.ok(!titles.includes("Odds"), "a stored date after the exam is not planned");
 	});
 

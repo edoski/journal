@@ -407,9 +407,12 @@ def _section_arcs(topics: dict[str, Any], keys: Collection[str]) -> dict[Section
 
 
 def _place(before: dict[str, Any], record: dict[str, Any]) -> dict[str, str]:
-    """P1: give every topic with no arc its section's arc, else the arc nearest
-    the learner, as far as its prerequisites and dependents allow, in
-    prerequisite order, so a placed topic bounds the ones after it."""
+    """P1: give every topic with no arc its section's arc, else the arc of its
+    latest prerequisite, as far as its prerequisites and dependents allow, in
+    prerequisite order, so a placed topic bounds the ones after it. A topic
+    with no prerequisite, or the one the lesson moves to, takes the arc
+    nearest the learner instead (round 16, AIKR: a Prolog topic needing only
+    Prolog landed in the current arc, "Uncertainty and probability")."""
     topics = record["topics"]
     if not record["arcs"]:
         return {}
@@ -445,7 +448,12 @@ def _place(before: dict[str, Any], record: dict[str, Any]) -> dict[str, str]:
             )
         home = homes.get(section) if (section := _section(topics[key])) else None
         index = arcs.index(home) if home in arcs else -1
-        arc = arcs[index if low <= index <= high else min(max(target, low), high)]
+        builds = key != record.get("path", {}).get("current") and any(
+            "arc" in topics[need] for need in topics[key].get("needs", ())
+        )
+        if not low <= index <= high:
+            index = low if builds else min(max(target, low), high)
+        arc = arcs[index]
         topics[key] = {**topics[key], "arc": arc}
         placed[key] = arc
     return placed

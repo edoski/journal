@@ -9,7 +9,7 @@ import { nowLine } from "@/components/study-home/needs-you";
 /**
  * What the calendar draws (spec: calendar.md): the engine's dates and the
  * stored sessions as entries, one per thing on one day. The engine owns
- * every date: today's review is the one `plan` makes, a later day shows
+ * every date: today's review is every one `plan` makes today, a later day shows
  * `plan`'s daily plan (its reviews and new topics), an exam is the
  * record's date, and the one clock is the engine's study day. Every
  * function here is pure.
@@ -323,7 +323,8 @@ export function holdsTask(chat: ChatListItem, task: CourseMapTask, holders: read
  * Every entry on the calendar, by day and then by look:
  *   - each exam on its date, with the course's next step toward it while
  *     it is ahead;
- *   - today's review as `plan` made it, each overdue when past its date,
+ *   - today's review as `plan` made it, every review its day today holds,
+ *     each overdue when past its date,
  *     and today's new topics from `plan`'s daily plan;
  *   - each later day's reviews and new topics as the daily plan proposes;
  *   - each open task today, since the engine dates none;
@@ -386,7 +387,11 @@ export function calendarEntries({
 		const fresh = (topic: CourseMapTopic, day: string) =>
 			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? (leftOutWords(topic, map.exam) ?? (topic.moved ? movedWords(null, today, topic.moved) : startsAfterWords(topic.startsAfter))) : null, ...facts(topic) });
 		const topicOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle);
-		for (const handle of due ?? []) {
+		// Today's review is every review the daily plan makes today: `plan`'s `due` names only its first five, so a
+		// sixth went unshown today and its first entry was the day after the exam the plan puts its next review on,
+		// while its topic page and the tutor's brief said today (17 Nov: Binomial distribution on Sat 12 Dec).
+		const todays = [...new Set([...(due ?? []), ...(planned.find((day) => day.date === today)?.reviews ?? [])])];
+		for (const handle of todays) {
 			const topic = topicOf(handle);
 			if (topic) review(topic, today, topic.review?.kind === "due" && topic.review.overdue > 0);
 		}
@@ -405,7 +410,7 @@ export function calendarEntries({
 				if (topic && !(day.date === today && lessonBegun(topic)) && !started) fresh(topic, day.date);
 			}
 		}
-		const reviewing = new Set<string>((due ?? []).filter((handle) => topicOf(handle)));
+		const reviewing = new Set<string>(todays.filter((handle) => topicOf(handle)));
 		reviewedToday.set(map.workspace, reviewing);
 		for (const task of map.tasks) {
 			const holders = taskTopics(task, map);

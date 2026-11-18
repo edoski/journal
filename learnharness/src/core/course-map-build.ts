@@ -456,6 +456,8 @@ export function answerProblems(submit: MapSubmit, view: MapCourseView): string |
 		problems.push("No topics: read the material and propose its topics, or list every source you could not read under unread.");
 	}
 	for (const h of submit.order) if (!known(h)) problems.push(`order lists "${h}", which is neither proposed nor in the course.`);
+	const unordered = submit.topics.filter((t) => !(t.handle in view.topics) && !submit.order.includes(t.handle)).map((t) => t.handle);
+	if (unordered.length > 0) problems.push(`order leaves out ${unordered.join(", ")}: list every new topic's handle in study order.`);
 	if (view.arcs.length > 0) problems.push(...arcProblems(submit, view, arcs));
 	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
 }
@@ -563,12 +565,13 @@ export function mapChanges(submit: MapSubmit, view: MapCourseView): { changes: J
 		while (taken.has(`${t.handle}-${n}`) || `${t.handle}-${n}` in view.topics) n++;
 		rename.set(t.handle, `${t.handle}-${n}`);
 	}
-	const kept: Record<string, ViewTopic> = { ...view.topics };
+	// Only into a topic the course has: two new topics the answer tells apart are two topics (a shared alias, as
+	// "Vector spaces" and "Vectors in space" or "Limits at infinity" and "The limit of a function" have, is no twin),
+	// and two with one name are refused before the merge.
 	for (const t of submit.topics) {
 		if (rename.has(t.handle) || t.handle in view.topics) continue;
-		const twin = duplicateOf(t, kept, twinWithin(t, submit, view, answerArcOrder));
+		const twin = duplicateOf(t, view.topics, twinWithin(t, submit, view, answerArcOrder));
 		if (twin) rename.set(t.handle, twin);
-		else kept[t.handle] = { title: t.title, needs: [], contrasts: [], refs: [], aliases: t.aliases ?? [] };
 	}
 	const h = (handle: string) => rename.get(handle) ?? handle;
 	const byHandle = new Map<string, MapTopic>();
@@ -650,7 +653,8 @@ export function mapChanges(submit: MapSubmit, view: MapCourseView): { changes: J
 
 	const order = [...view.order];
 	const placed = new Set(order);
-	const wanted = submit.order.map(h).filter((k) => exists.has(k));
+	// A topic folded into another names it twice: its first place counts, so what follows is never spliced in there.
+	const wanted = [...new Set(submit.order.map(h).filter((k) => exists.has(k)))];
 	for (const t of proposed) if (exists.has(t.handle) && !wanted.includes(t.handle)) wanted.push(t.handle);
 	for (const [i, k] of wanted.entries()) {
 		if (placed.has(k)) continue;

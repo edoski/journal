@@ -1,6 +1,6 @@
 /**
  * The whole app in this process, over the Logbook's seeded demo world
- * (`~/.claude/skills/logbook/adapters/journal/seed`, 8 Nov 2026): the real
+ * (`~/.config/logbook/adapters/journal/seed`, 8 Nov 2026): the real
  * engine on a fresh copy of the world, every `/api` route the pages fetch
  * answered by its own handler, the server's event bus wired into the
  * window's channel, and the pages mounted inside the app shell with its
@@ -31,7 +31,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "../../..");
 const API = path.resolve(HERE, "../../app/api");
 /** The Logbook's demo world seed (`seed.sh`), or another one named by `LH_DEMO_SEED`. */
-export const SEED = process.env.LH_DEMO_SEED ?? path.join(os.homedir(), ".claude", "skills", "logbook", "adapters", "journal", "seed");
+export const SEED = process.env.LH_DEMO_SEED ?? path.join(os.homedir(), ".config", "logbook", "adapters", "journal", "seed");
 
 /** The interpreter with the engine's packages: the app's own setting, else
  *  the checkout's `.venv`, else its main worktree's (a worktree has none). */
@@ -128,7 +128,17 @@ export interface SidebarCard {
 /** What `lookAt` says of a press that starts a new session. */
 export const NEW_SESSION = "a new session";
 
-export const text = (el: Element | null | undefined) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
+/** An element's words, its typeset math read back as the TeX the record writes (`$\binom{n}{j}$`), so a drawn title
+ *  reads as its topic's title: KaTeX's own text is the glyphs and the source run together. */
+export function text(el: Element | null | undefined): string {
+	if (!el) return "";
+	const copy = el.cloneNode(true) as Element;
+	for (const math of copy.querySelectorAll(".katex")) {
+		const tex = math.querySelector('annotation[encoding="application/x-tex"]')?.textContent;
+		if (tex != null) math.replaceWith(copy.ownerDocument.createTextNode(`$${tex}$`));
+	}
+	return (copy.textContent ?? "").replace(/\s+/g, " ").trim();
+}
 
 export type DemoApp = Awaited<ReturnType<typeof openDemoApp>>;
 
