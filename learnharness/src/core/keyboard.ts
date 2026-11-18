@@ -142,7 +142,8 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	// The composer's confidence icon owns these while it is mounted (prose-composer.tsx).
 	{ id: "confidence-up", label: "More sure", scope: "lesson", binding: "alt+arrowup", displayOnly: true },
 	{ id: "confidence-down", label: "Less sure", scope: "lesson", binding: "alt+arrowdown", displayOnly: true },
-	{ id: "pick-course", label: "Pick a course", scope: "lesson", binding: "mod+o" },
+	// The course picker of a new lesson's box, New lesson's and Home's: nothing in an open lesson (round 16, m28).
+	{ id: "pick-course", label: "Pick the course for a new lesson", scope: "global", binding: "mod+o" },
 	// Home owns its keys (components/study-home/home-keys.ts), so they never leak to other pages.
 	{ id: "home-course", label: "The course left or right on the map", scope: "global", binding: "arrows-lr", displayOnly: true, group: "home" },
 	{ id: "home-map-enlarge", label: "Enlarge the map, and back", scope: "global", binding: "mod+e", displayOnly: true, group: "home" },
