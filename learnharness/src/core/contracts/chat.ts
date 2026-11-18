@@ -11,6 +11,7 @@ import type { PlanNodeStatus, PlanTree } from "./plan.ts";
 import type { CourseLink } from "./course.ts";
 import type { MarkResult } from "./marks.ts";
 import type { ChatSession } from "../sdk-session.ts";
+import { SENTENCE_WORDS } from "../voice-check.ts";
 
 // ─── Chat records (the session store's on-disk format) ───────────────────────
 
@@ -187,13 +188,18 @@ export interface TurnUsage {
  *  approval of a map of material he doesn't know yet; he interrupts when
  *  he wants). No goal line (round 8: "Today: …" previewed the lesson), and
  *  the step builds on the probe's feedback, which he already read (round
- *  8: the first step re-taught it on the same matrix). */
+ *  8: the first step re-taught it on the same matrix). Its length is the
+ *  voice's own count (round 15, M9: three of the six measured first steps
+ *  came back refused, each four sentences with one over the word limit,
+ *  and the rewrite cost a high-effort reply of 5 to 8 s). */
 export const HANDOFF_TEXT =
 	"Next: plan the full teaching arc from my current understanding to the goal understanding. " +
 	"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
-	"When it's genuinely reasoned out, call plan_init and, in that same reply, start teaching with the first step alone: one idea in two to four sentences, then its question, never waiting for plan_init's result; I'll interrupt if I want something else.";
+	"When it's genuinely reasoned out, call plan_init and, in that same reply, start teaching with the first step alone: one idea in two to four sentences, " +
+	`each of ${SENTENCE_WORDS} words or fewer, since a longer one counts as two, ` +
+	"then its question, never waiting for plan_init's result; I'll interrupt if I want something else.";
 
 /** What the wake says of the probe's last answer, read from the record
  *  once the probe's turn has landed (round 15, m13: the first step opened
