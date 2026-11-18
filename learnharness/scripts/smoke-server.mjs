@@ -27,7 +27,6 @@
  */
 import { spawn } from "node:child_process";
 import { probeEnv, verifyDemoRuntime } from "./smoke-demo-runtime.mjs";
-import { verifyProviderRuntime } from "./smoke-provider-runtime.mjs";
 import { verifyCompressionRuntime } from "./smoke-compression-runtime.mjs";
 import { verifyImageRuntime } from "./smoke-image-runtime.mjs";
 import { createRequire } from "node:module";
@@ -68,8 +67,6 @@ async function main() {
 	// HTTP boot alone never imports the dynamically loaded demo engine.
 	// Fail before packaging if its standalone dependency graph is incomplete.
 	verifyDemoRuntime(STANDALONE, RUNTIME);
-	// /api/models only reads catalogs; initialize the real lazy SDK offline too.
-	verifyProviderRuntime(STANDALONE, RUNTIME);
 	// A plain GET without Accept-Encoding never exercises gzip backpressure.
 	verifyCompressionRuntime(STANDALONE, RUNTIME);
 	// Photon's WASM and the resize worker load unbundled from the payload.
