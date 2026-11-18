@@ -15,7 +15,6 @@ import {
 	ConversationEmptyState,
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
-import { LiveToolCard } from "@/components/artifacts/live-tool-card";
 import { AnswerMarksProvider, DisputeDialog, type DisputeDraft } from "@/components/answer-mark";
 import { useAnswerMarks } from "@/components/answer-marks-fetch";
 import { MalformedQuestion } from "@/components/malformed-question";
@@ -68,6 +67,7 @@ import {
 	latestMarkedAnswer,
 	appOpeningAt,
 	COMPACTING_LINE,
+	streamingToolActivity,
 	workingLine,
 	taskTurnOwed,
 } from "@/src/core";
@@ -1826,12 +1826,11 @@ export function Chat({
 													}
 													default: {
 														// A tool call being WRITTEN (owner, streaming round 2026-10-01):
-														// input-streaming spans the whole execution, and the live line
-														// says what the tutor is doing. On settling, the registry's card
-														// takes over below.
-														if (part.type.startsWith("tool-") && part.state === "input-streaming") {
-															return <LiveToolCard key={pi} part={part as ArtifactPartProps["part"]} idle={idleLine} />;
-														}
+														// input-streaming spans the whole execution, and the turn's one
+														// working line below says what the tutor is doing (round 16, m1:
+														// a line per running tool stacked). On settling, the registry's
+														// card takes over below.
+														if (part.type.startsWith("tool-") && part.state === "input-streaming") return null;
 														// A problem is the tutor's words, its end a mark and a
 														// disclosure (prose-practice.tsx).
 														if (part.type === "tool-problem") {
@@ -1873,7 +1872,7 @@ export function Chat({
 							    provider-connect gap. turnInFlight: the same state
 							    entered by external discovery (wake) / the poll
 							    fallback. Never collapsible itself. */}
-							{thinking && <ActivityLine testId="thinking-placeholder" label={compacting ? COMPACTING_LINE : idleLine} />}
+							{thinking && <ActivityLine testId="thinking-placeholder" label={compacting ? COMPACTING_LINE : (streamingToolActivity(messages) ?? idleLine)} />}
 							{replyCut && !courseGone && !gone && <ReplyCut cut={replyCut} onRetry={() => void send({ type: "continue" })} />}
 							{/* A failed turn whose cause is gone (signed in again): Retry alone. */}
 							{!error && retryable && !claudeLimit && !courseGone && !gone && <ReplyCut cut="lost" onRetry={retryFailedTurn} />}

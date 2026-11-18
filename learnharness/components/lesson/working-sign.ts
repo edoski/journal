@@ -1,10 +1,11 @@
 import { PRACTICE_PROBLEM_TOOL, QUESTION_TOOLS, SEND_TO_USER_TOOL, type LhViewMessage } from "@/src/core";
 
 /**
- * Whether the lesson shows its "Thinking…" line (round 2, 14 Nov 2026):
- * the whole time a turn runs, except while the tutor's words or a tool card
- * it is writing are themselves arriving at the end of the lesson, its reply
- * still streaming them. The
+ * Whether the lesson shows its one working line (round 2, 14 Nov 2026):
+ * the whole time a turn runs, except while the tutor's words are themselves
+ * arriving at the end of the lesson, its reply still streaming them. A
+ * running tool draws no line of its own, so this line is the turn's only
+ * one (round 16, m1: a line per tool stacked under it). The
  * tutor's own reasoning never shows (agent chrome out), so a turn that is
  * still reasoning, or running a tool with no card, would otherwise leave
  * the pane looking idle for most of a minute. A question or problem posed
@@ -26,10 +27,10 @@ export function showsWorking(messages: readonly LhViewMessage[], busy: boolean, 
 	// problem's closing words).
 	if (part.type === "text") return !part.text?.trim() || part.state === "done";
 	if (posed(part)) return rewriteOwed(last.parts);
-	// A question is drawn once it is posed, so one still being written shows
-	// nothing of itself (round 15, 3 m37: 2.8 s with Stop alone).
-	if (isQuestion(part)) return true;
-	return !(part.type.startsWith("tool-") && part.state === "input-streaming");
+	// A question is drawn once it is posed, and any other tool once it has
+	// run, so one still being written shows nothing of itself (round 15,
+	// 3 m37: 2.8 s with Stop alone).
+	return true;
 }
 
 function isQuestion(part: LhViewMessage["parts"][number]): boolean {
