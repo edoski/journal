@@ -127,8 +127,9 @@ export function LessonComposer({
 	// front of it). A value set while it is open moves the caret itself.
 	const openedWith = useRef(value);
 	useLayoutEffect(() => {
+		const field = fieldRef.current;
 		const words = openedWith.current;
-		if (words) fieldRef.current?.setSelectionRange(words.length, words.length);
+		if (field && words) field.selectionStart = field.selectionEnd = words.length;
 	}, []);
 	// Turning compact as he reads up a lesson, an empty field lets go of focus, so the composer folds; a key
 	// he types lands back in it (type-to-compose). A field holding words keeps focus and stays open.

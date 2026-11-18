@@ -14,20 +14,11 @@ import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { dom } from "./helpers/radix-dom.ts";
 import { LessonSessionComposer } from "../components/lesson/lesson-composer.tsx";
 
-const carets = new Map<Element, number>();
-Object.defineProperty(dom.window.HTMLTextAreaElement.prototype, "setSelectionRange", {
-	configurable: true,
-	value(this: HTMLTextAreaElement, start: number) {
-		carets.set(this, start);
-	},
-});
-
 let root: Root | null = null;
 afterEach(async () => {
 	await act(async () => root?.unmount());
 	root = null;
 	dom.document.body.innerHTML = "";
-	carets.clear();
 });
 
 async function mount(value: string) {
@@ -42,11 +33,12 @@ describe("the composer opens with the caret after its words (round 16, m27)", ()
 	it("puts the caret at the end of a kept message", async () => {
 		const kept = "hello? did that go through? ";
 		const field = await mount(kept);
-		assert.equal(carets.get(field), kept.length);
+		assert.equal(field.selectionStart, kept.length);
+		assert.equal(field.selectionEnd, kept.length);
 	});
 
 	it("leaves an empty field alone", async () => {
 		const field = await mount("");
-		assert.equal(carets.has(field), false);
+		assert.ok(!field.selectionStart, "nothing to step past");
 	});
 });
