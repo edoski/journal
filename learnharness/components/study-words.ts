@@ -911,3 +911,25 @@ export const MISTAKE_WORDS = {
 	helped: "With help",
 	none: "No mistakes to fix",
 } as const;
+
+/** The Mac app's notifications (`desktop-notices.ts`), in the words Home
+ *  and the sidebar use (Edo, 19 Nov 2026: "VERY sparingly", only the key
+ *  study events). */
+export const NOTICE_WORDS = {
+	/** Today's plan: the title over Today's lines. */
+	today: "Today",
+	/** A course's topic map finished building: under the course's name. */
+	mapReady: "Its topic map is ready",
+	/** A new lesson's opening is ready and waits on him: under its title,
+	 *  the sidebar's word for a session that waits on him. */
+	lessonReady: "Your turn",
+	/** The settings row and its hint. */
+	setting: "Study notifications",
+	settingHint: "Today's plan once a day, and a course map or a new lesson when it is ready while you are in another app",
+} as const;
+
+/** Today's plan in one line: Today's lines by their one name
+ *  (`lessonTitle`), in Today's order. */
+export function todayNoticeWords(titles: readonly string[]): string {
+	return titles.join(", ");
+}

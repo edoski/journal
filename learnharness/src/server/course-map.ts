@@ -55,6 +55,7 @@ export function courseMapBuilder(): CourseMapBuilder {
 			emit("courses-changed", {});
 			arcPass().built(workspace);
 		},
+		onBuilt: (workspace, title) => emit("work-finished", { kind: "course-map", workspace, title, at: new Date().toISOString() }),
 		onStatus: (workspace) => {
 			emit("courses-changed", {});
 			void arcPass().settle(workspace);

@@ -59,6 +59,7 @@ import {
 } from "../core/input-events.ts";
 import { steerDelivered } from "../core/contracts.ts";
 import { listenForCourseMaps } from "./course-map.ts";
+import { listenForLessonOpenings } from "./work-finished.ts";
 import { preparePhotos } from "./photos.ts";
 import type {CallUsage} from "../core/contracts.ts";
 
@@ -165,6 +166,8 @@ function sessionStoreFor(chatId: string): SessionStore {
 setJobRespawn((jobId) => void jobRunner.runJob(jobId));
 // A lesson's save that registers material extends the course's map.
 listenForCourseMaps();
+// A new lesson's opening turn settling is work he waited on (work-finished.ts).
+listenForLessonOpenings(stores.chatStore);
 
 /** The route-facing entry: parse {chatId, input} and run one turn. */
 export async function handleChatRequest(

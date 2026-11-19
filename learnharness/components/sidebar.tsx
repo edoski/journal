@@ -11,6 +11,7 @@ import { RailOpenButton } from "@/components/unit-inbox/sidebar-rail";
 import { ServerSidebarWidth } from "@/components/unit-inbox/sidebar-width";
 import { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_OPEN_COOKIE, SIDEBAR_WIDTH_COOKIE, sidebarCookie } from "@/components/sidebar-cookies";
 import { kbdEventForAction } from "@/src/core";
+import { DesktopNoticeBridge } from "@/components/desktop-notice-bridge";
 
 /**
  * Toggleable sidebar — NOT a modal drawer: no backdrop, no focus theft. It
@@ -193,6 +194,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			    after the content in the tree, but it's window-level so order only
 			    matters for the events it dispatches, never for DOM priority. */}
 			<KeyboardShortcuts />
+			{/* The Mac app's notifications: renders nothing, inert in a browser. */}
+			<DesktopNoticeBridge />
 		</SettingsDialogProvider>
 	);
 }
