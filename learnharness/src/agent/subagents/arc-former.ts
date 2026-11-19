@@ -3,7 +3,7 @@
  * arcs into arcs (core/arc-pass.ts holds the rules). A judge and one reader
  * per topic settle the prerequisites with the prerequisite test alone, never
  * seeing an arc. Then an agent cuts the settled graph from the material's
- * units with arcs.md's *Forming arcs*, and cannot change a prerequisite. Each answers
+ * units with arcs.md's *Forming arcs*, and changes no stored prerequisite. Each answers
  * with one submit call, which the app checks and the engine dry-runs
  * (`save --check`) before it counts; the saves go to the record as it is
  * when they are made.
@@ -35,7 +35,7 @@ import {
 	passDue,
 	purposeAnswerProblems,
 	purposeProblems,
-	restoredNeeds,
+	withdrawal,
 	purposeQuiz,
 	sortAnswerProblems,
 	sortMisses,
@@ -223,7 +223,7 @@ const arcSchema = Type.Object({
 	),
 	withdraw: Type.Optional(
 		Type.Array(Type.Object({ topic: Type.String(), need: Type.String(), reason: Type.String({ description: "Why an exercise on the topic can be worked without it." }) }), {
-			description: "Added or proposed needs that fail the prerequisite test: dropped, so the cut need not hold them.",
+			description: "Added, proposed or implied needs that fail the prerequisite test: dropped, so the cut need not hold them.",
 		}),
 	),
 	none: Type.Optional(Type.String({ description: "Only when the course should get no arcs: why, by the size rules." })),
@@ -281,8 +281,8 @@ export const ARC_LOOPS_INSTRUCTIONS = `You settle the loops in a course's prereq
 export const ARC_CUT_INSTRUCTIONS = `You group a course's topics into arcs, following *Forming arcs* below. You answer with one ${ARCS_TOOL} call; the app saves it.
 
 How this differs from the text below:
-- The prerequisites are settled and you cannot change them: your answer has no field for needs. A stored edge you think false goes under doubts with its reason; it is recorded and kept.
-- A topic's added and proposed needs are ones the edge step found just now, each from a reader's step on one exercise or example. Test each added need of the topics you place with the prerequisite test: could the learner work the exercises the material sets for the topic without it? When only a one-off brings it in (one example, a checkpoint, an odd exercise or two) while the topic's method and its standard exercises are worked without it, list it under withdraw with that reason; it is dropped and the cut need not hold it. A topic's implied needs are ones its readers found that were set aside because another of its needs leads to them: one comes back as a need of its own when you withdraw the only need that led to it, and the cut then holds it, unless it fails the same test: then list it under withdraw too. Judge it by the test alone, never by the order it would force; never withdraw a stored need.
+- The stored prerequisites are settled and you cannot change them. A stored edge you think false goes under doubts with its reason; it is recorded and kept.
+- A topic's added and proposed needs are ones the edge step found just now, each from a reader's step on one exercise or example. Test each added or proposed need of the topics you place with the prerequisite test: could the learner work the exercises the material sets for the topic without it? When only a one-off brings it in (one example, a checkpoint, an odd exercise or two) while the topic's method and its standard exercises are worked without it, list it under withdraw with that reason; it is dropped and the cut need not hold it. A topic's implied needs are ones its readers found that were set aside because another of its needs leads to them: one comes back as a need of its own when you withdraw the only need that led to it, and the cut then holds it, unless it fails the same test: then list it under withdraw too. Judge it by the test alone, never by the order it would force; never withdraw a stored need.
 - A topic's proposed needs are prerequisites the edge step found, waiting for the learner's yes. Cut as if they were stored: no topic sits in an arc before the arc holding one of its needs, stored or proposed, so the arcs hold whichever proposals the learner accepts.
 - Read the material's units before you cut: the sources' tables of contents with read_material, headings with search_material, and the unit each topic's reference locator names. A source the course cannot open is listed as such; then the locators are the material you have.
 - List the arcs in study order, and each arc's topics in study order. Every topic listed below, left-out ones too, goes in exactly one arc's topics.
@@ -795,7 +795,9 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		for (const d of edges.applied) if (d.change === "add") (added[d.topic] ??= []).push(d.need);
 		const settled = async () => {
 			const read = await viewNow(workspace);
-			const view = { ...read.view, ...(edges.applied.length > 0 ? { added } : {}), ...(edges.implied.length > 0 ? { implied: edges.implied } : {}) };
+			// A cut on stored edges withdraws nothing, so it gets no implied needs to bring back.
+			const implied = edges.implied.length > 0 && !(options.edges === "propose" && options.cutOn === "stored") ? { implied: edges.implied } : {};
+			const view = { ...read.view, ...(edges.applied.length > 0 ? { added } : {}), ...implied };
 			return { ...read, view: options.edges === "propose" && options.cutOn !== "stored" ? withProposed(view, diffs) : view };
 		};
 		const cut = await settled();
@@ -879,7 +881,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		const out = new Set((answer.withdraw ?? []).map((w) => `${w.topic}\u0000${w.need}`));
 		const withdrawnAs = (d: EdgeAdd): EdgeDiff => ({ ...d, change: "add", reason: answer.withdraw!.find((w) => w.topic === d.topic && w.need === d.need)!.reason.trim() });
 		edges.withdrawn = [...edges.diffs.filter((d) => d.change === "add"), ...edges.implied].filter((d) => out.has(`${d.topic}\u0000${d.need}`)).map(withdrawnAs);
-		edges.restored = restoredNeeds(now.view, answer);
+		edges.restored = withdrawal(now.view, answer).restored;
 		if (options.edges === "propose") edges.diffs = [...edges.diffs.filter((d) => !edges.withdrawn.some((w) => w.topic === d.topic && w.need === d.need)), ...edges.restored.map((r) => ({ ...r, change: "add" as const }))];
 		const formation = arcPassChanges(answer, now.view, { edgesEntry, asked: options.asked, reason: options.reason });
 		if (!formation) return { status: "none", reason: "the answer formed no arcs", edges, answer };

@@ -41,7 +41,7 @@ import {
 	mergeMisses,
 	purposeAnswerProblems,
 	purposeProblems,
-	restoredNeeds,
+	withdrawal,
 	purposeQuiz,
 	sortAnswerProblems,
 	sortMisses,
@@ -357,12 +357,12 @@ describe("the cut's shape rules", () => {
 		];
 		const added = view(CALC, { added: { riemann: ["chain"] }, implied });
 		const withdrawn: ArcSubmit = { ...good, withdraw: [{ topic: "riemann", need: "chain", reason: "one example composes" }] };
-		assert.deepEqual(restoredNeeds(added, withdrawn), [implied[0]], "chain still reaches limits through derivative");
+		assert.deepEqual(withdrawal(added, withdrawn).restored, [implied[0]], "chain still reaches limits through derivative");
 		assert.deepEqual(withoutWithdrawn(added, withdrawn).topics.riemann!.needs, ["limits", "derivative"]);
-		assert.deepEqual(restoredNeeds(added, good), [], "nothing withdrawn, nothing back");
+		assert.deepEqual(withdrawal(added, good).restored, [], "nothing withdrawn, nothing back");
 		const both: ArcSubmit = { ...good, withdraw: [...withdrawn.withdraw!, { topic: "riemann", need: "derivative", reason: "only Exercise 4 differentiates" }] };
 		assert.equal(arcPassProblems(both, added), null, "an implied need may be withdrawn with the need that led to it");
-		assert.deepEqual(restoredNeeds(added, both), [], "and then it does not come back");
+		assert.deepEqual(withdrawal(added, both).restored, [], "and then it does not come back");
 		assert.deepEqual(withoutWithdrawn(added, both).topics.riemann!.needs, ["limits"]);
 		const changes = arcPassChanges(withdrawn, added)!.changes as { topics: Record<string, { needs?: string[] }>; arc_change: { edges: unknown[] } };
 		assert.deepEqual(changes.topics.riemann!.needs, ["limits", "derivative"]);
@@ -373,6 +373,31 @@ describe("the cut's shape rules", () => {
 		const proposed = view(CALC, { proposed: { riemann: ["chain"] }, implied });
 		assert.deepEqual(withoutWithdrawn(proposed, withdrawn).proposed, { riemann: ["derivative"] }, "when the pass proposes, the need comes back as a proposal");
 		assert.equal("needs" in (arcPassChanges(withdrawn, proposed)!.changes as { topics: Record<string, object> }).topics.riemann!, false, "and changes no stored need");
+	});
+
+	it("a need comes back only when the withdrawal cut its path: not one the view never reached, nor one another restored need leads to", () => {
+		const t = (needs: string[]) => topic("T", needs);
+		const graph = { x: t(["y"]), y: t(["z", "w"]), z: t(["w"]), w: t([]), v: t([]), u: t(["v"]) };
+		const implied = [
+			{ topic: "x", need: "w", reason: "an exercise uses w" },
+			{ topic: "x", need: "z", reason: "an exercise uses z" },
+			{ topic: "x", need: "v", reason: "reached through a proposal the view left out" },
+		];
+		const submit: ArcSubmit = { ...good, withdraw: [{ topic: "x", need: "y", reason: "one example" }] };
+		const given = view(graph, { added: { x: ["y"] }, implied });
+		assert.deepEqual(withdrawal(given, submit).restored, [implied[1]], "w is reached through z; v was never reached");
+		assert.deepEqual(withdrawal(view(graph, { added: { x: ["y"] }, implied: [implied[1]!, implied[0]!] }), submit).restored, [implied[1]], "whatever the order");
+		const unrelated: ArcSubmit = { ...good, withdraw: [{ topic: "x", need: "v", reason: "one exercise" }] };
+		assert.deepEqual(withdrawal(given, unrelated).restored, [], "withdrawing an implied need alone brings nothing back");
+	});
+
+	it("a withdrawn add the record no longer holds is no drop of the formation's save", () => {
+		const meanwhile = view(CALC, { added: { limits: ["chain"] } });
+		const withdrawn: ArcSubmit = { ...good, withdraw: [{ topic: "limits", need: "chain", reason: "only one example uses it" }] };
+		const changes = arcPassChanges(withdrawn, meanwhile, { edgesEntry: 0 })!.changes as { topics: Record<string, object>; arc_change: Record<string, unknown> };
+		assert.equal("needs" in changes.topics.limits!, false, "a tutor dropped it meanwhile");
+		assert.equal(changes.arc_change.edges, undefined);
+		assert.equal(changes.arc_change.edges_entry, 0);
 	});
 
 	it("R1: every topic, left-out ones too, in exactly one arc", () => {
@@ -830,12 +855,17 @@ describe("the grouping pass (real engine, scripted model)", { skip: realEngineMi
 	});
 
 	it("a copy run told to cut on the stored edges keeps the material's cut where a proposed add would refuse it, and still proposes the add", async () => {
-		const readers = { continuity: [{ need: "derivative", step: "a continuity exercise differentiates the function first" }] };
+		const readers = {
+			continuity: [{ need: "derivative", step: "a continuity exercise differentiates the function first" }],
+			chain: [{ need: "limits", step: "the chain rule's proof takes a limit" }],
+		};
 		const kinds = { "continuity<-derivative": "method" } as const;
 		const stored = scriptedModel(EDGES, [CUT], undefined, {}, readers, [], [], {}, kinds);
 		const result = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: stored }).run(course("cut-stored"), { edges: "propose", cutOn: "stored" });
 		assert.equal(result.status, "formed", JSON.stringify(result));
 		assert.deepEqual(stored.refusals, [], "the cut puts continuity before the derivative, as the material does");
+		assert.deepEqual(result.status === "formed" && result.edges.implied.map((a) => `${a.topic}<-${a.need}`), ["chain<-limits"]);
+		assert.ok(![...stored.prompts].some((p) => p.includes("implied needs")), "a cut on stored edges withdraws nothing, so it sees no implied need to bring back");
 		assert.deepEqual(result.status === "formed" && result.edges.diffs.filter((d) => d.change === "add").map((d) => `${d.topic}<-${d.need}`), ["continuity<-derivative"]);
 		const proposed = scriptedModel(EDGES, [CUT], undefined, {}, readers, [], [], {}, kinds);
 		await assert.rejects(createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: proposed }).run(course("cut-proposed"), { edges: "propose" }), /never submitted/);
