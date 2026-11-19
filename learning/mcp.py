@@ -53,8 +53,8 @@ SAVE_RULES = "\n".join(
         "Record what happened, once per turn after your teaching (a review saves "
         "once at its end). changes is one patch of only what changed:",
         "- title, goal, journal, focus (a task key): replace; null clears.",
-        "- exam {date, format, coverage, criteria, constraints, unknowns, refs, "
-        "arcs, leaves_out} and path {current, order, basis, arcs}: merge by field; "
+        "- exam {date, sessions, format, coverage, criteria, constraints, unknowns, "
+        "refs, arcs, leaves_out} and path {current, order, basis, arcs}: merge by field; "
         "null clears a field or the whole object.",
         "- topics, knowledge, tasks, sources, arcs: maps by handle (a-z0-9_-, one "
         "namespace); an entry merges by field, a null field clears it, a null entry "

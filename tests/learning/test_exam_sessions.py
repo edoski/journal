@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from learning import agenda, capacity, planning, records, retrieval, schema
+from learning import agenda, capacity, mcp, planning, records, retrieval, schema
 from learning.workspace import Workspace
 
 SESSIONS = ["2026-12-21", "2027-01-19", "2027-02-03"]
@@ -203,3 +203,11 @@ def test_the_plan_and_the_map_name_the_sessions_and_the_one_gone_by(
     assert {key: exam[key] for key in shown} == shown
     exam = retrieval.course_map(workspace)["exam"]
     assert {key: exam[key] for key in shown} == shown
+
+
+def test_the_save_rules_name_every_exam_field() -> None:
+    line = next(
+        rule for rule in mcp.SAVE_RULES.splitlines() if rule.startswith("- exam {")
+    )
+    named = line.removeprefix("- exam {").split("}")[0].replace(" ", "").split(",")
+    assert named == list(schema.FIELDS["exam"])
