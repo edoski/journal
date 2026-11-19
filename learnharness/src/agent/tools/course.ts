@@ -44,6 +44,10 @@ export interface CourseToolContext {
 	 *  a restart between the engine's write and the transcript's lost the
 	 *  answer's mark). */
 	onSaved?: (links: { question: string; observation: string }[]) => void;
+	/** Keeps the topics a save's receipt moved the start of
+	 *  (`starts_moved`) with the lesson the moment the engine took it, so
+	 *  Home keeps those starts while the turn still runs. */
+	onMoved?: (topics: string[]) => void;
 	/** The session is a review (session-opening.ts `openedAsReview`): what
 	 *  it leaves stays with the topic, whose review carries it, so a save
 	 *  here keeps no task (round 9, 2 m4: a review turned into teaching saved
@@ -351,6 +355,13 @@ function keepLinks(ctx: CourseToolContext, questions: readonly (string | null)[]
  * answer they record. Every save of a session's answers comes through here.
  */
 export async function saveCourse(ctx: CourseToolContext, changes: unknown, problem?: { id: string; seen: boolean }): Promise<CourseResult> {
+	const result = await saveRuled(ctx, changes, problem);
+	const moved = result.ok && isObject(result.json) && isObject(result.json.starts_moved) ? Object.keys(result.json.starts_moved) : [];
+	if (moved.length > 0) ctx.onMoved?.(moved);
+	return result;
+}
+
+async function saveRuled(ctx: CourseToolContext, changes: unknown, problem?: { id: string; seen: boolean }): Promise<CourseResult> {
 	const patch = patchOf(changes);
 	const reviewTask = reviewTaskRefused(ctx, patch) ?? planStepAsTopic(ctx, patch);
 	if (reviewTask) return { ok: false, kind: "validation", message: reviewTask };

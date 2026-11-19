@@ -83,6 +83,11 @@ export interface ChatRecord {
 	 *  resumed tutor could save it again). Keyed as the marks key an
 	 *  answer: a graded question's call, or his message's id. */
 	answerSaves?: AnswerSaves;
+	/** The topics whose start its saves moved, kept the moment the engine
+	 *  took each save, as `answerSaves` is: the transcript is written when
+	 *  the turn ends, and Home dropped the start in between (round 18, M4,
+	 *  integration). */
+	startsMoved?: readonly string[];
 	/** Its topics' titles, by handle, kept when its course is deleted, so
 	 *  search still finds it by the topics it practised once no live map
 	 *  names them (round 18, m24). */

@@ -254,6 +254,16 @@ function turnAgent(
 			// The lesson was deleted mid-turn: nothing to keep the links with.
 		}
 	};
+	// Home rereads the session list on record-changed, so a start the save
+	// moved stays on it while the turn still runs (round 18, M4).
+	const keepMoved = (topics: string[]) => {
+		try {
+			stores.chatStore.saveStartsMoved(chatId, topics);
+			emit("record-changed", { chatId });
+		} catch {
+			// The lesson was deleted mid-turn: nothing to keep them with.
+		}
+	};
 	const agentOpts: AgentBuildOptions = {
 		engine,
 		messages: asAgentMessages(agentMessages),
@@ -273,7 +283,7 @@ function turnAgent(
 		// save's links are kept the moment the engine takes it, so a restart
 		// before the transcript's write loses neither the mark nor the
 		// "already saved" (round 8).
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, review: reviewRecord(record), reviewTopics: record.topics ?? [], lessonTopics: () => lessonTopicsOf(stores.chatStore.getChat(chatId) ?? record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [], courses: keptCourseMaps } } : {}),
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, onMoved: keepMoved, review: reviewRecord(record), reviewTopics: record.topics ?? [], lessonTopics: () => lessonTopicsOf(stores.chatStore.getChat(chatId) ?? record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [], courses: keptCourseMaps } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
 	// practitioner — no plan/question tools; problem + conclude, and the

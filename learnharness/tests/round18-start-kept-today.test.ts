@@ -93,9 +93,31 @@ describe("a start planned today stays on Home until the session that moved it cl
 		assert.equal(startLine(todayRows([course], [listed(created.id)], TODAY)), undefined);
 	});
 
+	it("keeps the start while the turn that moved it still runs, before its transcript is written (integration live check)", () => {
+		// Live on the merged head, the line left the sidebar at the save and came back only at the turn's end.
+		const running = chatStore.createChat("Probability review", PROB, ["random-variables"]);
+		chatStore.saveMessages(running.id, [{ ...newUserMessage("Probability review"), timestamp: at("12:00") }, review.at(-1)] as never);
+		assert.equal(startLine(todayRows([course], [{ ...listed(running.id), busy: true }], TODAY)), undefined, "no save kept yet");
+		chatStore.saveStartsMoved(running.id, ["expectation"]);
+		assert.ok(startLine(todayRows([course], [{ ...listed(running.id), busy: true }], TODAY)), "the save's moved start is kept the moment the engine took it");
+	});
+
 	it("another session open today, which moved nothing, brings no line back", () => {
 		const other = chatStore.createChat("Rank practice", PROB, ["rank"]);
 		chatStore.saveMessages(other.id, [{ ...newUserMessage("Practice rank"), timestamp: at("11:00") }, ...call(at("11:01"), "problem", { statement: "Find rank A.", mode: "recall", topics: ["rank"], modelSolution: "2" })] as never);
 		assert.equal(startLine(todayRows([course], [listed(created.id), listed(other.id)], TODAY)), undefined);
 	});
+});
+
+it("course_save hands the session the starts its receipt moved, the moment the engine took it (round 18, M4, integration)", async () => {
+	const { courseTools } = await import("../src/agent/tools/course.ts");
+	const kept: string[][] = [];
+	const ctx = {
+		course: PROB,
+		records: { run: async () => ({ ok: true, json: { saved: [], notes: [], starts_moved: MOVED } }) },
+		arcs: false,
+		onMoved: (topics: string[]) => kept.push(topics),
+	};
+	await courseTools(ctx as never).course_save!.execute("t1", { changes: { topics: { "random-variables": { introduced: true } } } } as never);
+	assert.deepEqual(kept, [["expectation"]]);
 });

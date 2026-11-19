@@ -152,7 +152,7 @@ function listChats(): ChatSummary[] {
 						...((t) => (t ? { taskTitle: t } : {}))(sessionTaskTitleOf(messages)),
 						review: openedAsReview({ title: summary.title, topics: summary.topics, messages }),
 						...((t) => (t ? { retaught: t } : {}))(retaughtTopicOf({ ...summary, messages })),
-						...((moved) => (moved.length > 0 ? { startsMoved: moved } : {}))(startsMovedOf(messages)),
+						...((moved) => (moved.length > 0 ? { startsMoved: moved } : {}))([...new Set([...startsMovedOf(messages), ...(summary.startsMoved ?? [])])]),
 						studied: studiedIn(messages),
 						...inputTimes(messages),
 					};
@@ -290,6 +290,15 @@ function saveAnswerSaves(id: string, links: Readonly<Record<string, readonly str
 	writeChat(record);
 }
 
+/** Add the topics a save's receipt moved the start of. Silent, and not
+ * conversation activity: updatedAt stays put. */
+function saveStartsMoved(id: string, topics: readonly string[]): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	record.startsMoved = [...new Set([...(record.startsMoved ?? []), ...topics])];
+	writeChat(record);
+}
+
 /** Keep its topics' titles as its course is deleted. Silent, and not
  * conversation activity: updatedAt stays put. */
 function saveTopicTitles(id: string, titles: Readonly<Record<string, string>>): void {
@@ -400,5 +409,6 @@ export const chatStore: ChatStore = {
 	appendTurnUsage,
 	saveDigestLedger,
 	saveAnswerSaves,
+	saveStartsMoved,
 	saveTopicTitles,
 };

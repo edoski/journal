@@ -62,6 +62,9 @@ export interface ChatStore {
 	/** Add a save's links to the record's `answerSaves`: answer key →
 	 *  observation ids. Silent, like the digest ledger. */
 	saveAnswerSaves(id: string, links: Readonly<Record<string, readonly string[]>>): void;
+	/** Add the topics a save's receipt moved the start of
+	 *  (`ChatRecord.startsMoved`). Silent, like the answer saves. */
+	saveStartsMoved(id: string, topics: readonly string[]): void;
 	/** Keep its topics' titles, by handle, as its course is deleted
 	 *  (`ChatRecord.topicTitles`). Silent, like the answer saves. */
 	saveTopicTitles(id: string, titles: Readonly<Record<string, string>>): void;
