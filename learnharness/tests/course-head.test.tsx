@@ -247,7 +247,7 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		const why = line.querySelector("[data-slot=exam-gaps-why]")?.textContent ?? "";
 		assert.match(why, /Hypergeometric distribution starts too close to the exam for a review/);
 		const which = examGapWhich(eve, examGaps(map)!);
-		assert.deepEqual(which, ["No room in the final review from 14 Nov for Binomial"], "only the topic neither the head's line nor the why names");
+		assert.deepEqual(which, ["Binomial is not revisited in the final review from 14 Nov"], "only the topic neither the head's line nor the why names");
 		for (const said of [why, ...which]) {
 			assert.doesNotMatch(said, /\bOne\b|\bone starts\b|\bsome start\b/i, `no topic left unnamed: "${said}"`);
 			assert.ok(!said.includes(head) && !head.includes(said.replace(/\.$/, "")), `no sentence of the head's line: "${said}"`);
