@@ -48,6 +48,10 @@ export interface CourseToolContext {
 	 *  here keeps no task (round 9, 2 m4: a review turned into teaching saved
 	 *  "Re-learn checking independence"). */
 	review?: boolean;
+	/** The topics a review was opened on (`ChatRecord.topics`): a task on
+	 *  none of them, saved once its plan taught here, is the lesson the
+	 *  review took up (`lessonTakenUp`), never one the review keeps. */
+	reviewTopics?: readonly string[];
 	/** The topics this session teaches as its lesson when a save runs
 	 *  (session-opening.ts `lessonTopicsOf`): an answer on none of them is
 	 *  saved `aside`, so a check in a side question never starts its topic
@@ -102,8 +106,21 @@ export const REVIEW_TASK_REFUSED =
 function reviewTaskRefused(ctx: CourseToolContext, patch: Record<string, unknown> | null): string | null {
 	if (!ctx.review || !patch) return null;
 	const tasks = patch.tasks;
-	const kept = tasks !== null && typeof tasks === "object" && Object.values(tasks).some((t) => t !== null);
-	return kept || (typeof patch.focus === "string" && patch.focus !== "") ? REVIEW_TASK_REFUSED : null;
+	const keptTasks = tasks !== null && typeof tasks === "object" ? Object.values(tasks).filter((t) => t !== null) : [];
+	if (keptTasks.length > 0 && keptTasks.every((t) => takesUpLesson(ctx, t))) return null;
+	return keptTasks.length > 0 || (typeof patch.focus === "string" && patch.focus !== "") ? REVIEW_TASK_REFUSED : null;
+}
+
+/** A task a review saves for the lesson it took up: on topics, none of
+ *  them the review's, once a plan taught here. Saving it makes the session
+ *  that topic's lesson (`lessonTakenUp`), so its page resumes it and the
+ *  review's own topic keeps its review (round 18, M3: the Probability
+ *  review that started Expectation had its close's task refused, and
+ *  Expectation's page had nothing to resume). */
+function takesUpLesson(ctx: CourseToolContext, task: unknown): boolean {
+	const topics = isObject(task) && Array.isArray(task.topics) ? task.topics.filter((t): t is string => typeof t === "string" && t !== "") : [];
+	const opened = ctx.reviewTopics ?? [];
+	return topics.length > 0 && topics.every((t) => !opened.includes(t)) && (ctx.planSteps?.() ?? []).length > 0;
 }
 
 /** A patch as the engine reads it: the object, or its JSON text, which the

@@ -83,7 +83,9 @@ function reviewOpening(record: { title?: string; topics?: readonly string[]; mes
  *  side answer started
  *  (round 17, M5 live: the Probability review's plan re-taught
  *  Inclusion-exclusion, he asked to start Expectation and answered its
- *  question, and the session stayed the review). A lesson keeps the topic
+ *  question, and the session stayed the review), else the first topic not
+ *  among them that a task it saved holds (round 18, M3: that plan gave no
+ *  topic, and its close's Expectation task is what said so). A lesson keeps the topic
  *  it opened on when a later plan repairs a prerequisite. Null otherwise.
  *  Pure. */
 export function lessonTakenUp(record: { title?: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): string | null {
@@ -91,7 +93,8 @@ export function lessonTakenUp(record: { title?: string; topics?: readonly string
 	const first = planTakesUp(record, sessionPlanTopicOf(messages) ?? firstStartedTopicOf(messages));
 	if (first || !reviewOpening(record)) return first;
 	const opened = record.topics ?? [];
-	return plannedTopicsOf(messages).find((topic) => !opened.includes(topic)) ?? null;
+	const outside = (topic: string) => !opened.includes(topic);
+	return plannedTopicsOf(messages).find(outside) ?? sessionTaskTopicsOf(messages).find(outside) ?? null;
 }
 
 /** The topic a session opened on topics takes up as its lesson when its

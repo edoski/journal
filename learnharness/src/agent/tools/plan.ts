@@ -9,7 +9,7 @@ import type { CourseToolContext } from "./course.ts";
 import { sessionTopicsOf } from "../../core/native-messages.ts";
 import { topicsToIntroduce, type CourseMap } from "../../core/contracts/course-map.ts";
 import { plannedDayWords } from "../../core/day-words.ts";
-import { planTakesUp } from "../../core/session-opening.ts";
+import { planTakesUp, reviewRecord } from "../../core/session-opening.ts";
 
 /** The binding-id reminder riding plan_init's slim content (owner,
  *  2026-10-09): plan_init is the exact moment the node ids become
@@ -153,11 +153,11 @@ const planInitInput = Type.Object({
 		Type.Object(
 			{
 				title: Type.String({ minLength: 1, description: "A short name for the lesson, a few words in his language, e.g. \"Eigenvalues by hand\"." }),
-				topic: Type.Optional(Type.String({ minLength: 1, description: "The handle of the course topic the lesson teaches, when it teaches one." })),
+				topic: Type.Optional(Type.String({ minLength: 1, description: "The handle of the course topic the lesson teaches, when it teaches one; always in his review, a re-teach of its own topic included." })),
 			},
 			{
 				description:
-					"What the lesson is for, on the first call: it names a session started from a free message, once, everywhere he sees it. A rewrite never renames it.",
+					"What the lesson is for, on the first call: it names a session started from a free message, once, everywhere he sees it. A rewrite never renames it. In his review every plan gives it, with `topic` (refused otherwise).",
 			},
 		),
 	),
@@ -176,6 +176,15 @@ export function doneBeforeNeeds(tree: PlanTree, messages: Parameters<typeof deri
 		const needs = tree.edges.filter((edge) => edge.to === step && !taught.has(edge.from)).map((edge) => edge.from);
 		return needs.length > 0 ? [{ step, needs }] : [];
 	});
+}
+
+/** Why a review's plan is refused: it names no topic. A review that
+ *  starts the topic he asked for is that topic's lesson from its plan on,
+ *  and only the plan's topic says which (round 18, M3: the Probability
+ *  review's second plan, on Expectation, gave no goal, so the session
+ *  stayed the review and its close's task was refused). */
+export function reviewPlanNamesNoTopic(opened: readonly string[]): string {
+	return `goal.topic: this session is his review of ${opened.join(", ") || "his topics"}, so its plan names the course topic it teaches: ${opened.length === 1 ? "that topic" : "one of them"} when it re-teaches it, else the topic he asked to start. Call plan_init again with goal { title, topic }.`;
 }
 
 /** A lesson's name, as its task is titled: its topic's title and
@@ -256,11 +265,14 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 					const lesson = { topic: goal?.topic, titles: [goal?.title, record.title, record.title?.replace(/\s+lesson$/i, "")].filter((t): t is string => typeof t === "string") };
 					const taught = record.tree ? derivePlanStatusesLh(record.tree, record.messages) : null;
 					const problems = [planMapTooBig(next), planTitlesGiveAway(next), planStepIsTheTopic(next, lesson), planDropsSteps(record.tree, next, (taught?.visited.size ?? 0) > 0 || taught?.current != null, taught?.done ?? new Set())].filter((p): p is string => p !== null);
+					const review = reviewRecord(record);
+					if (review && !goal?.topic) problems.push(reviewPlanNamesNoTopic(record.topics ?? []));
 					if (problems.length > 0) return { ok: false, error: problems.join("\n") };
 					chatStore.saveTree(chatId, next);
 					if (goal && !record.tree) chatStore.nameSession(chatId, goal);
-					// A session whose first plan teaches a topic it was not opened on is that topic's lesson from here (round 16, M4).
-					const taken = record.tree ? null : planTakesUp(record, goal?.topic);
+					// A session whose first plan teaches a topic it was not opened on is that topic's lesson from here (round 16, M4),
+					// and so is a review whose later plan does (round 18, M3).
+					const taken = record.tree && !review ? null : planTakesUp(record, goal?.topic);
 					if (taken) chatStore.takeUpLesson(chatId, await lessonName(ctx.course, taken));
 					// Context diet: content = the validated nodeIds + the reminder (the
 				// ids just became binding for every explain call); details =
