@@ -908,6 +908,32 @@ const UNSAVED = (tool: string): AgentToolResult<unknown> => ({
 	isError: true,
 	details: { withheld: "unsaved" },
 });
+/** His review's answer saved on a topic the review is not of, with
+ *  nothing said of it after the save (round 18, m16: under "Review
+ *  Inclusion-exclusion principle" his Σ(−1)ʲC(k,j) was marked Right, filed
+ *  under the binomial theorem, and a re-teach followed with no word; he
+ *  learnt it did not count only when he asked). */
+const OFF_TOPIC_TEXT = (saved: string, review: string): string =>
+	`his answer was saved on ${saved}, and this session is his review of ${review}, so his card's mark reads as that review's. Tell him first, in one sentence with send_to_user, what that question was for ("That identity is what the three-set count rests on; now the count itself."), never that it did not count`;
+const OFF_TOPIC = (tool: string, saved: string, review: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not done: ${OFF_TOPIC_TEXT(saved, review)}; then call ${tool} again.` }],
+	isError: true,
+	details: { withheld: "off-topic" },
+});
+
+/** The topics a review session was opened on, from its brief's
+ *  "Opened on: …, as its review." line. */
+function reviewTopicsOf(messages: readonly LhMessage[]): string[] {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "custom" || m.customType !== "course-context" || typeof m.content !== "string") continue;
+		const opened = /^Opened on: (.+?), as its review\.(?: |$)/m.exec(m.content);
+		return opened ? opened[1]!.split(/,\s*/) : [];
+	}
+	return [];
+}
+
+const OFF_TOPIC_NOTE = "off-topic";
 const UNSAVED_NOTE = "His answer to your last question is not saved. Save it with course_save now, as it was, a wrong prediction included, since every attempt is kept; if it only asked you something, it holds no attempt.";
 
 /** The graded question his answer opening this turn replies to, while no
@@ -1136,6 +1162,12 @@ export class VoiceGuard {
 	 *  worded one differently was held back (once a turn). */
 	private readonly rulings: string[] = [];
 	private heldRulingSaid = false;
+	/** The topics this review was opened on (none outside a review), and
+	 *  an answer of his this turn saved on none of them: its topics, how
+	 *  many messages had been sent at its save, and whether a turn-ending
+	 *  call was held for the sentence it owes (once a turn). */
+	private readonly reviewTopics: string[];
+	private offTopic: { topics: string[]; at: number; held: boolean } | null = null;
 	/** The topic titles this turn's results named. */
 	private readonly titles: string[] = [];
 	/** The close's `day_items`: what each day it names holds. */
@@ -1159,6 +1191,7 @@ export class VoiceGuard {
 		this.setAside = aside && !this.input.guess && !(this.input.words && TAUGHT_INSTEAD.test(this.input.words)) ? aside : null;
 		this.posedLast = posedLast(messages);
 		this.posedSinceInput = posedSinceInput(messages);
+		this.reviewTopics = review ? reviewTopicsOf(messages) : [];
 		this.openAbove = openAbove(messages);
 		this.stepsAhead = stepsNotDone(messages);
 		this.unsaved = saves ? unsavedAnswerOf(messages) : null;
@@ -1224,6 +1257,10 @@ export class VoiceGuard {
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
 		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
+		if (this.offTopic && this.sent === this.offTopic.at && !this.noted.has(OFF_TOPIC_NOTE)) {
+			this.noted.add(OFF_TOPIC_NOTE);
+			return `Not shown to him yet: ${OFF_TOPIC_TEXT(this.offTopic.topics.join(", "), this.reviewTopics.join(", "))}.`;
+		}
 		if (this.verdictOwed && !this.noted.has(VERDICT_NOTE)) {
 			this.noted.add(VERDICT_NOTE);
 			return VERDICT_NOTE;
@@ -1285,6 +1322,14 @@ export class VoiceGuard {
 		if (call.name === SAVE_TOOL && this.firstTry && savedNotRight(call.arguments, this.firstTry.id)) this.retryOwed = true;
 		if (call.name === SAVE_TOOL && this.secondTry && savedNotRight(call.arguments, this.secondTry.id)) this.repairOwed = true;
 		if (call.name === SAVE_TOOL && this.setAside && savedQuestionsOf(call.arguments).includes(HIS_MESSAGE)) this.setAside = null;
+		if (call.name === SAVE_TOOL && this.reviewTopics.length > 0 && !this.offTopic) {
+			const off = savedObservations(isRecord(call.arguments) ? call.arguments : {}).find((o) => typeof o.question === "string" && Array.isArray(o.topics) && o.topics.length > 0 && !o.topics.some((t) => this.reviewTopics.includes(String(t))));
+			if (off) this.offTopic = { topics: (off.topics as unknown[]).map(String), at: this.sent, held: false };
+		}
+		if (this.offTopic && !this.offTopic.held && this.sent === this.offTopic.at && (this.endsTurn(call.name) || call.name === PROBE_DONE_TOOL)) {
+			this.offTopic.held = true;
+			return OFF_TOPIC(call.name, this.offTopic.topics.join(", "), this.reviewTopics.join(", "));
+		}
 		if (this.unsaved && !this.heldUnsaved && (this.endsTurn(call.name) || call.name === PROBE_DONE_TOOL)) {
 			this.heldUnsaved = true;
 			return UNSAVED(call.name);
