@@ -231,7 +231,9 @@ class Replay:
     ``verdicts`` holds one ``(day, grade)`` per counted day; ``days`` classifies
     every attempted day as learning, probe or practice; ``shaky`` holds the
     counted days whose ``helped`` came only from a right answer a hint or his
-    guess kept from ``solid`` (``shaky_right``); ``expected`` is the next
+    guess kept from ``solid`` (``shaky_right``), and ``unsettled`` those of
+    them with no answer after it yet, which the review's next question
+    settles (``_probe``); ``expected`` is the next
     expected review day after the last verdict, and ``due`` the date the engine
     stores for it: after the exam when that day is on or after an exam still
     ahead of the verdict. ``schedule`` keeps each ``(day, due)`` the replay set,
@@ -241,6 +243,7 @@ class Replay:
     verdicts: list[tuple[str, str]] = field(default_factory=list)
     days: dict[str, str] = field(default_factory=dict)
     shaky: set[str] = field(default_factory=set)
+    unsettled: set[str] = field(default_factory=set)
     expected: date | None = None
     due: date | None = None
     streak: int = 0
@@ -455,6 +458,8 @@ def replay(
             result.days[day], verdict = PROBE, _probe(items)
             if verdict == "helped" and shaky_right(items[0]):
                 result.shaky.add(day)
+                if len(items) == 1:
+                    result.unsettled.add(day)
         elif day in learning:
             result.days[day], verdict = LEARNING, _learned(items)
         else:

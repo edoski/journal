@@ -60,7 +60,7 @@
       "contrasts": [],
       "level": "independent",
       "introduced": "2026-10-05",
-      "review": "2026-11-25",
+      "review": "2026-12-02",
       "held": true,
       "due": "2026-10-28",
       "weak": true,
@@ -197,7 +197,7 @@
       ],
       "level": "introduced",
       "introduced": "2026-11-05",
-      "review": "2026-11-27",
+      "review": "2026-11-23",
       "held": true,
       "due": "2026-11-06",
       "weak": false,
@@ -270,7 +270,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-20",
+      "starts": "2026-11-23",
       "starts_why": {
         "kind": "after",
         "needs": [
@@ -304,12 +304,9 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-23",
+      "starts": "2026-11-20",
       "starts_why": {
-        "kind": "after",
-        "needs": [
-          "inner-product"
-        ]
+        "kind": "early"
       },
       "weak": false,
       "tasks": []
