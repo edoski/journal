@@ -1,7 +1,7 @@
 import { courseLabel, type ChatListItem, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
 import { SLIP_WORDS, TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
 import { pausedWords, sessionState } from "@/components/nav/session-state";
-import { continueWords, planDay, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
+import { continueWords, planDay, stepTitle, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 import { leftWords, taskWords } from "@/components/unit-inbox/units";
 import { localDay } from "@/components/day-change";
 import { sessionName } from "@/components/study-home/day-record";
@@ -108,9 +108,9 @@ export function courseTitle(row: TodayRow): string {
  *  Linear maps and their matrices lesson" beside "Continue Problem sheet
  *  4"; round 16, m4: the lesson's row had no verb), its status saying it
  *  was left ("Left off 6 Nov"); else the course's next step ("Review
- *  A, B"). Home's line and its sidebar card read this one title. Pure. */
+ *  Rank", "Probability review", `stepTitle`). Home's line and its sidebar card read this one title. Pure. */
 export function lessonTitle(row: TodayRow): string {
-	if (row.kind === "course") return stepWords(row.step);
+	if (row.kind === "course") return stepTitle(row.step, row.course.map.title);
 	const name = sessionName(row.chat, row.course?.map.tasks ?? []);
 	return /^(?:Review|Start)\s/.test(name) ? name : continueWords(name);
 }

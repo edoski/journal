@@ -71,5 +71,12 @@ export function sessionTitleOf(record: { title: string; renamed?: true; course?:
 	if (record.renamed) return record.title;
 	const task = sessionTaskTitleOf(record.messages);
 	if (task) return task;
-	return record.course && (record.topics ?? []).length > 1 && openedAsReview(record) ? `${record.course.title} review` : record.title;
+	return record.course && (record.topics ?? []).length > 1 && openedAsReview(record) ? courseReviewName(record.course.title) : record.title;
+}
+
+/** A review of more than one topic by name: its course's review
+ *  ("Probability review"), as the session it opens is named
+ *  (`sessionTitleOf`) and Home's line for it reads (round 18, m10). Pure. */
+export function courseReviewName(courseTitle: string): string {
+	return `${courseTitle} review`;
 }

@@ -1,4 +1,4 @@
-import { isReviewSession, taskTopics, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
+import { courseReviewName, isReviewSession, taskTopics, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
 import { continueMove, sessionState, type SessionState } from "@/components/nav/session-state";
 import { SOLID, taskSessions, topicSessions } from "@/components/unit-inbox/units";
@@ -130,6 +130,17 @@ export const planDay = (date: string) => PLAN_DAY.format(new Date(`${date}T00:00
  *  ("Continue Eigenvalues: the full 2×2 computation"). Pure. */
 export function continueWords(title: string): string {
 	return /^Continue\s/.test(title) ? title : `Continue ${title}`;
+}
+
+/** The step as a line names it: a review of more than one topic by its
+ *  course's review ("Probability review"), as the session it opens is
+ *  named, never the list of its topics (round 18, m10: Home's row and its
+ *  sidebar card read "Review Binomial distribution, Inclusion-exclusion
+ *  principle, Random variables and distributions", clamped at "…and…");
+ *  else its instruction (`stepWords`), which the session opens with.
+ *  Pure. */
+export function stepTitle(step: NextStep, courseTitle: string): string {
+	return step.kind === "review" && step.titles.length > 1 ? courseReviewName(courseTitle) : stepWords(step);
 }
 
 /** The step as a short instruction: "Review Linear independence, Rank",
