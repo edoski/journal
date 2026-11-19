@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from learning import capacity, progress
-from tests.learning.test_one_plan import World, planned_days, within
+from tests.learning.test_one_plan import World, finish, planned_days, within
 
 ROUND12 = json.loads(
     (Path(__file__).parent / "golden" / "round12-world.json").read_text(
@@ -81,9 +81,12 @@ def test_a_night_after_a_begun_lesson_moves_no_day(
     """9 Nov held Poisson's start and he began its lesson: the next morning
     every day he was told the evening before stands, Poisson's included
     (round 12, 1 N2's three moves: Poisson's start 9 to 14 Nov and its review
-    10 to 18 Nov)."""
-    evening = world(tmp_path, "d9-end", monkeypatch, capsys).plan("2026-11-09")
-    morning = world(tmp_path, "d10", monkeypatch, capsys).plan("2026-11-10")
+    10 to 18 Nov). The world was recorded under an earlier plan, and since
+    round 18's M1 9 Nov held more starts: he does them first (d10 is d9-end
+    as the next day began)."""
+    days = world(tmp_path, "d9-end", monkeypatch, capsys)
+    finish(days, "2026-11-09", but=frozenset({"poisson"}))
+    evening, morning = days.plan("2026-11-09"), days.plan("2026-11-10")
     untaught = {("probability", "poisson")}
     told = {
         key: day
@@ -135,12 +138,16 @@ def test_the_final_review_owns_the_days_starts(
     """Two days before the Probability exam, its start that Variance stands
     on, Expectation, takes the day and is reviewed before the exam; Linear
     Algebra's Linear maps, which its own taught topics stand on but whose
-    exam is weeks away, waits until after it (round 12, 1 D2)."""
+    exam is weeks away, waits until after it (round 12, 1 D2): it starts
+    inside the final review only on room the exam's own starts leave, which
+    since round 18's M1 fits every one of them."""
     plan = world(tmp_path, "d17", monkeypatch, capsys).plan("2026-11-17")
     probability = plan["probability"]["plan"]
     assert starts(plan["probability"])["expectation"] == "2026-11-17"
     assert "expectation" not in probability.get("unreviewed", [])
-    assert starts(plan["linear-algebra"])["linear-maps"] > "2026-11-19"
+    linear_maps = starts(plan["linear-algebra"])["linear-maps"]
+    assert linear_maps > "2026-11-19" or not probability.get("does_not_fit")
+    assert linear_maps > "2026-11-17", "the eve's first day is the exam's"
 
 
 def test_a_first_review_the_exam_leaves_no_day_for_is_named(

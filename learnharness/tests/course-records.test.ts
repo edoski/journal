@@ -311,8 +311,8 @@ describe("course map arcs (E2's goldens)", () => {
 		assert.equal("currentArc" in map, false);
 		assert.equal(map.topics.some((t) => "arc" in t), false, "no topic names an arc");
 		assert.equal(currentArc(map), null);
-		assert.deepEqual(topicOf(map, "invertibility").startsWhy, { kind: "after", needs: ["rank"], partners: [] });
-		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", waitingOn: [], exam: false });
+		assert.deepEqual(topicOf(map, "invertibility").startsWhy, { kind: "after", needs: ["determinant"], partners: [] });
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", waitingOn: ["matmul", "determinant"], exam: false });
 		assert.deepEqual(
 			map.topics.filter((t) => t.startsWhy).map((t) => t.handle),
 			map.topics.filter((t) => t.starts).map((t) => t.handle),
@@ -339,7 +339,7 @@ describe("course map arcs (E2's goldens)", () => {
 			"every topic in one arc",
 		);
 		assert.equal(map.currentArc, "eigenvalues");
-		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", arc: "orthogonality", waitingOn: [], exam: false });
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", arc: "orthogonality", waitingOn: ["invertibility"], exam: false });
 		assert.deepEqual(topicOf(map, "change-basis").startsWhy, { kind: "after", arc: "eigenvalues", needs: ["invertibility"], partners: [] });
 	});
 
@@ -379,8 +379,8 @@ describe("course map arcs (E2's goldens)", () => {
 	it("the exam's scope of arcs and the topics it leaves out, as far as the map shows them", () => {
 		const golden = goldenMap("linear-algebra-arcs");
 		const exam = { ...(golden.exam as object), arcs: ["spaces", "systems", "gone"], leaves_out: ["kernel", "nope"] };
-		assert.deepEqual(parsed({ ...golden, exam }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-16", arcs: ["spaces", "systems"], leavesOut: ["kernel"] });
-		assert.deepEqual(parsed({ ...golden, exam: { ...exam, arcs: null } }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-16", leavesOut: ["kernel"] }, "null is the whole course, less what it leaves out");
+		assert.deepEqual(parsed({ ...golden, exam }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-17", arcs: ["spaces", "systems"], leavesOut: ["kernel"] });
+		assert.deepEqual(parsed({ ...golden, exam: { ...exam, arcs: null } }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-17", leavesOut: ["kernel"] }, "null is the whole course, less what it leaves out");
 	});
 
 	it("the topics an exam leaves out in a course without arcs", () => {

@@ -35,6 +35,10 @@ at that pace, and past each exam's pace when it needs more.
 A day he answered no review at all says only that he did not review that
 day, not how many he gets through when he does, so it never shows a review
 limit: a limit of none would hold every review off the plan for good.
+Likewise a day he left a start owed and started no topic, or did more
+reviews than the plan proposed, spent the day elsewhere and says nothing of
+his new-topic pace (``_elsewhere``); a day he started more topics than the
+plan proposed always does, since it raises it.
 
 Which weekdays he studies is censored the same way: a day the plan held
 nothing and he did nothing says nothing, since nothing was proposed. A weekday
@@ -553,7 +557,9 @@ def _settled(
         if done.reviews_short or done.new_short:
             morning = estimate(settled, day, rest)
             reviews = _stop(morning, day, "reviews", done.reviews, today)
-            new = _stop(morning, day, "new", done.new, today)
+            new = _stop(morning, day, "new", done.new, today) and not _elsewhere(
+                morning, day, done
+            )
             done = replace(
                 done,
                 reviews_short=done.reviews_short and reviews,
@@ -577,6 +583,20 @@ def _stop(morning: Capacity, day: date, kind: str, done: int, today: date) -> bo
     if day >= today:
         return False
     return proposed is None or done < proposed
+
+
+def _elsewhere(morning: Capacity, day: date, done: Done) -> bool:
+    """Whether he spent a day his new topics were left owed elsewhere: he
+    started no topic, or did more reviews than the morning's plan proposed
+    (his review limit's whole items, once shown). Like a day he answered no
+    review, it says nothing of his new-topic pace. A day he started more
+    topics than the plan proposed is never elsewhere: it raises his pace."""
+    if morning.on(day).new.shown and done.new > morning.room(day, "new"):
+        return False
+    reviews = morning.on(day).reviews
+    return not done.new or (
+        reviews.shown and done.reviews > morning.room(day, "reviews")
+    )
 
 
 # --- the estimate -------------------------------------------------------------
