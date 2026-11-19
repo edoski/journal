@@ -248,6 +248,40 @@ def test_a_day_whose_plan_he_finished_moves_nothing_overnight(
     ]
 
 
+@pytest.mark.parametrize("left", ["determinant", "elimination"])
+def test_a_day_he_finished_but_one_review_moves_only_that_review(
+    left: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 18, M1: on 9 Nov he did every item the plan held but one Linear
+    Algebra review, and the night planned afresh, moving 53 dates: as 10 Nov
+    began the final reviews started a day later, which re-read 30 Oct and
+    1 Nov as days he stopped short of a start, and his new-topic pace read
+    lower than as 9 Nov began, with nothing he did. A day he was told stays
+    unless his own study moves it: the night moves the review he left, and
+    only what stands on it."""
+    world = World(tmp_path, "day-done", monkeypatch, capsys)
+    finish(world, "2026-11-09", but=frozenset({left}))
+    evening, morning = world.maps("2026-11-09"), world.maps("2026-11-10")
+    told, now = map_days(evening), map_days(morning)
+    needs = {
+        topic["topic"]: set(topic.get("needs", []))
+        for topic in morning["linear-algebra"]["topics"]
+    }
+
+    def stands_on(key: str) -> bool:
+        return any(need == left or stands_on(need) for need in needs.get(key, ()))
+
+    moved = {key for key, when in now.items() if told.get(key) != when}
+    assert ("linear-algebra", "reviews", left) in moved
+    assert all(
+        name == "linear-algebra" and (topic == left or stands_on(topic))
+        for name, _, topic in moved
+    ), sorted(moved)
+
+
 def test_a_moved_day_names_the_day_he_was_told(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -358,7 +392,8 @@ def test_deleting_a_course_moves_no_day_of_another(
         assert now == others
     else:
         # A day a plan made afresh (a day he studies went by with no study)
-        # may move any topic; each says so, from the day he was told.
+        # may move any topic; each later day says so, from the day he was
+        # told, and one that came forward names no delay.
         shown = {
             (name, "new" if topic.get("starts") else "reviews", topic["topic"]): topic
             for name in COURSES[1:]
@@ -367,7 +402,8 @@ def test_deleting_a_course_moves_no_day_of_another(
         assert {
             key: shown[key].get("moved")
             for key in unmoved
-            if (shown[key].get("moved") or {}).get("from") != told[key]
+            if now[key] > told[key]
+            and (shown[key].get("moved") or {}).get("from") != told[key]
         } == {}
 
 
@@ -479,7 +515,11 @@ def test_a_slip_moves_a_start_to_the_first_final_review_day_with_room(
     topics as the day's room allows, before any start a day already holds,
     and every start the slip did not touch keeps its day (round 14, m7:
     Random variables slipped on 9 Nov, and Poisson's start went to Sat
-    14 Nov while Linear Algebra's kept 11 and 13 Nov)."""
+    14 Nov while Linear Algebra's kept 11 and 13 Nov). Since a night that
+    left nothing keeps every day he was told (round 18), Poisson keeps the
+    13 Nov that 8 Nov told, after Random variables' next review, and the
+    starts the slip moved come back by the final review's first day; a
+    start that stands on one of them (Variance on Expectation) follows it."""
     seeded = World(tmp_path, "slip", monkeypatch, capsys, R14)
     found = seeded.plan("2026-11-09")
     starts = {
@@ -488,39 +528,47 @@ def test_a_slip_moves_a_start_to_the_first_final_review_day_with_room(
         for topic in day["new"]
     }
     exam = seeded.run("probability", "map", day="2026-11-09")["exam"]
-    assert starts["poisson"] <= exam["final_review"], starts
+    assert starts["poisson"] < exam["date"], starts
+    for topic in ("geometric", "expectation"):
+        assert starts[topic] <= exam["final_review"], starts
     monkeypatch.setenv("LEARNING_TODAY", "2026-11-09")
     stored = {name: records.read(resolve(root)) for name, root in seeded.roots.items()}
     made = agenda.replay(stored, date(2026, 11, 9), WINDOW)
     for name, record in stored.items():
         touched = agenda.touched(record, date(2026, 11, 9))
+
+        def stands_on(topic: str, record: dict[str, Any] = record) -> bool:
+            return any(
+                need in touched or stands_on(need)
+                for need in progress.needs(record, topic)
+            )
+
         for began, now in zip(made.began.days[name], made.now.days[name]):
             kept = {
                 topic
                 for topic in began["new"]
-                if topic not in touched
-                and not touched.intersection(progress.needs(record, topic))
+                if topic not in touched and not stands_on(topic)
             }
             assert kept <= set(now["new"]), (name, began, now)
 
 
-def slip_sequences(world: World) -> tuple[dict[str, Any], dict[str, Any]]:
-    """On 9 Nov, the day Continuity's first lesson is planned, a wrong
-    answer on Convergent sequences, which it needs: Continuity as the map
-    then shows it, and the save's receipt."""
+def slip_basis(world: World) -> tuple[dict[str, Any], dict[str, Any]]:
+    """On 9 Nov, the day Linear maps' first lesson is planned, a wrong answer
+    on Basis and dimension, which it needs: Linear maps as the map then
+    shows it, and the save's receipt."""
 
-    def continuity() -> dict[str, Any]:
+    def linear_maps() -> dict[str, Any]:
         return next(
             topic
-            for topic in world.run("real-analysis", "map", day="2026-11-09")["topics"]
-            if topic["topic"] == "continuity"
+            for topic in world.run("linear-algebra", "map", day="2026-11-09")["topics"]
+            if topic["topic"] == "linear-maps"
         )
 
-    assert continuity()["starts"] == "2026-11-09"
+    assert linear_maps()["starts"] == "2026-11-09"
     answer = {
-        "topics": ["sequences"],
-        "text": "Proved $1/n \\to 0$ but chose $M$ from $\\varepsilon$ backwards",
-        "response": "M = epsilon",
+        "topics": ["basis"],
+        "text": "Called four vectors spanning $\\mathbb{R}^3$ a basis",
+        "response": "Yes, they are a basis",
         "help": "none",
         "result": "incorrect",
     }
@@ -528,9 +576,9 @@ def slip_sequences(world: World) -> tuple[dict[str, Any], dict[str, Any]]:
     world.monkeypatch.setattr(
         sys, "stdin", io.StringIO(json.dumps({"observations": [answer]}))
     )
-    assert main(["--workspace", str(world.roots["real-analysis"]), "save"]) == 0
+    assert main(["--workspace", str(world.roots["linear-algebra"]), "save"]) == 0
     receipt = json.loads(world.capsys.readouterr().out)
-    return continuity(), receipt
+    return linear_maps(), receipt
 
 
 def test_a_moved_day_says_what_of_his_study_moved_it(
@@ -545,12 +593,14 @@ def test_a_moved_day_says_what_of_his_study_moved_it(
     read Wed 11 after more practice with no reason; here Span, told 25 Nov,
     is missed on 9 Nov). Since a day he started nothing no longer lowers
     his pace (round 18, M1), Poisson starts after Random variables' next
-    review and the slip leaves it be; Continuity, planned 9 Nov, needs
-    Convergent sequences, which slips instead."""
+    review and the slip leaves it be. Since a night that left nothing keeps
+    every day he was told (round 18), Continuity starts on 20 Nov, as 8 Nov
+    told; Linear maps, planned 9 Nov, needs Basis and dimension, which slips
+    instead."""
     monkeypatch.setenv("HOME", str(tmp_path / "slip" / "home"))
     slipped = World(tmp_path / "slip", "seed", monkeypatch, capsys, R14)
-    continuity = slip_sequences(slipped)[0]
-    assert continuity["moved"]["waits_on"] == ["sequences"], continuity
+    linear_maps = slip_basis(slipped)[0]
+    assert linear_maps["moved"]["waits_on"] == ["basis"], linear_maps
     monkeypatch.setenv("HOME", str(tmp_path / "seed" / "home"))
     seeded = World(tmp_path / "seed", "seed", monkeypatch, capsys, R14)
     told = {
@@ -589,21 +639,21 @@ def test_a_save_receipt_names_each_start_his_study_moved_today(
     day he was told, with its new day and the move the map gives, so the
     close that follows says it (round 15, m2: a partly right Binomial review
     moved Poisson's start from tomorrow to 13 Nov, and neither the close nor
-    the page said so; on the new plan, round 18 M1, Continuity's start
-    moves when Convergent sequences slips on its day)."""
+    the page said so; on the new plan, round 18, Linear maps' start moves
+    when Basis and dimension slips on its day)."""
     slipped = World(tmp_path, "seed", monkeypatch, capsys, R14)
-    continuity, receipt = slip_sequences(slipped)
-    assert continuity["moved"]["by"] == "study", continuity
+    linear_maps, receipt = slip_basis(slipped)
+    assert linear_maps["moved"]["by"] == "study", linear_maps
     titles = {
         topic["topic"]: topic["title"]
-        for topic in slipped.run("real-analysis", "map", day="2026-11-09")["topics"]
+        for topic in slipped.run("linear-algebra", "map", day="2026-11-09")["topics"]
     }
-    assert receipt["starts_moved"]["continuity"] == {
-        "title": titles["continuity"],
-        "starts": continuity["starts"],
+    assert receipt["starts_moved"]["linear-maps"] == {
+        "title": titles["linear-maps"],
+        "starts": linear_maps["starts"],
         "moved": {
-            **continuity["moved"],
-            "waits_on": [titles[key] for key in continuity["moved"]["waits_on"]],
+            **linear_maps["moved"],
+            "waits_on": [titles[key] for key in linear_maps["moved"]["waits_on"]],
         },
     }, receipt
 

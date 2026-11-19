@@ -193,7 +193,8 @@ def test_a_lesson_day_of_predictions_is_a_day_he_studied(
     """After 17 Nov's Poisson answer that counts, 10 Nov's lesson, all
     predictions, is still the last day he studied before the week he missed:
     every moved day names it, never 9 Nov (round 12, 1 m7: the tutor said
-    "you haven't studied since Monday 9 November")."""
+    "you haven't studied since Monday 9 November"). A day his 17 Nov answer
+    moved says so and names no day."""
     days = world(tmp_path, "d17-post-poisson", monkeypatch, capsys)
     moved = [
         topic["moved"]
@@ -201,4 +202,4 @@ def test_a_lesson_day_of_predictions_is_a_day_he_studied(
         if topic.get("moved")
     ]
     assert moved
-    assert {why["on"] for why in moved} == {"2026-11-10"}
+    assert {why["on"] for why in moved if why["by"] != "answered"} == {"2026-11-10"}
