@@ -31,7 +31,7 @@ import { studyDay, withDayWords } from "../../core/day-words.ts";
 import type { LhMarkerMessage } from "../../core/native-messages.ts";
 import { CONCLUDE_ACK_TEXT } from "../../core/contracts/chat.ts";
 import { CONFIDENCE_STATES } from "../../core/contracts/course.ts";
-import { conclusionProblem, practiceObservations, type PracticeConclusion } from "../../core/practice-attempts.ts";
+import { conclusionProblem, practiceObservations, recordLineProblem, type PracticeConclusion } from "../../core/practice-attempts.ts";
 
 
 /** The record-reading context the gates need (the plan-tools idiom). */
@@ -154,7 +154,7 @@ function partsField() {
  *  line his topic's history reads for the answer (round 11, 2 n5: the
  *  history showed the whole problem, and a first try as "First try"). */
 const RECORD_DESCRIPTION =
-	"What he did on this answer, as one short line for his course record in the words a lesson save uses, with math in `$…$` LaTeX: what he got right or where it broke (\"Subtracted the rank from the rows instead of the columns\"), never the problem's statement. His topic's history reads it.";
+	"What he did on this answer, as one short line for his course record in the words a lesson save uses, with math in `$…$` LaTeX: what he got right or where it broke (\"Subtracted the rank from the rows instead of the columns\"), never the problem's statement. His topic's history reads it. Required when the answer is not right.";
 
 export const concludeInputObject = Type.Object({
 	outcome: Type.Union(
@@ -291,6 +291,8 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 	// session holds, never the tutor's claim alone (round 16, M2: one answer
 	// after a hint was saved twice, once as a right first try).
 	if (answersOn(record.messages, active.toolCallId) < 2) delete conclusion.firstTry;
+	const bare = recordLineProblem(conclusion, pose.statement);
+	if (bare) return { refused: bare, text: "" };
 	// His newest message came from Ask: a question, never his answer, and
 	// the confidence of an earlier note is not its (round 5).
 	const final = finalSubmissionOf(record.messages, active.toolCallId);

@@ -61,7 +61,7 @@ describe("per-part results (round 14 integration)", () => {
 		const tools = practiceTools({ chatId: "c", chatStore: { getChat: () => ({ messages }) } as never }, { course: { workspace: "/w", title: "LA" }, records } as never);
 		const result = await tools.conclude!.execute(
 			"c1",
-			{ outcome: "movedOn", verdict: "(a) is right; (b)'s vector is not in the kernel.", rung: null, missClass: "execution", retest: true, result: "partial", response: "(a) 2 (b) {(1,0,0)}", parts: split.parts } as never,
+			{ outcome: "movedOn", verdict: "(a) is right; (b)'s vector is not in the kernel.", rung: null, missClass: "execution", retest: true, result: "partial", response: "(a) 2 (b) {(1,0,0)}", record: "Rank 2 right; gave $(1,0,0)$, which is not in the kernel", parts: split.parts } as never,
 			undefined,
 		);
 		assert.notEqual(result.isError, true);
