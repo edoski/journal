@@ -1445,10 +1445,11 @@ def _worked_on(record: dict[str, Any], day: date) -> bool:
 def _where(sources: dict[str, Any], item: dict[str, Any]) -> list[dict[str, Any]]:
     """Each of ``item``'s refs as a place in his material: the source's file,
     as the record keeps it (in the workspace's ``sources`` folder), and the
-    ref's locator."""
+    ref's locator. A ref that names a whole source has no place to show."""
     return [
         {"path": sources[ref["source"]]["path"], "locator": ref["locator"]}
         for ref in item.get("refs", ())
+        if "locator" in ref
     ]
 
 

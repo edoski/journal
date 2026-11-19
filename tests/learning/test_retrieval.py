@@ -668,6 +668,10 @@ def test_map_says_where_a_tasks_text_is_in_his_material(workspace: Workspace) ->
                     "refs": [{"source": "sheets", "locator": "Sheet 4"}],
                 },
                 "essay": {"title": "Essay"},
+                "whole-sheets": {
+                    "title": "All the sheets",
+                    "refs": [{"source": "sheets"}],
+                },
             },
         },
     )
@@ -676,6 +680,8 @@ def test_map_says_where_a_tasks_text_is_in_his_material(workspace: Workspace) ->
         {"path": "material/problem-sheets.md", "locator": "Sheet 4"}
     ]
     assert "where" not in tasks["essay"]
+    # A ref may name a whole source (its locator is optional): no place to show.
+    assert "where" not in tasks["whole-sheets"]
 
 
 def test_map_says_how_a_topic_not_yet_solid_was_best_answered(
