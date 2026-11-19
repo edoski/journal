@@ -44,7 +44,9 @@ export interface TopicAttempt {
  *  it (a topic's `refs`): the source's title and, when the record has one,
  *  the place in it ("Section 4.7"). */
 export interface TopicRef {
-	source: string;
+	/** The source by its own title; null when it names itself nowhere, and
+	 *  the row shows only the place in it (round 18, m23). */
+	source: string | null;
 	locator: string | null;
 }
 

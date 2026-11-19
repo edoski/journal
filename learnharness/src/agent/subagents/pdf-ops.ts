@@ -144,6 +144,32 @@ export async function pdfProbe(filePath: string): Promise<void> {
 	await readPdfFile(filePath, async () => {});
 }
 
+/** A PDF's front: the title its metadata gives (the Info dictionary's, else
+ *  its XMP `dc:title`), and its first page's text runs, each with its type
+ *  size, in reading order (round 18, m23: a book is named by its title, never
+ *  by its file's name). */
+export interface PdfFront {
+	title: string | null;
+	runs: { text: string; size: number }[];
+}
+
+export async function pdfFront(filePath: string): Promise<PdfFront> {
+	return readPdfFile(filePath, async (doc) => {
+		const meta = await doc.getMetadata().catch(() => null);
+		const info = (meta?.info ?? {}) as { Title?: unknown };
+		const xmp = meta?.metadata?.get("dc:title");
+		const title = [info.Title, xmp].find((t): t is string => typeof t === "string" && t.trim() !== "")?.trim() ?? null;
+		const page = await doc.getPage(1);
+		const content = await page.getTextContent();
+		const runs = (content.items as { str?: unknown; transform?: number[] }[]).flatMap((item) => {
+			const text = typeof item.str === "string" ? item.str.trim() : "";
+			const [, , c = 0, d = 0] = item.transform ?? [];
+			return text ? [{ text, size: Math.round(Math.hypot(c, d) * 10) / 10 }] : [];
+		});
+		return { title, runs };
+	});
+}
+
 /** pdf_info: page count + per-page triage signals. ALWAYS run first. */
 export async function pdfInfo(filePath: string): Promise<PdfInfo> {
 	const pdfjs = await loadPdfjs(); // OPS constant for the operator-list scan
