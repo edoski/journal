@@ -736,6 +736,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `A topic's title straight after a comma reads as a new sentence: ${quoted(b.excerpt)}. Open the sentence on it, or set it off in quotes ("Starting “${b.excerpt}” moves to …").`;
 		case "vague-moves":
 			return `Later moves said with nothing he can act on: ${quoted(b.excerpt)}. Name each move with its new day, or leave out the ones the close is not about.`;
+		case "split-display":
+			return `Two displays joined by a lone "${b.excerpt}" leave it alone on a line between them. Write short equations inline in the sentence ("$h(1,1) = (1,0,2)$ ${b.excerpt} $h(1,-1) = (3,2,0)$"), or set both in one display.`;
 		case "nothing-above":
 			return `No question or problem is open above him, so this points at nothing: ${quoted(b.excerpt)}. Leave it out.`;
 		case "undisputed":
@@ -1505,7 +1507,10 @@ export class VoiceGuard {
 	private judgeProblem(call: ToolCall): AgentToolResult<unknown> | null {
 		const statement = isRecord(call.arguments) && typeof call.arguments.statement === "string" ? call.arguments.statement : "";
 		const advice = problemAdvice(statement);
-		const breaks = this.held("question", advice.length > 0 ? [{ rule: "advice", excerpt: advice.join(" ") }] : []);
+		// A problem is read as a question is for how its maths is set (round
+		// 18, m18: "and" alone between two one-line displays).
+		const set = voiceBreaks(statement).filter((b) => b.rule === "vector" || b.rule === "split-display");
+		const breaks = this.held("question", [...(advice.length > 0 ? [{ rule: "advice" as const, excerpt: advice.join(" ") }] : []), ...set]);
 		if (breaks.length === 0) return null;
 		this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 		return refusal("question", call.name, statement, breaks, undefined);
