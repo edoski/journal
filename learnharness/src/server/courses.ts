@@ -229,12 +229,30 @@ export async function renameCourse(workspace: string, title: string): Promise<Co
 export async function deleteCourse(workspace: string): Promise<CourseChange> {
 	const found = await listedCourse(workspace);
 	if (!found.ok) return found;
+	await keepTopicTitles(workspace);
 	const forgotten = await stores.courseRecords.run(workspace, { verb: "forget-course" });
 	if (!forgotten.ok) return engineFailure("delete", forgotten.message);
 	stores.courseMapLedgers.forget(workspace);
 	stores.arcPassLedgers.forget(workspace);
 	emit("courses-changed", { deleted: workspace });
 	return { ok: true };
+}
+
+/** Before a course's record goes, each of its sessions keeps the titles
+ *  of the topics it studied, so search still finds it by them (round 18,
+ *  m24: after Calculus I was deleted, "chain rule" found none of its
+ *  reviews). A map that cannot be read keeps nothing. */
+async function keepTopicTitles(workspace: string): Promise<void> {
+	const chats = stores.chatStore.listChats().filter((chat) => chat.course?.workspace === workspace);
+	if (chats.length === 0) return;
+	const map = await stores.courseRecords.map(workspace);
+	if (!map.ok) return;
+	const titles = new Map<string, string>(map.map.topics.map((t) => [t.handle, t.title]));
+	for (const chat of chats) {
+		const handles = [...new Set([...(chat.topics ?? []), ...Object.keys(chat.answeredOn ?? {})])];
+		const kept: Record<string, string> = Object.fromEntries(handles.flatMap((h): [string, string][] => (titles.has(h) ? [[h, titles.get(h)!]] : [])));
+		if (Object.keys(kept).length > 0) stores.chatStore.saveTopicTitles(chat.id, kept);
+	}
 }
 
 /** The words for a lesson whose course was deleted: the lesson shows them

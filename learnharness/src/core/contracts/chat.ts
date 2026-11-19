@@ -83,6 +83,10 @@ export interface ChatRecord {
 	 *  resumed tutor could save it again). Keyed as the marks key an
 	 *  answer: a graded question's call, or his message's id. */
 	answerSaves?: AnswerSaves;
+	/** Its topics' titles, by handle, kept when its course is deleted, so
+	 *  search still finds it by the topics it practised once no live map
+	 *  names them (round 18, m24). */
+	topicTitles?: Readonly<Record<string, string>>;
 	/** SCHEMA STAMP (schema-versioning wave, owner 2026-10-10): LAZY v1 —
 	 *  existing records stay unstamped (absence reads as v1); every write
 	 *  stamps the current version. A record stamped NEWER than this build
@@ -546,6 +550,8 @@ export interface ChatSummary {
 	 *  a review he left today keeps Home's line for the topics it did not
 	 *  answer today (round 17, M4). Absent with no saved answer. */
 	answeredOn?: Readonly<Record<string, string>>;
+	/** Its topics' titles kept when its course was deleted (`ChatRecord.topicTitles`). */
+	topicTitles?: Readonly<Record<string, string>>;
 }
 
 /** The sidebar's session row: a summary + live liveness. The chats list

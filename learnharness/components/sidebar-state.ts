@@ -70,7 +70,8 @@ export function rankByTitle<T>(items: readonly T[], query: string, title: (item:
  *  "chain rule" found no session). */
 export function filterSessions(list: ChatListItem[], query: string, topicTitle: (chat: ChatListItem, handle: string) => string | undefined = () => undefined): ChatListItem[] {
 	if (!query.trim()) return [...list];
-	const names = (c: ChatListItem) => [c.title, ...Object.keys(c.answeredOn ?? {}).flatMap((h) => topicTitle(c, h) ?? [])];
+	// A deleted course's session reads the titles it kept (round 18, m24).
+	const names = (c: ChatListItem) => [c.title, ...[...new Set([...Object.keys(c.answeredOn ?? {}), ...Object.keys(c.topicTitles ?? {})])].flatMap((h) => topicTitle(c, h) ?? c.topicTitles?.[h] ?? [])];
 	return list
 		.map((item) => ({ item, score: Math.max(...names(item).map((name) => titleScore(name, query))) }))
 		.filter((r) => r.score > 0)
