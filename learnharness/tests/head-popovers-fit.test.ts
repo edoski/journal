@@ -155,3 +155,33 @@ describe("the exam eve at the new world's size (round 17, M3)", () => {
 		assert.ok(pick.order.every((line, i) => i === 0 || line >= pick.order[i - 1]!), `the pick's words read in order, line by line, never in columns: ${pick.order.join(" ")}`);
 	});
 });
+
+/**
+ * Round 18, m9 (1 n7, `41`, `75`): when the 17 Nov head wrapped, "Studied
+ * 10 Nov" went to a line of its own with the facts' divider still in front
+ * of it. The facts are apart by the line's gap, never a divider, so a fact
+ * that wraps starts on the line's left edge.
+ */
+describe("the head's facts when they wrap (round 18, m9)", () => {
+	it("puts Studied on its own line at the line's left edge, with no divider before it", async () => {
+		const page = await shell.open("browser", { sidebar: "open", search: "&case=eve" });
+		await page.waitForSelector('[data-slot="course-studied"]');
+		const m = await page.evaluate(() => {
+			// The head's lines' left edge, where every line starts.
+			const lineLeft = document.querySelector('[data-slot="page-lines"]')!.getBoundingClientRect().left;
+			const clip = document.querySelector('[data-slot="page-standing"]')!.getBoundingClientRect();
+			const ready = document.querySelector('[data-slot="course-ready-fact"]')!.getBoundingClientRect();
+			const studied = document.querySelector('[data-slot="course-studied"]')!;
+			const box = studied.getBoundingClientRect();
+			const before = getComputedStyle(studied, "::before");
+			const drawn = before.content !== "none" && before.content !== "normal" && parseFloat(before.width) > 0;
+			// A hairline placed inside the fact's flow is drawn; one placed left of the clip is cut away.
+			const shown = drawn && (before.position !== "absolute" || box.left + parseFloat(before.left) + parseFloat(before.width) > clip.left);
+			return { lineLeft, iconLeft: studied.querySelector("svg")!.getBoundingClientRect().left, wrapped: box.top >= ready.bottom - 0.5, divider: shown };
+		});
+		await page.close();
+		assert.ok(m.wrapped, "Studied wraps under the readiness line at 1512 px");
+		assert.equal(m.divider, false, "no divider drawn before a fact");
+		assert.ok(Math.abs(m.iconLeft - m.lineLeft) < 0.5, `Studied's mark starts on the line's left edge (${m.iconLeft} against ${m.lineLeft})`);
+	});
+});

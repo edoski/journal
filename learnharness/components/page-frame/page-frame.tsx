@@ -49,8 +49,11 @@ export function PageReading() {
 }
 
 /** A hairline between the facts of the standing line, 12px tall, 12px
- *  clear on each side. */
-const BETWEEN_FACTS = "*:not-first:before:ml-3 *:not-first:before:mr-1.5 *:not-first:before:h-3 *:not-first:before:w-px *:not-first:before:bg-border *:not-first:before:content-['']";
+ *  clear on each side, drawn in the gap before each fact: the facts sit a
+ *  gap left of a clip, so the first fact on each line, wrapped or not, has
+ *  its hairline cut away and starts on the line's left edge (round 18, m9:
+ *  "Studied 10 Nov" wrapped to its own line with the hairline in front). */
+const BETWEEN_FACTS = "-ml-6 *:relative *:ml-6 *:before:absolute *:before:top-1/2 *:before:-left-3 *:before:h-3 *:before:w-px *:before:-translate-y-1/2 *:before:bg-border *:before:content-['']";
 
 /**
  * The page's head, every line on the column's one left edge, in the order
@@ -59,7 +62,7 @@ const BETWEEN_FACTS = "*:not-first:before:ml-3 *:not-first:before:mr-1.5 *:not-f
  * 20/500 with the page's actions at its right end, then the lines under
  * it: what to do next (`lead`, 14/500 in full ink), the standing line (a
  * 16px mark and a few words per fact, muted, a thin divider between
- * facts), then any more (`children`: a mistake, an error). The head's
+ * facts on one line), then any more (`children`: a mistake, an error). The head's
  * first row stands on the band's centre line: the title, or the line
  * above it when a page has one, a 32px row so it centres there (Edo,
  * 16 Nov 2026: the course page's title should align with the open button,
@@ -115,8 +118,9 @@ export function PageHead({
 					</div>
 				)}
 				{standing && (
-					<div data-slot="page-standing" className={cn("flex min-h-5 min-w-0 flex-wrap items-center gap-y-1 text-body text-muted-foreground tabular-nums", BETWEEN_FACTS)}>
-						{standing}
+					// The clip, with 2px of room on every side for a fact's focus ring.
+					<div data-slot="page-standing" className="-m-0.5 min-w-0 overflow-hidden p-0.5">
+						<div className={cn("flex min-h-5 min-w-0 flex-wrap items-center gap-y-1 text-body text-muted-foreground tabular-nums", BETWEEN_FACTS)}>{standing}</div>
 					</div>
 				)}
 				{children}
