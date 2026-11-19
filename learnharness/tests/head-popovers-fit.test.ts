@@ -141,9 +141,16 @@ describe("the exam eve at the new world's size (round 17, M3)", () => {
 		const why = await page.evaluate(() => document.querySelector('[data-slot="exam-gaps-why"]')?.textContent ?? "");
 		assert.ok(why.split(/\s+/).length <= 30, `the why is short: "${why}"`);
 		assert.doesNotMatch(why, /Variance|Martingales|Geometric/, "it lists no topic");
-		await page.click('[data-slot="exam-gaps-which-press"]');
-		const which = await page.evaluate(() => document.querySelector('[data-slot="exam-gaps-which"]')?.textContent ?? "");
-		assert.match(which, /Geometric distribution.*Variance of sums/, "Which topics names them all");
+		// Round 18, m7 (1 n5): Which topics repeated the head's line word for word. The head's line names every topic
+		// with no room here, so the answer has nothing behind Which topics and says no sentence of the line.
+		const answer = await page.evaluate(() => ({
+			head: document.querySelector('[data-slot="course-ready-fact"]')?.textContent ?? "",
+			popover: document.querySelector('[data-slot="course-ready-detail"]')?.textContent ?? "",
+			whichPress: document.querySelector('[data-slot="exam-gaps-which-press"]') !== null,
+		}));
+		assert.equal(answer.whichPress, false, "no Which topics with nothing the head's line does not say");
+		assert.ok(!answer.popover.includes(answer.head), "no sentence of the head's line in its answer");
+		assert.doesNotMatch(answer.popover, /\bOne starts\b|\bsome start\b/i, "no topic left unnamed");
 		await page.close();
 		assert.ok(pick.order.every((line, i) => i === 0 || line >= pick.order[i - 1]!), `the pick's words read in order, line by line, never in columns: ${pick.order.join(" ")}`);
 	});

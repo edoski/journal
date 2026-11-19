@@ -6,17 +6,33 @@ import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MathText } from "@/components/ui/math-text";
-import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords, finalReviewGapWords, pressWord } from "@/components/study-words";
-import { misfitWords } from "@/components/calendar/calendar-facts";
+import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords, finalReviewMissWords, pressWord } from "@/components/study-words";
 import { examGapAskCreation, topicPress } from "@/components/unit-inbox/start-unit";
 import { useStartScope } from "@/components/start/start-scope";
-import { examGaps } from "@/components/course-page/course-head/head-facts";
+import { examGaps, type ExamGaps } from "@/components/course-page/course-head/head-facts";
 import { continueHref } from "@/components/nav/session-state";
 
 /** A way in, as a link in the line: its words start on the body's left
  *  edge and wrap inside the popover (round 15, 1 m7: the first ran past
  *  the popover's edge, 8px right of the line above it). */
 const PRESS = "h-auto min-h-6 min-w-0 shrink justify-start px-0 has-[>svg]:px-0 text-left whitespace-normal text-body text-link hover:text-link";
+
+/**
+ * What Which topics lists: only the topics left out that neither the
+ * head's line nor the why names (round 18, m7: on 8 Nov it repeated the
+ * head's "No room before the exam to start Martingales and Variance…" word
+ * for word, then the why's late topic). The head's line names the topics
+ * with no room to start, or with none the taught topics the final review
+ * leaves out (`examReady`); the why names a topic that starts too late.
+ * What is left is the final review's, in its own words ("No room in the
+ * final review from 14 Nov for Binomial"). Empty with nothing more. Pure.
+ */
+export function examGapWhich(course: StudyCourse, gaps: ExamGaps): string[] {
+	const { exam } = course.map;
+	if (gaps.start.length === 0 || !exam) return [];
+	const rest = gaps.review.filter((t) => exam.reasons?.[t.handle] !== "too_late").map((t) => t.title);
+	return rest.length > 0 ? [finalReviewMissWords(rest, exam, course.map.today)] : [];
+}
 
 /**
  * Under the head's first line, when the exam's plan leaves topics out
@@ -41,10 +57,10 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 	const { workspace } = course.map;
 	const titles = (topics: readonly CourseMapTopic[]) => topics.map((t) => t.title);
 	const reasoned = (topics: readonly CourseMapTopic[]) => topics.map((t) => ({ title: t.title, reason: course.map.exam?.reasons?.[t.handle] }));
-	// The one consequence, naming no topic; the topics themselves are behind Which topics (round 17, m6: a
-	// 90-word paragraph listing 11 topics on the exam eve).
+	// The one consequence, naming no topic but one that starts too late; the rest are behind Which topics (round 17,
+	// m6: a 90-word paragraph listing 11 topics on the exam eve).
 	const why = examGapWhyWords(reasoned(gaps.start), reasoned(gaps.review), false);
-	const which = [...(misfitWords(titles(gaps.start)) ? [misfitWords(titles(gaps.start))!] : []), ...finalReviewGapWords(reasoned(gaps.review))];
+	const which = examGapWhich(course, gaps);
 	const { ways } = gaps;
 	const named = [...gaps.start, ...gaps.review];
 	const press = (topic: CourseMapTopic) => topicPress(topic, course.map, chats);
@@ -69,12 +85,12 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 					<MathText>{why}</MathText>
 				</span>
 			)}
-			{why && (
+			{why && which.length > 0 && (
 				<Button variant="quiet" size="xs" data-slot="exam-gaps-which-press" aria-expanded={listed} className={PRESS} onClick={() => setListed((open) => !open)}>
 					{EXAM_GAP_WORDS.which}
 				</Button>
 			)}
-			{listed && (
+			{listed && which.length > 0 && (
 				<span data-slot="exam-gaps-which" className="flex w-full flex-col gap-1 text-foreground">
 					{which.map((line) => (
 						<span key={line}>
