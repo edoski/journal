@@ -78,8 +78,10 @@ describe("the folded rail in the Mac app", () => {
 });
 
 /** Folds or unfolds with the sidebar's own button and samples every frame
- *  of the next 300ms: what the sidebar mounts and drops, what animates in
- *  it, where the rail's Home icon and the page's left edge stand. */
+ *  for at least 300ms and until the sidebar has switched state and every
+ *  transition has ended: what the sidebar mounts and drops, what animates in
+ *  it, where the rail's Home icon and the page's left edge stand. A fixed
+ *  300ms let CI's slow runner stop mid-slide (x 59.7 for 48, 19 Nov 2026). */
 const press = (page: Page, button: "Close sidebar" | "Open sidebar") =>
 	page.evaluate(async (label: string) => {
 		const aside = document.querySelector('[data-testid="sidebar"]')!;
@@ -92,6 +94,7 @@ const press = (page: Page, button: "Close sidebar" | "Open sidebar") =>
 		const panelHome: number[] = [];
 		const edges: number[] = [];
 		const animated = new Set<string>();
+		const from = aside.getAttribute("data-state");
 		const t0 = performance.now();
 		document.querySelector<HTMLElement>(`button[aria-label="${label}"]`)!.click();
 		await new Promise<void>((done) => {
@@ -105,7 +108,8 @@ const press = (page: Page, button: "Close sidebar" | "Open sidebar") =>
 					edges.push(Math.round(panel.getBoundingClientRect().right));
 				}
 				for (const a of document.getAnimations()) if (a instanceof CSSTransition && aside.contains((a.effect as KeyframeEffect).target)) animated.add(a.transitionProperty);
-				if (t - t0 < 300) requestAnimationFrame(frame);
+				const sliding = document.getAnimations().some((a) => a instanceof CSSTransition && a.playState === "running");
+				if (t - t0 < 300 || (t - t0 < 3000 && (aside.getAttribute("data-state") === from || sliding))) requestAnimationFrame(frame);
 				else done();
 			};
 			requestAnimationFrame(frame);
