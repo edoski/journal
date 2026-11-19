@@ -67,6 +67,8 @@ describe("the half-answer close's words (round 18, m15)", () => {
 		const titles = ["Invertible matrices", "Homomorphisms", "Kernel and rank-nullity"];
 		assert.equal(titleAfterComma("Invertible matrices, Homomorphisms and Kernel and rank-nullity come back tomorrow too.", titles), null);
 		assert.equal(titleAfterComma("Homomorphisms comes back on Wednesday.", titles), null);
+		// A day's items as the close is told them (`day_items`: "<title> review", "<title> starts").
+		assert.equal(titleAfterComma("Tomorrow: Kernel and rank-nullity review, Homomorphisms review, Invertible matrices starts.", titles), null);
 		assert.equal(titleAfterComma("Since this lesson is open, Homomorphisms waits.", titles), "Homomorphisms");
 	});
 

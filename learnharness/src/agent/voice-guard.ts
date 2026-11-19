@@ -862,8 +862,9 @@ function titlesIn(result: AgentToolResult<unknown>): string[] {
 /** A topic title set straight after a comma, where its capital reads as a
  *  new sentence ("Because that lesson is unfinished, Any matrix represents
  *  a linear map moved…", round 18, m15). A title after another title, in
- *  a list, reads as one; so does one set off in quotes or opening a
- *  sentence. The title, or null. */
+ *  a list, reads as one, a day's item too ("Homomorphisms review, Kernel
+ *  and rank-nullity review", as `day_items` words them); so does one set
+ *  off in quotes or opening a sentence. The title, or null. */
 export function titleAfterComma(text: string, titles: readonly string[]): string | null {
 	const capital = [...new Set(titles)].filter((t) => /^[A-Z]/.test(t)).sort((a, b) => b.length - a.length);
 	for (const title of capital) {
@@ -872,7 +873,7 @@ export function titleAfterComma(text: string, titles: readonly string[]): string
 			from = at + title.length;
 			const before = text.slice(0, at);
 			if (!/[,;]\s+$/.test(before)) continue;
-			const clause = before.replace(/[,;]\s+$/, "");
+			const clause = before.replace(/[,;]\s+$/, "").replace(/ (?:review|starts|lesson continues)$/, "");
 			if (capital.some((other) => clause.endsWith(other))) continue;
 			return title;
 		}
