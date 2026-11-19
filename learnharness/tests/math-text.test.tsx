@@ -17,7 +17,7 @@ describe("MathText", () => {
 			assert.match(html, /class="katex"/, label);
 			assert.doesNotMatch(html, /katex-display/, `${label} stays inline`);
 		}
-		assert.match(renderToStaticMarkup(<MathText>{"$\\sigma$-algebras"}</MathText>), /<\/span>-algebras<\/span>$/, "the words follow the formula");
+		assert.match(renderToStaticMarkup(<MathText>{"$\\sigma$-algebras"}</MathText>), /<\/span>-algebras<\/span><\/span>$/, "the words follow the formula");
 	});
 
 	it("leaves a label with no formula as plain text, money included", () => {
@@ -44,8 +44,8 @@ describe("MathText", () => {
 		const html = renderToStaticMarkup(<MathText>{"Nondeterministic finite automata (NFA) with $\\varepsilon$-moves"}</MathText>);
 		const word = html.match(/<span data-slot="math-word" class="whitespace-nowrap">(.*?)<\/span>-moves<\/span>/);
 		assert.ok(word, "ε and -moves share one unbreakable word");
-		assert.match(html, /^Nondeterministic finite automata \(NFA\) with <span data-slot="math-word"/, "the words before it still wrap");
-		assert.match(renderToStaticMarkup(<MathText>{"Kernel of $A$, then rank"}</MathText>), /<span data-slot="math-word" class="whitespace-nowrap"><span data-slot="math-text".*?<\/span>,<\/span> then rank$/);
+		assert.match(html, /^<span data-slot="math-run">Nondeterministic finite automata \(NFA\) with <span data-slot="math-word"/, "the words before it still wrap, in the label's one run of text (round 17, M3)");
+		assert.match(renderToStaticMarkup(<MathText>{"Kernel of $A$, then rank"}</MathText>), /<span data-slot="math-word" class="whitespace-nowrap"><span data-slot="math-text".*?<\/span>,<\/span> then rank<\/span>$/);
 	});
 
 	it("keeps a lone symbol and its hyphenated word together in plain titles", () => {

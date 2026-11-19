@@ -88,6 +88,21 @@ function sumAtTop(tex: string): boolean {
  *  "k!", "x_1", "\sqrt{x}"). */
 const ATOM = /^(?:-?[0-9.]+|[A-Za-z]|\\[A-Za-z]+(?:\{[^{}]*\})*)(?:[!']|[_^](?:\{[^{}]*\}|[A-Za-z0-9]))*$/;
 
+/** A denominator its own brackets already hold whole: a bracketed group,
+ *  or a function applied to one ("P(X=k-1)", "f(x)", "\\sin(x)"), whose
+ *  bracket closes at its end. Bracketed again it read as a stray bracket
+ *  (round 18, m18: "P(X=k)/(P(X=k−1))"). */
+function bracketed(tex: string): boolean {
+	const open = /^(?:[A-Za-z]|\\[A-Za-z]+)?\(/.exec(tex);
+	if (!open) return false;
+	let depth = 0;
+	for (let i = open[0].length - 1; i < tex.length; i++) {
+		if (tex[i] === "(") depth++;
+		else if (tex[i] === ")" && --depth === 0) return i === tex.length - 1;
+	}
+	return false;
+}
+
 /** The commands that join or space terms rather than stand as one: a slash
  *  beside them reads one way. Any other command (`\binom`, `\lambda`,
  *  `\sqrt`, `\left`) is a factor. */
@@ -131,7 +146,7 @@ function slashFractions(body: string): string {
 		}
 		const n = slashFractions(top.arg).trim();
 		const d = slashFractions(bottom.arg).trim();
-		const slash = `${sumAtTop(n) || n.includes("/") ? `(${n})` : n}/${ATOM.test(d) ? d : `(${d})`}`;
+		const slash = `${sumAtTop(n) || n.includes("/") ? `(${n})` : n}/${ATOM.test(d) || bracketed(d) ? d : `(${d})`}`;
 		out += besideFactor(out, body.slice(bottom.end)) ? `(${slash})` : slash;
 		i = bottom.end;
 	}

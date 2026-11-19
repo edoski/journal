@@ -25,7 +25,7 @@ describe("the close knows he left a half answer (round 16, m13)", () => {
 	it("the tutor reads that a half answer was kept, never its words", () => {
 		const read = readOf("e1 = ((1,1) + (1,-1))/2 so T(e1) = (1,2), and T(e2) =");
 		assert.match(read, /"draftKept"/);
-		assert.match(read, /his half answer waiting for him there/);
+		assert.match(read, /his half answer, waiting in this session by its name/);
 		assert.doesNotMatch(read, /T\(e1\) = \(1,2\)/);
 	});
 
@@ -34,7 +34,7 @@ describe("the close knows he left a half answer (round 16, m13)", () => {
 	});
 
 	it("every close is told to name it as waiting", () => {
-		for (const agent of ["prober", "teacher"] as const) assert.match(DONE_TONIGHT_TEXT[agent], /a question he left a half answer on \(`draftKept`\) is his half answer waiting for him there/);
+		for (const agent of ["prober", "teacher"] as const) assert.match(DONE_TONIGHT_TEXT[agent], /a question he left a half answer on \(`draftKept`\) is his half answer, waiting in this session by its name/);
 	});
 
 	it("the recorded close is refused, and the one it asks for passes", () => {

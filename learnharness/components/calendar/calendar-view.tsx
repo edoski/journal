@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCalendarController, type CalendarController, type DayHeaderInfo, type EventInput } from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/react/daygrid";
 import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, MoonIcon, XIcon } from "lucide-react";
@@ -110,8 +110,10 @@ function MoreLabel({ hidden, entries }: { hidden: number; entries: readonly Cale
 }
 
 /** A week's day head: the weekday, the date (today's filled), and the
- *  Journal's study time for that day, or Day off. */
-function DayHead({ info, schedule }: { info: DayHeaderInfo; schedule: ReadonlyMap<string, ScheduledDay> }) {
+ *  Journal's study time for that day, or Day off. A day too narrow for its
+ *  hours wraps them between study windows, each whole, never cut (round
+ *  17, m26: every day read "Study 9:00 to 13:00, 14:00"). */
+export function DayHead({ info, schedule }: { info: DayHeaderInfo; schedule: ReadonlyMap<string, ScheduledDay> }) {
 	const day = schedule.get(isoDay(info.date));
 	const words = studyTimeWords(day);
 	return (
@@ -128,9 +130,16 @@ function DayHead({ info, schedule }: { info: DayHeaderInfo; schedule: ReadonlyMa
 				</span>
 			</div>
 			{words && (
-				<span className="flex min-w-0 items-center gap-1 text-callout text-muted-foreground">
-					{day?.off || day?.journalOff ? <MoonIcon aria-hidden className="size-3.5 shrink-0" /> : <ClockIcon aria-hidden className="size-3.5 shrink-0" />}
-					<span className="truncate">{words}</span>
+				<span data-slot="calendar-day-hours" className="flex max-w-full min-w-0 items-start gap-1 text-callout text-muted-foreground">
+					{day?.off || day?.journalOff ? <MoonIcon aria-hidden className="mt-[0.5px] size-3.5 shrink-0" /> : <ClockIcon aria-hidden className="mt-[0.5px] size-3.5 shrink-0" />}
+					<span className="min-w-0 whitespace-normal">
+						{words.split(", ").map((part, i, all) => (
+							<Fragment key={i}>
+								<span className="whitespace-nowrap">{i < all.length - 1 ? `${part},` : part}</span>
+								{i < all.length - 1 && " "}
+							</Fragment>
+						))}
+					</span>
 				</span>
 			)}
 		</div>

@@ -11,7 +11,7 @@
  */
 
 import type { z } from "zod";
-import { AppearanceSettingsSchema, ClaudeSettingsSchema } from "../core/settings.ts";
+import { AppearanceSettingsSchema, ClaudeSettingsSchema, NotificationSettingsSchema } from "../core/settings.ts";
 
 /** Parsed-or-rejected — `ok: false` carries the 400's error message. */
 export type SettingsBodyResult<T> =
@@ -30,6 +30,7 @@ const FIELD_ERRORS: Record<string, string> = {
 	"mdRendering.boldColor": "mdRendering.boldColor must be a #hex color or null",
 	"mdRendering.italicColor": "mdRendering.italicColor must be a #hex color or null",
 	account: "account must be a Claude account id",
+	enabled: "enabled must be a boolean",
 };
 
 function bodyParser<T>(schema: z.ZodType<T>) {
@@ -45,4 +46,5 @@ function bodyParser<T>(schema: z.ZodType<T>) {
 export const SETTINGS_SECTIONS = {
 	appearance: bodyParser(AppearanceSettingsSchema),
 	claude: bodyParser(ClaudeSettingsSchema),
+	notifications: bodyParser(NotificationSettingsSchema),
 } as const;

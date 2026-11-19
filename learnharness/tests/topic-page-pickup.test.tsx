@@ -254,7 +254,7 @@ describe("a topic not started", () => {
 		const row = page(facts).querySelector('[data-slot="pickup-builds-on"]')!;
 		const title = row.querySelector('[data-slot="pickup-builds-on-title"]')!;
 		assert.doesNotMatch(title.className, /\btruncate\b/, "the title is never cut to one line");
-		assert.match(title.className, /\bline-clamp-2\b/, "two lines at most");
+		assert.match(title.className, /\bline-clamp-3\b/, "three lines at most, as the sidebar's (round 17, m26)");
 		assert.doesNotMatch(row.className, /(?:^|\s)h-10(?:\s|$)/, "a fixed 40px row would clip the second line");
 		assert.match(row.className, /\bmin-h-10\b/, "one line keeps the history's 40px row");
 	});

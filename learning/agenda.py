@@ -271,6 +271,14 @@ class _Course:
     """The lessons he has begun on topics not yet taught, each with the last
     day he worked on it (``_lessons``): each goes on on the next study day
     (``_continued``)."""
+    unsettled: set[str] = field(default_factory=set)
+    """The topics whose review today stands on a right answer a hint or his
+    guess kept from solid, with no answer after it yet
+    (``progress.Replay.unsettled``): the review's next question settles it,
+    so until one comes the plan holds it as a review still to come today,
+    planned to come out solid (round 18, M4: a hinted right Random
+    variables answer moved Expectation, planned that day, a week, and Home
+    dropped it before any answer settled the hint)."""
 
     soonest: str | None = field(default=None, init=False)
     """The earliest review day on record, read again after a review moves
@@ -637,7 +645,7 @@ class _Course:
         questions, where nothing can show it solid, taught on an earlier day."""
         if not self.asks:
             return self.levels[need]["level"] != "new" and need not in self.fresh
-        return solid(self.levels[need])
+        return solid(self.levels[need]) or need in self.unsettled
 
     def ready(self, topic: str) -> bool:
         """Its prerequisites are met, and no competing method is half-learned
@@ -646,7 +654,9 @@ class _Course:
         return all(self.met(need) for need in needs) and not (
             self.asks
             and any(
-                self.levels[other]["level"] != "new" and not solid(self.levels[other])
+                self.levels[other]["level"] != "new"
+                and not solid(self.levels[other])
+                and other not in self.unsettled
                 for other in self.partners[topic]
             )
         )
@@ -1635,7 +1645,11 @@ def structure(record: dict[str, Any]) -> dict[str, str]:
     tutor set; under ``""`` its exam, path and preferences. His answers,
     starts and lessons are dated and replayed (``as_of``), and a topic's
     words move nothing."""
-    exam = {k: v for k, v in record.get("exam", {}).items() if k != "final_review"}
+    exam = {
+        k: v
+        for k, v in record.get("exam", {}).items()
+        if k not in ("final_review", "past")
+    }
     path = {k: v for k, v in record.get("path", {}).items() if k != "current"}
     found = {
         "": json.dumps(
@@ -1721,11 +1735,17 @@ def replay(
     (round 11: a day whose plan was all done moved 36 dates overnight, and
     the pages called it unfinished). An unfinished day that also showed
     where he stops (``capacity.Done``'s ``reviews_short`` or ``new_short``),
-    or a day he studies gone by with no study, is his own study moving the
-    days, so the next begins with a plan made afresh from the record as it
-    began, which spreads what he left within his limit. So the replay
-    reaches back through the days he finished, to the day after one he did
-    not.
+    and lowered the new topics he starts on a weekday, or the weekdays he
+    studies (``_moved_week``), or a day he studies gone by with no study, is
+    his own study moving the days, so the next begins with a plan made
+    afresh from the record as it began, which spreads what he left within
+    his limit. An unfinished day that moved neither moves only what it left,
+    into the room the days he was told leave, as a finished day's night does
+    (round 17, 1 M2: a day that left one start and a review was planned
+    afresh, and two exam topics that had fitted fell after the exam with no
+    new answer). So the replay reaches back through the days he finished,
+    and the days that left work without lowering his week, to the day after
+    one that did.
 
     ``week`` is his week on every day the plan is made; by default, what the
     records showed as each day began (``capacity.of``). Today's allowance is
@@ -1804,7 +1824,8 @@ def _day(
         for name in live
     }
     done = capacity.activity(morning.values(), day).get(studied, capacity.Done())
-    if any(left.values()) and (done.reviews_short or done.new_short):
+    short = any(left.values()) and (done.reviews_short or done.new_short)
+    if short and _moved_week(morning, studied, day, weekly, week):
         return replace(
             _afresh(
                 records,
@@ -1847,6 +1868,43 @@ def _day(
         left,
         finals,
         before,
+    )
+
+
+def _moved_week(
+    morning: Mapping[str, dict[str, Any]],
+    studied: date,
+    day: date,
+    weekly: Capacity,
+    week: Capacity | None,
+) -> bool:
+    """Whether the day he studied last showed he starts fewer new topics on
+    some weekday (a lower limit, or a limit where he had shown none), or
+    studies on fewer weekdays, than the week that day began with: only then
+    can the days he was told hold more starts than his week gives, so the
+    next day is planned afresh (``replay``). A lower review limit moves only
+    the reviews he left, which take the room the days he was told leave; a
+    higher limit leaves room past them.
+
+    Both weeks are read from the record as ``day`` began (``morning``), the
+    week that day began with from the days before it: each morning reads
+    the days gone with the final reviews his pace gives that morning
+    (``capacity.final_reviews``), so a week read as the day he studied began
+    differs from this morning's by a final review that moved a day, and the
+    exam pace it re-reads every day gone by, not by anything he did (round
+    18: he did all of 9 Nov but one review, the final reviews started a day
+    later, 30 Oct and 1 Nov read as days he stopped short of a start, and the
+    night planned afresh, moving 53 dates)."""
+    if week is not None:
+        return False
+    records = list(morning.values())
+    read = capacity.activity(records, day)
+    began = capacity.estimate(
+        capacity.began(read, studied), studied, capacity.exam_days(records)
+    )
+    return not weekly.study_weekdays >= began.study_weekdays or any(
+        now.new.value < then.new.value or (now.new.shown and not then.new.shown)
+        for now, then in zip(weekly.weekdays, began.weekdays, strict=True)
     )
 
 
@@ -2062,6 +2120,14 @@ def _planned(
         for name, record in records.items()
         if not capacity.gone(record)
     ]
+    for course in courses:
+        course.unsettled = {
+            key
+            for key, replayed in course.replayed.items()
+            if replayed.verdicts
+            and replayed.verdicts[-1][0] == today.isoformat()
+            and today.isoformat() in replayed.unsettled
+        }
     if told is not None:
         for course in courses:
             course.moving = set(told.touched.get(course.name, ()))

@@ -330,9 +330,10 @@ describe("when a topic comes up", () => {
 		const variance = examOf(topic("variance", { starts: "2026-12-13", startsAfter: ["Linear Algebra"], startsWhy: { kind: "after", needs: [h("expectation")], partners: [] } }));
 		assert.equal(variance.startsWhy?.words, "Not before the exam, what it needs won’t be solid in time");
 		assert.equal(variance.starts?.waits, null, "the exam is why, not another course");
-		assert.equal(examOf(topic("poisson", { starts: "2026-11-18", startsWhy: { kind: "next" } })).startsWhy?.words, "No room in the final review, it starts too close to the exam");
+		// Round 17, 3 m4: "No room in the final review…" beside "Planned Wed 18 Nov" read as a contradiction.
+		assert.equal(examOf(topic("poisson", { starts: "2026-11-18", startsWhy: { kind: "next" } })).startsWhy?.words, "Too close to the exam for a review before it");
 		const bayes = topic("bayes", { level: "independent", introduced: "2026-10-01", review: { kind: "scheduled", date: "2026-12-15", held: { exam: null, since: "2026-11-11" } } });
-		assert.equal(examOf(bayes).waits, "No room in the final review at your pace");
+		assert.equal(examOf(bayes).waits, "Not revisited in the final review, full at your pace");
 	});
 
 	it("still says the exam leaves out a topic he started, beside the lesson he left (demo world, 17 Nov: Simulation of continuous probabilities read only Left off today)", () => {
@@ -351,14 +352,14 @@ describe("when a topic comes up", () => {
 		const facts = topicFacts({ course: { ...COURSE, map: { ...COURSE.map, exam, topics: [...COURSE.map.topics, binomial] } }, topic: binomial, chats: [], read: null });
 		assert.ok(binomial.review?.kind === "scheduled" && binomial.review.date < exam.date, "its review comes before the exam");
 		assert.doesNotMatch(facts.waits ?? "", /No review before the exam/);
-		assert.equal(facts.waits, "No room in the final review at your pace");
+		assert.equal(facts.waits, "Not revisited in the final review, full at your pace");
 	});
 
 	it("names the final review's first day beside a review before it (round 11 integration: Binomial read Review today and No room in the final review)", () => {
 		const exam = { date: "2026-11-19", daysLeft: 11, finalReview: "2026-11-13", unreviewed: [h("binomial")], reasons: { binomial: "full" } as const };
 		const binomial = topic("binomial", { level: "assisted", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-11" } });
 		const facts = topicFacts({ course: { ...COURSE, map: { ...COURSE.map, exam, topics: [...COURSE.map.topics, binomial] } }, topic: binomial, chats: [], read: null });
-		assert.equal(facts.waits, "No room in the final review from 13 Nov at your pace");
+		assert.equal(facts.waits, "Not revisited in the final review from 13 Nov, full at your pace");
 	});
 
 	it("says from which told day a review or a start moved and what of his study moved it", () => {

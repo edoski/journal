@@ -55,7 +55,11 @@ export async function POST(req: Request) {
 	// (Ask the tutor), which shows as his message (round 13, 1 n8). It is
 	// opened on no topic: it belongs to those its work is on (round 16, M3).
 	const named = name !== null;
-	const chat = createChat(titleFromPrompt(name ?? (openingTitle(title, topics, !practice && !arcCheck) || "Untitled session")), course, named ? [] : topics, arcCheck, named);
+	// A title the app words (on topics, or named) is kept whole and cut only where it is drawn (round 17, m5:
+	// "Review Inclusion-exclusion principle, Conditional probability, Random…" was stored cut); his own first
+	// message is cut to a title's length.
+	const opened = name ?? (openingTitle(title, topics, !practice && !arcCheck) || "Untitled session");
+	const chat = createChat(named || topics.length > 0 ? opened : titleFromPrompt(opened), course, named ? [] : topics, arcCheck, named);
 	const opening: LhMessage[] = practice ? [newSessionModeMessage("practice") as LhMessage] : [];
 	if (resumed) {
 		// The lesson's plan carries over as this session's plan map, so the

@@ -653,6 +653,37 @@ def test_map_lists_a_tasks_topics_in_the_tasks_own_order(workspace: Workspace) -
     assert result["tasks"][0]["topics"] == ["rank", "basis", "kernel"]
 
 
+def test_map_says_where_a_tasks_text_is_in_his_material(workspace: Workspace) -> None:
+    """Round 18, M6: Continue on Problem sheet 4 showed the part's title at
+    once, but the part itself only after the tutor found and read the sheet
+    (64 to 80 s). The map names the file and place each ref points to, so
+    the view can show the sheet's text at once."""
+    records.save(
+        workspace,
+        {
+            "sources": {"sheets": {"path": "material/problem-sheets.md"}},
+            "tasks": {
+                "sheet-4": {
+                    "title": "Problem sheet 4",
+                    "refs": [{"source": "sheets", "locator": "Sheet 4"}],
+                },
+                "essay": {"title": "Essay"},
+                "whole-sheets": {
+                    "title": "All the sheets",
+                    "refs": [{"source": "sheets"}],
+                },
+            },
+        },
+    )
+    tasks = {task["key"]: task for task in retrieval.course_map(workspace)["tasks"]}
+    assert tasks["sheet-4"]["where"] == [
+        {"path": "material/problem-sheets.md", "locator": "Sheet 4"}
+    ]
+    assert "where" not in tasks["essay"]
+    # A ref may name a whole source (its locator is optional): no place to show.
+    assert "where" not in tasks["whole-sheets"]
+
+
 def test_map_says_how_a_topic_not_yet_solid_was_best_answered(
     workspace: Workspace,
 ) -> None:

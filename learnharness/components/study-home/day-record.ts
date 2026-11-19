@@ -1,5 +1,6 @@
 import { courseLabel, type ChatListItem, type StudyCourse } from "@/src/core";
 import { localDay } from "@/components/day-change";
+import { pastSessionWords } from "@/components/study-words";
 
 /**
  * What he studied today, from the session records (spec: today.md, "A day
@@ -59,6 +60,16 @@ export interface NearExam {
 	date: string;
 	/** Days from the engine's today: 0 is today. */
 	daysLeft: number;
+	/** The course's workspace, for Ask the tutor. */
+	workspace?: string;
+	/** The titles of the topics its plan has no room to start before the
+	 *  exam (the engine's `does_not_fit`), in the plan's order (round 17,
+	 *  M2). */
+	wontFit?: readonly string[];
+	/** Of `wontFit`, the topics that fell past the exam today: the plan
+	 *  gave each a start before the exam as yesterday ended (the engine's
+	 *  `moved`, `from`). */
+	fellToday?: readonly string[];
 }
 
 const WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "UTC" });
@@ -71,6 +82,48 @@ const ONE_WEEK = 7;
  *  two days away). Pure. */
 export function nearExam(exams: readonly NearExam[]): NearExam | null {
 	return [...exams].filter((e) => e.daysLeft >= 0 && e.daysLeft < ONE_WEEK).sort((a, b) => a.daysLeft - b.daysLeft)[0] ?? null;
+}
+
+/** Each course's exam ahead as Home names it, with the topics its plan has
+ *  no room to start before it and those of them that fell past it today:
+ *  the plan gave each a start before the exam as yesterday ended (the
+ *  engine's `moved`). Pure. */
+export function homeExams(courses: readonly StudyCourse[]): NearExam[] {
+	return courses.flatMap(({ map }) => {
+		if (!map.exam) return [];
+		const { date, daysLeft, doesNotFit = [] } = map.exam;
+		const misfits = doesNotFit.flatMap((h) => map.topics.find((t) => t.handle === h) ?? []);
+		const fell = misfits.filter((t) => t.moved !== undefined && t.moved.from < date);
+		return [{ course: map.title, date, daysLeft, workspace: map.workspace, wontFit: misfits.map((t) => t.title), fellToday: fell.map((t) => t.title) }];
+	});
+}
+
+/** Home's ask on an exam session gone by: the course, and the words that
+ *  say what moved the plan and ask how it went (`pastSessionWords`). */
+export interface SessionAsk {
+	workspace: string;
+	words: string;
+}
+
+/** Each course's exam session gone by with no word from him yet, which
+ *  Home asks about until he answers. Pure. */
+export function sessionAsks(courses: readonly StudyCourse[]): SessionAsk[] {
+	return courses.flatMap(({ map }) => {
+		const words = map.exam ? pastSessionWords(map.title, map.exam) : null;
+		return words ? [{ workspace: map.workspace, words }] : [];
+	});
+}
+
+/** The exam whose topics with no room before it Home names under its
+ *  heading: the coming week's (`nearExam`) while any does not fit, else on
+ *  the day a topic falls past an exam further off, the nearest such exam,
+ *  so he learns of it the day it happens, not in the exam's last week
+ *  (round 18, M1: three exam topics fell past the exam overnight on 9 Nov,
+ *  and Home said nothing until 17 Nov). Pure. */
+export function misfitExam(exams: readonly NearExam[]): NearExam | null {
+	const near = nearExam(exams);
+	if (near?.wontFit?.length) return near;
+	return [...exams].filter((e) => e.daysLeft >= 0 && (e.fellToday?.length ?? 0) > 0).sort((a, b) => a.daysLeft - b.daysLeft)[0] ?? null;
 }
 
 /** Whose exam, by its day: "today's Probability exam", "tomorrow's",

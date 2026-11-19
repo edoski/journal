@@ -141,8 +141,8 @@ export function leftOpen(output: unknown): LeftOpen | null {
 	return null;
 }
 
-/** The question call `toolCallId` asks again, in whatever words: the
- *  question just before it, when that one was left open (round 7: the
+/** The question call `toolCallId` asks again, in its words or reworded
+ *  (`asksAgain`): the question just before it, when that one was left open (round 7: the
  *  re-ask after a hint dropped "Say why." and lost his carried work). */
 export function reaskedFrom(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>, toolCallId: string): string | null {
 	let previous: QuestionPart | null = null;
@@ -179,14 +179,24 @@ function leftForToday(output: unknown): boolean {
 	return left?.dismissed === true && left.reason === "tonight";
 }
 
-/** Whether `next` asks `left` again, in whatever words: the same kind of
- *  question on the same plan step, of the same type unless its words are
- *  the same. A question of another form, step or type after a hint or a
- *  side question is a new one, and draws its words (round 14, 2 D1: a
- *  prediction posed on the step of the check he set aside to guess first
- *  showed only "Your turn, on the question above"). */
+/** Whether `next` asks `left` again: the same kind of question on the
+ *  same plan step, and the same question, in its words or, reworded, by
+ *  the answer it commits to (a check's `correctAnswer`). A question of
+ *  another form, step or type after a hint or a side question is a new
+ *  one, and so is another check on the same step: each draws its words
+ *  (round 14, 2 D1: a prediction posed on the step of the check he set
+ *  aside to guess first showed only "Your turn, on the question above";
+ *  round 17, M7: a new check after an Ask was hidden the same way, and
+ *  his answer to the check he saw was filed under it). */
 function asksAgain(left: QuestionPart, next: QuestionPart): boolean {
-	return questionKindOf(left) === questionKindOf(next) && sameStep(left, next) && (sameType(left, next) || sameQuestionWords(left, next));
+	return questionKindOf(left) === questionKindOf(next) && sameStep(left, next) && (sameQuestionWords(left, next) || (sameType(left, next) && sameCommittedAnswer(left, next)));
+}
+
+function sameCommittedAnswer(a: QuestionPart, b: QuestionPart): boolean {
+	const answer = (part: QuestionPart) => (part.input as { correctAnswer?: unknown } | undefined)?.correctAnswer;
+	const x = answer(a);
+	const y = answer(b);
+	return typeof x === "string" && typeof y === "string" && x.trim().length > 0 && sameQuestionKey(x) === sameQuestionKey(y);
 }
 
 function sameType(a: QuestionPart, b: QuestionPart): boolean {
@@ -229,7 +239,7 @@ export function leftOpenOf(messages: ReadonlyArray<{ parts: readonly QuestionPar
 }
 
 /** The question calls that ask again the question he just pressed Hint on
- *  or set aside to ask the tutor something, in whatever words (the same
+ *  or set aside to ask the tutor something, in its words or reworded (the same
  *  identity `reaskedFrom` and the carry read). The tutor asks it again after
  *  either (neither is an answer, so the question must come back open), and
  *  the transcript draws its words once, above the hint or his side

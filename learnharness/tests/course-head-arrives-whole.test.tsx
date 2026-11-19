@@ -122,7 +122,8 @@ function head() {
 	return { title: title.textContent, ready: ready?.getAttribute("data-kind") ? ready.textContent : null, mistakes: document.querySelector("[data-slot=course-mistakes]") !== null };
 }
 
-const WHOLE = { title: "Linear Algebra", ready: READY_FACT_WORDS.notYet, mistakes: true };
+// Not ready with every topic fitting says no readiness line (round 17, m7): the head is whole with Mistakes.
+const WHOLE = { title: "Linear Algebra", ready: null, mistakes: true };
 
 describe("the course head arrives whole", () => {
 	it("waits for its standing when the course is read first, then shows the readiness fact and Mistakes at once", async () => {

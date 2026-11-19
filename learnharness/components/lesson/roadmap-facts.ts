@@ -4,7 +4,7 @@
  * done, and where in the transcript each step was first taught. Pure.
  */
 
-import { derivePlanStatuses, POSITION_QUESTION_TOOLS, type DerivedPlanStatuses, type PlanNodeStatus, type PlanTree } from "@/src/core";
+import { derivePlanStatuses, POSITION_QUESTION_TOOLS, type DerivedPlanStatuses, type PlanNodeStatus, type PlanTree, type TaskSession } from "@/src/core";
 import { topoFor, type PopupMessage } from "@/components/lesson/plan-facts";
 
 export interface RoadmapStep {
@@ -52,8 +52,13 @@ export function lessonRoadmapSteps(tree: PlanTree, messages: Parameters<typeof d
 }
 
 /** The words beside the strip: the step he is on, else the next one,
- *  else that every step was taught. Null with no steps. */
-export function roadmapLabel(steps: readonly RoadmapStep[]): string | null {
+ *  else that every step was taught. Null with no steps. In a task he
+ *  picked up with Continue (round 18, m22), the task's part: the one he
+ *  picked it up at until the tutor plans it, and past the plan's last step
+ *  the part the session's save named next, while the task is open. */
+export function roadmapLabel(steps: readonly RoadmapStep[], task?: TaskSession | null): string | null {
+	if (task && steps.length === 0) return task.next ?? task.step ?? task.title;
+	if (task?.next && !task.closed && !steps.some((s) => s.status === "current" || s.next)) return `Next: ${task.next}`;
 	if (steps.length === 0) return null;
 	const current = steps.find((s) => s.status === "current");
 	if (current) return current.title;

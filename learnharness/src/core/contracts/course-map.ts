@@ -34,7 +34,20 @@ export interface ReviewHeld {
  *  today (`answered`), no study yesterday, or yesterday's plan left
  *  unfinished. */
 export type TopicMoved =
-	| { from: string; by: "study"; courses: readonly string[]; day: "today" | "yesterday"; waitsOn?: readonly string[] }
+	| {
+			from: string;
+			by: "study";
+			courses: readonly string[];
+			day: "today" | "yesterday";
+			/** The topics it waits on that his study today left not solid. */
+			waitsOn?: readonly string[];
+			/** Each of `waitsOn` was right on his own today and waits only
+			 *  for its check on another day. */
+			anotherDay?: boolean;
+			/** On a day brought forward: the topics it waited on that his
+			 *  answers today made solid. */
+			ready?: readonly string[];
+	  }
 	| { from: string; by: "answered" }
 	| { from: string; by: "missed" | "left"; on?: string };
 
@@ -137,6 +150,15 @@ export interface CourseMapTask {
 	 *  (round 9, 2 m8: rebuilt in path order, sheet 4 on rank, basis and
 	 *  kernel was placed under Basis). Read `taskTopics(task, map)`. */
 	topics?: readonly TopicHandle[];
+	/** Where its text is in his material, as the engine's map names each of
+	 *  its refs: the source's file, as the record keeps it (in the course's
+	 *  material folder), and the place in it (round 18, M6). */
+	where?: readonly TaskPlace[];
+}
+
+export interface TaskPlace {
+	path: string;
+	locator: string;
 }
 
 /** Why the engine's plan leaves a topic out before the exam
@@ -155,8 +177,15 @@ export const EXAM_GAP_REASONS: readonly ExamGapReason[] = ["no_study_day", "not_
  *  exam, the taught ones its final review has no room for, and why each
  *  of those is left out. */
 export interface CourseExam {
+	/** The session he aims at. */
 	date: string;
 	daysLeft: number;
+	/** Every day the exam is held, earliest first, `date` among them;
+	 *  absent for an exam held once. */
+	sessions?: readonly string[];
+	/** The session gone by that the plan moved on from, until he says how
+	 *  it went (the engine's `exam.past`). */
+	past?: string;
 	finalReview?: string;
 	doesNotFit?: readonly TopicHandle[];
 	unreviewed?: readonly TopicHandle[];

@@ -1,7 +1,7 @@
 import { courseLabel, type ChatListItem, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
-import { TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
+import { SLIP_WORDS, TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
 import { pausedWords, sessionState } from "@/components/nav/session-state";
-import { continueWords, planDay, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
+import { continueWords, planDay, stepTitle, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 import { leftWords, taskWords } from "@/components/unit-inbox/units";
 import { localDay } from "@/components/day-change";
 import { sessionName } from "@/components/study-home/day-record";
@@ -45,6 +45,13 @@ export function followedRow(rows: readonly TodayRow[], pointed: string | null, c
 	const withCourse = rows.filter((row) => row.course !== null);
 	const found = withCourse.find((row) => lineKey(row) === pointed);
 	if (found) return found;
+	// In an exam's final review, Home is about that exam: its course's first line (round 17, m11: under "What are we
+	// studying for Thursday's Probability exam?" the map showed Linear Algebra, the composer "in Linear Algebra").
+	const finalReview = withCourse.find((row) => {
+		const exam = row.course!.map.exam;
+		return exam && exam.daysLeft >= 0 && exam.finalReview != null && exam.finalReview <= row.course!.map.today;
+	});
+	if (finalReview) return finalReview;
 	const listed = new Set(withCourse.map((row) => row.course!.map.workspace));
 	const last = [...chats].filter((chat) => chat.course && listed.has(chat.course.workspace)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
 	if (!last) return withCourse[0] ?? null;
@@ -101,9 +108,9 @@ export function courseTitle(row: TodayRow): string {
  *  Linear maps and their matrices lesson" beside "Continue Problem sheet
  *  4"; round 16, m4: the lesson's row had no verb), its status saying it
  *  was left ("Left off 6 Nov"); else the course's next step ("Review
- *  A, B"). Home's line and its sidebar card read this one title. Pure. */
+ *  Rank", "Probability review", `stepTitle`). Home's line and its sidebar card read this one title. Pure. */
 export function lessonTitle(row: TodayRow): string {
-	if (row.kind === "course") return stepWords(row.step);
+	if (row.kind === "course") return stepTitle(row.step, row.course.map.title);
 	const name = sessionName(row.chat, row.course?.map.tasks ?? []);
 	return /^(?:Review|Start)\s/.test(name) ? name : continueWords(name);
 }
@@ -125,7 +132,9 @@ export interface Why {
  *  topic it was), else how overdue the most overdue one is. Pure. */
 function reviewReason(due: readonly CourseMapTopic[], today: string): Why | null {
 	const lapsed = due.find((t) => lapsedNow(t.signals));
-	if (lapsed) return { kind: "missed", short: lapsedOnWords(lapsed.title) };
+	// A row of one topic already names it: its reason is the lapse alone (round 17, m12: "Review Cardinality… · Not
+	// right last time: Cardinality…").
+	if (lapsed) return { kind: "missed", short: due.length === 1 ? SLIP_WORDS.lapsed : lapsedOnWords(lapsed.title) };
 	const overdue = Math.max(-1, ...due.map((t) => (t.review?.kind === "due" ? t.review.overdue : -1)));
 	if (overdue < 0) return null;
 	return { kind: "review", short: overdueWords(overdue, today) };

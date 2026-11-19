@@ -141,7 +141,10 @@ export function LessonComposer({
 	const next = nextProblem && !answer ? { label: "Next problem", run: () => onNext?.(), testId: "next-problem-button" } : undefined;
 	const act = () => {
 		if (answer) {
+			// An open problem whose reply never came: Enter on the empty field
+			// tries it again, as the lesson's does (round 18, m19).
 			if (answer.ready) answer.onSubmit();
+			else if (!busy && empty) onEmptyEnter?.();
 			return;
 		}
 		const action = enterAction({ busy, canSend, nextProblem: Boolean(next), emptyAction: Boolean(onEmptyEnter) });

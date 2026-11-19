@@ -11,14 +11,19 @@ export function addDays(day: string, n: number): string {
 	return new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** Every day `words` names, in order, as ISO days ("today", "tomorrow", "Tue 10 Nov", "Tuesday 10 November"). */
+/** Every day `words` names, in order, as ISO days ("today", "tomorrow", "Tue 10 Nov", "Tuesday 10 November"). A day
+ *  the words give no year is the one nearest `today`: "Mon 4 Jan" read on 17 Nov 2026 is 4 Jan 2027 (round 17: the
+ *  plan's January starts read as 2026, a Sunday). */
 export function daysIn(words: string, today: string): string[] {
 	return [...words.matchAll(DAY_WORDS)].map((m) => {
 		const word = m[1]!.toLowerCase();
 		if (word === "today") return today;
 		if (word === "tomorrow") return addDays(today, 1);
 		const month = MONTHS.indexOf(m[3]!.toLowerCase());
-		return `2026-${String(month + 1).padStart(2, "0")}-${m[2]!.padStart(2, "0")}`;
+		const year = Number(today.slice(0, 4));
+		const on = (y: number) => `${y}-${String(month + 1).padStart(2, "0")}-${m[2]!.padStart(2, "0")}`;
+		const away = (day: string) => Math.abs(Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`));
+		return [year - 1, year, year + 1].map(on).reduce((best, day) => (away(day) < away(best) ? day : best));
 	});
 }
 

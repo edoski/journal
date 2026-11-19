@@ -17,9 +17,9 @@ import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, Sessi
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
-import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, opensTurn, savedAnswerTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
-import { leftQuestionRepose, sessionEndOf } from "../core/session-end.ts";
-import { lessonTakenUp, openedAsReview } from "../core/session-opening.ts";
+import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, isQuestionRepose, opensTurn, savedAnswerTimesOf, savedAnswerTopicsOf, savedTaskTimesOf, startsMovedOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
+import { leftQuestionRepose, offersStop, sessionEndOf } from "../core/session-end.ts";
+import { lessonTakenUp, openedAsReview, retaughtTopicOf } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
 import { stoppedByHim } from "../core/turn-cut.ts";
 import { failedResponseAtEnd } from "../core/input-events.ts";
@@ -90,7 +90,8 @@ function getChat(id: string): ChatRecord | null {
 function listChats(): ChatSummary[] {
 	try {
 		fs.mkdirSync(PATHS.chats, { recursive: true });
-		return fs
+		const work = new Map<string, Work>();
+		const listed = fs
 			.readdirSync(PATHS.chats)
 			.filter((f) => f.endsWith(".json"))
 			.map((f) => getChat(f.slice(0, -5)))
@@ -103,6 +104,7 @@ function listChats(): ChatSummary[] {
 				// zero-back-compat wipe makes these "corrupt") must not blank the
 				// whole sidebar — same isolation getChat's per-file catch gives.
 				try {
+					work.set(summary.id, workOf(messages));
 					// Its own topics follow what it did: the task it took up (round 15,
 					// m4), else the lesson its plan took up (round 16, M4), else the ones
 					// it was started on or named after, else for practice its first
@@ -141,13 +143,16 @@ function listChats(): ChatSummary[] {
 						pendingProblem: activeProblemOf(messages) !== null,
 						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages), ...own])],
 						ownTopics: own,
-						ended: endedBy(sessionEndOf(messages, tree, summary.kind, own), summary.updatedAt, danglingQuestionOf(messages) !== null || leftQuestionRepose(messages).length > 0 || activeProblemOf(messages) !== null),
+						// The tutor's offer to go on, one of whose options stops for today, asks nothing of him: left where it is (round 18, m4).
+						ended: offersStop(messages) ? "left" : endedBy(sessionEndOf(messages, tree, summary.kind, own), summary.updatedAt, danglingQuestionOf(messages) !== null || leftQuestionRepose(messages).length > 0 || activeProblemOf(messages) !== null),
 						...(stoppedByHim(messages) ? { stopped: true as const } : {}),
 						...(failedResponseAtEnd(messages) ? { failed: true as const } : {}),
 						...(learnerWords(messages).length <= 1 ? { untouched: true as const } : {}),
 						tasks: sessionTasksOf(messages),
 						...((t) => (t ? { taskTitle: t } : {}))(sessionTaskTitleOf(messages)),
 						review: openedAsReview({ title: summary.title, topics: summary.topics, messages }),
+						...((t) => (t ? { retaught: t } : {}))(retaughtTopicOf({ ...summary, messages })),
+						...((moved) => (moved.length > 0 ? { startsMoved: moved } : {}))([...new Set([...startsMovedOf(messages), ...(summary.startsMoved ?? [])])]),
 						studied: studiedIn(messages),
 						...inputTimes(messages),
 					};
@@ -158,9 +163,48 @@ function listChats(): ChatSummary[] {
 			})
 			.filter((s) => s !== null)
 			.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+		return listed.map((s) => closedByNewerWork(s, listed, work));
 	} catch {
 		return [];
 	}
+}
+
+/** When a session's work came, on the messages' own clock: its newest
+ *  message but a question the app posed again as he opened it (round 17,
+ *  M6), and its newest saved answer on each topic. */
+interface Work {
+	last: number;
+	answered: ReadonlyMap<string, number>;
+	/** When its saves wrote each task (`savedTaskTimesOf`). */
+	tasked: ReadonlyMap<string, number>;
+}
+
+function workOf(messages: readonly LhMessage[]): Work {
+	const last = messages.reduce((at, m) => (isQuestionRepose(m) || typeof m.timestamp !== "number" ? at : Math.max(at, m.timestamp)), 0);
+	return { last, answered: savedAnswerTimesOf(messages), tasked: savedTaskTimesOf(messages) };
+}
+
+/** A session left with a question open closes once newer work took its
+ *  place: for a review, another session of its course saved an answer on
+ *  one of its topics after his last word in this one; for a lesson that
+ *  holds a task, another session wrote that task after it, so the lesson
+ *  goes on there. Every list reads it closed, so Home, Sessions and the
+ *  topic page keep no stale "Left off" row and one open session per lesson
+ *  (Edo, 18 Nov 2026, round 17 m10: the 9 Nov review's "1 to 105" question
+ *  stayed "Left off 9 Nov" after the 10 Nov review answered its topic;
+ *  round 18, m5: after "Yes" to picking up the Expectation lesson, the Ask
+ *  session carried it on, and the 10 Nov lesson's lottery question stayed
+ *  open as a second "Expectation and linearity lesson"). */
+function closedByNewerWork(chat: ChatSummary, all: readonly ChatSummary[], work: ReadonlyMap<string, Work>): ChatSummary {
+	if (!chat.pendingQuestion) return chat;
+	const since = work.get(chat.id)?.last ?? 0;
+	const open = chat.review ? (chat.retaught ? [chat.retaught] : (chat.ownTopics ?? [])) : [];
+	const tasks = chat.review ? [] : (chat.tasks ?? []);
+	const newer = all.some((other) => {
+		const theirs = other.id !== chat.id && other.course?.workspace === chat.course?.workspace ? work.get(other.id) : undefined;
+		return theirs !== undefined && (open.some((t) => (theirs.answered.get(t) ?? 0) > since) || tasks.some((k) => (theirs.tasked.get(k) ?? 0) > since));
+	});
+	return newer ? { ...chat, pendingQuestion: false, ended: "closed" } : chat;
 }
 
 /** How a session stands in every list: as its tutor's last turn left it,
@@ -178,24 +222,35 @@ function endedBy(ended: SessionEnd, updatedAt: string, waits: boolean): SessionE
 }
 
 /** When his input in a session came: its newest, and every local day it
- *  came on (`ChatSummary.studiedAt`, `studiedDays`). */
-function inputTimes(messages: readonly LhMessage[]): { studiedAt?: string; studiedDays: string[] } {
+ *  came on (`ChatSummary.studiedAt`, `studiedDays`), and the day of its
+ *  newest saved answer on each topic (`answeredOn`). */
+function inputTimes(messages: readonly LhMessage[]): { studiedAt?: string; studiedDays: string[]; answeredOn?: Record<string, string> } {
 	const at = messages.flatMap((m) => (opensTurn(m) && typeof m.timestamp === "number" ? [m.timestamp] : []));
 	const day = (ms: number) => {
 		const d = new Date(ms);
 		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 	};
-	return { ...(at.length > 0 ? { studiedAt: new Date(Math.max(...at)).toISOString() } : {}), studiedDays: [...new Set(at.map(day))].sort() };
+	const answered = [...savedAnswerTimesOf(messages)];
+	return {
+		...(at.length > 0 ? { studiedAt: new Date(Math.max(...at)).toISOString() } : {}),
+		studiedDays: [...new Set(at.map(day))].sort(),
+		...(answered.length > 0 ? { answeredOn: Object.fromEntries(answered.map(([topic, ms]) => [topic, day(ms)])) } : {}),
+	};
 }
 
 /** Persist the full native message list (the record IS the agent state —
  *  Wave B: replay is state.messages = record.messages). SILENT by the
- *  events law — see the SILENCE LAW comment at createChat. */
+ *  events law — see the SILENCE LAW comment at createChat. updatedAt moves
+ *  only with a message the save adds; the app asking his left question
+ *  again as he opens the session is not study, so it keeps the day he left
+ *  it (round 17, M6: a view re-stamped a 9 Nov session "Studied today"). */
 function saveMessages(id: string, messages: LhMessage[]): void {
 	const record = getChat(id);
 	if (!record) throw new Error(`Chat not found: ${id}`);
+	const had = new Set(record.messages.map((m) => m.id));
+	const added = messages.some((m) => !had.has(m.id) && !isQuestionRepose(m));
 	record.messages = messages;
-	record.updatedAt = studyNow().toISOString();
+	if (added) record.updatedAt = studyNow().toISOString();
 	writeChat(record);
 }
 
@@ -232,6 +287,24 @@ function saveAnswerSaves(id: string, links: Readonly<Record<string, readonly str
 		saves[key] = [...seen, ...ids.filter((o) => !seen.includes(o))];
 	}
 	record.answerSaves = saves;
+	writeChat(record);
+}
+
+/** Add the topics a save's receipt moved the start of. Silent, and not
+ * conversation activity: updatedAt stays put. */
+function saveStartsMoved(id: string, topics: readonly string[]): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	record.startsMoved = [...new Set([...(record.startsMoved ?? []), ...topics])];
+	writeChat(record);
+}
+
+/** Keep its topics' titles as its course is deleted. Silent, and not
+ * conversation activity: updatedAt stays put. */
+function saveTopicTitles(id: string, titles: Readonly<Record<string, string>>): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	record.topicTitles = { ...(record.topicTitles ?? {}), ...titles };
 	writeChat(record);
 }
 
@@ -336,4 +409,6 @@ export const chatStore: ChatStore = {
 	appendTurnUsage,
 	saveDigestLedger,
 	saveAnswerSaves,
+	saveStartsMoved,
+	saveTopicTitles,
 };

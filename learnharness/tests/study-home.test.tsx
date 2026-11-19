@@ -264,7 +264,7 @@ describe("lessons", () => {
 
 	it("words a course's step as a lesson: its name, what follows and its button, with no place in a course without arcs", () => {
 		const review = lesson(LINALG);
-		assert.equal(review.title, "Review Linear independence, Rank, Span");
+		assert.equal(review.title, "Linear Algebra review");
 		assert.equal(review.detail, "Then Problem sheet 4");
 		assert.equal(review.action, "Review");
 		assert.equal(review.exam, "Exam 29 Nov");
@@ -325,7 +325,7 @@ describe("Today", () => {
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
 			// The course's badge leads each line with its two letters (the Visual system, shipped 17 Nov 2026).
-			["LALinear AlgebraReview Linear independence, Rank, SpanDue 23 Oct", "RAReal AnalysisReview SequencesDue 7 Nov", "LALinear AlgebraContinue Eigen lessonYour turn", "PProbabilityContinue Bayes' ruleNot right last time", "LALinear AlgebraContinue Problem sheet 4Left off 5 Nov"],
+			["LALinear AlgebraLinear Algebra reviewDue 23 Oct", "RAReal AnalysisReview SequencesDue 7 Nov", "LALinear AlgebraContinue Eigen lessonYour turn", "PProbabilityContinue Bayes' ruleNot right last time", "LALinear AlgebraContinue Problem sheet 4Left off 5 Nov"],
 		);
 		assert.equal(lines[2]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
@@ -373,7 +373,8 @@ describe("what a line of Today reads", () => {
 		assert.deepEqual(short(todayRows([LINALG], [waiting], TODAY).find((r) => r.kind === "session")!), ["reply", "Your turn"]);
 		assert.deepEqual(short(rowOf(LINALG)), ["review", "Due 23 Oct"]);
 		assert.deepEqual(short(rowOf(ANALYSIS)), ["review", "Due 7 Nov"]);
-		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Not right last time: Sequences"]);
+		// A row of one topic names it already: the lapse alone (round 17, m12).
+		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Not right last time"]);
 		assert.deepEqual(short(rowOf({ ...LINALG, due: [] })), ["task", "Left off 5 Nov"], "when the task was left, never the tutor's step");
 		assert.deepEqual(short(rowOf(PROB)), ["next", "Next up"]);
 	});
@@ -424,7 +425,7 @@ describe("what a line of Today reads", () => {
 		const doc = render(<HybridRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
 		assert.deepEqual(lines, [
-			"LALinear AlgebraReview Linear independence, Rank, SpanDue 23 Oct",
+			"LALinear AlgebraLinear Algebra reviewDue 23 Oct",
 			"RAReal AnalysisReview SequencesDue 7 Nov",
 			"LALinear AlgebraContinue Eigen lessonYour turn",
 			"PProbabilityContinue Bayes' ruleNot right last time",

@@ -83,6 +83,15 @@ export interface ChatRecord {
 	 *  resumed tutor could save it again). Keyed as the marks key an
 	 *  answer: a graded question's call, or his message's id. */
 	answerSaves?: AnswerSaves;
+	/** The topics whose start its saves moved, kept the moment the engine
+	 *  took each save, as `answerSaves` is: the transcript is written when
+	 *  the turn ends, and Home dropped the start in between (round 18, M4,
+	 *  integration). */
+	startsMoved?: readonly string[];
+	/** Its topics' titles, by handle, kept when its course is deleted, so
+	 *  search still finds it by the topics it practised once no live map
+	 *  names them (round 18, m24). */
+	topicTitles?: Readonly<Record<string, string>>;
 	/** SCHEMA STAMP (schema-versioning wave, owner 2026-10-10): LAZY v1 —
 	 *  existing records stay unstamped (absence reads as v1); every write
 	 *  stamps the current version. A record stamped NEWER than this build
@@ -229,11 +238,14 @@ export const TASK_HANDOFF_TEXT =
  *  Problem sheet 4 opened the sheet's finished chat with no turn, and his
  *  "let us continue the sheet" was planned as a lesson from the basics, so
  *  part (c) was put off to next time. The task's step is the record's, in
- *  the course brief above. */
-export function taskContinueText(tasks: readonly string[]): string {
+ *  the course brief above. The part's text from his material (`passage`),
+ *  on his screen from the press, comes with it, so the turn reads no file
+ *  to find it (round 18, M6). */
+export function taskContinueText(tasks: readonly string[], passage?: string | null): string {
 	const named = tasks.map((key) => `\`${key}\``).join(" and ");
 	return (
 		`[CONTINUE MY TASK] I pressed Continue on my open task ${named}. Carry on at its saved step, as the course record above gives it. ` +
+		(passage ? `My screen already shows its text from my material, so read no file for it:\n\n${passage}\n\n` : "") +
 		"It is my task, not a lesson: never a lesson on the topic from its basics, and a step before it only for a gap the record names. If you plan, plan only that step with plan_init, one node named for the part it is. " +
 		"If the step needs something from me first, such as a part's text, ask me for it in one plain line and end your turn; otherwise pose the step straight away. Never say this message."
 	);
@@ -317,7 +329,22 @@ const DONE_LIMITS = "Never a step, cue, method or hint toward anything he left o
  *  turn; its card said "Partly right" with no reason, straight before the
  *  close (round 11, 4 minor 1). */
 const DONE_GRADED = "An answer he sent before pressing it is still graded and saved as usual; when it was not fully right, first say in one sentence what it missed, as its own message, then close.";
-const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one; a topic not started is one he starts, never a review; a question he left a half answer on (\`draftKept\`) is his half answer waiting for him there. ${DONE_LIMITS}`;
+/** Every topic he answered in the session has a next day, and the close
+ *  names it (round 17, 2 m2: a four-topic review's close named only
+ *  Conditional probability's, and Binomial, Random variables and
+ *  Inclusion-exclusion got none). */
+const DONE_DAYS = "and the day each topic he answered in this session comes back, by its topic: topics on one day together, and with three days or more, the soonest and that the rest are on his calendar";
+/** A start planned for today that the session's saves moved is named,
+ *  with its new day and its cause (round 18, M4: a hinted, then partly
+ *  right, answer moved Expectation off today, every receipt carried it in
+ *  `starts_moved`, and the close named only the review days). */
+const DONE_MOVED = "a start planned for today that his answers moved (a save's `starts_moved` whose `moved.from` is today) is named too, by its title, with its new day and its cause, its day said even when the other days are left to his calendar";
+/** Where his half answer waits, and a start's title inside a sentence
+ *  (round 18, m15: "…is waiting for you there. Because that lesson is
+ *  unfinished, Any matrix represents a linear map moved …, and later
+ *  starts moved too."). */
+const DONE_HALF = 'a question he left a half answer on (`draftKept`) is his half answer, waiting in this session by its name (your Invertible matrices lesson, your Probability review), never "there"; a start named inside a sentence has its title set off in quotes (Starting “Any matrix represents a linear map” moves to Tuesday 10 November), and every move he is told is named with its day, never as "later starts moved too"';
+const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one, ${DONE_DAYS}; ${DONE_MOVED}; a topic not started is one he starts, never a review; ${DONE_HALF}. ${DONE_LIMITS}`;
 /** Practice keeps nothing of a problem dropped at Done for today, so its
  *  close names only what the record keeps (round 9, 3 m7: "You still have
  *  the kernel problem you closed … to pick up"), and only this session's:
@@ -326,7 +353,7 @@ const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, 
  *  problem he left open is named once, as set aside (round 14, m31: "Your
  *  Rank and the column space review is on Wednesday 11 November." left the
  *  4 × 6 system unnamed). */
-const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: a problem he left open, named once by what it is on (the 4 × 6 system), as set aside, never as something he picks up; then only what his record keeps for next time from this session, an open task this session worked on at its place (part (c) of the sheet), never another session's open work, and the day of his next review when the plan gives one, never by what it asks; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
+const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: a problem he left open, named once by what it is on (the 4 × 6 system), as set aside, never as something he picks up; then only what his record keeps for next time from this session, an open task this session worked on at its place (part (c) of the sheet), never another session's open work, and the day of his next review when the plan gives one, never by what it asks, ${DONE_DAYS}; ${DONE_MOVED}; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
 
 export const DONE_TONIGHT_TEXT = {
 	prober:
@@ -525,6 +552,14 @@ export interface ChatSummary {
 	 *  words (`openedAsReview`), whatever it is named now. The list always
 	 *  sets it; a summary made elsewhere may leave it out. */
 	review?: boolean;
+	/** The one of a review's topics its plan re-teaches (`retaughtTopicOf`):
+	 *  its map and what it left are that topic's alone, never its other
+	 *  topics' (round 18, M2). Absent otherwise. */
+	retaught?: string;
+	/** The topics whose start its saves moved (`startsMovedOf`): while it
+	 *  is open, Home keeps a start it moved off today (round 18, M4).
+	 *  Absent when none. */
+	startsMoved?: readonly string[];
 	/** He studied in it (`studiedIn`): he answered something, or wrote
 	 *  after its opening. The list always sets it; a summary made elsewhere
 	 *  may leave it out, which reads as not studied. */
@@ -537,6 +572,12 @@ export interface ChatSummary {
 	 *  every day he worked in it, a lesson begun one day and left the next
 	 *  included (round 16, m8). */
 	studiedDays?: readonly string[];
+	/** The local day, YYYY-MM-DD, of its newest saved answer on each topic:
+	 *  a review he left today keeps Home's line for the topics it did not
+	 *  answer today (round 17, M4). Absent with no saved answer. */
+	answeredOn?: Readonly<Record<string, string>>;
+	/** Its topics' titles kept when its course was deleted (`ChatRecord.topicTitles`). */
+	topicTitles?: Readonly<Record<string, string>>;
 }
 
 /** The sidebar's session row: a summary + live liveness. The chats list

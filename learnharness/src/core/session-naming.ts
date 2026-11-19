@@ -1,4 +1,5 @@
 import { opensTurn, sessionTaskTitleOf, type LhMessage } from "./native-messages.ts";
+import { openedAsReview } from "./session-opening.ts";
 
 /**
  * The course topics a session's first turn looked at, in the order it
@@ -57,11 +58,25 @@ export function onFirstTurn(messages: readonly LhMessage[]): boolean {
 }
 
 /** A session's one name on every surface, the chat's head included: the
- *  title its saves gave the task it took up (`sessionTaskTitleOf`), else
- *  the name it was created or named with; a name he gave it himself always
- *  (round 15, m5: "Problem sheet 4" in Sessions and on the calendar,
- *  "Problem sheet 4: rank and nullity" on Home; "Invertible matrices lesson"
- *  on the live card, "Invertible matrices" elsewhere). Pure. */
-export function sessionTitleOf(record: { title: string; renamed?: true; messages: readonly LhMessage[] }): string {
-	return record.renamed ? record.title : (sessionTaskTitleOf(record.messages) ?? record.title);
+ *  title its saves gave the task it took up (`sessionTaskTitleOf`), else,
+ *  for a review of more than one topic, its course's review ("Probability
+ *  review"), else the name it was created or named with; a name he gave it
+ *  himself always (round 15, m5: "Problem sheet 4" in Sessions and on the
+ *  calendar, "Problem sheet 4: rank and nullity" on Home; "Invertible
+ *  matrices lesson" on the live card, "Invertible matrices" elsewhere;
+ *  round 17, m5: "Review Inclusion-exclusion principle, Conditional
+ *  probability, Random…" and "Matrix multiplication and 5 more" named a
+ *  review by a list it cut or counted). Pure. */
+export function sessionTitleOf(record: { title: string; renamed?: true; course?: { title: string }; topics?: readonly string[]; messages: readonly LhMessage[] }): string {
+	if (record.renamed) return record.title;
+	const task = sessionTaskTitleOf(record.messages);
+	if (task) return task;
+	return record.course && (record.topics ?? []).length > 1 && openedAsReview(record) ? courseReviewName(record.course.title) : record.title;
+}
+
+/** A review of more than one topic by name: its course's review
+ *  ("Probability review"), as the session it opens is named
+ *  (`sessionTitleOf`) and Home's line for it reads (round 18, m10). Pure. */
+export function courseReviewName(courseTitle: string): string {
+	return `${courseTitle} review`;
 }

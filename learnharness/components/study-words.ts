@@ -292,14 +292,14 @@ export function movedWords(review: CourseMapTopic["review"], today: string, told
 	return review.held.since < today ? dueWords(review.held.since) : null;
 }
 
-/** A review that is due: "Due today", "Due 5 Nov"; one the plan holds
- *  past a day memory asked for already says since when, so a review weeks
- *  late never reads as spacing, and the day the plan brings it back, "Due 1
- *  Oct, back 3 Dec" (round 8: Calculus' rows gave no return day);
- *  any other dated review "Back in 5d". `today` is the engine's day. */
+/** A review that is due: "Due today", "Due 5 Nov"; any review the plan
+ *  has a day for, one it holds past a day memory asked for included, the
+ *  day it comes back, "Back Mon 16 Nov": what will happen, never the day
+ *  memory asked for beside it (round 18, m1: "Due 6 Nov, back 16 Nov" on
+ *  Uniform distribution said nothing he could act on; the hint says why
+ *  it waits, `heldWords`). `today` is the engine's day. */
 export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
 	if (review.kind === "due") return overdueWords(review.overdue, today);
-	if (review.held && review.held.since < today) return `${dueWords(review.held.since)}, back ${shortDay(review.date)}`;
 	return returnWords(review.date);
 }
 
@@ -369,10 +369,18 @@ export const ARC_EXAM_WORDS = {
  *  why, in the engine's reasons (`EXAM_GAP_WHY`), then a way in. "Today",
  *  since a press starts it now. */
 export const EXAM_GAP_WORDS = {
+	/** The readiness answer's list of the topics left out that the head's line and the why do not name, behind its
+	 *  press (round 17, m6; round 18, m7). */
+	which: "Which topics",
+	/** "Or another"'s groups: the plan's own for today, then the topics it leaves out (round 17, m6). */
+	planned: "Planned today",
+	leftOut: "Left out before the exam",
 	start: "Start it today",
 	review: "Review it today",
 	/** The menu of the other topics he can take up today, beside the pick. */
 	another: "Or another",
+	/** Where that menu folds every way but the pick, which it marks (round 18, m6: 17 options with none marked). */
+	more: "More",
 	/** A topic he began, whose press picks its session or task up (round 12, 1 D5). */
 	continue: "Continue it today",
 	ask: "Ask the tutor",
@@ -419,13 +427,18 @@ const startsWord = (titles: readonly string[]) => (titles.length === 1 ? "starts
  * (the review's topics under a first line about starts), or when its list
  * has more than one reason; a topic that starts too late is always named.
  * Your pace is said once: a final review full at your pace is the same
- * cause as study days full at your pace. Null with nothing left out. Pure.
+ * cause as study days full at your pace. With `names` false it names no
+ * topic but one that starts too late, the one consequence alone, for the
+ * readiness answer, whose list is behind Which topics (round 17, m6: a
+ * 90-word paragraph of 11 topics on the exam eve; round 18, m7: "One
+ * starts too close to the exam", one what?). Null with nothing left out.
+ * Pure.
  */
-export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly ExamGapTopic[]): string | null {
+export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly ExamGapTopic[], names = true): string | null {
 	const by = (topics: readonly ExamGapTopic[], reason: ExamGapReason) => topics.filter((t) => t.reason === reason).map((t) => t.title);
 	const reasons = (topics: readonly ExamGapTopic[]) => new Set(topics.map((t) => t.reason)).size;
 	const sentence = (clauses: readonly string[]) => (clauses.length > 0 ? `${clauses.join(", and ").replace(/^./, (c) => c.toUpperCase())}.` : null);
-	const name = start.length > 1 && reasons(start) > 1;
+	const name = names && start.length > 1 && reasons(start) > 1;
 	const startFull = by(start, "full");
 	const notReady = by(start, "not_ready");
 	const first = sentence([
@@ -434,13 +447,14 @@ export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly
 		...(notReady.length > 0 ? [name ? `what ${listWords(notReady)} ${notReady.length === 1 ? "needs" : "need"} won’t be solid in time` : "what comes first won’t be solid in time"] : []),
 	]);
 	const paceSaid = startFull.length > 0;
-	const named = start.length > 0 || reasons(review) > 1;
+	const named = names && (start.length > 0 || reasons(review) > 1);
 	const full = by(review, "full");
 	const noDay = by(review, "no_study_day");
 	const late = by(review, "too_late");
 	const second = sentence([
 		...(noDay.length > 0 ? [named ? `no study day is left in the final review for ${listWords(noDay)}` : "no study day is left in the final review"] : []),
 		...(full.length > 0 ? [named ? `the final review has no room for ${listWords(full)}${paceSaid ? "" : " at your pace"}` : paceSaid ? "the final review is full too" : "your pace fills every day of the final review"] : []),
+		// A topic that starts too late is always named, names or not (round 18, m7: "One starts too close…", one what?).
 		...(late.length > 0 ? [`${listWords(late)} ${startsWord(late)} too close to the exam for a review`] : []),
 	]);
 	const both = [first, second].filter((s): s is string => s !== null);
@@ -482,10 +496,14 @@ function finalReviewName(exam: Pick<CourseExam, "finalReview">, today: string): 
 	return exam.finalReview && exam.finalReview > today ? `the final review from ${shortDay(exam.finalReview)}` : "the final review";
 }
 
-/** The taught topics the final review has no room for, standing alone
- *  (the calendar's "No room in it for" reads under its final review). */
+/** The taught topics the final review has no room for, standing alone,
+ *  as what happens to them: they are not revisited in it (round 18, m1:
+ *  "No room in the final review from 27 Nov for Similar matrices and
+ *  Diagonalization" beside their rows planned 24 and 25 Nov read as if
+ *  they had no day; the calendar's "No room in it for" reads under its
+ *  final review). */
 export function finalReviewMissWords(titles: readonly string[], exam: Pick<CourseExam, "finalReview">, today: string): string {
-	return `No room in ${finalReviewName(exam, today)} for ${listWords(titles)}`;
+	return `${listWords(titles)} ${titles.length === 1 ? "is" : "are"} not revisited in ${finalReviewName(exam, today)}`;
 }
 
 /** His opening words in a lesson Ask the tutor starts, naming the topics. */
@@ -533,10 +551,13 @@ export const EXAM_GAP_TOPIC_WORDS: {
 		none: "",
 		no_study_day: ", no study day is left in it",
 		not_ready: "",
-		full: " at your pace",
-		too_late: ", it starts too close to the exam",
+		full: ", full at your pace",
+		too_late: "", // the start, not the room: TOO_LATE_FOR_A_REVIEW
 	},
 };
+
+/** A start whose first review would fall on the exam day or after. */
+export const TOO_LATE_FOR_A_REVIEW = "Too close to the exam for a review before it";
 
 /** The words for `topic` when the exam ahead has no room to start it
  *  (`doesNotFit`) or to review it (`unreviewed`); null otherwise. Pure. */
@@ -544,7 +565,15 @@ export function examGapTopicWords(topic: Pick<CourseMapTopic, "handle">, exam: P
 	if (!exam || exam.daysLeft < 0) return null;
 	const reason = exam.reasons?.[topic.handle] ?? "none";
 	if (exam.doesNotFit?.includes(topic.handle)) return EXAM_GAP_TOPIC_WORDS.start[reason];
-	if (exam.unreviewed?.includes(topic.handle)) return `No room in ${finalReviewName(exam, today)}${EXAM_GAP_TOPIC_WORDS.review[reason]}`;
+	// A start too near the exam has its review fall on it or after: the final
+	// review has room, his start comes too late for it (round 17, 3 m4: "Planned
+	// Wed 18 Nov · No room in the final review from 15 Nov, it starts too close
+	// to the exam" read as if it were not planned).
+	// One planned before the final review is reviewed then, and only the
+	// final review leaves it out: "Not revisited in the final review from 27
+	// Nov, full at your pace" says what happens (round 18, m1: "Planned Wed
+	// 25 Nov · No room in the final review from 27 Nov at your pace").
+	if (exam.unreviewed?.includes(topic.handle)) return reason === "too_late" ? TOO_LATE_FOR_A_REVIEW : `Not revisited in ${finalReviewName(exam, today)}${EXAM_GAP_TOPIC_WORDS.review[reason]}`;
 	return null;
 }
 
@@ -609,6 +638,40 @@ export function startsWhyShort(why: StartsWhy, map: StartsMap): string {
 	}
 	const arc = why.arc && behindHere(why.arc, map) ? map.arcs?.find((a) => a.handle === why.arc)?.title : undefined;
 	return arc ? `Back to ${arc}` : startsWhyWords(why, map);
+}
+
+/** An exam held in several sessions (Edo, 19 Nov 2026). Home asks once
+ *  how the session gone by went (`pastSessionWords`); his answer is one of
+ *  these, saved to the record. */
+export const EXAM_SESSION_WORDS = {
+	passed: "Passed",
+	notThisTime: "Not this time",
+} as const;
+
+const LONG_DAY = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+
+/** "Sunday 29 November". */
+export function longDayWords(day: string): string {
+	return LONG_DAY.format(new Date(`${day}T00:00:00Z`)).replace(",", "");
+}
+
+type Sessions = { date: string; sessions?: readonly string[]; past?: string };
+
+/** The session after the one he aims at, as a plain second line beside the
+ *  exam's day ("Next session: Wednesday 3 February"); null when none is
+ *  listed. Pure. */
+export function nextSessionWords(exam: Sessions): string | null {
+	const next = exam.sessions?.find((day) => day > exam.date);
+	return next ? `Next session: ${longDayWords(next)}` : null;
+}
+
+/** Home's one ask once a session has gone by, saying truly what moved the
+ *  plan: "Your Artificial Intelligence exam on Monday 21 December has gone
+ *  by, so the plan now aims at the next session, Tuesday 19 January. How
+ *  did it go?" Null while no session has gone by unanswered. Pure. */
+export function pastSessionWords(course: string, exam: Sessions): string | null {
+	if (!exam.past) return null;
+	return `Your ${course} exam on ${longDayWords(exam.past)} has gone by, so the plan now aims at the next session, ${longDayWords(exam.date)}. How did it go?`;
 }
 
 /** A day beside the engine's, one form wherever a day shows (an exam, a
@@ -816,6 +879,14 @@ export const READY_FACT_WORDS = {
 	none: "No exam",
 } as const;
 
+/** An arc not started whose topics the plan gives no day yet, on the road's line. */
+export const ARC_NOT_PLANNED = "Not planned yet";
+
+/** An arc under way, when the plan starts its next topic, on the road's line: "Planned 10 Dec". */
+export function arcPlannedWords(day: string): string {
+	return `Planned ${shortDay(day)}`;
+}
+
 /** When an arc's first new topic starts, on the road's line: "Starts 15 Nov". */
 export function arcStartsWords(day: string): string {
 	return `Starts ${shortDay(day)}`;
@@ -840,3 +911,25 @@ export const MISTAKE_WORDS = {
 	helped: "With help",
 	none: "No mistakes to fix",
 } as const;
+
+/** The Mac app's notifications (`desktop-notices.ts`), in the words Home
+ *  and the sidebar use (Edo, 19 Nov 2026: "VERY sparingly", only the key
+ *  study events). */
+export const NOTICE_WORDS = {
+	/** Today's plan: the title over Today's lines. */
+	today: "Today",
+	/** A course's topic map finished building: under the course's name. */
+	mapReady: "Its topic map is ready",
+	/** A new lesson's opening is ready and waits on him: under its title,
+	 *  the sidebar's word for a session that waits on him. */
+	lessonReady: "Your turn",
+	/** The settings row and its hint. */
+	setting: "Study notifications",
+	settingHint: "Today's plan once a day, and a course map or a new lesson when it is ready while you are in another app",
+} as const;
+
+/** Today's plan in one line: Today's lines by their one name
+ *  (`lessonTitle`), in Today's order. */
+export function todayNoticeWords(titles: readonly string[]): string {
+	return titles.join(", ");
+}

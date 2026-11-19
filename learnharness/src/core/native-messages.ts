@@ -436,6 +436,17 @@ export function hintsAsked(messages: readonly LhMessage[], problemCallId: string
 	}).length;
 }
 
+/** Whether he gave this problem up: he pressed Show me or Explain
+ *  instead on it. Both end it (`PRACTICE_REQUEST_TEXT`), so nothing is
+ *  left for him to answer while the tutor concludes it. */
+export function gaveUpOn(messages: readonly LhMessage[], problemCallId: string): boolean {
+	return messages.some((m) => {
+		if (m.role !== "custom" || m.customType !== "practice-request") return false;
+		const d = m.details as Partial<PracticeRequestDetails> | null;
+		return d?.problemCallId === problemCallId && (d.request === "show" || d.request === "explain");
+	});
+}
+
 /** The learner's thinking submission (ONE send lane, owner round
  *  2026-10-05): the register is no longer declared by a button — the
  *  model READS the text to tell working traces from claimed answers. The
@@ -676,17 +687,31 @@ export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT): Lh
 	};
 }
 
+/** The task Continue picks up, as the engine's record names it: its title
+ *  and the step he left it at, and the text of that part from his own
+ *  material when a ref points to it (`passage`, round 18, M6). */
+export interface ContinuedTask {
+	title: string;
+	step: string | null;
+	passage?: string | null;
+}
+
 /** His Continue on an open task the session holds, with nothing in it
  *  waiting on him (round 13, 2 M1): the turn carries on at the task's step.
- *  The transcript draws nothing for it; the tutor's step is the reply. */
-export function newTaskContinueMessage(tasks: readonly string[]): LhMarkerMessage {
+ *  With the task's record (`task`), the transcript draws its title, the
+ *  part's text from his material and the step he left it at the moment he
+ *  presses, before the tutor's turn writes that step out (round 17, M8:
+ *  Continue Problem sheet 4 showed "Thinking…" for 42 s before part (c);
+ *  round 18, M6: the part's matrix waited 64 to 80 s). The model reads the
+ *  content, which carries that text too, so it reads no file to find it. */
+export function newTaskContinueMessage(tasks: readonly string[], task?: ContinuedTask | null): LhMarkerMessage {
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "task-continue",
-		content: taskContinueText(tasks),
+		content: taskContinueText(tasks, task?.passage),
 		display: true,
-		details: { tasks: [...tasks] },
+		details: { tasks: [...tasks], ...(task ? { title: task.title, step: task.step, ...(task.passage ? { passage: task.passage } : {}) } : {}) },
 		timestamp: Date.now(),
 	};
 }
@@ -808,7 +833,7 @@ export function concludedByDismissalPair(
  *  subject is the call, not a dangling result). */
 /** The ids of tool calls whose results are CLEAN (not errored) — the only
  *  calls that ever happened, per the honest-activation ruling. */
-function cleanToolCallIds(messages: readonly LhMessage[]): Set<string> {
+export function cleanToolCallIds(messages: readonly LhMessage[]): Set<string> {
 	const ids = new Set<string>();
 	for (const m of messages) {
 		if ((m as { role?: string }).role !== "toolResult") continue;
@@ -823,7 +848,7 @@ const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filt
 /** A course_save's changes as the engine read them: the tool takes an
  *  object, and also its JSON text, which the tutor often sends. Null when
  *  neither. Pure. */
-function saveChanges(args: Record<string, unknown>): Record<string, unknown> | null {
+export function saveChanges(args: Record<string, unknown>): Record<string, unknown> | null {
 	let changes = args.changes;
 	if (typeof changes === "string") {
 		try {
@@ -935,6 +960,8 @@ export interface AnsweredQuestion {
 	/** The question he answered, as `sameQuestionKey` reads it; absent for
 	 *  an answer in words or a problem's conclude. */
 	asked?: string;
+	/** His answer as he wrote it, for a graded question's answer. */
+	words?: string;
 	/** A save that went through already recorded it, or its problem's
 	 *  conclude did. */
 	recorded: boolean;
@@ -1006,7 +1033,14 @@ const UNSAVED_CONCLUDE = /The attempt was not saved|The attempt could not be rec
 function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { key: string; seen: boolean; predicted: boolean }>; answered: Map<string, AnsweredQuestion> } {
 	const clean = cleanToolCallIds(messages);
 	const revealed = new Set<string>();
-	const posed = new Map<string, { key: string; seen: boolean; predicted: boolean }>();
+	// His answers to each question's words: one shows the solution once the
+	// record keeps it as his attempt, so a question he typed into the answer
+	// box, which the tutor answered and asked again unsaved, shows nothing
+	// (fix round 18: the re-ask's answer was saved "solution shown").
+	const answeredOn = new Map<string, string[]>();
+	const posed = new Map<string, { key: string; seen: boolean; predicted: boolean; shownBy: string[] }>();
+	// A problem's conclude, by the call that posed the problem.
+	const concludedFrom = new Map<string, string>();
 	const answered = new Map<string, AnsweredQuestion>();
 	// Each save's named answers, until its result says whether it went
 	// through; an answer in words stands for his newest message then.
@@ -1021,7 +1055,7 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 	const pose = (callId: string, text: unknown, type?: unknown) => {
 		if (typeof text !== "string") return;
 		const key = sameQuestionKey(text);
-		posed.set(callId, { key, seen: revealed.has(key), predicted: normalizeQuestionType(type) === "predict" });
+		posed.set(callId, { key, seen: revealed.has(key), predicted: normalizeQuestionType(type) === "predict", shownBy: [...(answeredOn.get(key) ?? [])] });
 	};
 	for (const m of messages) {
 		if (m.role === "user") {
@@ -1044,11 +1078,13 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 					problem = block.id;
 					posedSinceSaid = true;
 				} else if (block.name === PRACTICE_CONCLUDE_TOOL && clean.has(block.id) && problem) {
-					const asked = posed.get(problem);
+					const poseCall = problem;
+					const asked = posed.get(poseCall);
 					problem = null;
 					if (!asked || args.outcome === "dismissed") continue;
 					revealed.add(asked.key);
-					answered.set(block.id, { tool: PRACTICE_CONCLUDE_TOOL, seenBefore: asked.seen, predicted: false, recorded: false });
+					concludedFrom.set(block.id, poseCall);
+					answered.set(block.id, { tool: PRACTICE_CONCLUDE_TOOL, seenBefore: false, predicted: false, recorded: false });
 				}
 			}
 		} else if (m.role === "toolResult" && !m.isError && m.toolName === "course_save") {
@@ -1062,14 +1098,19 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 		} else if (m.role === "toolResult" && GRADED_QUESTION_TOOLS.includes(m.toolName) && !m.isError && isRealAnswer(m.details)) {
 			const asked = posed.get(m.toolCallId);
 			if (!asked) continue;
-			revealed.add(asked.key);
-			const details = m.details as { confidence?: unknown; showMe?: unknown };
+			const details = m.details as { confidence?: unknown; showMe?: unknown; text?: unknown };
+			// A Show me shows its answer, whatever is saved of it.
+			if (details.showMe === true) revealed.add(asked.key);
+			else answeredOn.set(asked.key, [...(answeredOn.get(asked.key) ?? []), m.toolCallId]);
 			const confidence = chosenConfidence(details.confidence) ?? null;
-			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, recorded: false });
+			const words = typeof details.text === "string" && details.text.trim() ? { words: details.text } : {};
+			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: false, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, ...words, recorded: false });
 		}
 	}
+	for (const asked of posed.values()) asked.seen ||= asked.shownBy.some((id) => recorded.has(id));
 	for (const [key, answer] of answered) {
 		answer.recorded = recorded.has(key);
+		answer.seenBefore = posed.get(concludedFrom.get(key) ?? key)?.seen === true;
 		const replay = unsaved.get(key);
 		if (replay && !answer.recorded) answer.replay = replay;
 	}
@@ -1222,6 +1263,90 @@ export function sessionPlanTopicOf(messages: readonly LhMessage[]): string | nul
 		}
 	}
 	return null;
+}
+
+/** The topic not started that the session's answers started before any
+ *  plan: the first save that went through whose receipt moved a topic up
+ *  from "new" (its `levels`), as a probe's first answer on the topic he
+ *  asked to start does (round 17, M5). Null when a plan came first, or no
+ *  save started one. Pure. */
+export function firstStartedTopicOf(messages: readonly LhMessage[]): string | null {
+	const clean = cleanToolCallIds(messages);
+	for (const m of messages) {
+		if (m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === "plan_init" && clean.has(b.id))) return null;
+		if (m.role !== "toolResult" || m.isError || m.toolName !== "course_save") continue;
+		let receipt: unknown;
+		try { receipt = JSON.parse(resultText(m)); } catch { continue; }
+		const levels = (receipt as { levels?: unknown } | null)?.levels;
+		const started = Object.entries(typeof levels === "object" && levels !== null ? levels : {}).find(([, change]) => (change as { from?: unknown } | null)?.from === "new");
+		if (started) return started[0];
+	}
+	return null;
+}
+
+/** The topics whose start the session's saves moved: each key of a
+ *  `starts_moved` in the receipt of a save that went through, in order.
+ *  Pure. */
+export function startsMovedOf(messages: readonly LhMessage[]): string[] {
+	const moved = new Set<string>();
+	for (const m of messages) {
+		if (m.role !== "toolResult" || m.isError || m.toolName !== "course_save") continue;
+		let receipt: unknown;
+		try { receipt = JSON.parse(resultText(m)); } catch { continue; }
+		const starts = (receipt as { starts_moved?: unknown } | null)?.starts_moved;
+		for (const key of typeof starts === "object" && starts !== null ? Object.keys(starts) : []) moved.add(key);
+	}
+	return [...moved];
+}
+
+/** The goal topic of each plan that went through, in order. Pure. */
+export function plannedTopicsOf(messages: readonly LhMessage[]): string[] {
+	const clean = cleanToolCallIds(messages);
+	return messages.flatMap((m) =>
+		m.role !== "assistant"
+			? []
+			: m.content.flatMap((block) => {
+					if (block.type !== "toolCall" || block.name !== "plan_init" || !clean.has(block.id)) return [];
+					const topic = ((block.arguments as { goal?: { topic?: unknown } } | null)?.goal ?? null)?.topic;
+					return typeof topic === "string" && topic.trim() ? [topic.trim()] : [];
+				}),
+	);
+}
+
+/** When the session's saved answers on each topic came: the time of the
+ *  newest message whose save went through with an answer on it, by topic.
+ *  Pure. */
+export function savedAnswerTimesOf(messages: readonly LhMessage[]): Map<string, number> {
+	const clean = cleanToolCallIds(messages);
+	const at = new Map<string, number>();
+	for (const m of messages) {
+		if (m.role !== "assistant" || typeof m.timestamp !== "number") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const changes = saveChanges(block.arguments as Record<string, unknown>);
+			for (const o of Array.isArray(changes?.observations) ? changes.observations : []) {
+				for (const t of strings((o as { topics?: unknown } | null)?.topics)) at.set(t, Math.max(at.get(t) ?? 0, m.timestamp));
+			}
+		}
+	}
+	return at;
+}
+
+/** When the session's saves wrote each engine task: the time of the newest
+ *  message whose save went through with that task in it, by key, a task
+ *  removed included. Pure. */
+export function savedTaskTimesOf(messages: readonly LhMessage[]): Map<string, number> {
+	const clean = cleanToolCallIds(messages);
+	const at = new Map<string, number>();
+	for (const m of messages) {
+		if (m.role !== "assistant" || typeof m.timestamp !== "number") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const tasks = saveChanges(block.arguments as Record<string, unknown>)?.tasks;
+			for (const key of typeof tasks === "object" && tasks !== null ? Object.keys(tasks) : []) at.set(key, Math.max(at.get(key) ?? 0, m.timestamp));
+		}
+	}
+	return at;
 }
 
 /** The topics the session's saved answers were on: each observation's

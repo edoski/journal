@@ -25,13 +25,20 @@ owed, says nothing either (``Done.reviews_kept``): he stopped where the plan
 stopped him, so counting it would let the plan's own rounding of his limit to
 whole items (``whole``) move his limit, and with it the days he was told. So
 whether a day stopped short is read against the plan made that morning, from
-the days before it (``_settled``). Until then the same mean, over finished
+the days before it (``_settled``). A day he started nothing because his own
+answers withdrew its start (a need he answered that day left not solid) is
+kept too: the plan keeps every other topic's day, so the room it freed held
+nothing he could take. Until then the same mean, over finished
 days only, is the most he has shown he does: new topics are proposed at least
 at that pace, and past each exam's pace when it needs more.
 
 A day he answered no review at all says only that he did not review that
 day, not how many he gets through when he does, so it never shows a review
 limit: a limit of none would hold every review off the plan for good.
+Likewise a day he left a start owed and started no topic, or did more
+reviews than the plan proposed, spent the day elsewhere and says nothing of
+his new-topic pace (``_elsewhere``); a day he started more topics than the
+plan proposed always does, since it raises it.
 
 Which weekdays he studies is censored the same way: a day the plan held
 nothing and he did nothing says nothing, since nothing was proposed. A weekday
@@ -105,8 +112,9 @@ class Done:
     """What one day's record shows was completed, across every course, and
     whether he stopped with reviews or exam-paced new topics still owed
     (``reviews_short``), or did exactly what his limit proposed with more
-    owed, or has not finished today's yet (``reviews_kept``): such a day says
-    nothing about that kind's limit."""
+    owed, or has not finished today's yet, or started nothing because his
+    own answers withdrew the day's start (``reviews_kept``, ``new_kept``):
+    such a day says nothing about that kind's limit."""
 
     reviews: int = 0
     new: int = 0
@@ -268,10 +276,25 @@ def first_day(
     return date.fromisoformat(first) if first else None
 
 
-def _solid_before(replayed: progress.Replay, day: date) -> bool:
-    """Solid on ``day``'s morning: the last verdict before it was ``solid``."""
-    before = [verdict for when, verdict in replayed.verdicts if when < day.isoformat()]
-    return bool(before) and before[-1] == "solid"
+def _solid_on(replayed: progress.Replay, day: date, ended: bool = False) -> bool:
+    """Solid on ``day``'s morning, or as it ``ended``: the last verdict
+    before it (through it) was ``solid``, or a shaky right answer after one
+    (``progress.shaky_right``: no lapse)."""
+    last = day.isoformat()
+    seen = [
+        (when, verdict)
+        for when, verdict in replayed.verdicts
+        if when < last or (ended and when == last)
+    ]
+    if not any(verdict == "solid" for _, verdict in seen):
+        return False
+    when, verdict = seen[-1]
+    return verdict == "solid" or when in replayed.shaky
+
+
+def _answered_on(replayed: progress.Replay, day: date) -> bool:
+    """Whether a verdict of ``day`` counted his answers on it."""
+    return any(when == day.isoformat() for when, _ in replayed.verdicts)
 
 
 def _reviews_left(
@@ -329,15 +352,25 @@ def _new_short(
     replayed: Mapping[str, progress.Replay],
     days: Iterable[date],
     studies: frozenset[int],
-) -> set[date]:
+) -> tuple[set[date], set[date]]:
     """Of ``days``, those he started fewer of this course's topics than its
     exam pace owed: the topics the exam needed started that morning
     (``progress.exam_topics``) over the study days left, as many as were
     ready in the window the plan read them from (``progress.opens``), or
-    beyond it on a day holding them would have raised the pace."""
+    beyond it on a day holding them would have raised the pace; and those
+    whose answers withdrew a start ready that morning, a need they left not
+    solid.
+
+    A day of the second kind on which he started nothing says nothing of his
+    limit (``_activity``): his own study moved the day's start, and the plan
+    keeps every other topic's day through the day, so the room it freed held
+    nothing he could take (round 17, 1 M2:
+    his Linear Algebra review on 9 Nov moved Linear maps to 11 Nov, the day
+    read as one he stopped short of a start, and Variance left the exam
+    overnight)."""
     exam = progress.exam_plan(record)
     if exam is None:
-        return set()
+        return set(), set()
     lessons = progress.lessons(record)
     starts = {
         key: first
@@ -350,6 +383,7 @@ def _new_short(
     asks = progress.asks(record)
     free = progress.free_arcs(record)
     short: set[date] = set()
+    moved: set[date] = set()
     for day in days:
         if exam.day <= day:
             continue
@@ -364,41 +398,61 @@ def _new_short(
         if not left or not untaught:
             continue
 
-        def solid(key: str, day: date = day) -> bool:
+        def ready(solid: Callable[[str], bool]) -> list[str]:
+            return [
+                key
+                for key in untaught
+                if all(solid(need) for need in progress.needs(record, key))
+                and not any(
+                    starts.get(other, day) < day and not solid(other)
+                    for other in partners[key]
+                )
+            ]
+
+        def before(key: str, day: date = day) -> bool:
             if not asks:
                 return starts.get(key, day) < day
-            return _solid_before(replayed[key], day)
+            return _solid_on(replayed[key], day)
 
-        ready = [
-            key
-            for key in untaught
-            if all(solid(need) for need in progress.needs(record, key))
-            and not any(
-                starts.get(other, day) < day and not solid(other)
-                for other in partners[key]
-            )
-        ]
         owed = pace(len(untaught), left, day, lambda other: other.weekday() in studies)
-        opened = _opened(record, untaught, ready, owed, free, exam.final <= day)
+        final = exam.final <= day
+        if asks:
+            # The plan proposes a start on the day of its need's review, as
+            # if it came out solid: one his answers left not solid withdrew it.
+
+            def hoping(key: str, day: date = day) -> bool:
+                return before(key) or _answered_on(replayed[key], day)
+
+            def ended(key: str, day: date = day) -> bool:
+                return _solid_on(replayed[key], day, True)
+
+            if set(ready(hoping)) - set(ready(ended)):
+                moved.add(day)
+                continue
+        morning = ready(before)
+        opened = _opened(record, untaught, morning, owed, free, final)
         if len(opened) < owed and not progress.holding_raises(
             left, len(untaught) - len(opened), len(untaught)
         ):
-            ready = opened
-        owed = min(len(ready), owed)
+            morning = opened
+        owed = min(len(morning), owed)
         if sum(starts.get(key) == day for key in untaught) < owed:
             short.add(day)
-    return short
+    return short, moved
 
 
 def exam_days(records: Iterable[dict[str, Any]]) -> frozenset[date]:
     """The days he sits an exam, of every course: the plan holds nothing on
     them, of any course, since the exam is that day's work. Nothing he does
-    or leaves that day reads as his limit or his study days."""
+    or leaves that day reads as his limit or his study days. Of an exam with
+    several sessions, each up to the one he aims at: those gone by were his
+    to sit, and the later ones are not his yet."""
     return frozenset(
         day
         for record in records
         if (when := record.get("exam", {}).get("date"))
-        and _kept((day := date.fromisoformat(when)), record)
+        for held in {when, *record["exam"].get("sessions", ())}
+        if held <= when and _kept((day := date.fromisoformat(held)), record)
     )
 
 
@@ -448,6 +502,7 @@ def _activity(records: list[dict[str, Any]], today: date) -> dict[date, Done]:
     week = _study_weekdays(studied, today, rest)
     left: set[date] = set()
     short: set[date] = set()
+    moved: set[date] = set()
     for record, replays in zip(records, replayed, strict=True):
         if progress.asks(record):
             exam_of = progress.examining(record)
@@ -459,24 +514,27 @@ def _activity(records: list[dict[str, Any]], today: date) -> dict[date, Done]:
                     )
                     if _kept(day, record)
                 }
-        short |= {
-            day
-            for day in memo.once(
-                "new_short",
-                (memo.content(record), week.planned, week.study),
-                functools.partial(
-                    _new_short, record, replays, week.planned, week.study
-                ),
-            )
-            if _kept(day, record)
-        }
+        found = memo.once(
+            "new_short",
+            (memo.content(record), week.planned, week.study),
+            functools.partial(_new_short, record, replays, week.planned, week.study),
+        )
+        short |= {day for day in found[0] if _kept(day, record)}
+        moved |= {day for day in found[1] if _kept(day, record)}
+
+    def withdrew(day: date) -> bool:
+        """A day he started nothing because his own answers withdrew its
+        start (``_new_short``): it says nothing of his limit."""
+        return day in moved and not new.get(day, 0)
+
     return _settled(
         {
             day: Done(
                 reviews.get(day, 0),
                 new.get(day, 0),
                 day in left and day in week.planned and reviews.get(day, 0) > 0,
-                day in short,
+                day in short and not withdrew(day),
+                new_kept=withdrew(day),
             )
             for day in studied
         },
@@ -502,7 +560,9 @@ def _settled(
         if done.reviews_short or done.new_short:
             morning = estimate(settled, day, rest)
             reviews = _stop(morning, day, "reviews", done.reviews, today)
-            new = _stop(morning, day, "new", done.new, today)
+            new = _stop(morning, day, "new", done.new, today) and not _elsewhere(
+                morning, day, done
+            )
             done = replace(
                 done,
                 reviews_short=done.reviews_short and reviews,
@@ -526,6 +586,20 @@ def _stop(morning: Capacity, day: date, kind: str, done: int, today: date) -> bo
     if day >= today:
         return False
     return proposed is None or done < proposed
+
+
+def _elsewhere(morning: Capacity, day: date, done: Done) -> bool:
+    """Whether he spent a day his new topics were left owed elsewhere: he
+    started no topic, or did more reviews than the morning's plan proposed
+    (his review limit's whole items, once shown). Like a day he answered no
+    review, it says nothing of his new-topic pace. A day he started more
+    topics than the plan proposed is never elsewhere: it raises his pace."""
+    if morning.on(day).new.shown and done.new > morning.room(day, "new"):
+        return False
+    reviews = morning.on(day).reviews
+    return not done.new or (
+        reviews.shown and done.reviews > morning.room(day, "reviews")
+    )
 
 
 # --- the estimate -------------------------------------------------------------
@@ -705,7 +779,9 @@ def began(days: Mapping[date, Done], today: date) -> dict[date, Done]:
 def final_reviews(
     records: Mapping[Name, dict[str, Any]], today: date
 ) -> dict[Name, dict[str, Any]]:
-    """Every course read with the plan: each exam's final review from his pace
+    """Every course read with the plan, each aimed at its exam session ahead
+    (``progress.aimed``, with its engine dates re-derived for it at once):
+    each exam's final review from his pace
     as the record now shows it (``final_review_days``), nearest exam first,
     with the dates the engine set re-derived from it (``progress.redated``).
     A final review a course preference sets, or one that has begun
@@ -721,12 +797,18 @@ def final_reviews(
     (``_kept``), so its final review is its shortest form too.
     """
 
+    aimed = {name: progress.aimed(record, today) for name, record in records.items()}
+    moved = {name for name, record in aimed.items() if record is not records[name]}
+    records = aimed
+
     def exam_day(name: Name) -> date:
         return date.fromisoformat(records[name]["exam"]["date"])
 
     result = {
         name: progress.with_final_review(record, exam_day(name))
         if progress.unplanned(record)
+        else progress.redated(record, today)
+        if name in moved
         else record
         for name, record in records.items()
     }

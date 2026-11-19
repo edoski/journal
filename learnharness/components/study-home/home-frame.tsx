@@ -7,7 +7,7 @@ import { CoursesUnavailable } from "@/components/course-picker";
 import { StartScope } from "@/components/start/start-scope";
 import { takeLine, useLessonStart, type TakeLine } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
-import { doneToday, nearExam, type NearExam } from "@/components/study-home/day-record";
+import { doneToday, homeExams, misfitExam, nearExam, sessionAsks, type NearExam, type SessionAsk } from "@/components/study-home/day-record";
 import { needsYouNow } from "@/components/study-home/needs-you";
 import { todayCourses, type TodayRow } from "@/components/study-home/study-facts";
 import { UnreadableLines } from "@/components/study-home/unreadable-course";
@@ -29,6 +29,10 @@ export interface HomeReady {
 	done: readonly string[];
 	/** The nearest exam in the coming week, which the heading names (`nearExam`). */
 	exam: NearExam | null;
+	/** The exam whose topics with no room before it the heading's line names (`misfitExam`). */
+	misfit: NearExam | null;
+	/** Each exam session gone by that Home asks about (`sessionAsks`). */
+	asks: readonly SessionAsk[];
 	busy: boolean;
 	/** Take up a course line's step, else the course's next (`takeLine`). */
 	onContinue: TakeLine;
@@ -90,9 +94,12 @@ function homeOf(courses: readonly StudyCourse[], chats: readonly ChatListItem[],
 		courses: todayCourses(rows, courses),
 		chats,
 		done: doneToday(chats, new Date(), courses),
-		exam: nearExam(courses.flatMap(({ map }) => (map.exam ? [{ course: map.title, date: map.exam.date, daysLeft: map.exam.daysLeft }] : []))),
+		exam: nearExam(homeExams(courses)),
+		misfit: misfitExam(homeExams(courses)),
+		asks: sessionAsks(courses),
 	};
 }
+
 
 /** Home's read: the page's notice while it reads or can't (`PageNotice`), else its column. */
 function HomeBody({ state, onRetry, children }: { state: StudyHomeState; onRetry: () => void; children: (ready: Extract<StudyHomeState, { status: "ready" }>) => React.ReactNode }) {

@@ -36,9 +36,10 @@ import { applyParkedDismissal } from "./dismissal-park.ts";
 import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn } from "./turn-runs.ts";
 import { askPrestart, claimPrestart, prestart } from "./prestart.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
+import { continuedTask } from "./task-passage.ts";
 import { activeProblemOf, answeredQuestionsOf, danglingQuestionOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
 import { remarkableOf } from "../core/answer-marks.ts";
-import { reviewRecord } from "../core/session-opening.ts";
+import { lessonTopicsOf, reviewRecord } from "../core/session-opening.ts";
 import { compactionInstructions, planTreeToText } from "../core/compaction.ts";
 import { PATHS } from "../../config.ts";
 import { nextChatSession } from "../core/sdk-session.ts";
@@ -58,6 +59,7 @@ import {
 } from "../core/input-events.ts";
 import { steerDelivered } from "../core/contracts.ts";
 import { listenForCourseMaps } from "./course-map.ts";
+import { listenForLessonOpenings } from "./work-finished.ts";
 import { preparePhotos } from "./photos.ts";
 import type {CallUsage} from "../core/contracts.ts";
 
@@ -164,6 +166,8 @@ function sessionStoreFor(chatId: string): SessionStore {
 setJobRespawn((jobId) => void jobRunner.runJob(jobId));
 // A lesson's save that registers material extends the course's map.
 listenForCourseMaps();
+// A new lesson's opening turn settling is work he waited on (work-finished.ts).
+listenForLessonOpenings(stores.chatStore);
 
 /** The route-facing entry: parse {chatId, input} and run one turn. */
 export async function handleChatRequest(
@@ -253,6 +257,16 @@ function turnAgent(
 			// The lesson was deleted mid-turn: nothing to keep the links with.
 		}
 	};
+	// Home rereads the session list on record-changed, so a start the save
+	// moved stays on it while the turn still runs (round 18, M4).
+	const keepMoved = (topics: string[]) => {
+		try {
+			stores.chatStore.saveStartsMoved(chatId, topics);
+			emit("record-changed", { chatId });
+		} catch {
+			// The lesson was deleted mid-turn: nothing to keep them with.
+		}
+	};
 	const agentOpts: AgentBuildOptions = {
 		engine,
 		messages: asAgentMessages(agentMessages),
@@ -272,7 +286,7 @@ function turnAgent(
 		// save's links are kept the moment the engine takes it, so a restart
 		// before the transcript's write loses neither the mark nor the
 		// "already saved" (round 8).
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, review: reviewRecord(record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [], courses: keptCourseMaps } } : {}),
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, onMoved: keepMoved, review: reviewRecord(record), reviewTopics: record.topics ?? [], lessonTopics: () => lessonTopicsOf(stores.chatStore.getChat(chatId) ?? record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [], courses: keptCourseMaps } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
 	// practitioner — no plan/question tools; problem + conclude, and the
@@ -430,9 +444,14 @@ export async function handleChatInput(
 	const learnerInput = input.type !== "steers" && input.type !== "retry" && input.type !== "retry-question" && input.type !== "continue";
 	// A mode handoff starts the other agent, whose brief differs.
 	const handoffWake = input.type === "steers" && input.steers.some((s) => s.role === "custom" && s.customType === "mode-handoff");
-	const [courseBrief, courseArcs] = await Promise.all([
-		learnerInput || handoffWake ? fetchCourseBrief(record, input.type === "text" ? input.text : null) : null,
+	// Continue on a task: its title, step and the part's text from his
+	// material, as the engine's map names them, drawn the moment he presses
+	// (round 17, M8; round 18, M6).
+	const opened = record;
+	const [courseBrief, courseArcs, task] = await Promise.all([
+		learnerInput || handoffWake ? fetchCourseBrief(record) : null,
 		fetchCourseArcs(record),
+		input.type === "task" ? keptCourseMaps().then((maps) => continuedTask(maps.find((m) => m.workspace === opened.course?.workspace), opened.messages)) : null,
 	]);
 	const freshRecord = stores.chatStore.getChat(chatId);
 	if (!freshRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
@@ -466,7 +485,7 @@ export async function handleChatInput(
 		appends =
 			input.type === "steers"
 				? input.steers.filter((s) => !steerDelivered(record.messages, s.id)).map((s) => withProbeFeedback(s, record.messages))
-				: inputAppends(record, input);
+				: inputAppends(record, input.type === "task" ? { type: "task", task } : input);
 	} catch (err) {
 		if (err instanceof ChatInputError) {
 			return Response.json({ error: err.message }, { status: 400 });

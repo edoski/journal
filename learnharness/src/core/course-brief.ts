@@ -367,50 +367,41 @@ function studiedLine({ date, daysAgo }: LastStudied): string {
 	return `He last studied this course ${when}: the only day to tell him he last studied, never a moved day's note.`;
 }
 
-/** "A", "A and B", "A, B and C". */
-const listedWords = (names: readonly string[]) => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
-
-/** The reviews today's plan still holds, in any course: what starting
- *  `topic` early puts off. A new topic planned today is not due, and
- *  what it builds on is the probe's to show (round 15, m12: the opener
- *  grew to the plan's day, shaky prerequisites and today's other starts,
- *  and taught nothing). Empty when nothing is due. */
-function displacedReviews(plans: CoursePlans): string[] {
-	return plans.courses.flatMap(({ map: m, days }) => {
-		const today = days.find((d) => d.date === m.today);
-		return (today?.reviews ?? []).map((h) => `your ${m.topics.find((t) => t.handle === h)?.title ?? h} review`);
-	});
+/** Which of the reviews due today the lesson he opened builds on (its
+ *  topics' `needs`): those it takes first, and the rest, which Home offers
+ *  and the lesson leaves alone (round 18, m17: Start on Poisson ran the
+ *  Binomial review, then two questions of Random variables', which Poisson
+ *  does not build on, four answers before its first probe). Null outside
+ *  a lesson opened on a topic. */
+function lessonBuildsOn(plan: CoursePlans | undefined, lesson: readonly string[], due: readonly string[]): string | null {
+	if (lesson.length === 0 || due.length === 0) return null;
+	const map = plan?.courses.find((c) => c.map.workspace === plan.workspace)?.map;
+	if (!map) return null;
+	const needs = new Set(map.edges.flatMap((e) => (e.kind === "needs" && lesson.includes(e.topic) ? [e.prerequisite as string] : [])));
+	const first = due.filter((t) => needs.has(t));
+	const rest = due.filter((t) => !needs.has(t) && !lesson.includes(t));
+	const named = lesson.join(", ");
+	if (rest.length === 0) return `${named} builds on each of them: their reviews come first, each opened with one plain line naming it.`;
+	const left = `${rest.join(", ")} ${rest.length > 1 ? "are" : "is"} not one ${named} builds on: Home offers ${rest.length > 1 ? "their reviews" : "its review"}, so this lesson leaves ${rest.length > 1 ? "them" : "it"} alone.`;
+	return first.length > 0 ? `${named} builds on ${first.join(", ")}: ${first.length > 1 ? "their reviews come" : "its review comes"} first, opened with one plain line naming it. ${left}` : `${named} builds on none of them, so it opens on the lesson. ${left}`;
 }
 
-/** A topic he started today, from its page or a row, that his plan starts
- *  on a later day, while a review is still due today: the lesson's first
- *  words say that review is still due, in one short clause, and nothing
- *  else of the plan (round 13, 1 n7: a start 11 days early opened on a
- *  bare probe; round 14, m1: the line opened every lesson, a lesson he had
- *  begun, and the Ask-the-tutor reply; round 15, m12: it grew to three
- *  clauses that offered nothing). With nothing due today it says nothing.
- *  `opening` is the session's first words: a start opens with the topic's
- *  title ("Start" and it, or it alone); a continue, a question and a free
- *  message never do. */
-function aheadOfPlanLines(plans: CoursePlans | undefined, opened: readonly string[], opening: string | null): string[] {
-	const map = plans?.courses.find((c) => c.map.workspace === plans.workspace)?.map;
-	if (!plans || !map || !opening) return [];
-	const words = opening.trim().replace(/^Start\s+/, "").toLowerCase();
-	return opened.flatMap((handle) => {
-		const topic = map.topics.find((t) => t.handle === handle);
-		if (!topic || topic.level !== "new" || !topic.starts || topic.starts <= map.today || lessonBegun(topic)) return [];
-		if (words !== topic.title.toLowerCase()) return [];
-		const due = displacedReviews(plans);
-		if (due.length === 0) return [];
-		const clause = `${listedWords(due)} ${due.length > 1 ? "are" : "is"} still due today`;
-		return [`Started early: his plan starts ${topic.title} on a later day, and he starts it today while ${clause}. Your first message says so in one short clause before its question ("${clause[0]!.toUpperCase()}${clause.slice(1)}."), and nothing else about his plan: never its day, what ${topic.title} builds on, or a reason.`];
-	});
+/** An exam held in several sessions, after its day in the record line:
+ *  every session, and the one gone by that he has not said how it went
+ *  (the engine's `exam.past`), so the tutor saves his word on it. */
+function sessionsWords(exam: Record<string, unknown>): string {
+	const sessions = Array.isArray(exam.sessions) ? exam.sessions.filter((d): d is string => typeof d === "string") : [];
+	if (sessions.length < 2) return "";
+	const days = sessions.map(longDay);
+	const listed = `${days.slice(0, -1).join(", ")} and ${days.at(-1)}`;
+	const past = typeof exam.past === "string" ? `; ${longDay(exam.past)} has gone by and he has not said how it went` : "";
+	return `, the session he aims at (sessions: ${listed}${past})`;
 }
 
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
-	{ runup, arcCheck, plan, opened = [], opening = null, live = [], review = false, takenUp = null, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; opening?: string | null; live?: readonly string[]; review?: boolean; takenUp?: string | null; studied?: LastStudied | null } = {},
+	{ runup, arcCheck, plan, opened = [], live = [], review = false, takenUp = null, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; live?: readonly string[]; review?: boolean; takenUp?: string | null; studied?: LastStudied | null } = {},
 ): { key: string; text: string } {
 	const r = obj(resume);
 	const course = obj(r.course);
@@ -420,15 +411,14 @@ export function projectCourseBrief(
 	const due = list(r.due);
 
 	const lines: string[] = [];
-	const examLine = typeof exam.date === "string" ? ` · exam on ${longDay(exam.date)}` : "";
+	const examLine = typeof exam.date === "string" ? ` · exam on ${longDay(exam.date)}${sessionsWords(exam)}` : "";
 	lines.push(`[Course record] ${str(course.title) ?? "Untitled course"} · today ${dayWithWeekday(str(r.today))}${examLine}`);
 	if (str(course.goal)) lines.push(`About the course, in his words: ${course.goal}`);
 	if (studied) lines.push(studiedLine(studied));
 	// A review whose plan teaches another topic is that topic's lesson from then on (round 16, M4).
-	if (opened.length > 0 && takenUp) lines.push(`Opened on: ${opened.join(", ")}, as its review; its plan then took up ${takenUp}, so the session is now the ${takenUp} lesson, a lesson like any other: what is left of it at its close is that lesson's task, and the close calls it the lesson, never a review.`);
+	if (opened.length > 0 && takenUp) lines.push(`Opened on: ${opened.join(", ")}, as its review; it then took up ${takenUp}, so the session is now the ${takenUp} lesson, a lesson like any other: what is left of it at its close is that lesson's task, and the close calls it the lesson, never a review.`);
 	else if (opened.length > 0 && review) lines.push(`Opened on: ${opened.join(", ")}, as its review. He pressed its button, and the app posted his first message. The session is his review, whatever it re-teaches.`);
 	else if (opened.length > 0) lines.push(`Opened on: ${opened.join(", ")}. He pressed the action on its page, and the app posted his first message.`);
-	if (!review) lines.push(...aheadOfPlanLines(plan, opened, opening));
 	const topics = list(path.topics)
 		.map((t) => (Array.isArray(t) ? `${String(t[0])} (${String(t[1])})` : undefined))
 		.filter(Boolean);
@@ -455,6 +445,8 @@ export function projectCourseBrief(
 	const detail = obj(r.topics);
 	if (due.length > 0) {
 		lines.push(dueHeading(r, due.length), ...due.map((d) => dueLine(withDetail(d, detail), role)));
+		const builds = review ? null : lessonBuildsOn(plan, takenUp ? [takenUp] : opened, due.map((d) => str(obj(d).topic) ?? ""));
+		if (builds) lines.push(builds);
 	} else {
 		lines.push("Due today: nothing.");
 	}

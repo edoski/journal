@@ -300,7 +300,7 @@ describe("TodayList", () => {
 		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
-			["Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence", "Review Convergent sequences, Cauchy sequences", "Review Chain rule, Riemann sums, Improper integrals", "Continue Eigenvalues lesson"],
+			["Probability review", "Review Linear independence", "Real Analysis review", "Calculus I review", "Continue Eigenvalues lesson"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
@@ -309,7 +309,8 @@ describe("TodayList", () => {
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
-			["Due 5 Nov", "Due 4 Nov", "Due 1 Nov", "Not right last time", "Your turn"],
+			// "Calculus I review" names no topic, so its lapse keeps Chain rule, as Home's line does (round 18, M1's seed).
+			["Due 5 Nov", "Due 4 Nov", "Due 1 Nov", "Not right last time: Chain rule", "Your turn"],
 		);
 		assert.deepEqual(
 			[...doc.querySelectorAll('[data-slot="unit-section-header"]')].map((h) => h.textContent),

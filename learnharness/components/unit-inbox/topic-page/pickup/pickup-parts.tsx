@@ -106,7 +106,10 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 }
 
 /** Builds on: each topic this one builds on as a row, its pie, its title
- *  (two lines at most, never cut to one)
+ *  (three lines at most, as the sidebar's) and its standing wrapping in
+ *  10rem, so a long standing never squeezes the title into a cut (round
+ *  17, m26: "Gauss-Jordan reduction and…" beside "Right on your own,
+ *  check another day")
  *  and where he stands on it in the pie's words, opening its page; a
  *  pointer or focus on a row tells the page (`onPoint`), so the map beside
  *  can light it. */
@@ -126,10 +129,10 @@ export function BuildsOnList({ builds, onPoint }: { builds: readonly BuildsOn[];
 						className={cn(WRAPPING_ROW, "outline-none transition-colors duration-150 hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none")}
 					>
 						<TopicGlyph standing={standing} />
-						<span data-slot="pickup-builds-on-title" className="line-clamp-2 text-body text-foreground">
+						<span data-slot="pickup-builds-on-title" className="line-clamp-3 text-body text-foreground">
 							<LineText>{topic.title}</LineText>
 						</span>
-						<span data-slot="pickup-builds-on-standing" className="text-callout text-muted-foreground">
+						<span data-slot="pickup-builds-on-standing" className="max-w-40 text-right text-callout text-muted-foreground">
 							{words}
 						</span>
 					</Link>
@@ -145,10 +148,10 @@ export function MaterialList({ refs }: { refs: readonly TopicRef[] }) {
 	return (
 		<ul className="flex flex-col">
 			{refs.map((ref, i) => (
-				<li key={`${ref.source}#${ref.locator ?? i}`} data-slot="pickup-material" className={cn(ref.locator ? TWO_LINE_ROW : ONE_LINE_ROW, "mx-0 w-full pr-0 has-[>svg]:pr-0", GUTTER)}>
+				<li key={`${ref.source}#${ref.locator ?? i}`} data-slot="pickup-material" className={cn(ref.locator && ref.source ? TWO_LINE_ROW : ONE_LINE_ROW, "mx-0 w-full pr-0 has-[>svg]:pr-0", GUTTER)}>
 					<BookOpenIcon aria-hidden className={ICON} />
 					<span className="col-span-2 truncate text-body text-foreground">{ref.locator ?? ref.source}</span>
-					{ref.locator && <span className="col-span-2 col-start-2 truncate text-callout text-muted-foreground">{ref.source}</span>}
+					{ref.locator && ref.source && <span className="col-span-2 col-start-2 truncate text-callout text-muted-foreground">{ref.source}</span>}
 				</li>
 			))}
 		</ul>

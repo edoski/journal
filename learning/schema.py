@@ -108,6 +108,7 @@ _HANDLES = "handles"
 _IDS = "ids"
 _REFS = "refs"
 _DAY = "day"
+_DAYS = "days"
 _FLAG = "flag"
 _KIND = "kind"
 _RESULT = "result"
@@ -128,6 +129,7 @@ POINT_CHARS = 200
 FIELDS: dict[str, dict[str, str]] = {
     "exam": {
         "date": _DAY,
+        "sessions": _DAYS,
         "format": _TEXT,
         "coverage": _TEXT,
         "criteria": _TEXTS,
@@ -166,6 +168,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "shown": _FLAG,
         "gave_up": _FLAG,
         "predicted": _FLAG,
+        "aside": _FLAG,
         "date": _DAY,
         "task": _HANDLE,
         "refs": _REFS,
@@ -220,7 +223,7 @@ FIELDS: dict[str, dict[str, str]] = {
     },
 }
 HELPERS: dict[str, dict[str, str]] = {
-    "exam": {"final_review": _DAY},
+    "exam": {"final_review": _DAY, "past": _DAY},
     "topic": {"judged": _DAY},
     "review": {"by": _BY},
     "observation": {"recorded": _STAMP, "due_topics": _HANDLES},
@@ -334,6 +337,7 @@ class Observation(TypedDict, total=False):
     shown: bool
     gave_up: bool
     predicted: bool
+    aside: bool
     date: str
     task: str
     refs: list[Reference]
@@ -370,7 +374,9 @@ class Task(TypedDict, total=False):
 
 class Exam(TypedDict, total=False):
     date: str
+    sessions: list[str]
     final_review: str
+    past: str
     format: str
     coverage: str
     criteria: list[str]
@@ -580,6 +586,15 @@ def _day(value: Any, path: str, patch: bool) -> str:
     raise ValueError(f"{path} must be a date in YYYY-MM-DD form, not {value!r}")
 
 
+def _days(value: Any, path: str, patch: bool) -> list[str] | None:
+    """Days in ascending order, each once: an exam's listed sessions."""
+    items = _list(value, path, "dates in YYYY-MM-DD form")
+    days = [_day(item, f"{path}[{index}]", False) for index, item in enumerate(items)]
+    if days != sorted(set(days)):
+        raise ValueError(f"{path} must list each day once, earliest first")
+    return days or None
+
+
 def _flag(value: Any, path: str, patch: bool) -> bool | None:
     if type(value) is not bool:
         raise ValueError(f"{path} must be true or false")
@@ -681,6 +696,7 @@ _RULES: dict[str, Callable[[Any, str, bool], Any]] = {
     _IDS: _ids,
     _REFS: _refs,
     _DAY: _day,
+    _DAYS: _days,
     _FLAG: _flag,
     _KIND: _choice(KINDS),
     _RESULT: _choice(RESULTS),
@@ -857,8 +873,21 @@ def counts(observation: dict[str, Any]) -> bool:
     except a prediction made before its step was taught (``predicted``).
     Before the teaching a wrong guess is expected, so it says nothing about
     what is held, and a right one is not yet recall of what was taught; it
-    stays in the history as what happened."""
-    return observation["kind"] in SCHEDULING_KINDS and not observation.get("predicted")
+    stays in the history as what happened. An answer given inside another
+    topic's lesson (``aside``) is no start either: it moves nothing, and
+    counts for its topic's level only once the topic has an answer that
+    counts (``progress``)."""
+    return (
+        observation["kind"] in SCHEDULING_KINDS
+        and not observation.get("predicted")
+        and not observation.get("aside")
+    )
+
+
+def counts_aside(observation: dict[str, Any]) -> bool:
+    """An answer that would count but was given inside another topic's
+    lesson (``aside``)."""
+    return bool(observation.get("aside")) and counts({**observation, "aside": False})
 
 
 def _predictions_alone(
@@ -1040,6 +1069,11 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
                 f"{path}.predicted marks a prediction made in a session before "
                 "its step was taught; an exam is never one"
             )
+        if "aside" in observation:
+            raise ValueError(
+                f"{path}.aside marks an answer given inside another topic's "
+                "lesson; an exam is never one"
+            )
     else:
         given = [
             name
@@ -1052,6 +1086,7 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
                 "shown",
                 "gave_up",
                 "predicted",
+                "aside",
             )
             if name in observation
         ]
@@ -1260,6 +1295,16 @@ def _arc_log(value: Any) -> list[dict[str, Any]]:
     return log
 
 
+def _check_sessions(exam: dict[str, Any]) -> None:
+    """An exam that lists its sessions aims at one of them (``exam.date``)."""
+    sessions = exam.get("sessions")
+    if sessions and exam.get("date") not in sessions:
+        raise ValueError(
+            "exam.date must be one of exam.sessions: the session he is aiming "
+            f"at ({', '.join(sessions)}); set exam.date to it, or list it"
+        )
+
+
 def validate_record(record: Any, *, placing: bool = False) -> dict[str, Any]:
     """Check a whole stored course record and return its canonical form.
 
@@ -1281,6 +1326,7 @@ def validate_record(record: Any, *, placing: bool = False) -> dict[str, Any]:
         if name in record:
             result[name] = _text(record[name], name, False)
     if "exam" in record and (exam := entry("exam", record["exam"], "exam")):
+        _check_sessions(exam)
         result["exam"] = exam
     if "journal" in record:
         result["journal"] = _text(record["journal"], "journal", False)
@@ -1821,6 +1867,20 @@ def _content(observation: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _begun(record: dict[str, Any], topic: str) -> bool:
+    """A topic taught, answered in a way that counts, or held by a lesson he
+    began: an answer on it inside another topic's lesson is an ordinary
+    answer, never ``aside`` (a due review taken at a lesson's start)."""
+    return (
+        "introduced" in record["topics"].get(topic, {})
+        or any(
+            counts(item) and topic in item["topics"]
+            for item in record["observations"].values()
+        )
+        or any(topic in task.get("topics", ()) for task in record["tasks"].values())
+    )
+
+
 def _append_observations(
     record: dict[str, Any],
     additions: list[dict[str, Any]],
@@ -1836,6 +1896,8 @@ def _append_observations(
         item = {**addition}
         item.setdefault("date", _default_day(item, record, today))
         _check_new(item, path, record, tasks, today)
+        if item.get("aside") and any(_begun(record, t) for t in item["topics"]):
+            del item["aside"]
         if "disputed" in item:
             item = _sure_as_given(item, record["observations"][item["corrects"][0]])
         duplicate = next(
@@ -1924,6 +1986,10 @@ def apply_patch(
                 merged = _merged(
                     merged, {"leaves_out": changes[name].get("leaves_out")}
                 )
+            if merged and name == "exam" and "date" in changes[name]:
+                # His word on the session he aims at replaces the plan's move
+                # past one gone by (``progress.aimed``).
+                merged.pop("past", None)
             if merged:
                 result[name] = merged
             else:

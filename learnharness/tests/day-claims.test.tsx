@@ -16,11 +16,17 @@ import { describe, it } from "node:test";
 import { parseHTML } from "linkedom";
 import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { ScheduledEntry } from "../components/unit-inbox/topic-page/pickup/pickup-parts.tsx";
-import { briefDays, scheduledDay } from "./helpers/day-claims.ts";
+import { briefDays, daysIn, scheduledDay } from "./helpers/day-claims.ts";
 
 const TODAY = "2026-11-08";
 
 describe("the journey's day readers", () => {
+	it("read a day with no year as the one nearest today, across the new year (round 17: Mon 4 Jan read as 2026, a Sunday)", () => {
+		assert.deepEqual(daysIn("Planned Mon 4 Jan", "2026-11-17"), ["2027-01-04"]);
+		assert.deepEqual(daysIn("Due Mon 28 Dec", "2027-01-03"), ["2026-12-28"]);
+		assert.deepEqual(daysIn("Planned Tue 10 Nov", "2026-11-08"), ["2026-11-10"]);
+	});
+
 	it("read a Scheduled row's day from its date, not from a day its note names", () => {
 		const { document } = parseHTML(`<html><body>${renderToStaticMarkup(<ScheduledEntry kind="review" day="Tue 10 Nov" waits="Moved from 9 Nov after your answer today" />)}</body></html>`);
 		assert.equal(scheduledDay(document.querySelector('[data-slot="pickup-scheduled"]'), TODAY), "2026-11-10");

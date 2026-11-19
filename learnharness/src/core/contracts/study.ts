@@ -6,6 +6,7 @@
 
 import type { UnreadableCourse } from "./course.ts";
 import type { CourseMap, TopicHandle } from "./course-map.ts";
+import type { StudyWindow } from "./calendar.ts";
 
 /** One course on the home. */
 export interface StudyCourse {
@@ -30,7 +31,9 @@ export interface StudyCourse {
 
 /** What GET /api/study answers. A course whose read failed is in `failed`
  *  instead of `courses`, so one broken record never hides the others and
- *  is never hidden itself. */
+ *  is never hidden itself. `hours` are today's study windows in his
+ *  Journal (none on its day off, or without a Journal): the hours the Mac
+ *  app's morning notice keeps to. */
 export type StudyListing =
-	| { available: true; courses: StudyCourse[]; failed: UnreadableCourse[] }
+	| { available: true; courses: StudyCourse[]; failed: UnreadableCourse[]; hours?: readonly StudyWindow[] }
 	| { available: false; reason: string };

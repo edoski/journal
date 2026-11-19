@@ -74,7 +74,7 @@ describe("Home's sessions land without waiting on the courses' read", () => {
 
 	it("a session finished since the courses' read began ends its line until the next read knows it (1 n1)", () => {
 		const read = "2026-11-09T09:00:00.000Z";
-		const review = chat({ id: "rev", title: "Review Eigenvalues and eigenvectors", review: true, topics: ["eigen"], ownTopics: ["eigen"], createdAt: "2026-11-09T09:10:00.000Z", updatedAt: "2026-11-09T09:30:00.000Z" });
+		const review = chat({ id: "rev", title: "Review Eigenvalues and eigenvectors", review: true, topics: ["eigen"], ownTopics: ["eigen"], createdAt: "2026-11-09T09:10:00.000Z", updatedAt: "2026-11-09T09:30:00.000Z", answeredOn: { eigen: TODAY } });
 		const before = needsYouNow([COURSE], [], TODAY, read).rows;
 		assert.ok(before.some((r) => r.kind === "course" && r.step.kind === "review"), "the review is on Today before it is done");
 		const afterClose = needsYouNow([COURSE], [review], TODAY, read).rows;

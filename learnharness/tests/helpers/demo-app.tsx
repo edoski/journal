@@ -113,6 +113,8 @@ export interface HomeLine {
 	status: string;
 	/** The kind of a new topic's reason its mark gives in place of its plain words (`data-starts`), else null. */
 	starts: string | null;
+	/** The topics the line takes up (`data-topics`): a review named as its course's names none. */
+	topics: string[];
 	text: string;
 }
 
@@ -124,6 +126,9 @@ export interface SidebarCard {
 	shelf: string;
 	text: string;
 }
+
+/** When the demo day opens: its clock's first instant, and where the scenario's own messages are stamped from. */
+const DAY_OPENS = "T10:00:00Z";
 
 /** What `lookAt` says of a press that starts a new session. */
 export const NEW_SESSION = "a new session";
@@ -162,6 +167,10 @@ export async function openDemoApp(day = "2026-11-08") {
 	}
 	// Every sidebar shelf open, so each card can be read where it is filed.
 	localStorage.setItem("lh:topic-sidebar-folded", JSON.stringify({ sessions: false }));
+	// The demo day's clock opens when the scenario's own messages are stamped from (`stamp`), whatever the time of day
+	// the run starts: on the machine's time of day, a lesson begun before 09:20 sorted under the seed's 09:19 one.
+	const { studyNow } = await import("../../src/core/day-words.ts");
+	const shift = Math.round((Date.parse(`${day}${DAY_OPENS}`) - studyNow({ LEARNING_TODAY: day }).getTime()) / 1000);
 	Object.assign(process.env, {
 		HOME: path.join(world, "home"),
 		VAULT_DIR: path.join(world, "vault"),
@@ -169,6 +178,7 @@ export async function openDemoApp(day = "2026-11-08") {
 		LH_LEARNING_ENGINE: REPO,
 		LH_LEARNING_PYTHON: python,
 		LEARNING_TODAY: day,
+		LEARNING_CLOCK_SHIFT: String(shift),
 		PYTHONDONTWRITEBYTECODE: "1",
 	});
 
@@ -393,7 +403,8 @@ export async function openDemoApp(day = "2026-11-08") {
 			const [course, title] = [...el.children].filter((c) => c.matches("span.block")).map(text);
 			const status = text(el.querySelector('[data-slot="why-mark"], [data-slot="today-standing"], [data-slot="today-why"]'));
 			const starts = el.querySelector('[data-slot="today-why"]')?.getAttribute("data-starts") ?? null;
-			return { el, course: course ?? "", title: title ?? "", status, starts, text: text(el) };
+			const topics = (el.getAttribute("data-topics") ?? "").split(" ").filter(Boolean);
+			return { el, course: course ?? "", title: title ?? "", status, starts, topics, text: text(el) };
 		});
 	}
 
@@ -492,7 +503,7 @@ export async function openDemoApp(day = "2026-11-08") {
 		return chat;
 	};
 	let n = 0;
-	const stamp = () => Date.parse(`${process.env.LEARNING_TODAY}T10:00:00Z`) + ++n * 60_000;
+	const stamp = () => Date.parse(`${process.env.LEARNING_TODAY}${DAY_OPENS}`) + ++n * 60_000;
 	const usage = { input: 10, output: 10, cacheRead: 0, cacheWrite: 0, totalTokens: 20, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 	const assistant = (content: unknown[], stopReason: "toolUse" | "stop") => ({ id: `msg_n6_${++n}`, role: "assistant", content, api: "anthropic-messages", provider: "anthropic", model: "claude-opus-5-5", usage, stopReason, timestamp: stamp() });
 	const append = (id: string, ...messages: unknown[]) => {

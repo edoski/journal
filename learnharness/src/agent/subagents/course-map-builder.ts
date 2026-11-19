@@ -75,6 +75,9 @@ const answerFields = {
 		Type.Object({
 			coverage: Type.Optional(Type.String({ description: "What the exam covers, as the material states it." })),
 			format: Type.Optional(Type.String({ description: "The exam's format, as the material states it." })),
+			sessions: Type.Optional(
+				Type.Array(Type.String(), { description: "Only when the material lists more than one session (sitting) of this exam: every day it lists, YYYY-MM-DD." }),
+			),
 		}),
 	),
 	unread: Type.Optional(Type.Array(Type.Object({ source: Type.String(), reason: Type.String() }), { description: "Sources you could not read, each with why." })),
@@ -215,6 +218,8 @@ export interface CourseMapBuilderDeps {
 	fetchPage?: (url: string) => Promise<string>;
 	/** A build saved to a course record (Home and the course page refetch). */
 	onSaved?: (workspace: string) => void;
+	/** A build ended having saved the map: the course's title. */
+	onBuilt?: (workspace: string, title: string) => void;
 	/** A build started or ended (the dialog refetches its status). */
 	onStatus?: (workspace: string) => void;
 	/** The app's sessions: a course's open lessons count as studied, and the
@@ -426,9 +431,14 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 		deps.onStatus?.(workspace);
 		const jobKey = jobKeyOf(workspace);
 		let signal: AbortSignal | undefined;
+		let course = workspace;
 		try {
 			// The dock row shows a run's label: what it does and for which course.
-			const outcome = await build(workspace, (title) => (signal = setRunPhase(jobKey, "mapping", "course-map", title).controller.signal));
+			const outcome = await build(workspace, (title) => {
+				course = title;
+				return (signal = setRunPhase(jobKey, "mapping", "course-map", title).controller.signal);
+			});
+			if (outcome.status === "saved") deps.onBuilt?.(workspace, course);
 			if (outcome.status === "skipped") {
 				console.info(`[course-map ${workspace}] skipped: ${outcome.reason}`);
 				const sources = window(workspace);

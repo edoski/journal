@@ -140,6 +140,19 @@ function answerProblem(topics: readonly string[], answer: GradedAnswer, statemen
 	return null;
 }
 
+/** Why the answers a conclusion saves have no line of their own: a
+ *  not-right answer's `record` is what he did, read in his topic's history
+ *  days later, never the problem, which stands in when it is missing
+ *  (round 18, m2: o123's text was the whole statement, so Independence's
+ *  Earlier read "In ℝ³, let u = (1,0,2)… For which value of k … · Sure, but
+ *  wrong"). Read once the conclusion holds only the answers it saves. */
+export function recordLineProblem(c: PracticeConclusion, statement: string): string | null {
+	const bare = (answer: GradedAnswer) => answer.result !== "correct" && (!answer.record?.trim() || sameText(answer.record, statement));
+	const label = c.result !== null && bare({ ...c, result: c.result }) ? "" : c.firstTry && bare(c.firstTry) ? "firstTry." : null;
+	if (label === null) return null;
+	return `${label}record: a not-right answer's record says what he did, in one line he reads in his topic's history days later ("Took the third entry of $v$ as $0$ and got $k = 5$"), never the problem's statement`;
+}
+
 /** Why a conclusion cannot be recorded as given, or null when it can. A
  *  surrendered problem may still credit the parts answered before. */
 export function conclusionProblem(c: PracticeConclusion, topics: readonly string[], statement = ""): string | null {
@@ -175,6 +188,12 @@ function answerObservations(
 		const gaveUp = marks.gave_up && result === "incorrect" ? { gave_up: true } : {};
 		return { topics, text: answer.record?.trim() || pose.statement, response: answer.response, help, result, ...(chose ? { chose } : {}), ...(marks.sure ? { sure: marks.sure } : {}), ...(marks.shown ? { shown: true } : {}), ...gaveUp };
 	});
+}
+
+/** Whether two texts say the same, read past spacing and case. */
+function sameText(a: string, b: string): boolean {
+	const plain = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+	return plain(a) === plain(b);
 }
 
 function sameResults(topics: readonly string[], a: GradedAnswer, b: GradedAnswer): boolean {

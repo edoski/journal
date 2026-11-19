@@ -24,7 +24,7 @@ export const pushed: string[] = [];
 const router = { push: (href: string) => pushed.push(href), replace: () => {}, prefetch: () => {}, back: () => {}, forward: () => {}, refresh: () => {} };
 
 export const { rows } = needsYouNow(COURSES, CHATS, TODAY);
-const ready = { rows, lessons: rows.map(lessonOf), courses: todayCourses(rows, COURSES), chats: CHATS, done: [], exam: null, busy: false, onContinue: () => {} };
+const ready = { rows, lessons: rows.map(lessonOf), courses: todayCourses(rows, COURSES), chats: CHATS, done: [], exam: null, misfit: null, asks: [], busy: false, onContinue: () => {} };
 
 export async function unmount() {
 	await act(async () => root?.unmount());

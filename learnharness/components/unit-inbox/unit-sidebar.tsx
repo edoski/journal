@@ -62,7 +62,7 @@ export function searchInbox(
 		),
 		units: best(everyTopic(inbox, chats, courses), (u) => u.topic.title),
 		// Sessions are history: newest first, as everywhere they are listed.
-		sessions: filterSessions([...chats], query).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+		sessions: filterSessions([...chats], query, (chat, handle) => courses.find((c) => c.map.workspace === chat.course?.workspace)?.map.topics.find((t) => t.handle === handle)?.title).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
 	};
 	// In the order the rows are drawn, each with its row's name and title.
 	const shown: Array<[string, string]> = [

@@ -67,12 +67,23 @@ export type VoiceRule =
 	| "card-words"
 	| "unbuilt"
 	| "day-part"
+	| "moved-start"
 	| "below"
 	| "pointer"
 	| "arrival"
 	| "own-words"
 	| "mark-case"
-	| "not-yet";
+	| "not-yet"
+	| "due-reviews"
+	| "undisputed"
+	| "verdict-words"
+	| "begun"
+	| "vector"
+	| "nothing-above"
+	| "half-answer"
+	| "title-comma"
+	| "vague-moves"
+	| "split-display";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -120,7 +131,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "backref", re: /\b(?:the )?same as (?:before|last time|above|earlier|the last (?:one|question|problem))\b|\bas (?:before|last time)\b/i },
 	// The app's own parts are nothing he talks about (round 9: "Your message
 	// arrived in the answer field…, so that question is now closed").
-	{ rule: "machinery", re: /\b(?:answer|input|text|message) (?:field|box)\b|\bthe dock\b/i },
+	// Round 18, m14: "your answer goes in its thinking field", the prompts'
+	// own name for his box.
+	{ rule: "machinery", re: /\b(?:answer|input|text|message|thinking) (?:fields?|box(?:es)?)\b|\bthe dock\b/i },
 	// The open question stays above, unchanged, and the app shows no copy of
 	// it (round 11, 4 minor 6: "Here is the question again." and nothing).
 	// Every answer in the record stays saved, an earlier day's included, and
@@ -139,7 +152,11 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// Its own earlier words are nothing he acts on: what is true is said
 	// as itself (round 15, m17: "My earlier line saying the set was done
 	// was wrong, since one problem is not a set.").
-	{ rule: "own-words", re: /\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b/i },
+	// Round 17, m18: "A correction to what I said earlier: …", pointing at
+	// a turn end he never saw.
+	// Round 18, m13: "marking them as solved 'with the hint' was my error",
+	// a slip of its own he never saw, told instead of the next problem.
+	{ rule: "own-words", re: /\bmy (?:error|mistake|slip|fault|oversight)s?\b|\bI (?:made|have made) (?:an error|a mistake|a slip|two mistakes)\b|\b(?:mistakes|errors|slips) of mine\b|\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b|\b(?:a )?correction to what I (?:said|wrote|told you)\b|\b(?:correcting|to correct) what I (?:said|wrote)\b|\bwhat I (?:said|wrote|told you) (?:earlier|before|above)\b/i },
 	// What he has not done yet is no step for him: it reads as a reproach
 	// (round 16, m13: "You still haven't started Linear maps and their
 	// matrices." closing a lesson under his half answer).
@@ -148,6 +165,51 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// (round 15, m18: "The mark stands as With help").
 	{ rule: "mark-case", re: /(?<=[a-z0-9,;)]\s+)(?:With help|On your own|Partly right|Not right|Gave up|Not yet confirmed|Prediction, not counted|Guessing|Confident)\b/ },
 ];
+
+const MATHS_SPANS = /\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\$([^$\n]+)\$/g;
+const ONE_COLUMN = /\\begin\{([pbvBV]?matrix)\}([^&]*?)\\end\{\1\}/;
+
+/** A short vector set as a column matrix in a sentence, or as a display
+ *  of its own: each stacks its entries on lines of their own, so "sends
+ *  (1,1) to (2,0) and (1,−1) to (0,4)" spans six lines, with "to" and
+ *  "and" alone between them (round 17, m20). Written inline as a tuple,
+ *  $(1,1)$, it reads as one line; display maths is for matrices and
+ *  equations. The vector's maths, or null. */
+export function columnVector(text: string): string | null {
+	for (const m of text.matchAll(MATHS_SPANS)) {
+		const inline = m[3];
+		const display = m[1] ?? m[2];
+		const tex = (inline ?? display ?? "").trim();
+		const column = ONE_COLUMN.exec(tex);
+		if (!column) continue;
+		const entries = column[2]!.split(/\\\\/).filter((e) => e.trim()).length;
+		if (entries > 4) continue;
+		// A display is a vector alone when nothing but the column (and a
+		// closing mark) is in it.
+		if (inline !== undefined || tex.replace(column[0], "").replace(/[.,;\s]/g, "") === "") return tex;
+	}
+	return null;
+}
+
+/** Two displays joined by a lone word, which then stands alone on a line
+ *  between them (round 18, m18: a practice problem set h(1,1) = (1,0,2)
+ *  and h(1,−1) = (3,2,0) as two displays with "and" alone between). The
+ *  word, or null. */
+export function splitDisplays(text: string): string | null {
+	const m = /\$\$[^$]*\$\$[ \t]*\n\s*(and|or|so|then|with|where)[ \t]*\n\s*\$\$/i.exec(text);
+	return m ? m[1]! : null;
+}
+
+/** A display holding only one short equation of tuples, a map's value at
+ *  a point ("h(1,1) = (1,0,2)"): a line of the sentence set apart, as a
+ *  short vector alone is (round 18, m18). Its maths, or null. */
+export function tupleDisplay(text: string): string | null {
+	for (const m of text.matchAll(/\$\$([^$]*)\$\$|\\\[([\s\S]*?)\\\]/g)) {
+		const tex = (m[1] ?? m[2] ?? "").trim();
+		if (/^[A-Za-z][\w']*\s*\([^()]*\)\s*=\s*\([^()]*\)\s*[.,;]?$/.test(tex)) return tex;
+	}
+	return null;
+}
 
 /** A sentence that puts a question or his answer to it below the message
  *  ("…the question about P is ready for your answer below."). Right only
@@ -258,6 +320,10 @@ function phraseBreaks(text: string, skip: ReadonlySet<VoiceRule> = new Set()): V
  *  each formula counting as one word. */
 export const SENTENCE_WORDS = 25;
 
+/** Words in his answer that say he is not sure of it or of its reason
+ *  (round 18, m3: "Honestly not sure, gut feeling."). */
+export const DOUBT = /\b(?:not sure|unsure|no idea|gut feeling|i think|i guess|i'?m guessing|maybe|probably|don'?t (?:know|see|get)|why (?:i'?m|am i|is it|does it|can i))\b/i;
+
 /** The sentences a text costs him to read: each sentence, plus each
  *  clause it joins with a colon or semicolon (a colon before a display or
  *  a list ends its line, so it joins nothing), plus one for every
@@ -327,6 +393,10 @@ export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	if (lone) out.push({ rule: "operand", excerpt: lone[0] });
 	const words = mathsWords(text);
 	if (words) out.push({ rule: "maths-words", excerpt: words });
+	const vector = columnVector(text) ?? tupleDisplay(text);
+	if (vector) out.push({ rule: "vector", excerpt: vector });
+	const split = splitDisplays(text);
+	if (split) out.push({ rule: "split-display", excerpt: split });
 	if (!kind) return out;
 	const load = sentenceLoad(said);
 	if (load > SENTENCE_BUDGETS[kind]) out.push({ rule: "length", excerpt: `${load} sentences, budget ${SENTENCE_BUDGETS[kind]}` });

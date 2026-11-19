@@ -20,6 +20,7 @@ import { engineConfidence } from "../../core/engine-confidence.ts";
 import { RUNG_HELP } from "../../core/practice-attempts.ts";
 import type { AnsweredQuestion } from "../../core/native-messages.ts";
 import { studyDay, withDayWords } from "../../core/day-words.ts";
+import { DOUBT } from "../../core/voice-check.ts";
 
 /** What the course tools close over. */
 export interface CourseToolContext {
@@ -43,11 +44,24 @@ export interface CourseToolContext {
 	 *  a restart between the engine's write and the transcript's lost the
 	 *  answer's mark). */
 	onSaved?: (links: { question: string; observation: string }[]) => void;
+	/** Keeps the topics a save's receipt moved the start of
+	 *  (`starts_moved`) with the lesson the moment the engine took it, so
+	 *  Home keeps those starts while the turn still runs. */
+	onMoved?: (topics: string[]) => void;
 	/** The session is a review (session-opening.ts `openedAsReview`): what
 	 *  it leaves stays with the topic, whose review carries it, so a save
 	 *  here keeps no task (round 9, 2 m4: a review turned into teaching saved
 	 *  "Re-learn checking independence"). */
 	review?: boolean;
+	/** The topics a review was opened on (`ChatRecord.topics`): a task on
+	 *  none of them, saved once its plan taught here, is the lesson the
+	 *  review took up (`lessonTakenUp`), never one the review keeps. */
+	reviewTopics?: readonly string[];
+	/** The topics this session teaches as its lesson when a save runs
+	 *  (session-opening.ts `lessonTopicsOf`): an answer on none of them is
+	 *  saved `aside`, so a check in a side question never starts its topic
+	 *  (round 17, m3). Absent or empty: no answer is aside. */
+	lessonTopics?: () => readonly string[];
 	/** The steps of this session's lesson plan as they stand when a save
 	 *  runs (the plan may be written in the same turn). Absent: none. */
 	planSteps?: () => readonly { id: string; title: string }[];
@@ -75,6 +89,20 @@ function planStepAsTopic(ctx: CourseToolContext, patch: Record<string, unknown> 
 	return `topics: ${made.map(([h]) => h).join(", ")} ${made.length > 1 ? "are steps" : "is a step"} of this lesson's plan, not ${made.length > 1 ? "course topics" : "a course topic"}. A step lives on the lesson's map; what he did on it is saved to the lesson's own topic. Leave ${made.length > 1 ? "them" : "it"} out of topics and send the rest.`;
 }
 
+/** Each answer on none of the lesson's topics marked `aside`: a check in a
+ *  side question is kept, and counts once its topic has an answer of its
+ *  own, but never starts it or takes its first lesson away (round 17, m3:
+ *  one Guessing answer on Similar matrices in the Linear maps lesson left
+ *  it "Right, but a guess" with no Start, and moved Diagonalization). */
+function asideOf(ctx: CourseToolContext, observations: readonly unknown[]): unknown[] {
+	const lesson = ctx.lessonTopics?.() ?? [];
+	if (lesson.length === 0) return [...observations];
+	return observations.map((o) => {
+		if (!isObject(o) || (o.kind ?? "attempt") !== "attempt" || "corrects" in o || !Array.isArray(o.topics) || o.topics.length === 0) return o;
+		return o.topics.some((t) => lesson.includes(t as string)) ? o : { ...o, aside: true };
+	});
+}
+
 /** Why a review's save is refused: it keeps a task. A task removed (null)
  *  is allowed. */
 export const REVIEW_TASK_REFUSED =
@@ -82,9 +110,25 @@ export const REVIEW_TASK_REFUSED =
 
 function reviewTaskRefused(ctx: CourseToolContext, patch: Record<string, unknown> | null): string | null {
 	if (!ctx.review || !patch) return null;
-	const tasks = patch.tasks;
-	const kept = tasks !== null && typeof tasks === "object" && Object.values(tasks).some((t) => t !== null);
-	return kept || (typeof patch.focus === "string" && patch.focus !== "") ? REVIEW_TASK_REFUSED : null;
+	const tasks = isObject(patch.tasks) ? patch.tasks : {};
+	const kept = Object.entries(tasks).filter(([, t]) => t !== null);
+	const lesson = kept.filter(([, t]) => takesUpLesson(ctx, t)).map(([key]) => key);
+	const refused = kept.some(([key]) => !lesson.includes(key)) || (typeof patch.focus === "string" && patch.focus !== "" && !lesson.includes(patch.focus));
+	return refused ? REVIEW_TASK_REFUSED : null;
+}
+
+/** Whether a task a review saves is the lesson the session took up: on
+ *  topics, none of them the review's, once a plan taught here. Saving it
+ *  makes the session that topic's lesson (`lessonTakenUp`), so its page
+ *  resumes it and the review's own topic keeps its review; a focus is kept
+ *  only on such a task (round 18, M3: a review of Inclusion-exclusion began
+ *  Expectation's lesson on his ask, with a plan that named no goal, and its
+ *  close's save of the Expectation lesson's task was refused, so its page
+ *  had nothing to resume). */
+function takesUpLesson(ctx: CourseToolContext, task: unknown): boolean {
+	const topics = isObject(task) && Array.isArray(task.topics) ? task.topics.filter((t): t is string => typeof t === "string" && t !== "") : [];
+	const opened = ctx.reviewTopics ?? [];
+	return topics.length > 0 && topics.every((t) => !opened.includes(t)) && (ctx.planSteps?.() ?? []).length > 0;
 }
 
 /** A patch as the engine reads it: the object, or its JSON text, which the
@@ -118,6 +162,18 @@ function questionAsText(o: Record<string, unknown>, answer: AnsweredQuestion): b
 	return text.endsWith("?") || (answer.asked !== undefined && text.toLowerCase() === answer.asked.toLowerCase());
 }
 
+/** The sentence of doubt his answer held beside a Confident meter that
+ *  the saved response leaves out, or null (round 18, m3: on sheet part
+ *  (c), Confident, he wrote "Honestly not sure, gut feeling.", and o132's
+ *  response dropped it; the card and `sure: confident` were right). */
+function doubtDropped(o: Record<string, unknown>, answer: AnsweredQuestion): string | null {
+	if (answer.confidence !== "confident" || !answer.words || !recordsAnAnswer(o)) return null;
+	const said = answer.words.split(/(?<=[.!?])\s+|\n+/).find((s) => DOUBT.test(s));
+	if (!said) return null;
+	const response = typeof o.response === "string" ? o.response : "";
+	return DOUBT.test(response) ? null : said.trim();
+}
+
 /** The answers each session's saves named in this turn, after they went
  *  through: the session's record holds them only from the next turn. */
 const savedThisTurn = new WeakMap<CourseToolContext, Set<string>>();
@@ -136,7 +192,7 @@ function remarkRefused(o: Record<string, unknown>, i: number, remarkable: Course
 	if ((o.kind ?? "attempt") === "self_report" || !Array.isArray(o.corrects)) return null;
 	const targets = o.corrects.filter((id): id is string => typeof id === "string");
 	if (!("disputed" in o)) {
-		return `observations[${i}].corrects: he did not dispute ${targets.join(", ") || "it"}, so ${targets.length > 1 ? "they stand" : "it stands"} as recorded: never re-mark an answer on your own, and never tell him a mark changed. Leave the re-mark out; a new answer is simply a new attempt.`;
+		return `observations[${i}].corrects: he did not dispute ${targets.join(", ") || "it"}, so ${targets.length > 1 ? "they stand" : "it stands"} as recorded: never re-mark an answer on your own, and say nothing to him of its mark or its help: not that it was wrong, not what it should have been, and never that a mark changed. Leave the re-mark out; a new answer is simply a new attempt.`;
 	}
 	const outside = targets.filter((id) => !remarkable?.disputed.has(id));
 	return outside.length === 0 ? null : `observations[${i}].corrects: he disputed no mark of ${outside.join(", ")}. A ruling re-marks only the attempts his dispute named.`;
@@ -226,6 +282,12 @@ function namedQuestions(
 			refuse(`observations[${i}].question: ${JSON.stringify(named)} is already saved, so it is not saved again. Leave it out and send the rest; a re-mark of it names its attempt with corrects.`);
 		}
 		const ruled: Record<string, unknown> = { ...rest };
+		const doubt = doubtDropped(rest, answer);
+		if (doubt) {
+			refuse(
+				`observations[${i}].response: he wrote ${JSON.stringify(doubt)} with his meter on Confident, and the response leaves it out. His words of doubt stay in response, as he wrote them, beside his answer: the meter sets \`sure\`, his words say what he doubted. Send it again with them.`,
+			);
+		}
 		if (questionAsText(rest, answer)) {
 			refuse(
 				`observations[${i}].text: a not-right answer's text says what went wrong, in a line he reads in his Mistakes list days later ("Took $(1,2)$ as a vector of $E_2$; it gives $2x+y=4$, not $0$"), never the question. Send it again with that text.`,
@@ -293,6 +355,13 @@ function keepLinks(ctx: CourseToolContext, questions: readonly (string | null)[]
  * answer they record. Every save of a session's answers comes through here.
  */
 export async function saveCourse(ctx: CourseToolContext, changes: unknown, problem?: { id: string; seen: boolean }): Promise<CourseResult> {
+	const result = await saveRuled(ctx, changes, problem);
+	const moved = result.ok && isObject(result.json) && isObject(result.json.starts_moved) ? Object.keys(result.json.starts_moved) : [];
+	if (moved.length > 0) ctx.onMoved?.(moved);
+	return result;
+}
+
+async function saveRuled(ctx: CourseToolContext, changes: unknown, problem?: { id: string; seen: boolean }): Promise<CourseResult> {
 	const patch = patchOf(changes);
 	const reviewTask = reviewTaskRefused(ctx, patch) ?? planStepAsTopic(ctx, patch);
 	if (reviewTask) return { ok: false, kind: "validation", message: reviewTask };
@@ -307,7 +376,7 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 		const question = named.questions[i];
 		return question ? answers.get(question)?.seenBefore === true : problem?.seen === true;
 	});
-	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: { ...patch, observations: ruled.observations } });
+	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: { ...patch, observations: asideOf(ctx, ruled.observations) } });
 	if (result.ok) for (const key of problem ? [problem.id] : named.questions) if (key) saved.add(key);
 	// A problem's attempts are kept under its conclude, so its card shows while
 	// the turn still runs (round 15, 2 D2: First try / Then came only after a

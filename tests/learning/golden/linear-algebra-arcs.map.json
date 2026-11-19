@@ -5,7 +5,7 @@
   "exam": {
     "date": "2026-12-03",
     "days_left": 25,
-    "final_review": "2026-11-16"
+    "final_review": "2026-11-17"
   },
   "current": "eigen",
   "current_arc": "eigenvalues",
@@ -77,6 +77,12 @@
         "rank",
         "basis",
         "kernel"
+      ],
+      "where": [
+        {
+          "path": "material/la-problem-sheets-contents.md",
+          "locator": "Sheet 4"
+        }
       ]
     }
   ],
@@ -89,7 +95,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-28",
-      "review": "2026-11-16",
+      "review": "2026-11-13",
       "held": true,
       "due": "2026-10-12",
       "weak": false,
@@ -105,7 +111,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-30",
-      "review": "2026-11-09",
+      "review": "2026-11-16",
       "held": true,
       "due": "2026-10-12",
       "weak": false,
@@ -121,7 +127,7 @@
       "contrasts": [],
       "level": "independent",
       "introduced": "2026-10-05",
-      "review": "2026-11-26",
+      "review": "2026-11-25",
       "held": true,
       "due": "2026-10-28",
       "weak": true,
@@ -143,7 +149,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-07",
-      "review": "2026-11-12",
+      "review": "2026-11-20",
       "held": true,
       "due": "2026-10-29",
       "weak": false,
@@ -179,7 +185,7 @@
       ],
       "level": "retained",
       "introduced": "2026-10-15",
-      "review": "2026-11-13",
+      "review": "2026-11-27",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -203,7 +209,7 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-03",
-      "review": "2026-11-13",
+      "review": "2026-11-16",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -265,7 +271,7 @@
       ],
       "level": "introduced",
       "introduced": "2026-11-05",
-      "review": "2026-11-27",
+      "review": "2026-11-23",
       "held": true,
       "due": "2026-11-06",
       "weak": false,
@@ -281,7 +287,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-13",
+      "starts": "2026-11-16",
       "starts_why": {
         "arc": "determinants",
         "kind": "after",
@@ -364,11 +370,14 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-19",
+      "starts": "2026-11-11",
       "starts_why": {
         "arc": "orthogonality",
         "kind": "early",
-        "behind": "eigenvalues"
+        "behind": "eigenvalues",
+        "waiting_on": [
+          "invertibility"
+        ]
       },
       "weak": false,
       "tasks": []
@@ -383,12 +392,13 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-23",
+      "starts": "2026-11-12",
       "starts_why": {
         "arc": "orthogonality",
-        "kind": "after",
-        "needs": [
-          "inner-product"
+        "kind": "early",
+        "behind": "eigenvalues",
+        "waiting_on": [
+          "invertibility"
         ]
       },
       "weak": false,

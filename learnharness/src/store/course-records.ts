@@ -197,11 +197,15 @@ function mapExamOf(value: unknown, listed: ReadonlySet<string>, block: ArcBlock)
 	const unreviewed = handles(e.unreviewed);
 	const arcs = block.arcs && Array.isArray(e.arcs) ? strings(e.arcs).flatMap((a) => block.arcOf(a) ?? []) : null;
 	const leavesOut = handles(e.leaves_out);
+	const sessions = strings(e.sessions);
+	const past = str(e.past);
 	const reasons = Object.fromEntries(
 		Object.entries(record(e.reasons) ?? {}).filter(([h, r]) => listed.has(h) && EXAM_GAP_REASONS.includes(r as ExamGapReason)),
 	) as Partial<Record<TopicHandle, ExamGapReason>>;
 	return {
 		...exam,
+		...(sessions.length > 0 ? { sessions } : {}),
+		...(past ? { past } : {}),
 		...(finalReview ? { finalReview } : {}),
 		...(doesNotFit.length > 0 ? { doesNotFit } : {}),
 		...(unreviewed.length > 0 ? { unreviewed } : {}),
@@ -248,7 +252,17 @@ function movedOf(value: unknown): { moved: TopicMoved } | Record<string, never> 
 	if (!m || !from) return {};
 	if (m.by === "study") {
 		const waitsOn = strings(m.waits_on);
-		return { moved: { from, by: "study", courses: strings(m.courses), day: m.day === "yesterday" ? "yesterday" : "today", ...(waitsOn.length > 0 ? { waitsOn } : {}) } };
+		const ready = strings(m.ready);
+		return {
+			moved: {
+				from,
+				by: "study",
+				courses: strings(m.courses),
+				day: m.day === "yesterday" ? "yesterday" : "today",
+				...(waitsOn.length > 0 ? { waitsOn, ...(m.another_day === true ? { anotherDay: true } : {}) } : {}),
+				...(ready.length > 0 ? { ready } : {}),
+			},
+		};
 	}
 	if (m.by === "answered") return { moved: { from, by: "answered" } };
 	const on = str(m.on);
@@ -330,7 +344,11 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 	const topics = parsed.map(({ needs: _needs, contrasts: _contrasts, rawArc, rawWhy, ...topic }): CourseMapTopic => {
 		const arc = block.arcOf(rawArc);
 		const startsWhy = startsWhyOf(rawWhy, listed, block.arcOf);
-		const moved = topic.moved?.by === "study" && topic.moved.waitsOn ? { moved: { ...topic.moved, waitsOn: topic.moved.waitsOn.map((h) => titles.get(h) ?? h) } } : {};
+		const titled = (handles: readonly string[] | undefined) => handles?.map((h) => titles.get(h) ?? h);
+		const moved =
+			topic.moved?.by === "study" && (topic.moved.waitsOn || topic.moved.ready)
+				? { moved: { ...topic.moved, ...(topic.moved.waitsOn ? { waitsOn: titled(topic.moved.waitsOn) } : {}), ...(topic.moved.ready ? { ready: titled(topic.moved.ready) } : {}) } }
+				: {};
 		return { ...topic, ...moved, ...(arc ? { arc } : {}), ...(startsWhy ? { startsWhy } : {}) };
 	});
 	const current = str(m.current);
@@ -338,7 +356,13 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 		const t = record(entry);
 		const key = str(t?.key);
 		const topics = Array.isArray(t?.topics) ? t.topics.filter((h): h is TopicHandle => typeof h === "string" && listed.has(h)) : null;
-		return t && key ? [{ key, title: str(t.title) ?? key, step: str(t.step), updated: str(t.updated), ...(topics ? { topics } : {}) }] : [];
+		const where = (Array.isArray(t?.where) ? t.where : []).flatMap((w) => {
+			const place = record(w);
+			const file = str(place?.path);
+			const locator = str(place?.locator);
+			return file && locator ? [{ path: file, locator }] : [];
+		});
+		return t && key ? [{ key, title: str(t.title) ?? key, step: str(t.step), updated: str(t.updated), ...(topics ? { topics } : {}), ...(where.length ? { where } : {}) }] : [];
 	});
 	return {
 		workspace,

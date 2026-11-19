@@ -99,12 +99,24 @@ export type AppearanceSettings = z.infer<typeof AppearanceSettingsSchema>;
 export const ClaudeSettingsSchema = z.object({ account: claudeAccount.optional() });
 export type ClaudeSettings = z.infer<typeof ClaudeSettingsSchema>;
 
+/** The notifications section: the Mac app's study notifications (today's
+ *  plan once a day, work he started when it finishes while he is away).
+ *  Absent means on; `enabled: false` turns them off. */
+export const NotificationSettingsSchema = z.object({ enabled: z.boolean().optional() });
+export type NotificationSettings = z.infer<typeof NotificationSettingsSchema>;
+
+/** Whether the Mac app sends study notifications: on unless turned off. Pure. */
+export function notificationsOn(settings: Pick<UserSettings, "notifications"> | null | undefined): boolean {
+	return settings?.notifications?.enabled !== false;
+}
+
 /** THE record. Every section optional (delta); unknown top-level keys are
  *  preserved verbatim (forward-compat with newer records). */
 export interface UserSettings {
 	version: number;
 	claude?: ClaudeSettings;
 	appearance?: AppearanceSettings;
+	notifications?: NotificationSettings;
 	[key: string]: unknown;
 }
 
@@ -166,6 +178,7 @@ const UserSettingsSchema = z.looseObject({
 		}).optional().catch({}),
 	}).optional().catch(undefined),
 	claude: z.object({ account: claudeAccount.optional().catch(undefined) }).optional().catch(undefined),
+	notifications: z.object({ enabled: z.boolean().optional().catch(undefined) }).optional().catch(undefined),
 	models: z.object({ strong: slotAccount, cheap: slotAccount, vision: slotAccount }).optional().catch(undefined),
 }).transform(({ chat, models, agent, ...record }): UserSettings => {
 	// The known-dead keys go, so a fossil copy never resurrects through reads

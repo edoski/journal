@@ -109,12 +109,12 @@ describe("the Prose problem", () => {
 	});
 
 	it("ends with the mark and the model solution, open when he asked to see it", () => {
-		const shown = withMarks(<ProseConclude toolCallId="c1" input={{ outcome: "surrendered" }} output={{}} reveal="The rank is 2." />);
+		const shown = withMarks(<ProseConclude state="output-available" toolCallId="c1" input={{ outcome: "surrendered" }} output={{}} reveal="The rank is 2." />);
 		assert.match(shown, /data-testid="mark-line"/);
 		assert.match(shown, /data-state="open"/);
-		const solved = withMarks(<ProseConclude toolCallId="c1" input={{ outcome: "solved" }} output={{}} reveal="The rank is 2." />);
+		const solved = withMarks(<ProseConclude state="output-available" toolCallId="c1" input={{ outcome: "solved" }} output={{}} reveal="The rank is 2." />);
 		assert.match(solved, /data-state="closed"/);
-		assert.equal(renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "dismissed" }} output={{ reason: "tonight" }} reveal="" />), "", "set aside by Done for today: the close says it (round 16, m15)");
+		assert.equal(renderToStaticMarkup(<ProseConclude state="output-available" toolCallId="c1" input={{ outcome: "dismissed" }} output={{ reason: "tonight" }} reveal="" />), "", "set aside by Done for today: the close says it (round 16, m15)");
 	});
 
 	it("shows what he asked for as his bubble", () => {

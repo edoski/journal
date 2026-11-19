@@ -22,7 +22,7 @@ import { lessonTopics } from "../core/course-map-build.ts";
 import { studyDay } from "../core/day-words.ts";
 import { subscribe } from "../core/events.ts";
 import { lastStudiedOf, projectCourseBrief, type CoursePlans } from "../core/course-brief.ts";
-import { lessonTakenUp, openingText, reviewRecord } from "../core/session-opening.ts";
+import { lessonTakenUp, reviewRecord } from "../core/session-opening.ts";
 import { newCourseContextMessage, sessionModeOf, sessionTopicsOf, visibleCourseBriefKey, type LhMessage } from "../core/native-messages.ts";
 import { planDays, plannedOf } from "./calendar.ts";
 import { stores } from "./stores.ts";
@@ -31,9 +31,7 @@ import { isTurnRunning } from "./turn-liveness.ts";
 
 export type CourseBrief = { key: string; text: string };
 
-/** `turnText` is the words of the turn the brief rides, which the record
- *  does not hold yet: on a session's first turn, his opening. */
-export async function fetchCourseBrief(record: ChatRecord, turnText: string | null = null): Promise<CourseBrief | null> {
+export async function fetchCourseBrief(record: ChatRecord): Promise<CourseBrief | null> {
 	if (!record.course) return null;
 	const { workspace } = record.course;
 	const role = sessionModeOf(record.messages, record.kind);
@@ -43,7 +41,7 @@ export async function fetchCourseBrief(record: ChatRecord, turnText: string | nu
 		// reports: the open course's own plan carries it.
 		const [resumed, read] = await Promise.all([keptResume(workspace), fetchCoursePlans(record.id, workspace)]);
 		const runup = role === "practice" && read?.own ? { plan: read.own, workspace } : undefined;
-		if (resumed.ok) return projectCourseBrief(resumed.json, role, { runup, arcCheck: record.arcCheck, plan: read?.plans, opened: openedOn(record), opening: openingText(record.messages) ?? turnText, live: liveTopics(record), review: reviewRecord(record), takenUp: lessonTakenUp(record), studied: lastStudiedOf(read?.own) });
+		if (resumed.ok) return projectCourseBrief(resumed.json, role, { runup, arcCheck: record.arcCheck, plan: read?.plans, opened: openedOn(record), live: liveTopics(record), review: reviewRecord(record), takenUp: lessonTakenUp(record), studied: lastStudiedOf(read?.own) });
 		console.error(`[chat ${record.id}] course brief skipped: ${resumed.message}`);
 	} catch (err) {
 		console.error(`[chat ${record.id}] course brief skipped:`, err);

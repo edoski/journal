@@ -36,6 +36,8 @@ function call(name: string, args: Record<string, unknown>, isError = false): LhM
 const pose = (topics: string[], statement = "Find the rank of $A$.") => call(PRACTICE_PROBLEM_TOOL, { statement, mode: "recall", topics, modelSolution: "Row 3 is row 1 plus row 2, so rank 2." });
 const conclude = (args: Record<string, unknown>) => call(PRACTICE_CONCLUDE_TOOL, { verdict: "v", rung: null, missClass: null, retest: false, response: "r", ...args });
 const attempt = (topics: string[], result: string, help = "none", extra: Record<string, unknown> = {}) => ({ kind: "attempt", topics, text: "q", response: "a", help, result, ...extra });
+/** The record keeping his answer to `question` as his attempt. */
+const keptAttempt = (question: string) => call("course_save", { changes: { observations: [attempt(["rank"], "correct", "none", { question })] } });
 
 /** A graded question asked and answered: its call and his answer. */
 function asked(question: string, answer: Record<string, unknown> = { text: "rank 2", confidence: "neutral" }, tool = "explain"): { id: string; messages: LhMessage[] } {
@@ -74,14 +76,14 @@ describe("which questions he answered, and whether he had seen their solution fi
 		const first = asked("Run BFS from $s$ and give every dist.");
 		const second = asked("Explain why no path to $e$ is shorter than 3.");
 		const answers = answeredQuestionsOf([...first.messages, ...second.messages]);
-		assert.deepEqual(answers.get(first.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, asked: "Run BFS from $s$ and give every dist.", recorded: false });
-		assert.deepEqual(answers.get(second.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, asked: "Explain why no path to $e$ is shorter than 3.", recorded: false });
+		assert.deepEqual(answers.get(first.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, asked: "Run BFS from $s$ and give every dist.", words: "rank 2", recorded: false });
+		assert.deepEqual(answers.get(second.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, asked: "Explain why no path to $e$ is shorter than 3.", words: "rank 2", recorded: false });
 	});
 
-	it("the same words asked again after he answered them were seen", () => {
+	it("the same words asked again after his answer to them was kept as an attempt were seen", () => {
 		const first = asked("What is the rank of $A$?");
 		const again = asked("What is  the rank of $A$? ");
-		assert.equal(answeredQuestionsOf([...first.messages, ...again.messages]).get(again.id)?.seenBefore, true);
+		assert.equal(answeredQuestionsOf([...first.messages, ...keptAttempt(first.id), ...again.messages]).get(again.id)?.seenBefore, true);
 	});
 
 	it("a Hint press and a question left for today reveal nothing and are no answer", () => {
@@ -111,7 +113,7 @@ describe("saving an answer to a question whose solution he had seen", () => {
 	it("an answer to the same question asked again, saved as unaided, is saved helped and the receipt says so", async () => {
 		const first = asked("What is the rank of $A$?");
 		const again = asked("What is the rank of $A$?");
-		const { saves, tools } = savingCourse([...first.messages, ...again.messages]);
+		const { saves, tools } = savingCourse([...first.messages, ...keptAttempt(first.id), ...again.messages]);
 		const { text } = await courseSave(tools, [attempt(["rank"], "correct", "none", { question: again.id })]);
 		assert.equal(saves[0]!.observations![0]!.help, SHOWN_HELP);
 		assert.equal(saves[0]!.observations![0]!.shown, true);
@@ -147,7 +149,7 @@ describe("saving an answer to a question whose solution he had seen", () => {
 	it("help the tutor named stays", async () => {
 		const first = asked("What is the rank of $A$?");
 		const again = asked("What is the rank of $A$?");
-		const { saves, tools } = savingCourse([...first.messages, ...again.messages]);
+		const { saves, tools } = savingCourse([...first.messages, ...keptAttempt(first.id), ...again.messages]);
 		await courseSave(tools, [attempt(["rank"], "correct", "Hint R1: re-described the pattern class", { question: again.id })]);
 		assert.equal(saves[0]!.observations![0]!.help, "Hint R1: re-described the pattern class");
 	});

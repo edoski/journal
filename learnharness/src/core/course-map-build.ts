@@ -150,7 +150,9 @@ export interface MapCourseView extends ArcStanding {
 	topics: Record<string, ViewTopic>;
 	order: string[];
 	basis: string | null;
-	exam: { coverage?: string; format?: string };
+	/** The exam facts a build may add to: its `date` and listed `sessions`
+	 *  are the record's, read so a build never moves the day he aims at. */
+	exam: { coverage?: string; format?: string; date?: string; sessions?: string[] };
 	/** Every registered source handle. */
 	sources: string[];
 	/** Handles knowledge entries and tasks hold: a topic cannot take one. */
@@ -221,11 +223,13 @@ export function courseView(record: unknown, standing: ArcStanding): MapCourseVie
 	const arcs = arcsOf(r);
 	const coverage = text(exam.coverage);
 	const format = text(exam.format);
+	const date = text(exam.date);
+	const sessions = strs(exam.sessions);
 	return {
 		topics,
 		order: strs(path.order),
 		basis: text(path.basis) ?? null,
-		exam: { ...(coverage ? { coverage } : {}), ...(format ? { format } : {}) },
+		exam: { ...(coverage ? { coverage } : {}), ...(format ? { format } : {}), ...(date ? { date } : {}), ...(sessions.length > 0 ? { sessions } : {}) },
 		sources: Object.keys(obj(r.sources)),
 		taken: [...Object.keys(obj(r.knowledge)), ...Object.keys(obj(r.tasks))],
 		arcs,
@@ -286,7 +290,7 @@ export interface MapSubmit {
 	order: string[];
 	/** Where the order comes from. */
 	basis?: string;
-	exam?: { coverage?: string; format?: string };
+	exam?: { coverage?: string; format?: string; sessions?: string[] };
 	/** Sources it could not read, each with why. */
 	unread?: { source: string; reason: string }[];
 	/** In a course with arcs: arcs for new units of the material. */
@@ -670,6 +674,8 @@ export function mapChanges(submit: MapSubmit, view: MapCourseView): { changes: J
 	const exam: Json = {};
 	if (!view.exam.coverage && submit.exam?.coverage?.trim()) exam.coverage = submit.exam.coverage.trim();
 	if (!view.exam.format && submit.exam?.format?.trim()) exam.format = submit.exam.format.trim();
+	const sessions = examSessions(submit.exam?.sessions, view.exam);
+	if (sessions) exam.sessions = sessions;
 
 	const changes: Json = {};
 	const why: string[] = [];
@@ -705,6 +711,19 @@ export function mapChanges(submit: MapSubmit, view: MapCourseView): { changes: J
 	if (why.length > 0) changes.arc_change = { reason: why.join("; ") };
 	if (Object.keys(changes).length === 0) return null;
 	return { changes, counts, summary: summaryOf(counts) };
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The exam's sessions as the material lists them, with the day he aims at
+ *  (`exam.date`) among them, earliest first; none when the record lists
+ *  them already, has no exam day to aim at, or the material lists one day
+ *  at most. A build never moves the day he aims at. Pure. */
+function examSessions(listed: readonly string[] | undefined, exam: MapCourseView["exam"]): string[] | null {
+	if (exam.sessions || !exam.date) return null;
+	const days = (listed ?? []).map((d) => d.trim()).filter((d) => DAY.test(d) && !Number.isNaN(Date.parse(d)));
+	const found = [...new Set([...days, exam.date])].sort();
+	return new Set(days).size > 1 ? found : null;
 }
 
 /** The answer's new arcs the merge takes: a new handle, its texts and unit,

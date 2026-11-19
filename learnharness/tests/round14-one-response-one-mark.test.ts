@@ -42,7 +42,7 @@ describe("one response, one observation (round 14, M2)", () => {
 		const saves: { observations: unknown[] }[] = [];
 		const records = { run: async (_w: string, req: { verb: string; changes?: unknown }) => (req.verb === "save" && saves.push(req.changes as never), { ok: true, json: { saved: (req.changes as { observations: unknown[] }).observations.map((_o, i) => `o${51 + i}`) } }) };
 		const tools = practiceTools({ chatId: "c", chatStore: { getChat: () => ({ messages }) } as never }, { course: { workspace: "/w", title: "LA" }, records } as never);
-		const result = await tools.conclude!.execute("c1", { outcome: "movedOn", verdict: "It broke at the rank.", rung: null, missClass: "execution", retest: true, result: "incorrect", response: "t = 4", brokeAt: "rank" }, undefined);
+		const result = await tools.conclude!.execute("c1", { outcome: "movedOn", verdict: "It broke at the rank.", rung: null, missClass: "execution", retest: true, result: "incorrect", response: "t = 4", record: "Stopped elimination after column 1", brokeAt: "rank" }, undefined);
 		assert.notEqual(result.isError, true);
 		assert.equal(saves[0]!.observations.length, 1);
 		const transcript = [...messages, { id: "a2", role: "assistant", content: [{ type: "toolCall", id: "c1", name: "conclude", arguments: {} }], stopReason: "toolUse", timestamp: 3 }, { id: "r2", role: "toolResult", toolCallId: "c1", toolName: "conclude", content: result.content, isError: false, timestamp: 4 }] as unknown as LhMessage[];

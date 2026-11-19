@@ -43,12 +43,15 @@ export function studyDay(env: Record<string, string | undefined> = process.env, 
 
 /** Now on the study day: the pinned `LEARNING_TODAY` at the time of day it
  *  is now, else now. What the app stamps a session's activity with, so the
- *  day it was studied is the day every surface and the engine call today. */
+ *  day it was studied is the day every surface and the engine call today.
+ *  A pinned day's clock runs `LEARNING_CLOCK_SHIFT` seconds ahead of the
+ *  machine's, as the engine's does (`learning/clock.py`), so a simulated
+ *  day keeps its own time of day whenever it is played. */
 export function studyNow(env: Record<string, string | undefined> = process.env, now = new Date()): Date {
 	const pinned = env.LEARNING_TODAY;
 	if (!pinned || !DAY.test(pinned)) return now;
 	const [year, month, day] = pinned.split("-").map(Number) as [number, number, number];
-	const at = new Date(now);
+	const at = new Date(now.getTime() + Number(env.LEARNING_CLOCK_SHIFT || 0) * 1000);
 	at.setFullYear(year, month - 1, day);
 	return at;
 }

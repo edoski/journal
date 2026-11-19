@@ -30,7 +30,7 @@ const dock = (input: { statement: unknown }) => <ProseProblem input={input} acti
 /** A problem earlier in the transcript. */
 const settled = (input: unknown) => <ProseProblem input={input} active={false} />;
 /** How a problem ended; the model solution shows open, as after Show me. */
-const conclude = (input: Record<string, unknown>, reveal?: string) => <ProseConclude toolCallId="call_conclude" input={{ ...input, outcome: input.outcome === "dismissed" ? "dismissed" : "surrendered" }} output={{}} reveal={reveal} />;
+const conclude = (input: Record<string, unknown>, reveal?: string) => <ProseConclude state="output-available" toolCallId="call_conclude" input={{ ...input, outcome: input.outcome === "dismissed" ? "dismissed" : "surrendered" }} output={{}} reveal={reveal} />;
 const question = (raw: string, id: string) => <ProseQuestion tool="ask_user_question" toolCallId={id} input={{ question: raw }} open />;
 
 function math(html: string) {

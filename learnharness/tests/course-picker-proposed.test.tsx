@@ -278,6 +278,20 @@ describe("course menu: rename and delete", () => {
 		assert.equal(deleted, 1);
 	});
 
+	it("names the exam day only for a course with an exam (round 17, m25)", async () => {
+		const { fetchLike } = recorder(() => Response.json({ ok: true }));
+		await mount(<DeleteCourseDialog course={{ workspace: "/study/calc", title: "Calculus I", exam: null }} fetchLike={fetchLike} onClose={() => {}} onDeleted={() => {}} />);
+		const without = element('[data-testid="delete-course-dialog"]').textContent ?? "";
+		assert.match(without, /Its topics and plan leave Home and the calendar/);
+		assert.doesNotMatch(without, /exam/);
+	});
+
+	it("names the exam day for a course with one", async () => {
+		const { fetchLike } = recorder(() => Response.json({ ok: true }));
+		await mount(<DeleteCourseDialog course={{ workspace: "/study/smm", title: "SMM", exam: { date: "2026-12-03", daysLeft: 15 } }} fetchLike={fetchLike} onClose={() => {}} onDeleted={() => {}} />);
+		assert.match(element('[data-testid="delete-course-dialog"]').textContent ?? "", /Its topics, plan and exam day leave Home/);
+	});
+
 	it("a refused delete shows the server's sentence and keeps the question open", async () => {
 		const { fetchLike } = recorder(() => Response.json({ error: "That course is no longer in your list." }, { status: 404 }));
 		await mount(<DeleteCourseDialog course={{ workspace: "/study/smm", title: "SMM" }} fetchLike={fetchLike} onClose={() => {}} onDeleted={() => assert.fail("not deleted")} />);

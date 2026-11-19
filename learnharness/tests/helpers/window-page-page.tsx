@@ -18,6 +18,8 @@ import type { MistakeRow } from "@/components/course-page/standing/standing-mode
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
 const quiet = (): NotifySource => ({ onEvent() {}, onOpen() {}, close() {} });
+/** `?open=0` folds the sidebar, as its cookie would; open otherwise. */
+const open = new URLSearchParams(location.search).get("open") !== "0";
 const row = {
 	topic: { handle: "rank", title: "Rank and the column space" },
 	slip: "confident",
@@ -37,7 +39,7 @@ createRoot(document.getElementById("root")!).render(
 		<ServerEventsProvider connect={quiet}>
 			<TooltipProvider>
 				<AppearanceProvider>
-					<SidebarProvider initial={{ open: true, width: 256 }}>
+					<SidebarProvider initial={{ open, width: 256 }}>
 						<ActivityProvider>
 							<AppShell>
 								<WindowPage data-testid="window-page">

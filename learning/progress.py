@@ -28,7 +28,7 @@ from itertools import groupby
 from typing import Any
 
 from learning import arc_rules, memo, preferences
-from learning.schema import PatchResult, counts, number, unaided
+from learning.schema import PatchResult, counts, counts_aside, number, unaided
 
 LADDER = (3, 7, 16, 35, 75, 160)
 INTERVALS = {"missed": 1, "helped": 2}
@@ -112,6 +112,27 @@ def exam_plan(record: dict[str, Any]) -> Exam | None:
             "(capacity.final_reviews); this record was read without it"
         )
     return Exam(day, date.fromisoformat(start))
+
+
+def aimed(record: dict[str, Any], today: date) -> dict[str, Any]:
+    """The record aimed at the exam session ahead: once the day it aims at
+    has gone by and the exam lists a later session (``exam.sessions``), the
+    next one from ``today``, with the latest session gone by as ``past``
+    until he says how that one went (a patch that sets ``exam.date``). The day passing
+    is what moves it, never a stored schedule: he stays ready for the next
+    session. The final review kept for the day gone by is that exam's, so
+    the next one's is read again (``capacity.final_reviews``)."""
+    exam = record.get("exam", {})
+    when = exam.get("date")
+    if not when or when >= today.isoformat():
+        return record
+    sessions = exam.get("sessions", ())
+    ahead = [day for day in sessions if day >= today.isoformat()]
+    if not ahead:
+        return record
+    past = max(day for day in (when, *sessions) if day < today.isoformat())
+    moved = {k: v for k, v in exam.items() if k != "final_review"}
+    return {**record, "exam": {**moved, "date": ahead[0], "past": past}}
 
 
 def examining(record: dict[str, Any]) -> Callable[[str], Exam | None]:
@@ -229,9 +250,11 @@ class Replay:
     """A topic's counted days replayed in order.
 
     ``verdicts`` holds one ``(day, grade)`` per counted day; ``days`` classifies
-    every attempted day as learning, probe or practice; ``guessed`` holds the
-    counted days whose ``helped`` came only from a right unaided answer he
-    marked a guess (``right_guess``); ``expected`` is the next
+    every attempted day as learning, probe or practice; ``shaky`` holds the
+    counted days whose ``helped`` came only from a right answer a hint or his
+    guess kept from ``solid`` (``shaky_right``), and ``unsettled`` those of
+    them with no answer after it yet, which the review's next question
+    settles (``_probe``); ``expected`` is the next
     expected review day after the last verdict, and ``due`` the date the engine
     stores for it: after the exam when that day is on or after an exam still
     ahead of the verdict. ``schedule`` keeps each ``(day, due)`` the replay set,
@@ -240,7 +263,8 @@ class Replay:
 
     verdicts: list[tuple[str, str]] = field(default_factory=list)
     days: dict[str, str] = field(default_factory=dict)
-    guessed: set[str] = field(default_factory=set)
+    shaky: set[str] = field(default_factory=set)
+    unsettled: set[str] = field(default_factory=set)
     expected: date | None = None
     due: date | None = None
     streak: int = 0
@@ -285,14 +309,26 @@ def positions(observations: dict[str, Any]) -> dict[str, int]:
 
 
 def _histories(observations: dict[str, Any]) -> dict[str, _History]:
+    """Each topic's effective attempts. An answer given inside another
+    topic's lesson (``aside``) counts once the topic has an answer of its
+    own that counts; until then it stays in the history only, so a check in
+    a side question never starts a topic or takes its first lesson away
+    (round 17, m3: one answer on Similar matrices in the Linear maps lesson
+    made it "Right, but a guess" with no Start, and moved Diagonalization)."""
     histories: dict[str, _History] = defaultdict(_History)
     place = positions(observations)
+    aside: dict[str, list[Attempt]] = defaultdict(list)
     for key, item in effective(observations).items():
         for topic in item["topics"]:
             history = histories[topic]
             history.latest = max(history.latest, item["date"])
             if counts(item):
                 history.attempts.append((key, item))
+            elif counts_aside(item):
+                aside[topic].append((key, item))
+    for topic, items in aside.items():
+        if histories[topic].attempts:
+            histories[topic].attempts.extend(items)
     for history in histories.values():
         history.attempts.sort(
             key=lambda pair: (pair[1]["date"], place[pair[0]], number(pair[0]))
@@ -315,12 +351,17 @@ def grade(observation: dict[str, Any]) -> str:
     return "helped"
 
 
-def right_guess(observation: dict[str, Any]) -> bool:
-    """A right unaided answer that only his ``sure: guess`` keeps from
-    ``solid``: weaker evidence than a sure one, never evidence he lost it."""
+def shaky_right(observation: dict[str, Any]) -> bool:
+    """A right answer that only a hint during it or his ``sure: guess`` keeps
+    from ``solid``: weaker evidence than a sure one on his own, never
+    evidence he lost the topic. Help that showed the method or the answer
+    first (``shown``) and doubtful evidence (``uncertain``) are not such an
+    answer: what was shown is not his."""
     return (
-        observation.get("sure") == "guess"
-        and grade({**observation, "sure": "neutral"}) == "solid"
+        observation["result"] == "correct"
+        and "uncertain" not in observation
+        and not observation.get("shown")
+        and grade(observation) == "helped"
     )
 
 
@@ -336,9 +377,16 @@ def _unaided_miss(observation: dict[str, Any]) -> bool:
 
 
 def _probe(items: list[dict[str, Any]]) -> str:
-    """The first try's grade, lowered only by a later unaided incorrect."""
+    """The first try's grade, lowered only by a later unaided incorrect. A
+    first try right but shaky (``shaky_right``) is what the review's second
+    question is for (``reviews.md``): his next answer that day settles it, so
+    right on his own makes the day ``solid`` (round 17, 1 M1: a hinted right
+    Random variables answer, then a sure one on his own, left Random
+    variables not solid and moved Expectation's start that day a week)."""
     if any(_unaided_miss(item) for item in items[1:]):
         return "missed"
+    if shaky_right(items[0]) and len(items) > 1 and grade(items[1]) == "solid":
+        return "solid"
     return grade(items[0])
 
 
@@ -429,8 +477,10 @@ def replay(
             day not in learning and (day >= result.due.isoformat() or was_due)
         ):
             result.days[day], verdict = PROBE, _probe(items)
-            if verdict == "helped" and right_guess(items[0]):
-                result.guessed.add(day)
+            if verdict == "helped" and shaky_right(items[0]):
+                result.shaky.add(day)
+                if len(items) == 1:
+                    result.unsettled.add(day)
         elif day in learning:
             result.days[day], verdict = LEARNING, _learned(items)
         else:
@@ -483,18 +533,24 @@ def _level(topic: dict[str, Any], attempts: list[Attempt], replayed: Replay) -> 
 
 
 def _lapsed(replayed: Replay) -> bool:
-    """Not solid on the last counted day after a solid one. A right answer he
-    marked a guess is no lapse: his flag may bring the review sooner, never
-    lower what the topic held (round 16, 1 M1: a right guess on the exam's
-    eve lapsed Random variables, and Expectation and Poisson, which need it,
-    left the exam)."""
-    grades = [verdict for _, verdict in replayed.verdicts]
-    return (
-        bool(grades)
-        and grades[-1] != "solid"
-        and replayed.verdicts[-1][0] not in replayed.guessed
-        and "solid" in grades[:-1]
-    )
+    """Not solid on the last counted day after a solid one. A right answer,
+    with a hint or marked a guess (``shaky_right``), is no lapse: the help or
+    his flag may bring the review sooner, never lower what the topic held
+    (round 16, 1 M1: a right guess on the exam's eve lapsed Random variables,
+    and Expectation and Poisson, which need it, left the exam; round 17, 1
+    M1: the same after a hint). Nor does it clear a lapse: the verdict that
+    counts is the last before such answers."""
+    grades = [verdict for day, verdict in held(replayed)]
+    return bool(grades) and grades[-1] != "solid" and "solid" in grades[:-1]
+
+
+def held(replayed: Replay) -> list[tuple[str, str]]:
+    """The counted verdicts but the shaky right answers at their end
+    (``shaky_right``), which neither lower what the topic held nor raise it."""
+    verdicts = list(replayed.verdicts)
+    while verdicts and verdicts[-1][0] in replayed.shaky:
+        verdicts.pop()
+    return verdicts
 
 
 def _relearn(replayed: Replay) -> bool:

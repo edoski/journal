@@ -35,6 +35,15 @@ describe("the study clock", () => {
 		assert.equal(studyNow({}, real).getTime(), real.getTime());
 	});
 
+	it("keeps a shifted pinned day's own time of day, whenever it is played (round 17, cross-surface after midnight)", () => {
+		const opens = new Date(2026, 10, 8, 10, 0);
+		for (const real of [new Date(2026, 10, 19, 0, 5), new Date(2026, 10, 19, 15, 0)]) {
+			const shift = (opens.getTime() - studyNow({ LEARNING_TODAY: "2026-11-08" }, real).getTime()) / 1000;
+			assert.equal(studyNow({ LEARNING_TODAY: "2026-11-08", LEARNING_CLOCK_SHIFT: String(shift) }, real).getTime(), opens.getTime());
+		}
+		assert.equal(studyNow({ LEARNING_CLOCK_SHIFT: "3600" }, opens).getTime(), opens.getTime(), "the shift moves only a pinned day");
+	});
+
 	it("stamps a session's activity on the study day, so Studied today names the lesson just finished", () => {
 		const chat = chatStore.createChat("Eigenvalues and eigenvectors");
 		// His opening and an answer in words after it: a session he studied in (round 10, 1 m2).

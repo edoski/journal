@@ -1,5 +1,5 @@
 import { courseLabel, type CourseMap, type CourseMapArc, type StudyCourse, type TopicHandle } from "@/src/core";
-import { runupExam, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
+import { runupExam, stepTitle, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 import { continueHref } from "@/components/nav/session-state";
 import { pressWord, type PressKind, type PressWord } from "@/components/study-words";
 
@@ -88,7 +88,7 @@ export function lessonOf(row: TodayRow): Lesson {
 		course,
 		courseTitle: course.map.title,
 		exam: runupExam(course),
-		title: stepWords(step),
+		title: stepTitle(step, course.map.title),
 		detail: step.kind === "review" && then ? `Then ${then}` : null,
 		action: pressWord(stepPress(step)),
 		topics,

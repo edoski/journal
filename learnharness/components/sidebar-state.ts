@@ -64,9 +64,19 @@ export function rankByTitle<T>(items: readonly T[], query: string, title: (item:
 		.map((r) => r.item);
 }
 
-/** The search over the sessions (owner round 8, 2026-10-05), by title. */
-export function filterSessions(list: ChatListItem[], query: string): ChatListItem[] {
-	return rankByTitle(list, query, (c) => c.title);
+/** The search over the sessions (owner round 8, 2026-10-05), by title,
+ *  and by the title of every topic it saved answers on (`topicTitle`), so
+ *  a review named for its course is found by its topics (round 17, m5:
+ *  "chain rule" found no session). */
+export function filterSessions(list: ChatListItem[], query: string, topicTitle: (chat: ChatListItem, handle: string) => string | undefined = () => undefined): ChatListItem[] {
+	if (!query.trim()) return [...list];
+	// A deleted course's session reads the titles it kept (round 18, m24).
+	const names = (c: ChatListItem) => [c.title, ...[...new Set([...Object.keys(c.answeredOn ?? {}), ...Object.keys(c.topicTitles ?? {})])].flatMap((h) => topicTitle(c, h) ?? c.topicTitles?.[h] ?? [])];
+	return list
+		.map((item) => ({ item, score: Math.max(...names(item).map((name) => titleScore(name, query))) }))
+		.filter((r) => r.score > 0)
+		.sort((a, b) => b.score - a.score)
+		.map((r) => r.item);
 }
 
 /**

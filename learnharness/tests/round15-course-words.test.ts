@@ -47,7 +47,7 @@ describe("the course page's words (round 15, m10)", () => {
 	it("says a review one way, as the sidebar and the map's card say it", () => {
 		for (const [handle, words] of [
 			["binomial", "Due 6 Nov"],
-			["bayes", "Due 13 Nov, back 23 Dec"],
+			["bayes", "Back Wed 23 Dec"],
 		] as const) {
 			const row = rows.find((r) => r.topic.handle === handle)!;
 			assert.equal(row.factWords, words, handle);

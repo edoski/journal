@@ -44,13 +44,18 @@ export function ProseProblem({ input, active }: { input: unknown; active: boolea
 
 /** How a problem ended: the record's mark under the bubble that ended it,
  *  and the model solution behind a disclosure, open when he asked to see
- *  it. A skip is one quiet line. */
-export function ProseConclude({ toolCallId, input, output, reveal }: {
+ *  it. A skip is one quiet line. Only a conclude that ran ended the
+ *  problem: one he stopped before it ran, or one the tool refused, shows
+ *  nothing (round 18, m19: a stopped mark showed the model solution under
+ *  his unmarked answer, and Try again's mark added a second). */
+export function ProseConclude({ toolCallId, input, output, reveal, state }: {
 	toolCallId: string;
 	input: unknown;
 	output: unknown;
 	reveal: unknown;
+	state: string | undefined;
 }) {
+	if (state !== "output-available") return null;
 	const { outcome, solutionReveal } = (input ?? {}) as { outcome?: unknown; solutionReveal?: unknown };
 	if (outcome === "dismissed") {
 		// Done for today set it aside: the Done for today line under it and

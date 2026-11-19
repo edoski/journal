@@ -147,10 +147,14 @@ describe("an arc is named one way", () => {
 		const roadmap = reading("maps", "the roadmap");
 
 		assert.deepEqual({ slot: list.slot, number: list.number, text: list.text, pill: list.pill, ring: list.ring }, { slot: "arc-label", number: "2", text: "2Linear maps", pill: false, ring: false });
+		// How a name fits its room is each place's (`wrap`: the road takes a
+		// second line before it cuts; round 17, m26); the look is the label's.
+		const FIT = new Set(["truncate", "line-clamp-2", "whitespace-nowrap"]);
+		const look = (classes: readonly (string | null)[]) => classes.map((c) => (c ?? "").split(/\s+/).filter((k) => k && !FIT.has(k)).join(" "));
+		assert.match(road.inner[1] ?? "", /\bline-clamp-2\b/, "the road's arc name wraps before it is cut");
 		for (const [where, seen] of Object.entries({ road, roadmap })) {
-			const inner = list.inner;
-			assert.deepEqual({ slot: seen.slot, number: seen.number, text: seen.text, inner: seen.inner, pill: seen.pill, ring: seen.ring }, { slot: list.slot, number: list.number, text: list.text, inner, pill: false, ring: false }, `${where} names the arc as the arc list does`);
-			assert.deepEqual(list.classes.filter((c) => !seen.classes.includes(c)), [], `${where} wears the label's own look`);
+			assert.deepEqual({ slot: seen.slot, number: seen.number, text: seen.text, inner: look(seen.inner), pill: seen.pill, ring: seen.ring }, { slot: list.slot, number: list.number, text: list.text, inner: look(list.inner), pill: false, ring: false }, `${where} names the arc as the arc list does`);
+			assert.deepEqual(list.classes.filter((c) => !FIT.has(c) && !seen.classes.includes(c)), [], `${where} wears the label's own look`);
 		}
 	});
 });

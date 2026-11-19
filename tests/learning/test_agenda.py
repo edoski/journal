@@ -373,6 +373,25 @@ def test_a_day_he_answered_no_review_shows_no_review_limit() -> None:
     assert plan_for(record, on(4))["reviews"]
 
 
+def test_a_day_he_spent_elsewhere_says_nothing_of_his_new_topic_pace() -> None:
+    """Round 18, M1: a day he left a start owed and started no topic, or did
+    more reviews than the plan proposed, chose other work; like a day he
+    answered no review, it shows no new-topic limit. A day he started more
+    topics than the plan proposed always counts: it raises his pace."""
+    past = every_day(Done(4, 2, reviews_short=True, new_short=True), days=14)
+    morning = capacity.estimate(past, MONDAY)
+    assert (morning.room(MONDAY, "reviews"), morning.room(MONDAY, "new")) == (4, 2)
+
+    def settled(reviews: int, new: int) -> Done:
+        today = Done(reviews, new, reviews_short=True, new_short=True)
+        return capacity._settled({**past, MONDAY: today}, on(1), frozenset())[MONDAY]
+
+    assert settled(4, 0).new_kept, "he started no topic"
+    assert settled(6, 1).new_kept, "he did more reviews than proposed"
+    assert settled(4, 1).new_short, "he did the reviews and stopped short of a start"
+    assert settled(6, 3).new_short, "he started more than proposed"
+
+
 def test_doing_exactly_what_the_plan_proposes_never_shows_a_limit() -> None:
     record = course(12, exam=40, needs={"t03": ["t02"]})
     for offset in range(21):

@@ -221,6 +221,8 @@ describe("course records adapter (fake engine)", () => {
 				{ topic: "det", title: "Determinants", needs: [], contrasts: [], level: "new", starts: "2026-11-19", starts_after: ["Probability"], moved: { from: "2026-11-12", by: "study", courses: ["Probability"], day: "today" }, weak: false, tasks: [] },
 				{ topic: "inverse", title: "Inverse matrices", needs: [], contrasts: [], level: "new", starts: "2026-11-20", moved: { from: "2026-11-12", by: "study", courses: ["Linear Algebra"], day: "today", waits_on: ["elimination"] }, weak: false, tasks: [] },
 				{ topic: "span", title: "Span", needs: [], contrasts: [], level: "assisted", review: "2026-11-10", moved: { from: "2026-11-25", by: "answered" }, weak: false, tasks: [] },
+				{ topic: "solve", title: "Solving systems", needs: [], contrasts: [], level: "new", starts: "2026-11-21", moved: { from: "2026-11-12", by: "study", courses: ["Linear Algebra"], day: "today", waits_on: ["elimination"], another_day: true }, weak: false, tasks: [] },
+				{ topic: "lu", title: "LU factorisation", needs: [], contrasts: [], level: "new", starts: "2026-11-10", moved: { from: "2026-11-12", by: "study", courses: ["Linear Algebra"], day: "today", ready: ["elimination"] }, weak: false, tasks: [] },
 				{ topic: "odd", level: "mastered", needs: [], contrasts: [], weak: false, tasks: [] },
 			],
 		};
@@ -237,7 +239,7 @@ describe("course records adapter (fake engine)", () => {
 		assert.deepEqual(map.tasks, [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: "2026-11-06" }]);
 		assert.deepEqual(
 			map.topics.map((t) => t.handle),
-			["vectors", "basis", "elimination", "rank", "cramer", "det", "inverse", "span"],
+			["vectors", "basis", "elimination", "rank", "cramer", "det", "inverse", "span", "solve", "lu"],
 			"a topic with a level the engine does not have is not drawn",
 		);
 		const [vectors, basis, elimination, rank, cramer] = map.topics;
@@ -245,6 +247,8 @@ describe("course records adapter (fake engine)", () => {
 		assert.deepEqual(map.topics.find((t) => t.handle === "det")?.startsAfter, ["Probability"], "a start says which courses' new topics come first");
 		assert.deepEqual(map.topics.find((t) => t.handle === "det")?.moved, { from: "2026-11-12", by: "study", courses: ["Probability"], day: "today" }, "a day he was told that moved says from which day and why");
 		assert.deepEqual(map.topics.find((t) => t.handle === "inverse")?.moved, { from: "2026-11-12", by: "study", courses: ["Linear Algebra"], day: "today", waitsOn: ["Gaussian elimination"] }, "round 14, m3: a start that moved because a topic it needs slipped names that topic");
+		assert.deepEqual(map.topics.find((t) => t.handle === "solve")?.moved, { from: "2026-11-12", by: "study", courses: ["Linear Algebra"], day: "today", waitsOn: ["Gaussian elimination"], anotherDay: true }, "round 17, 1 M1: a topic right on his own today waits only for its check on another day");
+		assert.deepEqual(map.topics.find((t) => t.handle === "lu")?.moved, { from: "2026-11-12", by: "study", courses: ["Linear Algebra"], day: "today", ready: ["Gaussian elimination"] }, "round 17, 2 m3: a day brought forward names what made it ready");
 		assert.deepEqual(map.topics.find((t) => t.handle === "span")?.moved, { from: "2026-11-25", by: "answered" }, "round 14, m3: his own answer today moved a day he was told");
 		assert.equal("moved" in basis!, false);
 		assert.deepEqual(basis!.review, { kind: "scheduled", date: "2026-12-04", held: { exam: "Probability", since: "2026-11-02" } }, "a review a final review holds back says which, and since when");
@@ -307,8 +311,8 @@ describe("course map arcs (E2's goldens)", () => {
 		assert.equal("currentArc" in map, false);
 		assert.equal(map.topics.some((t) => "arc" in t), false, "no topic names an arc");
 		assert.equal(currentArc(map), null);
-		assert.deepEqual(topicOf(map, "invertibility").startsWhy, { kind: "after", needs: ["rank"], partners: [] });
-		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", waitingOn: [], exam: false });
+		assert.deepEqual(topicOf(map, "invertibility").startsWhy, { kind: "after", needs: ["determinant"], partners: [] });
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", waitingOn: ["matmul", "determinant"], exam: false });
 		assert.deepEqual(
 			map.topics.filter((t) => t.startsWhy).map((t) => t.handle),
 			map.topics.filter((t) => t.starts).map((t) => t.handle),
@@ -335,7 +339,7 @@ describe("course map arcs (E2's goldens)", () => {
 			"every topic in one arc",
 		);
 		assert.equal(map.currentArc, "eigenvalues");
-		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", arc: "orthogonality", waitingOn: [], exam: false });
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", arc: "orthogonality", waitingOn: ["invertibility"], exam: false });
 		assert.deepEqual(topicOf(map, "change-basis").startsWhy, { kind: "after", arc: "eigenvalues", needs: ["invertibility"], partners: [] });
 	});
 
@@ -375,8 +379,8 @@ describe("course map arcs (E2's goldens)", () => {
 	it("the exam's scope of arcs and the topics it leaves out, as far as the map shows them", () => {
 		const golden = goldenMap("linear-algebra-arcs");
 		const exam = { ...(golden.exam as object), arcs: ["spaces", "systems", "gone"], leaves_out: ["kernel", "nope"] };
-		assert.deepEqual(parsed({ ...golden, exam }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-16", arcs: ["spaces", "systems"], leavesOut: ["kernel"] });
-		assert.deepEqual(parsed({ ...golden, exam: { ...exam, arcs: null } }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-16", leavesOut: ["kernel"] }, "null is the whole course, less what it leaves out");
+		assert.deepEqual(parsed({ ...golden, exam }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-17", arcs: ["spaces", "systems"], leavesOut: ["kernel"] });
+		assert.deepEqual(parsed({ ...golden, exam: { ...exam, arcs: null } }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-17", leavesOut: ["kernel"] }, "null is the whole course, less what it leaves out");
 	});
 
 	it("the topics an exam leaves out in a course without arcs", () => {

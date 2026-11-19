@@ -95,6 +95,68 @@ describe("a review whose plan teaches another topic is that topic's lesson (roun
 	});
 });
 
+/**
+ * Round 17, M5 (3 M4): in the Probability review he asked to start
+ * Expectation and linearity; the tutor probed it, and he left with the
+ * envelopes question open, before any plan. The session stayed the review,
+ * so its close saved no task and Expectation's page had nothing to resume.
+ * The probe is the first lesson's start: a save that starts the topic (its
+ * receipt moves it up from "new") takes up its lesson.
+ */
+describe("a review whose probe starts another topic is that topic's lesson, before any plan (round 17, M5)", () => {
+	const receipt = (levels: Record<string, unknown>) => (changes: unknown) => {
+		const [ask, result] = save(changes);
+		return [ask, { ...result!, content: [{ type: "text", text: JSON.stringify({ revision: 3, changed: true, levels }) }] }];
+	};
+	const created = chatStore.createChat("Review Inclusion-exclusion principle, Conditional probability", course, ["inclusion-exclusion", "conditional"]);
+	const reviewed = [newUserMessage("Review Inclusion-exclusion principle, Conditional probability"), ...receipt({ conditional: { from: "attempted", to: "solid" } })({ observations: [{ topics: ["conditional"], text: "Found P(A | B) from the table", result: "correct", help: "none" }] })];
+	const probed = [...reviewed, newUserMessage("Can we start Expectation and linearity now instead?"), ...receipt({ expectation: { from: "new", to: "attempted" } })({ observations: [{ topics: ["expectation"], text: "Gave E(X) for one die", result: "correct", help: "none" }] })];
+
+	it("is the review while its answers are on topics already started", () => {
+		chatStore.saveMessages(created.id, reviewed as never);
+		assert.equal(lessonTakenUp(chatStore.getChat(created.id)!), null);
+		assert.equal(listed(created.id).review, true);
+	});
+
+	it("once a probe answer starts Expectation: filed under it, no longer a review, its close saves the lesson's task, and it takes the lesson's name", async () => {
+		chatStore.saveMessages(created.id, probed as never);
+		const record = chatStore.getChat(created.id)!;
+		assert.equal(lessonTakenUp(record), "expectation");
+		assert.equal(reviewRecord(record), false, "its close saves the lesson's task");
+		assert.deepEqual(listed(created.id).ownTopics, ["expectation"], "Expectation's page resumes it");
+		assert.equal(listed(created.id).review, false);
+		const { nameTakenUpLesson } = await import("../src/server/session-naming.ts");
+		const courseRecords = { map: async () => ({ ok: true as const, map: { topics: [{ handle: "expectation", title: "Expectation and linearity" }] } }) };
+		assert.equal(await nameTakenUpLesson({ chatStore, courseRecords: courseRecords as never }, created.id), true);
+		assert.equal(listed(created.id).title, "Expectation and linearity lesson");
+	});
+
+	it("a plan that came first decides, as before", () => {
+		const planned = chatStore.createChat("Review Conditional probability", course, ["conditional"]);
+		chatStore.saveMessages(planned.id, [newUserMessage("Review Conditional probability"), ...call("plan_init", { mermaid: "graph TD\n  a[Bayes again]", goal: { title: "Conditional probability", topic: "conditional" } }), ...receipt({ expectation: { from: "new", to: "attempted" } })({ observations: [{ topics: ["expectation"], text: "A side question on E(X)", result: "correct", help: "none" }] })] as never);
+		assert.equal(lessonTakenUp(chatStore.getChat(planned.id)!), null);
+	});
+
+	it("a review whose plan re-taught its own topic takes up the topic a later plan teaches (round 17, M5 live)", () => {
+		// The live Probability review: its plan re-taught Inclusion-exclusion, he asked to start Expectation,
+		// the tutor planned it and he answered its first question; the session stayed the review.
+		const retaught = chatStore.createChat("Review Binomial distribution, Inclusion-exclusion principle", course, ["binomial", "inclusion-exclusion"]);
+		const opening = [newUserMessage("Review Binomial distribution, Inclusion-exclusion principle"), ...call("plan_init", { mermaid: "graph TD\n  a[Pairwise overlaps]", goal: { title: "Inclusion-exclusion review", topic: "inclusion-exclusion" } })];
+		chatStore.saveMessages(retaught.id, opening as never);
+		assert.equal(lessonTakenUp(chatStore.getChat(retaught.id)!), null, "re-teaching its own topic keeps the review");
+		chatStore.saveMessages(retaught.id, [...opening, newUserMessage("Can we start Expectation and linearity now instead?"), ...call("plan_init", { mermaid: "graph TD\n  a[Long-run average]", goal: { title: "Expectation and linearity", topic: "expectation" } }), ...receipt({ expectation: { from: "new", to: "assisted" } })({ observations: [{ topics: ["expectation"], text: "Said a die's average settles near 3.5", result: "correct", help: "none" }] })] as never);
+		assert.equal(lessonTakenUp(chatStore.getChat(retaught.id)!), "expectation");
+		assert.deepEqual(listed(retaught.id).ownTopics, ["expectation"], "Expectation's page resumes it");
+		assert.equal(listed(retaught.id).review, false, "its close saves the lesson's task");
+	});
+
+	it("a lesson keeps its topic when a later plan repairs a prerequisite", () => {
+		const lesson = chatStore.createChat("Invertible matrices lesson", course, ["invertibility"]);
+		chatStore.saveMessages(lesson.id, [newUserMessage("Start Invertible matrices"), ...call("plan_init", { mermaid: "graph TD\n  a[Two-sided inverses]", goal: { title: "Invertible matrices", topic: "invertibility" } }), ...call("plan_init", { mermaid: "graph TD\n  a[Rank again]", goal: { title: "Rank", topic: "rank" } })] as never);
+		assert.equal(lessonTakenUp(chatStore.getChat(lesson.id)!), null);
+	});
+});
+
 describe("when he worked in a session (round 16, m8, m9)", () => {
 	it("is his input's time and days, never a write that was not his", () => {
 		const created = chatStore.createChat("Linear maps and their matrices lesson", course, ["linear-maps"]);

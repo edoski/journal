@@ -213,8 +213,8 @@ function dayClaims(s: Survey): Claims {
 		}
 		// Home's Today: a course line's topics are planned today.
 		for (const line of s.home) {
-			if (line.course !== course.map.title || !/^(Review|Start) /.test(line.title)) continue;
-			for (const topic of titled) if (names(line.title, topic.title)) claim(keyOf(ws, topic.handle), "Home", s.today);
+			if (line.course !== course.map.title || !/^(Review|Start) |^.* review$/.test(line.title)) continue;
+			for (const topic of titled) if (names(line.title, topic.title) || line.topics.includes(topic.handle)) claim(keyOf(ws, topic.handle), "Home", s.today);
 		}
 		// The topic page: a review it starts now is today's; else its Now note's day, else Scheduled's.
 		for (const topic of course.map.topics) {
@@ -481,7 +481,7 @@ function assertNeedsYouOnToday(s: Survey) {
 			if (!topic) continue;
 			const asked = s.home.some((line) => {
 				if (line.course !== course.map.title) return false;
-				if (names(line.title, topic.title)) return true;
+				if (names(line.title, topic.title) || line.topics.includes(topic.handle)) return true;
 				const chat = s.chats.find((c) => c.id === chatOf(line.opens));
 				if (chat && [...(chat.ownTopics ?? []), ...(chat.topics ?? [])].includes(topic.handle)) return true;
 				const task = course.map.tasks.find((t) => line.title === `Continue ${t.title}`);
@@ -729,9 +729,15 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		await holds("Sun 8 Nov, after the Eigen lesson", (s) => assertLeftToday(app, s, "chat_demo_eigen", words, before));
 	});
 
-	it("Sun 8 Nov, after the Probability review from Home (lens 1, step 9)", async () => {
+	it("Mon 9 Nov, overnight", async () => {
+		app.day("2026-11-09");
+		await holds("Mon 9 Nov, overnight");
+	});
+
+	it("Mon 9 Nov, after the Probability review from Home (lens 1, step 9, a day on: since round 18's M1 Binomial's review is on 9 Nov)", async () => {
 		await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 });
-		const line = app.homeLines().find((l) => l.course === "Probability" && l.title.startsWith("Review "));
+		// Round 18, m10: a review of several topics is named as its session, "Probability review".
+		const line = app.homeLines().find((l) => l.course === "Probability" && l.title === "Probability review");
 		assert.ok(line, "Home offers the Probability review");
 		const opened = await app.press(line.el);
 		assert.ok(opened?.startsWith("/chat/"), `the review opens a session (${opened})`);
@@ -743,19 +749,25 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 			],
 		});
 		app.doneForToday(id, "Binomial distribution comes back for review another day.");
-		await holds("Sun 8 Nov, after the Probability review");
-	});
-
-	it("Mon 9 Nov, overnight", async () => {
-		app.day("2026-11-09");
-		await holds("Mon 9 Nov, overnight");
+		// Round 17, M4 (3 N2, 1 m4): the review's other topics got no answer today, so Home keeps their line, which
+		// picks up the review he left, as the calendar still lists them today.
+		await holds("Mon 9 Nov, after the Probability review", (s) => {
+			const prob = s.courses.find((c) => c.map.title === "Probability")!;
+			const rest = (prob.due ?? []).filter((h) => h !== "binomial").map((h) => prob.map.topics.find((t) => t.handle === h)!);
+			assert.ok(rest.length > 0, "the seeded Probability review holds topics beside Binomial");
+			const line = s.home.find((l) => l.course === "Probability" && (l.title === "Probability review" || l.title.startsWith("Review ")));
+			assert.ok(line, `Home keeps the review of the topics he did not answer today (${rest.map((t) => t.title).join(", ")}): ${s.home.map((l) => l.title).join(" | ")}`);
+			assert.ok(opensChat(line.opens, id), `the line picks up the review he left: it opens ${line.opens}`);
+			for (const topic of rest) assert.ok(line.topics.includes(topic.handle), `the line takes up ${topic.title}: ${line.topics.join(", ")}`);
+			assert.ok(!line.topics.includes("binomial"), `the line leaves out Binomial, answered today: ${line.topics.join(", ")}`);
+		});
 	});
 
 	it("Mon 9 Nov, after the Linear Algebra review from Home (lens 1, step 15)", async () => {
 		await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 });
 		// Eigen's review is due today, and the Eigen lesson left yesterday is open on it, so the review is that lesson's
 		// line, where his answers count as it (round 15, m6).
-		const line = app.homeLines().find((l) => l.course === "Linear Algebra" && (l.title.startsWith("Review ") || l.title.startsWith("Continue Eigenvalues and eigenvectors")));
+		const line = app.homeLines().find((l) => l.course === "Linear Algebra" && (l.title.startsWith("Review ") || l.title === "Linear Algebra review" || l.title.startsWith("Continue Eigenvalues and eigenvectors")));
 		assert.ok(line, `Home offers a Linear Algebra review: ${app.homeLines().map((l) => l.title).join(" | ")}`);
 		assert.ok(app.homeLines().filter((l) => /Eigenvalues and eigenvectors/.test(l.title)).length === 1, `one line for Eigen: ${app.homeLines().map((l) => `${l.title} · ${l.status}`).join(" | ")}`);
 		const opened = await app.press(line.el);
@@ -883,6 +895,32 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		assert.equal(listed.title, `${other.title} lesson`, "the session is named after the lesson it took up");
 		assert.ok(!listed.review, "it is no longer the review it opened as");
 		await holds("Tue 17 Nov, after the review that took up a lesson", (s) => {
+			const page = s.pages.get(keyOf(course.workspace, other.handle));
+			assert.ok(page?.opens?.split("?")[0] === `/chat/${id}`, `${other.title}'s page resumes its lesson: "${page?.now} · ${page?.press} · ${page?.note}" opens ${page?.opens}`);
+		});
+	});
+
+	it("Tue 17 Nov, a review whose probe starts a topic, left in the probe before any plan (round 17, M5: 3 M4)", async () => {
+		const { nameTakenUpLesson } = await import("../src/server/session-naming.ts");
+		const { stores } = await import("../src/server/stores.ts");
+		const { courses } = (await (await fetch("/api/calendar")).json()) as { courses: CalendarCourse[] };
+		const course = courses.find((c) => c.map.title === "Probability")!.map;
+		const taught = course.topics.find((t) => t.level !== "new")!;
+		const res = await fetch("/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: `Review ${taught.title}`, course: { workspace: course.workspace }, topics: [taught.handle] }) });
+		const { id } = (await res.json()) as { id: string };
+		const other = course.topics.find((t) => t.level === "new" && !app.chats().some((c) => (c.topics ?? []).includes(t.handle)))!;
+		assert.ok(other, "Probability has a topic no session touched");
+		app.say(id, `Can we start ${other.title} now instead?`);
+		// The probe's first answer on it, which starts it; no plan yet (lens 3: E(X), E(min)).
+		await app.save(id, { observations: [{ topics: [other.handle], text: `Probe question on ${other.title}`, result: "correct", help: "none", sure: "confident" }] });
+		await nameTakenUpLesson({ chatStore: stores.chatStore, courseRecords: stores.courseRecords }, id);
+		const left = app.pose(id, "Which envelope do you keep?");
+		app.leave(id);
+		app.closes(id, "We'll stop here for today.", left);
+		const listed = app.chats().find((c) => c.id === id)!;
+		assert.equal(listed.title, `${other.title} lesson`, "the session is named after the lesson its probe started");
+		assert.ok(!listed.review, "it is no longer the review it opened as");
+		await holds("Tue 17 Nov, after the review whose probe started a lesson", (s) => {
 			const page = s.pages.get(keyOf(course.workspace, other.handle));
 			assert.ok(page?.opens?.split("?")[0] === `/chat/${id}`, `${other.title}'s page resumes its lesson: "${page?.now} · ${page?.press} · ${page?.note}" opens ${page?.opens}`);
 		});

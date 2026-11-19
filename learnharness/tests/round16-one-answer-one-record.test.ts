@@ -73,7 +73,7 @@ describe("one answer is saved once, with no first try it never had (round 16, M2
 	it("a real first try that missed, then a fix after the hint, keeps both rows", async () => {
 		const wrong = newThinkingMessage(POSE, "rank 3, every row is nonzero", "confident") as LhMessage;
 		const messages = [newUserMessage("Practice rank") as LhMessage, pose, posed, wrong, hint, reply("a_hint", "Compare row 3 with the sum."), answer];
-		const observations = await concluded(messages, { ...conclusion, firstTry: { result: "incorrect", response: "rank 3", sure: "confident" } });
+		const observations = await concluded(messages, { ...conclusion, firstTry: { result: "incorrect", response: "rank 3", record: "Counted every nonzero row, missing that row 3 is row 1 plus row 2", sure: "confident" } });
 		assert.deepEqual(observations.map((o) => [o.result, o.help]), [["incorrect", "none"], ["correct", RUNG_HELP.R1]]);
 	});
 

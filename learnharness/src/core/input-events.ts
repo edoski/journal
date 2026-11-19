@@ -34,7 +34,7 @@
 import { dismissedAnswer, picksStop, type LeftDraft, type QuestionAnswerData } from "./question-core.ts";
 import { parsePhotos, type Photo } from "./photos.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
-import type { LhMessage } from "./native-messages.ts";
+import type { ContinuedTask, LhMessage } from "./native-messages.ts";
 import type { AnswerSaves, SessionMode } from "./contracts/chat.ts";
 import {
 	activeProblemOf,
@@ -103,8 +103,9 @@ export type ChatInput =
 	| { type: "tonight"; draft?: { toolCallId: string } & LeftDraft }
 	/** Continue pressed on an open task the session holds, with nothing
 	 *  in it waiting on him: the tutor carries on at the task's step
-	 *  (round 13, 2 M1). */
-	| { type: "task" }
+	 *  (round 13, 2 M1). `task` is the task's record as the server read it
+	 *  (`taskContinueAppends`); a client's is never kept. */
+	| { type: "task"; task?: ContinuedTask | null }
 	/** His dispute of an answer's mark (Edo, 14 Nov 2026): the answer's
 	 *  call, the attempts that stood for it when he pressed Dispute, and
 	 *  what he said is wrong or the mark he thinks is right (at least one).
@@ -400,7 +401,7 @@ export function inputAppends(
 		case "tonight":
 			return tonightAppends(record, input.draft);
 		case "task":
-			return taskContinueAppends(record);
+			return taskContinueAppends(record, input.task);
 		case "dispute":
 			return disputeAppends(record, input);
 	}
@@ -597,9 +598,9 @@ export function taskTurnOwed(messages: LhMessage[]): boolean {
 /** Continue on a task's appends (pure): refused unless the session holds
  *  an open task and nothing in it waits on him, since a posed question or
  *  problem is where he goes on, and his answer is the next input. */
-export function taskContinueAppends(record: { messages: LhMessage[] }): LhMessage[] {
+export function taskContinueAppends(record: { messages: LhMessage[] }, task?: ContinuedTask | null): LhMessage[] {
 	const tasks = sessionTasksOf(record.messages);
 	if (tasks.length === 0) throw new ChatInputError("task input requires a session holding an open task");
 	if (danglingQuestionOf(record.messages) || activeProblemOf(record.messages)) throw new ChatInputError("task input requires nothing waiting on him");
-	return [...dismissalConclusion(record), newTaskContinueMessage(tasks)];
+	return [...dismissalConclusion(record), newTaskContinueMessage(tasks, task)];
 }

@@ -127,7 +127,7 @@ describe("a question asked again after a hint", () => {
 	it("draws a prediction posed after a side question in full: another type of question on the same step (round 14, 2 D1)", () => {
 		// "let me guess first": the tutor set the Av check aside and posed a
 		// prediction on the same node, whose words never showed.
-		const av = { ...check, nodeId: "eigenbasis", type: "check", question: "What is $Av$ for $v = 2b_1 + b_2$?" };
+		const av = { ...check, nodeId: "eigenbasis", type: "check", question: "What is $Av$ for $v = 2b_1 + b_2$?", correctAnswer: "$Av = 2\\lambda_1 b_1 + \\lambda_2 b_2$" };
 		const guess = { nodeId: "eigenbasis", type: "predict", question: "Can every 2×2 matrix be made diagonal this way, and why?" };
 		const aside = dismissedAnswer("explain", av.question, "asked");
 		const lesson = [{ parts: [ask("q1", av, aside)] }, { parts: [hint, ask("q2", guess)] }];
@@ -135,6 +135,18 @@ describe("a question asked again after a hint", () => {
 		assert.deepEqual([...askedAgain(lesson)], [], "its words are drawn");
 		const reasked = { ...av, question: "So what is $Av$ for $v = 2b_1 + b_2$?" };
 		assert.equal(reaskedFrom([{ parts: [ask("q1", av, aside)] }, { parts: [hint, ask("q2", reasked)] }], "q2"), "q1", "the check asked again, reworded, is still a re-ask");
+	});
+
+	it("draws another check on the same step in full, after a hint or a side question (round 17, M7)", () => {
+		const sr = { ...check, nodeId: "two-sided", question: "Is $SR$ the $3 \\times 3$ identity, and why?", correctAnswer: "No. $SR$ sends $e_3$ to $0$." };
+		const uvw = { ...sr, question: "Three $3 \\times 3$ matrices satisfy $UVW = I$. Is $U$ invertible, and why?", correctAnswer: "Yes. $U(VW) = I$ and both are square." };
+		for (const left of [dismissedAnswer("explain", sr.question, "asked"), proseHintRequest(proseQuestionSpec("explain", "q1", sr)!, "rank at most 2")]) {
+			const lesson = [{ parts: [ask("q1", sr, left)] }, { parts: [hint, ask("q2", uvw)] }];
+			assert.deepEqual([...askedAgain(lesson)], [], "its words are drawn");
+			assert.equal(reaskedFrom(lesson, "q2"), null, "his work on SR is not carried into it");
+		}
+		const reworded = { ...sr, question: "So: is $SR$ the identity, and why?" };
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", sr, dismissedAnswer("explain", sr.question, "asked"))] }, { parts: [hint, ask("q2", reworded)] }])], ["q2"], "the same check reworded is still a re-ask");
 	});
 
 	it("draws a new question that follows an answer, and the same one, his retry after a nudge (Edo, 18 Nov 2026), once", () => {

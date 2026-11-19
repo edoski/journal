@@ -29,6 +29,7 @@ import {
 import type { ProseAnswer } from "@/components/lesson/prose/prose-answer";
 import { digitOption, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec, proseShowMeRequest, type ProseQuestionSpec } from "@/components/lesson/prose/prose-question-data";
 import { ChoiceRows, QuestionWords } from "@/components/lesson/prose/prose-question";
+import { LESSON_WORDS } from "@/components/study-words";
 
 /** What waits for his answer: a question the tutor asked, or a problem. */
 export type ProseOpen =
@@ -227,9 +228,17 @@ function AnswerComposer({
 		});
 	};
 
+	// A reply to his work that never came (he stopped it, or it failed):
+	// the empty box says Enter tries it again, and Enter does, as in a
+	// lesson (round 18, m19: the box read "Work here, think out loud." and
+	// Enter sent nothing).
+	const retry = problem && !busy ? message.onEmptyEnter : undefined;
 	const submit = () => {
 		if (steering) return sendOut(onSteer);
-		if (!ready) return;
+		if (!ready) {
+			if (retry && !written) retry();
+			return;
+		}
 		if (problem) {
 			const sure = confidence;
 			setConfidence(DEFAULT_CONFIDENCE);
@@ -350,7 +359,7 @@ function AnswerComposer({
 			<ModeToggle mode="answer" kind={open.kind} onToggle={onAsk} busy={busy} />
 		</>
 	);
-	const placeholder = problem ? "Work here, think out loud." : spec ? prosePlaceholder(spec, open.kind === "question" ? open.input : null, selection.selected.size > 0) : undefined;
+	const placeholder = problem ? (retry ? LESSON_WORDS.tryAgainPlaceholder : "Work here, think out loud.") : spec ? prosePlaceholder(spec, open.kind === "question" ? open.input : null, selection.selected.size > 0) : undefined;
 	return (
 		<>
 			<LessonComposer
@@ -364,6 +373,7 @@ function AnswerComposer({
 				leading={leading}
 				toolbar={toolbar}
 				answer={{ onSubmit: submit, ready: ready || steering, label: steering ? "Send" : problem ? "Submit your work" : "Submit answer" }}
+				onEmptyEnter={retry}
 				head={<OpenQuote open={open} spec={spec} selected={selection.selected} onPick={(i) => pick(i, multi)} />}
 				photos={textMode ? photos : undefined}
 				compact={message.compact}

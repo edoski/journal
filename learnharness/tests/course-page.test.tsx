@@ -182,11 +182,11 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		assert.equal(cardLine(sidebarSays([map], [], WS).get(h("basis"))), null);
 	});
 
-	it("says since when a review held past its day was due, in the words the sidebar and the topic page use", () => {
+	it("says the day a review held past its day comes back, in the words the sidebar and the topic page use (round 18, m1)", () => {
 		const held = { kind: "scheduled" as const, date: "2026-12-08", held: { exam: null, since: "2026-10-21" } };
 		const map = course({ topics: TOPICS.map((t) => (t.handle === "basis" ? { ...t, review: held } : t)) });
 		const row = groupOf(courseGroups(map), "on-your-own").topics.find((t) => t.topic.handle === "basis")!;
-		assert.deepEqual(row.fact, { kind: "review", words: "Due 21 Oct, back 8 Dec" }, "a late review needs him, so the map's card says it too, with the day it comes back (round 8)");
+		assert.deepEqual(row.fact, { kind: "review", words: "Back Tue 8 Dec" }, "the day it comes back (round 8), and only that (round 18, m1)");
 		const unit = buildInbox([map], [], WS).known.find((u) => u.topic.handle === "basis")!;
 		assert.deepEqual(unitStatus(unit, "2026-11-08"), { kind: "review", words: row.fact!.words }, "the sidebar's row says the same");
 		assert.deepEqual(
@@ -263,13 +263,15 @@ describe("the header's facts and next lesson", () => {
 		assert.deepEqual(next.lesson.open, { kind: "session", href: "/chat/c1" });
 	});
 
-	it("still takes up the course's next step once he ended today's lesson on it with Done for today, which Home leaves off Today", () => {
-		const left = chat("c1", { title: "Review Span", topics: [h("span")], ended: "left", updatedAt: "2026-11-08T12:00:00.000Z" });
+	it("still takes up the course's next step once he ended today's review on it with Done for today, its answer saved, which Home leaves off Today", () => {
+		const left = chat("c1", { title: "Review Span", topics: [h("span")], ended: "left", updatedAt: "2026-11-08T12:00:00.000Z", answeredOn: { span: "2026-11-08" } });
 		const next = courseNext(course({ tasks: [], focus: null }), [left]);
 		assert.equal(next.lesson.action, "Review");
 		assert.equal(next.lesson.title, "Review Span");
 		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
 		assert.equal(courseNext(course(), [left]).lesson.title, `Continue ${course().map.tasks[0]!.title}`, "with an open task, the line Home still has for the course");
+		// Round 17, M4: left with no answer on Span today, the review is still today's, on Home and here.
+		assert.equal(courseNext(course(), [{ ...left, answeredOn: undefined }]).lesson.title, "Review Span");
 	});
 
 	it("starts a lesson in a course with nothing to review, no task and no current topic", () => {
@@ -417,8 +419,8 @@ describe("a topic row's status in words, whole (round 11, 1 N8 and 2 n9)", () =>
 
 	it("says a review in the sidebar's and the map card's words, and a planned start by its date (round 15, m10)", () => {
 		const row = rowOf("matmul", course({ topics: [...TOPICS, held] }));
-		assert.deepEqual(row.fact, { kind: "review", words: "Due 6 Nov, back 20 Nov" });
-		assert.equal(row.factWords, "Due 6 Nov, back 20 Nov");
+		assert.deepEqual(row.fact, { kind: "review", words: "Back Fri 20 Nov" });
+		assert.equal(row.factWords, "Back Fri 20 Nov");
 		const span = rowOf("span", course());
 		assert.deepEqual([span.fact?.words, span.factWords], ["Due 29 Oct", "Due 29 Oct"]);
 		const fresh = rowOf("eigen", course({ topics: TOPICS.map((t) => (t.handle === "eigen" ? { ...t, starts: "2026-11-18" } : t)) }));
