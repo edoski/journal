@@ -77,6 +77,12 @@
         "rank",
         "basis",
         "kernel"
+      ],
+      "where": [
+        {
+          "path": "material/la-problem-sheets-contents.md",
+          "locator": "Sheet 4"
+        }
       ]
     }
   ],

@@ -80,7 +80,7 @@ export function sourceTitles(sources: readonly SourceFacts[], course: string | n
 
 /** Where the course's material is: the folder its workspace names, else
  *  the course's own folder (the engine's `Workspace.sources`). */
-async function materialOf(workspace: string): Promise<string> {
+export async function materialOf(workspace: string): Promise<string> {
 	try {
 		const manifest = JSON.parse(await fs.readFile(path.join(workspace, ".study", "workspace.json"), "utf8")) as { sources?: unknown };
 		return str(manifest.sources) ?? workspace;

@@ -8,10 +8,11 @@
 
 import type { ChatRecord } from "../core/contracts/chat.ts";
 import { lessonTopics } from "../core/course-map-build.ts";
-import { continuedTaskOf, lessonPlaceOf, type LessonPlace } from "../core/lesson-place.ts";
+import { lessonPlaceOf, type LessonPlace } from "../core/lesson-place.ts";
 import { sessionTopicsOf } from "../core/native-messages.ts";
 import { lessonTakenUp, reviewRecord } from "../core/session-opening.ts";
 import { stores } from "./stores.ts";
+import { continuedTask } from "./task-passage.ts";
 
 /** How long the page waits for the course map before it opens without it. */
 export const LESSON_PLACE_WAIT_MS = 1500;
@@ -46,7 +47,7 @@ export async function lessonPlace(chat: Pick<ChatRecord, "course" | "topics" | "
 	const placeIn = async (told: string | null): Promise<LessonPlace | null> => {
 		const result = await stores.courseRecords.map(workspace, told);
 		if (!result.ok) return null;
-		const place = { ...lessonPlaceOf(result.map, topics), task: continuedTaskOf(result.map, chat.messages) };
+		const place = { ...lessonPlaceOf(result.map, topics), task: await continuedTask(result.map, chat.messages) };
 		const fromCurrent = place.topic !== null && !result.map.topics.find((t) => t.handle === place.topic!.handle)?.arc && result.map.current === place.topic.handle;
 		return told !== null && fromCurrent ? placeIn(null) : place;
 	};

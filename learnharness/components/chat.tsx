@@ -151,12 +151,13 @@ export function retryFailedResponse(
 
 /** A wake-pipeline steer message: user-role delivery whose metadata marks it
  * as a sub-agent result — rendered as an artifact card, never a bubble. */
-/** The task his Continue picked up, as its marker names it: its title and
- *  step, or null for any other message and for a marker that names none. */
+/** The task his Continue picked up, as its marker names it: its title,
+ *  step and the part's text, or null for any other message and for a
+ *  marker that names none. */
 function continuedTaskIn(m: LhViewMessage): ContinuedTask | null {
 	if (m.role !== "user") return null;
 	const data = m.parts.find((p) => p.type === "data-task-continue")?.data as Partial<ContinuedTask> | undefined;
-	return typeof data?.title === "string" ? { title: data.title, step: data.step ?? null } : null;
+	return typeof data?.title === "string" ? { title: data.title, step: data.step ?? null, passage: data.passage ?? null } : null;
 }
 
 function isSubagentSteer(m: LhViewMessage): boolean {

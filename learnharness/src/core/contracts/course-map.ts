@@ -150,6 +150,15 @@ export interface CourseMapTask {
 	 *  (round 9, 2 m8: rebuilt in path order, sheet 4 on rank, basis and
 	 *  kernel was placed under Basis). Read `taskTopics(task, map)`. */
 	topics?: readonly TopicHandle[];
+	/** Where its text is in his material, as the engine's map names each of
+	 *  its refs: the source's file, as the record keeps it (in the course's
+	 *  material folder), and the place in it (round 18, M6). */
+	where?: readonly TaskPlace[];
+}
+
+export interface TaskPlace {
+	path: string;
+	locator: string;
 }
 
 /** Why the engine's plan leaves a topic out before the exam

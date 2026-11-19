@@ -238,11 +238,14 @@ export const TASK_HANDOFF_TEXT =
  *  Problem sheet 4 opened the sheet's finished chat with no turn, and his
  *  "let us continue the sheet" was planned as a lesson from the basics, so
  *  part (c) was put off to next time. The task's step is the record's, in
- *  the course brief above. */
-export function taskContinueText(tasks: readonly string[]): string {
+ *  the course brief above. The part's text from his material (`passage`),
+ *  on his screen from the press, comes with it, so the turn reads no file
+ *  to find it (round 18, M6). */
+export function taskContinueText(tasks: readonly string[], passage?: string | null): string {
 	const named = tasks.map((key) => `\`${key}\``).join(" and ");
 	return (
 		`[CONTINUE MY TASK] I pressed Continue on my open task ${named}. Carry on at its saved step, as the course record above gives it. ` +
+		(passage ? `My screen already shows its text from my material, so read no file for it:\n\n${passage}\n\n` : "") +
 		"It is my task, not a lesson: never a lesson on the topic from its basics, and a step before it only for a gap the record names. If you plan, plan only that step with plan_init, one node named for the part it is. " +
 		"If the step needs something from me first, such as a part's text, ask me for it in one plain line and end your turn; otherwise pose the step straight away. Never say this message."
 	);

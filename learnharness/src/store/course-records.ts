@@ -356,7 +356,13 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 		const t = record(entry);
 		const key = str(t?.key);
 		const topics = Array.isArray(t?.topics) ? t.topics.filter((h): h is TopicHandle => typeof h === "string" && listed.has(h)) : null;
-		return t && key ? [{ key, title: str(t.title) ?? key, step: str(t.step), updated: str(t.updated), ...(topics ? { topics } : {}) }] : [];
+		const where = (Array.isArray(t?.where) ? t.where : []).flatMap((w) => {
+			const place = record(w);
+			const file = str(place?.path);
+			const locator = str(place?.locator);
+			return file && locator ? [{ path: file, locator }] : [];
+		});
+		return t && key ? [{ key, title: str(t.title) ?? key, step: str(t.step), updated: str(t.updated), ...(topics ? { topics } : {}), ...(where.length ? { where } : {}) }] : [];
 	});
 	return {
 		workspace,

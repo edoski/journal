@@ -779,6 +779,10 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
     arc's title and standing in study order, and ``current_arc`` is the arc
     of "You are here": ``here``, the topic of a lesson in progress, else
     ``path.current``.
+
+    Each task names ``where`` its text is in his material: each of its refs
+    as its source's file and the ref's locator, so a view can show the part
+    he left without a tutor's turn (round 18, M6).
     """
     record = records.load(workspace)
     today = clock.today()
@@ -849,6 +853,7 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
                         "step": task.get("step"),
                         "updated": task.get("updated"),
                         "topics": list(task.get("topics", ())),
+                        "where": _where(record["sources"], task),
                     }
                 )
                 for key, task in tasks.items()
@@ -1435,6 +1440,16 @@ def _worked_on(record: dict[str, Any], day: date) -> bool:
         item["date"] == when and schema.counts(item)
         for item in record["observations"].values()
     ) or any(topic.get("introduced") == when for topic in record["topics"].values())
+
+
+def _where(sources: dict[str, Any], item: dict[str, Any]) -> list[dict[str, Any]]:
+    """Each of ``item``'s refs as a place in his material: the source's file,
+    as the record keeps it (in the workspace's ``sources`` folder), and the
+    ref's locator."""
+    return [
+        {"path": sources[ref["source"]]["path"], "locator": ref["locator"]}
+        for ref in item.get("refs", ())
+    ]
 
 
 def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:

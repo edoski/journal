@@ -688,26 +688,30 @@ export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT): Lh
 }
 
 /** The task Continue picks up, as the engine's record names it: its title
- *  and the step he left it at. */
+ *  and the step he left it at, and the text of that part from his own
+ *  material when a ref points to it (`passage`, round 18, M6). */
 export interface ContinuedTask {
 	title: string;
 	step: string | null;
+	passage?: string | null;
 }
 
 /** His Continue on an open task the session holds, with nothing in it
  *  waiting on him (round 13, 2 M1): the turn carries on at the task's step.
- *  With the task's record (`task`), the transcript draws its title and the
- *  step he left it at the moment he presses, before the tutor's turn writes
- *  that step out (round 17, M8: Continue Problem sheet 4 showed "Thinking…"
- *  for 42 s before part (c)). The model reads the content alone. */
+ *  With the task's record (`task`), the transcript draws its title, the
+ *  part's text from his material and the step he left it at the moment he
+ *  presses, before the tutor's turn writes that step out (round 17, M8:
+ *  Continue Problem sheet 4 showed "Thinking…" for 42 s before part (c);
+ *  round 18, M6: the part's matrix waited 64 to 80 s). The model reads the
+ *  content, which carries that text too, so it reads no file to find it. */
 export function newTaskContinueMessage(tasks: readonly string[], task?: ContinuedTask | null): LhMarkerMessage {
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "task-continue",
-		content: taskContinueText(tasks),
+		content: taskContinueText(tasks, task?.passage),
 		display: true,
-		details: { tasks: [...tasks], ...(task ? { title: task.title, step: task.step } : {}) },
+		details: { tasks: [...tasks], ...(task ? { title: task.title, step: task.step, ...(task.passage ? { passage: task.passage } : {}) } : {}) },
 		timestamp: Date.now(),
 	};
 }
