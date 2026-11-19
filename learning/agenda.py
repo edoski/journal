@@ -271,6 +271,14 @@ class _Course:
     """The lessons he has begun on topics not yet taught, each with the last
     day he worked on it (``_lessons``): each goes on on the next study day
     (``_continued``)."""
+    unsettled: set[str] = field(default_factory=set)
+    """The topics whose review today stands on a right answer a hint or his
+    guess kept from solid, with no answer after it yet
+    (``progress.Replay.unsettled``): the review's next question settles it,
+    so until one comes the plan holds it as a review still to come today,
+    planned to come out solid (round 18, M4: a hinted right Random
+    variables answer moved Expectation, planned that day, a week, and Home
+    dropped it before any answer settled the hint)."""
 
     soonest: str | None = field(default=None, init=False)
     """The earliest review day on record, read again after a review moves
@@ -637,7 +645,7 @@ class _Course:
         questions, where nothing can show it solid, taught on an earlier day."""
         if not self.asks:
             return self.levels[need]["level"] != "new" and need not in self.fresh
-        return solid(self.levels[need])
+        return solid(self.levels[need]) or need in self.unsettled
 
     def ready(self, topic: str) -> bool:
         """Its prerequisites are met, and no competing method is half-learned
@@ -646,7 +654,9 @@ class _Course:
         return all(self.met(need) for need in needs) and not (
             self.asks
             and any(
-                self.levels[other]["level"] != "new" and not solid(self.levels[other])
+                self.levels[other]["level"] != "new"
+                and not solid(self.levels[other])
+                and other not in self.unsettled
                 for other in self.partners[topic]
             )
         )
@@ -2092,6 +2102,14 @@ def _planned(
         for name, record in records.items()
         if not capacity.gone(record)
     ]
+    for course in courses:
+        course.unsettled = {
+            key
+            for key, replayed in course.replayed.items()
+            if replayed.verdicts
+            and replayed.verdicts[-1][0] == today.isoformat()
+            and today.isoformat() in replayed.unsettled
+        }
     if told is not None:
         for course in courses:
             course.moving = set(told.touched.get(course.name, ()))

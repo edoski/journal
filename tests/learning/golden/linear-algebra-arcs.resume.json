@@ -41,10 +41,10 @@
   "due_later_more": 4,
   "starts": {
     "invertibility": "2026-11-13",
+    "inner-product": "2026-11-16",
     "change-basis": "2026-11-18",
-    "inner-product": "2026-11-19",
-    "diagonalization": "2026-11-20",
-    "projection": "2026-11-23"
+    "projection": "2026-11-23",
+    "diagonalization": "2026-11-25"
   },
   "starts_why": {
     "invertibility": {
@@ -54,6 +54,11 @@
         "rank"
       ]
     },
+    "inner-product": {
+      "arc": "orthogonality",
+      "kind": "early",
+      "behind": "eigenvalues"
+    },
     "change-basis": {
       "arc": "eigenvalues",
       "kind": "after",
@@ -61,23 +66,18 @@
         "invertibility"
       ]
     },
-    "inner-product": {
-      "arc": "orthogonality",
-      "kind": "early",
-      "behind": "eigenvalues"
-    },
-    "diagonalization": {
-      "arc": "eigenvalues",
-      "kind": "after",
-      "needs": [
-        "eigen"
-      ]
-    },
     "projection": {
       "arc": "orthogonality",
       "kind": "after",
       "needs": [
         "inner-product"
+      ]
+    },
+    "diagonalization": {
+      "arc": "eigenvalues",
+      "kind": "after",
+      "needs": [
+        "change-basis"
       ]
     }
   },
@@ -304,7 +304,7 @@
       "review": {
         "due": "2026-10-28",
         "by": "engine",
-        "planned": "2026-11-26"
+        "planned": "2026-11-27"
       },
       "judged": "2026-10-22",
       "standing": {

@@ -67,6 +67,7 @@ export type VoiceRule =
 	| "card-words"
 	| "unbuilt"
 	| "day-part"
+	| "moved-start"
 	| "below"
 	| "pointer"
 	| "arrival"
@@ -289,6 +290,10 @@ function phraseBreaks(text: string, skip: ReadonlySet<VoiceRule> = new Set()): V
  *  plain-language ceiling GOV.UK's style guide sets; the voice states it,
  *  each formula counting as one word. */
 export const SENTENCE_WORDS = 25;
+
+/** Words in his answer that say he is not sure of it or of its reason
+ *  (round 18, m3: "Honestly not sure, gut feeling."). */
+export const DOUBT = /\b(?:not sure|unsure|no idea|gut feeling|i think|i guess|i'?m guessing|maybe|probably|don'?t (?:know|see|get)|why (?:i'?m|am i|is it|does it|can i))\b/i;
 
 /** The sentences a text costs him to read: each sentence, plus each
  *  clause it joins with a colon or semicolon (a colon before a display or

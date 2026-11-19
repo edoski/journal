@@ -263,8 +263,9 @@ export function unitStatus(unit: Unit, today: string, asked = false): UnitStatus
 	// latest about it (round 14, m33: Rank read "Left off 6 Nov", the sheet's day, after his Rank practice today).
 	const studied = unit.sessions.find((c) => ownsTopic(c, topic.handle))?.updatedAt;
 	if (unit.task && !(studied && unit.task.updated && dayOf(studied) > unit.task.updated)) return { kind: "task", words: taskWords(unit.task, today) };
-	// A review held past memory's day is due already ("Due 6 Nov"):
-	// a fact that needs him, which the map's card shows, never a date ahead.
+	// A review held past memory's day is late already: a fact that needs
+	// him, which the map's card shows, in the day it comes back ("Back Mon
+	// 16 Nov"; round 18, m1).
 	if (topic.review?.kind === "scheduled") return { kind: topic.review.held && topic.review.held.since < today ? "review" : "back", words: reviewWords(topic.review, today) };
 	const at = unit.sessions[0]?.updatedAt ?? topic.introduced;
 	if (at) return { kind: "studied", words: studiedWords(at, today) };

@@ -171,7 +171,7 @@ describe("conclude records the attempt, and never locks the session", async () =
 		const saves: unknown[] = [];
 		const records = { list: async () => ({ available: true, courses: [], roots: [] }), run: async (_w: string, req: unknown) => (saves.push(req), { ok: true, json: {} }) };
 		const tools = practiceTools({ chatId: "c", chatStore: { getChat: () => ({ messages: stringMessages }) } as never }, { course: { workspace: "/w", title: "T" }, records } as never);
-		const result = await tools.conclude!.execute("c1", { ...conclusion, result: "partial" }, undefined);
+		const result = await tools.conclude!.execute("c1", { ...conclusion, result: "partial", record: "Found the rank but not its pivot columns" }, undefined);
 		assert.notEqual(result.isError, true);
 		assert.deepEqual(
 			(saves[0] as { changes: { observations: { topics: string[]; result: string }[] } }).changes.observations.map((o) => [o.topics, o.result]),

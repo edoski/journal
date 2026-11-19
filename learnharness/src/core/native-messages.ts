@@ -956,6 +956,8 @@ export interface AnsweredQuestion {
 	/** The question he answered, as `sameQuestionKey` reads it; absent for
 	 *  an answer in words or a problem's conclude. */
 	asked?: string;
+	/** His answer as he wrote it, for a graded question's answer. */
+	words?: string;
 	/** A save that went through already recorded it, or its problem's
 	 *  conclude did. */
 	recorded: boolean;
@@ -1084,9 +1086,10 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 			const asked = posed.get(m.toolCallId);
 			if (!asked) continue;
 			revealed.add(asked.key);
-			const details = m.details as { confidence?: unknown; showMe?: unknown };
+			const details = m.details as { confidence?: unknown; showMe?: unknown; text?: unknown };
 			const confidence = chosenConfidence(details.confidence) ?? null;
-			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, recorded: false });
+			const words = typeof details.text === "string" && details.text.trim() ? { words: details.text } : {};
+			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, ...words, recorded: false });
 		}
 	}
 	for (const [key, answer] of answered) {

@@ -43,8 +43,8 @@
     "invertibility": "2026-11-13",
     "change-basis": "2026-11-18",
     "inner-product": "2026-11-19",
-    "diagonalization": "2026-11-20",
-    "projection": "2026-11-23"
+    "projection": "2026-11-20",
+    "diagonalization": "2026-11-23"
   },
   "starts_why": {
     "invertibility": {
@@ -62,16 +62,13 @@
     "inner-product": {
       "kind": "early"
     },
+    "projection": {
+      "kind": "early"
+    },
     "diagonalization": {
       "kind": "after",
       "needs": [
         "eigen"
-      ]
-    },
-    "projection": {
-      "kind": "after",
-      "needs": [
-        "inner-product"
       ]
     }
   },
@@ -223,7 +220,7 @@
       "review": {
         "due": "2026-10-28",
         "by": "engine",
-        "planned": "2026-11-25"
+        "planned": "2026-12-02"
       },
       "judged": "2026-10-22",
       "standing": {

@@ -74,8 +74,8 @@ describe("which questions he answered, and whether he had seen their solution fi
 		const first = asked("Run BFS from $s$ and give every dist.");
 		const second = asked("Explain why no path to $e$ is shorter than 3.");
 		const answers = answeredQuestionsOf([...first.messages, ...second.messages]);
-		assert.deepEqual(answers.get(first.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, asked: "Run BFS from $s$ and give every dist.", recorded: false });
-		assert.deepEqual(answers.get(second.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, asked: "Explain why no path to $e$ is shorter than 3.", recorded: false });
+		assert.deepEqual(answers.get(first.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, asked: "Run BFS from $s$ and give every dist.", words: "rank 2", recorded: false });
+		assert.deepEqual(answers.get(second.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, asked: "Explain why no path to $e$ is shorter than 3.", words: "rank 2", recorded: false });
 	});
 
 	it("the same words asked again after he answered them were seen", () => {

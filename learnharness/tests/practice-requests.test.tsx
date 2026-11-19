@@ -82,7 +82,7 @@ function recorder(messages: LhMessage[]) {
 	return { tool: concludeTool(createPracticeGate(ctx), { ctx, course: course as never }), saves };
 }
 
-const MOVED_ON = { outcome: "movedOn", verdict: "He asked to be taught.", rung: null, missClass: null, retest: false, result: "incorrect", response: "(none)" } as const;
+const MOVED_ON = { outcome: "movedOn", verdict: "He asked to be taught.", rung: null, missClass: null, retest: false, result: "incorrect", response: "(none)", record: "Asked to be taught after a first try of rank 3" } as const;
 
 describe("concluding after Explain instead", () => {
 	it("records no attempt when he asked to be taught before any work", async () => {

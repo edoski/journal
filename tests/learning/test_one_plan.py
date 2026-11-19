@@ -788,6 +788,82 @@ def test_a_day_his_answers_left_without_a_start_keeps_his_pace_and_the_exam(
     assert morning["capacity"]["new_per_day"] == evening["capacity"]["new_per_day"]
 
 
+R18 = json.loads(
+    (Path(__file__).parent / "golden" / "demo-world-r18.json").read_text(
+        encoding="utf-8"
+    )
+)
+
+
+HINTED = {
+    "topics": ["random-variables"],
+    "text": "Wrote the distribution of the larger of two dice, "
+    "$P(X=k) = \\frac{2k-1}{36}$, counting an L-shape of cells in the grid",
+    "response": "P(X=k) = (2k-1)/36, k = 1..6",
+    "help": "Count how many of the 36 equally likely ordered pairs have larger "
+    "entry exactly k",
+    "result": "correct",
+}
+
+
+@pytest.mark.parametrize(
+    ("after", "stays"),
+    [
+        (None, True),
+        (
+            {
+                "topics": ["random-variables"],
+                "text": "Added the masses of the even outcomes and got 7/10",
+                "response": "2/10 + 4/10 = 7/10",
+                "help": "none",
+                "result": "partial",
+                "sure": "confident",
+            },
+            False,
+        ),
+    ],
+)
+def test_a_hinted_right_answer_not_yet_settled_keeps_today_s_start(
+    after: dict[str, Any] | None,
+    stays: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 18, M4 (2 D2): in the 8 Nov Probability review he answered
+    Random variables right after a hint, and Expectation, planned today and
+    needing it, left Home at that save, before any answer settled the hint.
+    A hinted right answer waits for the answer that settles it: until one
+    comes, today's start stays where he was told. A partly right answer
+    after it is what moves it, and the receipt names that move for the
+    close."""
+    seeded = World(tmp_path, "seed", monkeypatch, capsys, R18)
+
+    def expectation() -> dict[str, Any]:
+        return next(
+            topic
+            for topic in seeded.run("probability", "map", day="2026-11-08")["topics"]
+            if topic["topic"] == "expectation"
+        )
+
+    assert expectation()["starts"] == "2026-11-08"
+    for answer in [HINTED, *([after] if after else [])]:
+        monkeypatch.setenv("LEARNING_TODAY", "2026-11-08")
+        monkeypatch.setattr(
+            sys, "stdin", io.StringIO(json.dumps({"observations": [answer]}))
+        )
+        assert main(["--workspace", str(seeded.roots["probability"]), "save"]) == 0
+        receipt = json.loads(capsys.readouterr().out)
+    found = expectation()
+    if stays:
+        assert "expectation" not in receipt.get("starts_moved", {}), receipt
+        assert (found["starts"], found.get("moved")) == ("2026-11-08", None), found
+    else:
+        moved = receipt["starts_moved"]["expectation"]
+        assert moved["moved"]["from"] == "2026-11-08", moved
+        assert moved["starts"] == found["starts"] > "2026-11-08", (moved, found)
+
+
 @pytest.mark.parametrize(
     ("checkpoint", "day"),
     [("seed", "2026-11-08"), ("d9-end", "2026-11-09"), ("d9-end", "2026-11-10")],

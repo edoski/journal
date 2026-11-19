@@ -121,7 +121,7 @@
       "contrasts": [],
       "level": "independent",
       "introduced": "2026-10-05",
-      "review": "2026-11-26",
+      "review": "2026-11-27",
       "held": true,
       "due": "2026-10-28",
       "weak": true,
@@ -265,7 +265,7 @@
       ],
       "level": "introduced",
       "introduced": "2026-11-05",
-      "review": "2026-11-27",
+      "review": "2026-11-23",
       "held": true,
       "due": "2026-11-06",
       "weak": false,
@@ -344,12 +344,12 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-20",
+      "starts": "2026-11-25",
       "starts_why": {
         "arc": "eigenvalues",
         "kind": "after",
         "needs": [
-          "eigen"
+          "change-basis"
         ]
       },
       "weak": false,
@@ -364,7 +364,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-19",
+      "starts": "2026-11-16",
       "starts_why": {
         "arc": "orthogonality",
         "kind": "early",

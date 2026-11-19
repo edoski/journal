@@ -176,7 +176,7 @@ describe("his confidence is the one he chose", () => {
 	it("the meter wins over the tutor's reading of his words (round 6: 'gut feeling' saved as a guess over his Confident)", async () => {
 		const check = asked("check", { text: "gut feeling: 2", confidence: "confident" });
 		const { saves, tools } = savingCourse(check.messages);
-		await courseSave(tools, [attempt({ question: check.id, sure: "guess" })]);
+		await courseSave(tools, [attempt({ question: check.id, sure: "guess", response: "gut feeling: 2" })]);
 		assert.equal(saves[0]!.observations![0]!.sure, "confident");
 	});
 
