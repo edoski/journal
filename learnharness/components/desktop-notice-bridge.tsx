@@ -40,8 +40,8 @@ async function todayPlan(): Promise<Notice | null> {
  * The Mac app's side of its notifications (spec: desktop-notices.md):
  * when the app comes into use (this window opening, the Mac waking or
  * unlocking) it offers today's plan, and when work he started finishes it
- * offers that; the shell shows each at most once, the plan once a day, the
- * work only while no window of the app is focused. A click opens the
+ * offers that; the shell shows each at most once, the plan once a day, and
+ * each only while no window of the app is focused. A click opens the
  * place a notification names here. Renders nothing; inert in a browser.
  */
 export function DesktopNoticeBridge() {

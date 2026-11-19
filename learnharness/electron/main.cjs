@@ -406,8 +406,8 @@ function installMenu() {
  * The renderer decides what to say, in Home's words
  * (components/desktop-notice-bridge.tsx); the shell only shows it, at most
  * once: today's plan once a day (the id names the day, kept in userData so
- * a relaunch never repeats it), work he started once per job, and that only
- * while no window of the app is focused. macOS's own permission and Focus
+ * a relaunch never repeats it), work he started once per job, and each only
+ * while no window of the app is focused: he is already looking at the app. macOS's own permission and Focus
  * apply. Every notice shown or held is logged (userData/logs/main.log). */
 
 /** The day's plan already shown, by its id ("plan:2026-11-19"). */

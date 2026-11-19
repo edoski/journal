@@ -4,8 +4,9 @@ import { courseHref } from "@/components/unit-inbox/unit-href";
 
 /**
  * The Mac app's notifications (spec: desktop-notices.md), very sparing:
- * today's plan at most once a day, and work he started when it finishes
- * while no window of the app is focused. Nothing else: no reminders, no
+ * today's plan at most once a day, and work he started when it finishes,
+ * each only while no window of the app is focused (he is already looking
+ * at the app). Nothing else: no reminders, no
  * repeats. The words are Home's (`study-words.ts`). Pure.
  */
 
@@ -34,10 +35,11 @@ export function inStudyHours(hours: readonly StudyWindow[], now: Date): boolean 
 
 /** Today's plan, when the app is first in use that day: Today's lines in
  *  one line, opening Home. None when today holds nothing or outside his
- *  study hours. `titles` are Today's lines' names (`lessonTitle`). */
+ *  study hours, and held while a window of the app is focused.
+ *  `titles` are Today's lines' names (`lessonTitle`). */
 export function planNotice(titles: readonly string[], hours: readonly StudyWindow[], today: string, now: Date): Notice | null {
 	if (titles.length === 0 || !inStudyHours(hours, now)) return null;
-	return { id: `plan:${today}`, title: NOTICE_WORDS.today, body: todayNoticeWords(titles), href: "/", away: false };
+	return { id: `plan:${today}`, title: NOTICE_WORDS.today, body: todayNoticeWords(titles), href: "/", away: true };
 }
 
 /** Work he started that finished: a course's topic map, opening its course

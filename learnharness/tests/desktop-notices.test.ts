@@ -2,8 +2,8 @@
  * The Mac app's study notifications (Edo, 19 Nov 2026: "macOS
  * notifications (VERY sparingly) on the most important key events"):
  * today's plan at most once a day, in his study hours, in Today's words;
- * work he started (a course's topic map, a new lesson's opening) once,
- * only while he is in another app; nothing when he turned them off.
+ * work he started (a course's topic map, a new lesson's opening) once;
+ * each only while he is in another app; nothing when he turned them off.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -29,14 +29,14 @@ const HOURS = [
 const at = (time: string) => new Date(`2026-11-19T${time}:00`);
 
 describe("today's plan", () => {
-	it("says Today's lines in one line, opens Home, once for the day", () => {
+	it("says Today's lines in one line, opens Home, once for the day, only while he is in another app", () => {
 		const notice = planNotice(["Review Binomial distribution", "Start Poisson distribution"], HOURS, "2026-11-19", at("09:30"));
 		assert.deepEqual(notice, {
 			id: "plan:2026-11-19",
 			title: "Today",
 			body: "Review Binomial distribution, Start Poisson distribution",
 			href: "/",
-			away: false,
+			away: true,
 		});
 	});
 
@@ -129,7 +129,7 @@ describe("the setting", () => {
 });
 
 /** The shell's `showNotice` with a stub Electron: what it shows, what it holds, what it logs. */
-function shell({ focused = false }: { focused?: boolean } = {}) {
+function shell(window: { focused: boolean } = { focused: false }) {
 	const mainFile = fileURLToPath(new URL("../electron/main.cjs", import.meta.url));
 	const mainRequire = createRequire(mainFile);
 	const files = new Map<string, string>();
@@ -146,7 +146,7 @@ function shell({ focused = false }: { focused?: boolean } = {}) {
 	}
 	const electron = {
 		app: { setName() {}, getPath: () => "/fixture/LearnHarness", setPath() {}, requestSingleInstanceLock: () => false, quit() {} },
-		BrowserWindow: { getFocusedWindow: () => (focused ? {} : null), getAllWindows: () => [] },
+		BrowserWindow: { getFocusedWindow: () => (window.focused ? {} : null), getAllWindows: () => [] },
 		Notification: FakeNotification,
 	};
 	const fs = {
@@ -171,7 +171,7 @@ function shell({ focused = false }: { focused?: boolean } = {}) {
 }
 
 describe("the shell shows each notice at most once", () => {
-	const plan = { id: "plan:2026-11-19", title: "Today", body: "Review Binomial distribution", href: "/", away: false };
+	const plan = planNotice(["Review Binomial distribution"], [{ start: "09:00", end: "18:00" }], "2026-11-19", at("10:00"))!;
 	const map = { id: "map:/study/la:t", title: "Linear Algebra", body: NOTICE_WORDS.mapReady, href: "/unit/x", away: true };
 
 	it("today's plan once a day, kept across relaunches, and logged", () => {
@@ -182,6 +182,18 @@ describe("the shell shows each notice at most once", () => {
 		assert.deepEqual(JSON.parse(s.files.get("/fixture/LearnHarness/notices.json")!), { plan: "plan:2026-11-19" });
 		assert.ok(s.logged.some((l) => l.includes('notice shown: plan:2026-11-19 "Today" — Review Binomial distribution → /')), s.logged.join("\n"));
 		assert.ok(s.logged.some((l) => l.includes("notice held: plan:2026-11-19 (already shown)")));
+	});
+
+	it("today's plan never while a window of the app is focused, and still that day once he is away", () => {
+		const window = { focused: true };
+		const s = shell(window);
+		s.show(plan);
+		assert.deepEqual(s.shown, []);
+		assert.ok(s.logged.some((l) => l.includes("notice held: plan:2026-11-19 (a window is focused)")), s.logged.join("\n"));
+		assert.equal(s.files.has("/fixture/LearnHarness/notices.json"), false);
+		window.focused = false;
+		s.show(plan);
+		assert.equal(s.shown.length, 1);
 	});
 
 	it("work he started only while no window of the app is focused, once per job", () => {
