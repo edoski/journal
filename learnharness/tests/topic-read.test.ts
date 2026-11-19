@@ -100,8 +100,8 @@ describe("the engine's show as the topic's record", () => {
 		const refs = topicRecordOf(show, "invertibility", [])?.refs ?? [];
 		assert.deepEqual(refs.map((r) => r.source), [null, null, null, null], "the record's titles are the files' stems");
 		assert.deepEqual(refs.map((r) => r.locator), ["Three.IV.4, PDF pp. 264–271", "Three.IV.4, PDF pp. 226–233", "Sheet 6", "Week 8"]);
-		const titles = new Map([["hefferon-linear-algebra", "Linear Algebra"], ["hefferon-answers", "Linear Algebra: Answers to exercises"], ["problem-sheets", "Problem sheets"], ["syllabus", null]]);
-		assert.deepEqual((topicRecordOf(show, "invertibility", [], new Map(), titles)?.refs ?? []).map((r) => r.source), ["Linear Algebra", "Linear Algebra: Answers to exercises", "Problem sheets", null], "the documents' own titles, where they have one");
+		const titles = new Map([["hefferon-linear-algebra", "Linear Algebra"], ["hefferon-answers", "Linear Algebra: Answers"], ["problem-sheets", "Problem sheets"], ["syllabus", null]]);
+		assert.deepEqual((topicRecordOf(show, "invertibility", [], new Map(), titles)?.refs ?? []).map((r) => r.source), ["Linear Algebra", "Linear Algebra: Answers", "Problem sheets", null], "the documents' own titles, where they have one");
 	});
 
 	it("names the method he reached for in the topic's place", () => {
