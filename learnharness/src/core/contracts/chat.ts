@@ -327,7 +327,12 @@ const DONE_DAYS = "and the day each topic he answered in this session comes back
  *  right, answer moved Expectation off today, every receipt carried it in
  *  `starts_moved`, and the close named only the review days). */
 const DONE_MOVED = "a start planned for today that his answers moved (a save's `starts_moved` whose `moved.from` is today) is named too, by its title, with its new day and its cause";
-const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one, ${DONE_DAYS}; ${DONE_MOVED}; a topic not started is one he starts, never a review; a question he left a half answer on (\`draftKept\`) is his half answer waiting for him there. ${DONE_LIMITS}`;
+/** Where his half answer waits, and a start's title inside a sentence
+ *  (round 18, m15: "…is waiting for you there. Because that lesson is
+ *  unfinished, Any matrix represents a linear map moved …, and later
+ *  starts moved too."). */
+const DONE_HALF = 'a question he left a half answer on (`draftKept`) is his half answer, waiting in this session by its name (your Invertible matrices lesson, your Probability review), never "there"; a start named inside a sentence has its title set off in quotes (Starting “Any matrix represents a linear map” moves to Tuesday 10 November), and every move he is told is named with its day, never as "later starts moved too"';
+const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one, ${DONE_DAYS}; ${DONE_MOVED}; a topic not started is one he starts, never a review; ${DONE_HALF}. ${DONE_LIMITS}`;
 /** Practice keeps nothing of a problem dropped at Done for today, so its
  *  close names only what the record keeps (round 9, 3 m7: "You still have
  *  the kernel problem you closed … to pick up"), and only this session's:

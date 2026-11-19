@@ -78,7 +78,12 @@ export type VoiceRule =
 	| "undisputed"
 	| "verdict-words"
 	| "begun"
-	| "vector";
+	| "vector"
+	| "nothing-above"
+	| "half-answer"
+	| "title-comma"
+	| "vague-moves"
+	| "split-display";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -126,7 +131,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "backref", re: /\b(?:the )?same as (?:before|last time|above|earlier|the last (?:one|question|problem))\b|\bas (?:before|last time)\b/i },
 	// The app's own parts are nothing he talks about (round 9: "Your message
 	// arrived in the answer field…, so that question is now closed").
-	{ rule: "machinery", re: /\b(?:answer|input|text|message) (?:field|box)\b|\bthe dock\b/i },
+	// Round 18, m14: "your answer goes in its thinking field", the prompts'
+	// own name for his box.
+	{ rule: "machinery", re: /\b(?:answer|input|text|message|thinking) (?:fields?|box(?:es)?)\b|\bthe dock\b/i },
 	// The open question stays above, unchanged, and the app shows no copy of
 	// it (round 11, 4 minor 6: "Here is the question again." and nothing).
 	// Every answer in the record stays saved, an earlier day's included, and
@@ -147,7 +154,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// was wrong, since one problem is not a set.").
 	// Round 17, m18: "A correction to what I said earlier: …", pointing at
 	// a turn end he never saw.
-	{ rule: "own-words", re: /\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b|\b(?:a )?correction to what I (?:said|wrote|told you)\b|\b(?:correcting|to correct) what I (?:said|wrote)\b|\bwhat I (?:said|wrote|told you) (?:earlier|before|above)\b/i },
+	// Round 18, m13: "marking them as solved 'with the hint' was my error",
+	// a slip of its own he never saw, told instead of the next problem.
+	{ rule: "own-words", re: /\bmy (?:error|mistake|slip|fault|oversight)s?\b|\bI (?:made|have made) (?:an error|a mistake|a slip|two mistakes)\b|\b(?:mistakes|errors|slips) of mine\b|\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b|\b(?:a )?correction to what I (?:said|wrote|told you)\b|\b(?:correcting|to correct) what I (?:said|wrote)\b|\bwhat I (?:said|wrote|told you) (?:earlier|before|above)\b/i },
 	// What he has not done yet is no step for him: it reads as a reproach
 	// (round 16, m13: "You still haven't started Linear maps and their
 	// matrices." closing a lesson under his half answer).
@@ -178,6 +187,26 @@ export function columnVector(text: string): string | null {
 		// A display is a vector alone when nothing but the column (and a
 		// closing mark) is in it.
 		if (inline !== undefined || tex.replace(column[0], "").replace(/[.,;\s]/g, "") === "") return tex;
+	}
+	return null;
+}
+
+/** Two displays joined by a lone word, which then stands alone on a line
+ *  between them (round 18, m18: a practice problem set h(1,1) = (1,0,2)
+ *  and h(1,−1) = (3,2,0) as two displays with "and" alone between). The
+ *  word, or null. */
+export function splitDisplays(text: string): string | null {
+	const m = /\$\$[^$]*\$\$[ \t]*\n\s*(and|or|so|then|with|where)[ \t]*\n\s*\$\$/i.exec(text);
+	return m ? m[1]! : null;
+}
+
+/** A display holding only one short equation of tuples, a map's value at
+ *  a point ("h(1,1) = (1,0,2)"): a line of the sentence set apart, as a
+ *  short vector alone is (round 18, m18). Its maths, or null. */
+export function tupleDisplay(text: string): string | null {
+	for (const m of text.matchAll(/\$\$([^$]*)\$\$|\\\[([\s\S]*?)\\\]/g)) {
+		const tex = (m[1] ?? m[2] ?? "").trim();
+		if (/^[A-Za-z][\w']*\s*\([^()]*\)\s*=\s*\([^()]*\)\s*[.,;]?$/.test(tex)) return tex;
 	}
 	return null;
 }
@@ -364,8 +393,10 @@ export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	if (lone) out.push({ rule: "operand", excerpt: lone[0] });
 	const words = mathsWords(text);
 	if (words) out.push({ rule: "maths-words", excerpt: words });
-	const vector = columnVector(text);
+	const vector = columnVector(text) ?? tupleDisplay(text);
 	if (vector) out.push({ rule: "vector", excerpt: vector });
+	const split = splitDisplays(text);
+	if (split) out.push({ rule: "split-display", excerpt: split });
 	if (!kind) return out;
 	const load = sentenceLoad(said);
 	if (load > SENTENCE_BUDGETS[kind]) out.push({ rule: "length", excerpt: `${load} sentences, budget ${SENTENCE_BUDGETS[kind]}` });

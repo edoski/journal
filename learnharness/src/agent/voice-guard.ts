@@ -230,6 +230,44 @@ function posedLast(messages: readonly LhMessage[]): boolean {
 	return false;
 }
 
+/** Whether the open question or problem was posed after the input this
+ *  turn answers: the turn goes on after posing it, with nothing new from
+ *  him, so a pointer to it tells him nothing, whatever was said under it
+ *  (round 18, m14: "Your Homomorphisms review is still open above, and
+ *  your answer goes in its thinking field." in a turn that went on after
+ *  the problem and its "This one is your Homomorphisms review."). */
+function posedSinceInput(messages: readonly LhMessage[]): boolean {
+	const failed = failedOutputCallIds(messages);
+	const posing: readonly string[] = [...QUESTION_TOOLS, PRACTICE_PROBLEM_TOOL];
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "assistant") {
+			if (opensTurn(m)) return false;
+			continue;
+		}
+		const call = m.content.findLast((b): b is ToolCall => b.type === "toolCall" && !failed.has(b.id) && (posing.includes(b.name) || b.name === PRACTICE_CONCLUDE_TOOL));
+		if (call) return posing.includes(call.name);
+	}
+	return false;
+}
+
+/** Whether a question or a practice problem is open above this turn,
+ *  answered or not: a pointer "above" needs one there. */
+function openAbove(messages: readonly LhMessage[]): boolean {
+	if (standingQuestion(messages)) return true;
+	const failed = failedOutputCallIds(messages);
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "assistant") continue;
+		const call = m.content.findLast((b): b is ToolCall => b.type === "toolCall" && !failed.has(b.id) && (b.name === PRACTICE_PROBLEM_TOOL || b.name === PRACTICE_CONCLUDE_TOOL));
+		if (call) return call.name === PRACTICE_PROBLEM_TOOL;
+	}
+	return false;
+}
+
+/** A sentence that points at an open question above him. */
+const POINTS_ABOVE = /\b(?:still )?open above\b|\babove,? (?:still )?open\b|\bis (?:still )?(?:waiting|there) above\b|\b(?:question|problem|check|review|part) above\b/i;
+
 /** Every text he read from the tutor before this turn: its delivered
  *  messages and the questions it posed, each marked which it is. */
 function earlierTexts(messages: readonly LhMessage[]): Array<{ text: string; asked: boolean }> {
@@ -272,10 +310,31 @@ const SAVE_TOOL = "course_save";
  *  those two card marks myself, but disputing them from the cards gets
  *  them re-marked."). */
 const MARK_TALK = /\bre-mark(?:ed|ing|s)?\b|\bdisput(?:e|ed|es|ing)\b|\b(?:change|fix|correct)(?:s|ed|ing)? (?:(?:those|these|the|its|their|your|that|this|two|both|earlier|card)\s+)*marks?\b|\bmarks? (?:are|is|was|were|look|looks) (?:wrong|off|mistaken)\b|\bkeeps? (?:their|its) marks?\b/i;
+/** Words on how an earlier answer was marked or helped: its mark, a hint
+ *  it had or lacked, that it was right or reached on his own (round 18,
+ *  m13: with the record unreadable, Next problem opened "No hint was given
+ *  on the ordered-field problem or the √n/(n+1) problem, so marking them
+ *  as solved 'with the hint' was my error. Your bound by 1/√n was a
+ *  complete, right answer, reached on your own.", over the cards that
+ *  still read "With help"). In a turn that answers nothing of his, or
+ *  after a save that re-marked an answer unasked was refused, they can be
+ *  about an earlier answer only. */
+const EARLIER_MARK = /\bmark(?:ed|ing|s)?\b|\bwith (?:the |a |one |any )?(?:hint|help|nudge)s?\b|\bno hint was (?:given|needed)\b|\bI (?:never|didn't|did not) (?:give|gave|offer) you (?:a |any )?(?:hint|help|nudge)\b|\b(?:reached|found|solved|got|did|answered|managed|worked)\b[^.?!]{0,40}\b(?:on your own|unaided|without (?:a |any )?(?:hint|help|nudge))\b|\b(?:was|were) (?:a |an )?(?:[a-z]+,? ){0,3}(?:right|correct)(?: answers?)?\b/i;
 /** His words about a mark: then a reply may answer them. */
 const HIS_MARK_WORDS = /\b(?:mark(?:s|ed)?|dispute|re-?mark|card)\b/i;
-/** A reply that says how his answer was judged. */
-const VERDICT_SAID = /\b(?:right|correct|wrong|incorrect)\b/i;
+/** His words about how his answers went or were saved: then a reply may
+ *  say their marks ("was I right?", "can you save my answers now?"). */
+const HIS_ANSWER_WORDS = /\b(?:mark(?:s|ed)?|dispute|re-?mark|card|right|wrong|correct|hints?|help(?:ed)?|on my own|sav(?:e|ed|ing))\b/i;
+/** A message that opens on how his answer was judged: the verdict his
+ *  card cannot show while the record can't be read ("Right, with one
+ *  nudge.", "Not right. …"). A verdict word later in the message, or about
+ *  another answer, is not it (round 18, m13: "Your bound by 1/√n was a
+ *  complete, right answer" stood for a verdict). */
+const VERDICT_OPENING = /^(?:(?:that|this|it|your (?:answer|map|work|proof|bound))(?:'s| is) )?(?:not (?:quite )?|partly |half )?(?:right|correct|wrong|incorrect)\b|^(?:yes|no)\b/i;
+const opensOnVerdict = (text: string): boolean => VERDICT_OPENING.test(sentences(text)[0]?.trim() ?? "");
+/** The rules that refuse grading in words, which the verdict owed while
+ *  his card shows no mark is exempt from. */
+const GRADING_RULES: ReadonlySet<VoiceRule> = new Set(["echo", "feedback", "card"]);
 
 /** Words that start the lesson he is closing (round 17, m19: "…waits
  *  for you in Linear maps and their matrices, which you start tomorrow"
@@ -314,6 +373,22 @@ function savedObservations(args: Record<string, unknown>): Record<string, unknow
 	}
 	const listed = isRecord(changes) && Array.isArray(changes.observations) ? changes.observations : [];
 	return listed.filter((o): o is Record<string, unknown> => isRecord(o) && !("corrects" in o));
+}
+
+/** Whether a save re-marks an answer he never disputed (`corrects` with
+ *  no `disputed`), which course_save refuses. */
+function remarksUnasked(args: unknown): boolean {
+	if (!isRecord(args)) return false;
+	let changes: unknown = args.changes;
+	if (typeof changes === "string") {
+		try {
+			changes = JSON.parse(changes);
+		} catch {
+			return false;
+		}
+	}
+	const listed = isRecord(changes) && Array.isArray(changes.observations) ? changes.observations : [];
+	return listed.some((o) => isRecord(o) && "corrects" in o && !("disputed" in o) && o.kind !== "self_report");
 }
 
 /** The results a save or a conclude records for his answers. */
@@ -395,7 +470,7 @@ const REPAIRED = (correct: string): AgentToolResult<unknown> => ({
 	isError: true,
 	details: { withheld: "repaired" },
 });
-const VERDICT_NOTE = "His answer's save failed, so his card shows no mark, and nothing you sent says how his answer was judged. Send him the verdict in words, opening on it (\"Right, …\", \"Not right: …\").";
+const VERDICT_NOTE = "His answer's save failed, so his card shows no mark, and nothing you sent says how his answer was judged. Send him the verdict in words, opening on it (\"Right, with one nudge.\", \"Not right. …\").";
 const REPAIRED_NOTE = "His second try at your check was not right either, and nothing you sent writes its right answer. Send the repair ending on the right answer, written out in its maths.";
 
 /** The rulings a save records on a dispute (`ruling` on each re-mark). */
@@ -656,10 +731,20 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `The demo you called for this turn is still being built, so it is not on his screen: ${quoted(b.excerpt)}. It appears where you called for it once it is built, and a message tells you then. Until that message, say nothing of it and ask nothing that needs it: teach the step in words now, and point him at the demo, and ask what needs it, once it has arrived.`;
 		case "due-reviews":
 			return `A lesson opens on its first step, and his reviews due today are already on Home: ${quoted(b.excerpt)}. Leave the reviews out and open on the lesson.`;
+		case "half-answer":
+			return `Say where his half answer waits, by the session's name, never "there": ${quoted(b.excerpt)}. Name it ("Your half answer to the kernel question waits in your Invertible matrices lesson, which continues tomorrow, Monday 9 November.").`;
+		case "title-comma":
+			return `A topic's title straight after a comma reads as a new sentence: ${quoted(b.excerpt)}. Open the sentence on it, or set it off in quotes ("Starting “${b.excerpt}” moves to …").`;
+		case "vague-moves":
+			return `Later moves said with nothing he can act on: ${quoted(b.excerpt)}. Name each move with its new day, or leave out the ones the close is not about.`;
+		case "split-display":
+			return `Two displays joined by a lone "${b.excerpt}" leave it alone on a line between them. Write short equations inline in the sentence ("$h(1,1) = (1,0,2)$ ${b.excerpt} $h(1,-1) = (3,2,0)$"), or set both in one display.`;
+		case "nothing-above":
+			return `No question or problem is open above him, so this points at nothing: ${quoted(b.excerpt)}. Leave it out.`;
 		case "undisputed":
-			return `He disputed no mark, so say nothing of one, nor of how to dispute it: ${quoted(b.excerpt)}. Leave it out; every mark he has not disputed stands as recorded.`;
+			return `He disputed no mark, so say nothing of an earlier answer's mark or help, nor of how to dispute one, even where you think it wrong: ${quoted(b.excerpt)}. Leave it out; every mark he has not disputed stands as recorded, and his card shows it.`;
 		case "verdict-words":
-			return `His answer's save failed, so his card shows no mark, and this reply never says how his answer was judged: ${quoted(b.excerpt)}. Open on the verdict in words ("Right, …", "Not right: …", "Partly right: …"), then the rest.`;
+			return `His answer's save failed, so his card shows no mark, and this reply never opens on how his answer was judged: ${quoted(b.excerpt)}. Open on the verdict in words ("Right, with one nudge.", "Not right.", "Partly right."), then the rest.`;
 		case "begun":
 			return `This lesson began today, so at its close it continues, never starts: ${quoted(b.excerpt)}. Say it continues on its day ("which you continue tomorrow, Monday 9 November").`;
 		case "vector":
@@ -740,6 +825,60 @@ function dayItemsIn(result: AgentToolResult<unknown>): DayItems | null {
 	} catch {
 		return null;
 	}
+}
+
+/** The topic titles a result names: the first lessons a save moved
+ *  (`starts_moved`, in a save's receipt or a conclude's "Course record:")
+ *  and what the close's days hold (`day_items`). */
+function titlesIn(result: AgentToolResult<unknown>): string[] {
+	const text = result.content.find((c): c is { type: "text"; text: string } => c.type === "text")?.text ?? "";
+	const at = text.indexOf("{");
+	if (at < 0) return [];
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text.slice(at));
+	} catch {
+		return [];
+	}
+	if (!isRecord(parsed)) return [];
+	const moved = isRecord(parsed.starts_moved) ? Object.values(parsed.starts_moved).flatMap((m) => (isRecord(m) && typeof m.title === "string" ? [m.title] : [])) : [];
+	const days = isRecord(parsed.day_items) ? Object.values(parsed.day_items).filter(isRecord) : [];
+	const held = days.flatMap((d) => [...(Array.isArray(d.items) ? d.items : []), ...(Array.isArray(d.lesson) ? d.lesson : [])]).flatMap((t) => (typeof t === "string" ? [t.replace(/ (?:review|starts|lesson continues)$/, "")] : []));
+	return [...moved, ...held];
+}
+
+/** A topic title set straight after a comma, where its capital reads as a
+ *  new sentence ("Because that lesson is unfinished, Any matrix represents
+ *  a linear map moved…", round 18, m15). A title after another title, in
+ *  a list, reads as one; so does one set off in quotes or opening a
+ *  sentence. The title, or null. */
+export function titleAfterComma(text: string, titles: readonly string[]): string | null {
+	const capital = [...new Set(titles)].filter((t) => /^[A-Z]/.test(t)).sort((a, b) => b.length - a.length);
+	for (const title of capital) {
+		let from = 0;
+		for (let at = text.indexOf(title, from); at >= 0; at = text.indexOf(title, from)) {
+			from = at + title.length;
+			const before = text.slice(0, at);
+			if (!/[,;]\s+$/.test(before)) continue;
+			const clause = before.replace(/[,;]\s+$/, "");
+			if (capital.some((other) => clause.endsWith(other))) continue;
+			return title;
+		}
+	}
+	return null;
+}
+
+/** Later moves waved at with nothing he can act on ("and later starts
+ *  moved too", round 18, m15): each move is named with its day, or the
+ *  rest are on his calendar, or they are left out. */
+const VAGUE_MOVES = /\b(?:later|other|more|further) (?:starts|lessons|topics|reviews)\b(?![^.?!]*\bcalendar\b)[^.?!]{0,30}\b(?:moved|move|shifted|shift|too)\b|\b(?:starts|lessons|reviews|topics) (?:after it |after that |behind it )?(?:moved|move|shift(?:ed)?) too\b/i;
+
+/** A half answer he left, said with no session to find it in, or as
+ *  "there" (round 18, m15: "Your half answer in the Linear maps and their
+ *  matrices lesson is waiting for you there", in that lesson; "Your half
+ *  answer to the wheel question is waiting for you", naming none). */
+function halfAnswerUnplaced(text: string): string | null {
+	return sentences(text).map((s) => s.trim()).find((s) => /\bhalf(?:-finished)? answer\b/i.test(s) && (/\bthere\b/i.test(s) || !/\b(?:lesson|review|sheet|practice)\b/i.test(s))) ?? null;
 }
 
 /** The refusal the tutor reads: what broke and how to send it again. The
@@ -830,6 +969,32 @@ const UNSAVED = (tool: string): AgentToolResult<unknown> => ({
 	isError: true,
 	details: { withheld: "unsaved" },
 });
+/** His review's answer saved on a topic the review is not of, with
+ *  nothing said of it after the save (round 18, m16: under "Review
+ *  Inclusion-exclusion principle" his Σ(−1)ʲC(k,j) was marked Right, filed
+ *  under the binomial theorem, and a re-teach followed with no word; he
+ *  learnt it did not count only when he asked). */
+const OFF_TOPIC_TEXT = (saved: string, review: string): string =>
+	`his answer was saved on ${saved}, and this session is his review of ${review}, so his card's mark reads as that review's. Tell him first, in one sentence with send_to_user, what that question was for ("That identity is what the three-set count rests on; now the count itself."), never that it did not count`;
+const OFF_TOPIC = (tool: string, saved: string, review: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not done: ${OFF_TOPIC_TEXT(saved, review)}; then call ${tool} again.` }],
+	isError: true,
+	details: { withheld: "off-topic" },
+});
+
+/** The topics a review session was opened on, from its brief's
+ *  "Opened on: …, as its review." line. */
+function reviewTopicsOf(messages: readonly LhMessage[]): string[] {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "custom" || m.customType !== "course-context" || typeof m.content !== "string") continue;
+		const opened = /^Opened on: (.+?), as its review\.(?: |$)/m.exec(m.content);
+		return opened ? opened[1]!.split(/,\s*/) : [];
+	}
+	return [];
+}
+
+const OFF_TOPIC_NOTE = "off-topic";
 const UNSAVED_NOTE = "His answer to your last question is not saved. Save it with course_save now, as it was, a wrong prediction included, since every attempt is kept; if it only asked you something, it holds no attempt.";
 
 /** The graded question his answer opening this turn replies to, while no
@@ -944,6 +1109,10 @@ export class VoiceGuard {
 	private readonly standing: boolean;
 	/** The open question or problem is the last thing he read. */
 	private readonly posedLast: boolean;
+	/** The open question or problem was posed after this turn's input. */
+	private readonly posedSinceInput: boolean;
+	/** A question or a problem is open above this turn. */
+	private readonly openAbove: boolean;
 	private readonly earlier: string[];
 	/** The messages he read before this turn, questions aside. */
 	private readonly told: string[];
@@ -1011,6 +1180,9 @@ export class VoiceGuard {
 	/** A save of his answer failed this turn, and no message has said its
 	 *  verdict: his card shows no mark while the record can't be read. */
 	private verdictOwed = false;
+	/** A save this turn re-marked an earlier answer he never disputed, and
+	 *  was refused: its words are what the tutor wanted to tell him. */
+	private remarkedUnasked = false;
 	/** The turn opens a lesson: nothing was said in the session before it. */
 	private readonly opening: boolean;
 	/** Ordinary text this turn took out of a reply, and whether the turn
@@ -1051,6 +1223,14 @@ export class VoiceGuard {
 	 *  worded one differently was held back (once a turn). */
 	private readonly rulings: string[] = [];
 	private heldRulingSaid = false;
+	/** The topics this review was opened on (none outside a review), and
+	 *  an answer of his this turn saved on none of them: its topics, how
+	 *  many messages had been sent at its save, and whether a turn-ending
+	 *  call was held for the sentence it owes (once a turn). */
+	private readonly reviewTopics: string[];
+	private offTopic: { topics: string[]; at: number; held: boolean } | null = null;
+	/** The topic titles this turn's results named. */
+	private readonly titles: string[] = [];
 	/** The close's `day_items`: what each day it names holds. */
 	private dayItems: DayItems | null = null;
 	/** The turn is his Done for today's close, and the starts planned for
@@ -1081,6 +1261,9 @@ export class VoiceGuard {
 		// A guess he asks to make first is the guess rule's: it is posed as a prediction.
 		this.setAside = aside && !this.input.guess && !(this.input.words && TAUGHT_INSTEAD.test(this.input.words)) ? aside : null;
 		this.posedLast = posedLast(messages);
+		this.posedSinceInput = posedSinceInput(messages);
+		this.reviewTopics = review ? reviewTopicsOf(messages) : [];
+		this.openAbove = openAbove(messages);
 		this.stepsAhead = stepsNotDone(messages);
 		this.unsaved = saves ? unsavedAnswerOf(messages) : null;
 		const earlier = earlierTexts(messages);
@@ -1100,7 +1283,10 @@ export class VoiceGuard {
 	/** Whether a tool's calls pass through the guard: the probe's end too,
 	 *  which it reads only once the probe has ended. */
 	guards(toolName: string): boolean {
-		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || toolName === SAVE_TOOL || toolName === DEMO_TOOL || toolName === LESSON_PROGRESS_TOOL || this.endsTurn(toolName);
+		// A problem's conclude saves his answer: one the record would not take
+		// owes its verdict in words (round 18, m13: unwrapped, a failed
+		// conclude owed nothing, and "…is what made it work" stood as one).
+		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || toolName === SAVE_TOOL || toolName === PRACTICE_CONCLUDE_TOOL || toolName === DEMO_TOOL || toolName === LESSON_PROGRESS_TOOL || this.endsTurn(toolName);
 	}
 
 	/** Read a call as it finishes streaming. A refused message's text leaves
@@ -1149,6 +1335,10 @@ export class VoiceGuard {
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
 		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
+		if (this.offTopic && this.sent === this.offTopic.at && !this.noted.has(OFF_TOPIC_NOTE)) {
+			this.noted.add(OFF_TOPIC_NOTE);
+			return `Not shown to him yet: ${OFF_TOPIC_TEXT(this.offTopic.topics.join(", "), this.reviewTopics.join(", "))}.`;
+		}
 		if (this.verdictOwed && !this.noted.has(VERDICT_NOTE)) {
 			this.noted.add(VERDICT_NOTE);
 			return VERDICT_NOTE;
@@ -1174,7 +1364,9 @@ export class VoiceGuard {
 				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
 				if (tool.name === LESSON_PROGRESS_TOOL && !result.isError) this.dayItems = dayItemsIn(result) ?? this.dayItems;
 				if (tool.name === SAVE_TOOL && !result.isError) this.moved = movedToday(result, this.today) ?? this.moved;
-				if (this.saveFailed(tool.name, params, result)) this.verdictOwed = !this.toldNow.some((t) => VERDICT_SAID.test(t));
+				if (!result.isError) this.titles.push(...titlesIn(result));
+				if (this.saveFailed(tool.name, params, result)) this.verdictOwed = !this.toldNow.some(opensOnVerdict);
+				if (tool.name === SAVE_TOOL && result.isError && remarksUnasked(params) && !this.input.ruling) this.remarkedUnasked = true;
 				else if (tool.name === SAVE_TOOL && !result.isError && savedObservations(isRecord(params) ? params : {}).length > 0) this.verdictOwed = false;
 				if (this.kept?.call.id === toolCallId) {
 					if (result.isError) this.letGo();
@@ -1209,6 +1401,14 @@ export class VoiceGuard {
 		if (call.name === SAVE_TOOL && this.firstTry && savedNotRight(call.arguments, this.firstTry.id)) this.retryOwed = true;
 		if (call.name === SAVE_TOOL && this.secondTry && savedNotRight(call.arguments, this.secondTry.id)) this.repairOwed = true;
 		if (call.name === SAVE_TOOL && this.setAside && savedQuestionsOf(call.arguments).includes(HIS_MESSAGE)) this.setAside = null;
+		if (call.name === SAVE_TOOL && this.reviewTopics.length > 0 && !this.offTopic) {
+			const off = savedObservations(isRecord(call.arguments) ? call.arguments : {}).find((o) => typeof o.question === "string" && Array.isArray(o.topics) && o.topics.length > 0 && !o.topics.some((t) => this.reviewTopics.includes(String(t))));
+			if (off) this.offTopic = { topics: (off.topics as unknown[]).map(String), at: this.sent, held: false };
+		}
+		if (this.offTopic && !this.offTopic.held && this.sent === this.offTopic.at && (this.endsTurn(call.name) || call.name === PROBE_DONE_TOOL)) {
+			this.offTopic.held = true;
+			return OFF_TOPIC(call.name, this.offTopic.topics.join(", "), this.reviewTopics.join(", "));
+		}
 		if (this.unsaved && !this.heldUnsaved && (this.endsTurn(call.name) || call.name === PROBE_DONE_TOOL)) {
 			this.heldUnsaved = true;
 			return UNSAVED(call.name);
@@ -1242,7 +1442,7 @@ export class VoiceGuard {
 			this.lengthDraft = null;
 			if (this.kept || this.waiting.size > 0) this.releasing = call.id;
 			this.toldNow.push(text);
-			if (VERDICT_SAID.test(text)) this.verdictOwed = false;
+			if (opensOnVerdict(text)) this.verdictOwed = false;
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
 			this.said.push(text);
 			this.asked.push(...sentences(text).filter((s) => s.trim().endsWith("?")));
@@ -1384,7 +1584,10 @@ export class VoiceGuard {
 	private judgeProblem(call: ToolCall): AgentToolResult<unknown> | null {
 		const statement = isRecord(call.arguments) && typeof call.arguments.statement === "string" ? call.arguments.statement : "";
 		const advice = problemAdvice(statement);
-		const breaks = this.held("question", advice.length > 0 ? [{ rule: "advice", excerpt: advice.join(" ") }] : []);
+		// A problem is read as a question is for how its maths is set (round
+		// 18, m18: "and" alone between two one-line displays).
+		const set = voiceBreaks(statement).filter((b) => b.rule === "vector" || b.rule === "split-display");
+		const breaks = this.held("question", [...(advice.length > 0 ? [{ rule: "advice" as const, excerpt: advice.join(" ") }] : []), ...set]);
 		if (breaks.length === 0) return null;
 		this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 		return refusal("question", call.name, statement, breaks, undefined);
@@ -1460,14 +1663,24 @@ export class VoiceGuard {
 		if (this.input.demo && this.sent === 0 && !POINTS_AT_DEMO.test(text)) out.push({ rule: "demo-unused", excerpt: first });
 		const below = this.standing ? questionBelow(text) : null;
 		if (below) out.push({ rule: "below", excerpt: below });
-		const pointer = this.posedLast && this.sent === 0 ? sentences(text).map((s) => s.trim()).find((s) => /\b(?:still )?open above\b|\babove,? (?:still )?open\b|\bis (?:still )?(?:waiting|there) above\b/i.test(s)) : undefined;
+		const pointer = (this.posedLast || this.posedSinceInput) && this.sent === 0 ? sentences(text).map((s) => s.trim()).find((s) => POINTS_ABOVE.test(s) && !/\bquestion above\b/i.test(s)) : undefined;
 		if (pointer) out.push({ rule: "pointer", excerpt: pointer });
+		const unplaced = halfAnswerUnplaced(text);
+		if (unplaced) out.push({ rule: "half-answer", excerpt: unplaced });
+		const commaTitle = titleAfterComma(text, this.titles);
+		if (commaTitle) out.push({ rule: "title-comma", excerpt: commaTitle });
+		const vague = VAGUE_MOVES.exec(text);
+		if (vague) out.push({ rule: "vague-moves", excerpt: sentences(text).find((s) => VAGUE_MOVES.test(s))?.trim() ?? vague[0] });
+		const nothingAbove = !this.openAbove && !this.posed ? sentences(text).map((s) => s.trim()).find((s) => POINTS_ABOVE.test(s)) : undefined;
+		if (nothingAbove) out.push({ rule: "nothing-above", excerpt: nothingAbove });
 		// A lesson's opening teaches: the reviews due today are Home's to
 		// offer (round 17, m15: every new lesson, a Linear Algebra one
 		// included, opened by listing four due Probability reviews).
-		const markTalk = !this.input.ruling && !HIS_MARK_WORDS.test(this.input.words ?? "") ? sentences(text).find((s) => MARK_TALK.test(s)) : undefined;
+		const earlierOnly = !this.input.answers || this.remarkedUnasked;
+		const words = this.input.words ?? "";
+		const markTalk = this.input.ruling ? undefined : sentences(text).find((s) => (MARK_TALK.test(s) && !HIS_MARK_WORDS.test(words)) || (earlierOnly && EARLIER_MARK.test(s) && !HIS_ANSWER_WORDS.test(words)));
 		if (markTalk) out.push({ rule: "undisputed", excerpt: markTalk.trim() });
-		if (this.verdictOwed && !VERDICT_SAID.test(text)) out.push({ rule: "verdict-words", excerpt: first });
+		if (this.verdictOwed && !opensOnVerdict(text)) out.push({ rule: "verdict-words", excerpt: first });
 		const startsBegun = kind === "close" && !this.review && this.earlier.length > this.told.length ? sentences(text).find((s) => STARTS_IT.test(s)) : undefined;
 		if (startsBegun) out.push({ rule: "begun", excerpt: startsBegun.trim() });
 		const dueSaid = this.opening && kind !== "close" && !asksPlan ? DUE_REVIEWS.exec(text) : null;
@@ -1478,7 +1691,8 @@ export class VoiceGuard {
 		if (shownBefore) out.push({ rule: "repeat", excerpt: `display ${shownBefore}` });
 		const boxed = restatingCallout(text);
 		if (boxed) out.push({ rule: "repeat", excerpt: `callout ${quoted(boxed.said)}, said above as ${quoted(boxed.before)}` });
-		return [...out, ...this.letters(text), ...this.repeats(text, true), ...this.unbuilt(text)];
+		const breaks = [...out, ...this.letters(text), ...this.repeats(text, true), ...this.unbuilt(text)];
+		return this.verdictOwed ? breaks.filter((b) => !GRADING_RULES.has(b.rule)) : breaks;
 	}
 
 	/** The starts moved off today that neither `text` nor an earlier

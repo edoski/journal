@@ -367,6 +367,25 @@ function studiedLine({ date, daysAgo }: LastStudied): string {
 	return `He last studied this course ${when}: the only day to tell him he last studied, never a moved day's note.`;
 }
 
+/** Which of the reviews due today the lesson he opened builds on (its
+ *  topics' `needs`): those it takes first, and the rest, which Home offers
+ *  and the lesson leaves alone (round 18, m17: Start on Poisson ran the
+ *  Binomial review, then two questions of Random variables', which Poisson
+ *  does not build on, four answers before its first probe). Null outside
+ *  a lesson opened on a topic. */
+function lessonBuildsOn(plan: CoursePlans | undefined, lesson: readonly string[], due: readonly string[]): string | null {
+	if (lesson.length === 0 || due.length === 0) return null;
+	const map = plan?.courses.find((c) => c.map.workspace === plan.workspace)?.map;
+	if (!map) return null;
+	const needs = new Set(map.edges.flatMap((e) => (e.kind === "needs" && lesson.includes(e.topic) ? [e.prerequisite as string] : [])));
+	const first = due.filter((t) => needs.has(t));
+	const rest = due.filter((t) => !needs.has(t) && !lesson.includes(t));
+	const named = lesson.join(", ");
+	if (rest.length === 0) return `${named} builds on each of them: their reviews come first, each opened with one plain line naming it.`;
+	const left = `${rest.join(", ")} ${rest.length > 1 ? "are" : "is"} not one ${named} builds on: Home offers ${rest.length > 1 ? "their reviews" : "its review"}, so this lesson leaves ${rest.length > 1 ? "them" : "it"} alone.`;
+	return first.length > 0 ? `${named} builds on ${first.join(", ")}: ${first.length > 1 ? "their reviews come" : "its review comes"} first, opened with one plain line naming it. ${left}` : `${named} builds on none of them, so it opens on the lesson. ${left}`;
+}
+
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
@@ -414,6 +433,8 @@ export function projectCourseBrief(
 	const detail = obj(r.topics);
 	if (due.length > 0) {
 		lines.push(dueHeading(r, due.length), ...due.map((d) => dueLine(withDetail(d, detail), role)));
+		const builds = review ? null : lessonBuildsOn(plan, takenUp ? [takenUp] : opened, due.map((d) => str(obj(d).topic) ?? ""));
+		if (builds) lines.push(builds);
 	} else {
 		lines.push("Due today: nothing.");
 	}

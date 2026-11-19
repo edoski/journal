@@ -525,7 +525,7 @@ export const LEFT_FOR_TONIGHT_TEXT =
  *  (round 16, m13: with nothing to say so, the close read "You still
  *  haven't started Linear maps and their matrices" under his half answer). */
 export const LEFT_DRAFT_TEXT =
-	"He had started an answer to it, kept in his box for when he comes back. It is not an attempt: grade nothing. In the close it is his half answer waiting for him there (\"Your half answer to the kernel question waits here for next time.\"), never a topic or question he has not started, and never what it says.";
+	"He had started an answer to it, kept in his box for when he comes back. It is not an attempt: grade nothing. In the close it is his half answer, waiting in this session by its name, never \"there\" (\"Your half answer to the kernel question waits in your Invertible matrices lesson, which continues tomorrow, Monday 9 November.\"), never a topic or question he has not started, and never what it says.";
 
 /** What the agent reads for a question he set aside to ask something
  *  (round 6: the question stays open, so it comes back as it was and the
