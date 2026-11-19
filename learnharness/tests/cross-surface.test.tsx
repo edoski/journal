@@ -729,7 +729,12 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		await holds("Sun 8 Nov, after the Eigen lesson", (s) => assertLeftToday(app, s, "chat_demo_eigen", words, before));
 	});
 
-	it("Sun 8 Nov, after the Probability review from Home (lens 1, step 9)", async () => {
+	it("Mon 9 Nov, overnight", async () => {
+		app.day("2026-11-09");
+		await holds("Mon 9 Nov, overnight");
+	});
+
+	it("Mon 9 Nov, after the Probability review from Home (lens 1, step 9, a day on: since round 18's M1 Binomial's review is on 9 Nov)", async () => {
 		await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 });
 		// Round 18, m10: a review of several topics is named as its session, "Probability review".
 		const line = app.homeLines().find((l) => l.course === "Probability" && l.title === "Probability review");
@@ -746,7 +751,7 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		app.doneForToday(id, "Binomial distribution comes back for review another day.");
 		// Round 17, M4 (3 N2, 1 m4): the review's other topics got no answer today, so Home keeps their line, which
 		// picks up the review he left, as the calendar still lists them today.
-		await holds("Sun 8 Nov, after the Probability review", (s) => {
+		await holds("Mon 9 Nov, after the Probability review", (s) => {
 			const prob = s.courses.find((c) => c.map.title === "Probability")!;
 			const rest = (prob.due ?? []).filter((h) => h !== "binomial").map((h) => prob.map.topics.find((t) => t.handle === h)!);
 			assert.ok(rest.length > 0, "the seeded Probability review holds topics beside Binomial");
@@ -756,11 +761,6 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 			for (const topic of rest) assert.ok(line.topics.includes(topic.handle), `the line takes up ${topic.title}: ${line.topics.join(", ")}`);
 			assert.ok(!line.topics.includes("binomial"), `the line leaves out Binomial, answered today: ${line.topics.join(", ")}`);
 		});
-	});
-
-	it("Mon 9 Nov, overnight", async () => {
-		app.day("2026-11-09");
-		await holds("Mon 9 Nov, overnight");
 	});
 
 	it("Mon 9 Nov, after the Linear Algebra review from Home (lens 1, step 15)", async () => {

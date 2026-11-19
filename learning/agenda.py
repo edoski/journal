@@ -1821,7 +1821,7 @@ def _day(
     }
     done = capacity.activity(morning.values(), day).get(studied, capacity.Done())
     short = any(left.values()) and (done.reviews_short or done.new_short)
-    if short and _moved_week(records, studied, until, weekly, week):
+    if short and _moved_week(morning, studied, day, weekly, week):
         return replace(
             _afresh(
                 records,
@@ -1868,9 +1868,9 @@ def _day(
 
 
 def _moved_week(
-    records: Mapping[str, dict[str, Any]],
+    morning: Mapping[str, dict[str, Any]],
     studied: date,
-    until: date,
+    day: date,
     weekly: Capacity,
     week: Capacity | None,
 ) -> bool:
@@ -1880,10 +1880,24 @@ def _moved_week(
     can the days he was told hold more starts than his week gives, so the
     next day is planned afresh (``replay``). A lower review limit moves only
     the reviews he left, which take the room the days he was told leave; a
-    higher limit leaves room past them."""
+    higher limit leaves room past them.
+
+    Both weeks are read from the record as ``day`` began (``morning``), the
+    week that day began with from the days before it: each morning reads
+    the days gone with the final reviews his pace gives that morning
+    (``capacity.final_reviews``), so a week read as the day he studied began
+    differs from this morning's by a final review that moved a day, and the
+    exam pace it re-reads every day gone by, not by anything he did (round
+    18: he did all of 9 Nov but one review, the final reviews started a day
+    later, 30 Oct and 1 Nov read as days he stopped short of a start, and the
+    night planned afresh, moving 53 dates)."""
     if week is not None:
         return False
-    began = capacity.of(_at(records, studied, None, until).values(), studied)
+    records = list(morning.values())
+    read = capacity.activity(records, day)
+    began = capacity.estimate(
+        capacity.began(read, studied), studied, capacity.exam_days(records)
+    )
     return not weekly.study_weekdays >= began.study_weekdays or any(
         now.new.value < then.new.value or (now.new.shown and not then.new.shown)
         for now, then in zip(weekly.weekdays, began.weekdays, strict=True)

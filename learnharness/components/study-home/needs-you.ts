@@ -63,11 +63,12 @@ export function lineTopics(row: TodayRow): TopicHandle[] {
 /** The reason's words for a status slot: Home's words, a new topic's
  *  reason when it names topics ("After Random variables and
  *  distributions"), never an arc, except a
- *  lapse on the lead topic itself ("Not right last time", since the card
- *  already names it). Pure. */
-export function slotWords(why: Why | null, lead: CourseMapTopic | null): string | null {
+ *  lapse on the lead topic itself ("Not right last time") when the card's
+ *  `title` already names it, as a topic's own row does; a review titled by
+ *  its course ("Calculus I review", round 18 m10) keeps the topic. Pure. */
+export function slotWords(why: Why | null, lead: CourseMapTopic | null, title?: string): string | null {
 	if (!why) return null;
-	if (why.kind === "missed" && lead && why.short === lapsedOnWords(lead.title)) return SLIP_WORDS.lapsed;
+	if (why.kind === "missed" && lead && why.short === lapsedOnWords(lead.title) && (title === undefined || title.includes(lead.title))) return SLIP_WORDS.lapsed;
 	// A new topic's reason when it names the topics it waits on, as Home's line says it (round 13, 1 n5: "Planned today"
 	// beside Home's "After Random variables…"); a reason naming an arc stays plain, since a sidebar card names no arc (Edo, 14 Nov).
 	return why.starts?.kind === "after" && why.starts.words.startsWith("After ") ? why.starts.words : why.short;
@@ -107,8 +108,9 @@ export function nowLine(row: TodayRow): NowLine {
 	const lead = leadOf(row, taken, why);
 	const topics = lead ? [lead, ...taken.filter((t) => t !== lead)] : taken;
 	const status = rowStatus(row);
-	const slot = status?.kind === "standing" ? rowWords(status.facts) : status ? slotWords(status.why, lead) : null;
-	return { key: lineKey(row), row, title: lessonTitle(row), why, topics, lead, status, slot };
+	const title = lessonTitle(row);
+	const slot = status?.kind === "standing" ? rowWords(status.facts) : status ? slotWords(status.why, lead, title) : null;
+	return { key: lineKey(row), row, title, why, topics, lead, status, slot };
 }
 
 /**

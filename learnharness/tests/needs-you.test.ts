@@ -65,11 +65,11 @@ describe("needsYouNow", () => {
 		assert.deepEqual(needsYouNow([empty], [], TODAY).lines, [], "a course with nothing to take up has no line");
 	});
 
-	it("words the status slot as Today does, a lapse on the lead itself as Not right last time and a task up to its colon", () => {
+	it("words the status slot as Today does, a lapse with the topic a review titled by its course does not name, and a task up to its colon", () => {
 		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
 		assert.deepEqual(
 			[...lines, ...also].map((l) => l.slot),
-			["Due 5 Nov", "Due 4 Nov", "Due 1 Nov", "Not right last time", "Your turn", "Your turn"],
+			["Due 5 Nov", "Due 4 Nov", "Due 1 Nov", "Not right last time: Chain rule", "Your turn", "Your turn"],
 		);
 		const task: StudyCourse = {
 			...LINALG,
@@ -84,14 +84,16 @@ describe("needsYouNow", () => {
 		assert.equal(slotWords(null, null), null);
 	});
 
-	it("leads a lapse with the lapsed topic, so the card's title and its reason name the same topic", () => {
+	it("leads a lapse with the lapsed topic, and a card titled by its course keeps the topic in its reason, as Home's line does (round 18, M1's seed: the sidebar's \"Not right last time\" beside Home's \"Not right last time: The chain rule\")", () => {
 		const other: StudyCourse = { ...CALCULUS, due: ["riemann", "chain"] as TopicHandle[] };
 		const [line] = needsYouNow([other], [], TODAY).lines;
 		assert.equal(line!.why?.short, "Not right last time: Chain rule");
 		assert.deepEqual(
-			[line!.lead?.title, line!.slot, line!.topics.map((t) => t.title)],
-			["Chain rule", "Not right last time", ["Chain rule", "Riemann sums"]],
+			[line!.title, line!.lead?.title, line!.slot, line!.topics.map((t) => t.title)],
+			["Calculus I review", "Chain rule", "Not right last time: Chain rule", ["Chain rule", "Riemann sums"]],
 		);
+		const chain = CALCULUS.map.topics.find((t) => t.title === "Chain rule")!;
+		assert.equal(slotWords(line!.why, chain, "Chain rule"), "Not right last time", "a card that names the topic says the lapse alone");
 	});
 
 	it("leads an open task with the course's current topic when the task holds it, else with none, since the record does not say which topic the task is at", () => {

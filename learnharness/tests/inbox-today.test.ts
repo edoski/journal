@@ -309,7 +309,8 @@ describe("TodayList", () => {
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
-			["Due 5 Nov", "Due 4 Nov", "Due 1 Nov", "Not right last time", "Your turn"],
+			// "Calculus I review" names no topic, so its lapse keeps Chain rule, as Home's line does (round 18, M1's seed).
+			["Due 5 Nov", "Due 4 Nov", "Due 1 Nov", "Not right last time: Chain rule", "Your turn"],
 		);
 		assert.deepEqual(
 			[...doc.querySelectorAll('[data-slot="unit-section-header"]')].map((h) => h.textContent),
