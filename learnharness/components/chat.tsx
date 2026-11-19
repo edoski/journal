@@ -234,7 +234,11 @@ export function Chat({
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
 	const { messages, nativeMessages, hasConfirmedConversation, compacting, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, stopReply, clearError, outlivedFailure, recoverDroppedStream, resumeStream, setReattachSettled } =
-		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
+		// Continue on a task starts its turn as the page opens: the last
+		// turn's failure is not this one's, so the line never shows it
+		// (round 18, m25: "The tutor stopped before replying. Try again"
+		// flashed as Continue opened, until the turn's start cleared it).
+		useChatSession({ chatId, initialMessages, initialError: continueTask && !initiallyInFlight && taskTurnOwed(initialMessages) ? undefined : initialError, initiallyInFlight });
 
 	// The question is the tutor's words and the one composer answers it
 	// (components/lesson/prose/prose.md). Esc while something is open turns
