@@ -11,7 +11,7 @@ import { MathText, mathPlain } from "@/components/ui/math-text";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { focusWhereHeTypes } from "@/components/ui/overlay";
 import { courseHref, unitHref } from "@/components/unit-inbox/unit-href";
-import { kbdEventForAction, type LessonPlace } from "@/src/core";
+import { kbdEventForAction, type LessonPlace, type TaskSession } from "@/src/core";
 import { roadmapLabel, type RoadmapStep } from "@/components/lesson/roadmap-facts";
 
 /** A step behind him: one he reached, or one before Now he never did. */
@@ -66,6 +66,7 @@ function walkStops(e: KeyboardEvent<HTMLElement>) {
  */
 export function LessonRoadmap({
 	steps,
+	task,
 	place,
 	course,
 	open,
@@ -73,6 +74,8 @@ export function LessonRoadmap({
 	onJump,
 }: {
 	steps: readonly RoadmapStep[];
+	/** The task his Continue picked up: the strip names its parts (round 18, m22). */
+	task?: TaskSession | null;
 	place?: LessonPlace;
 	course?: { title: string; workspace: string };
 	open: boolean;
@@ -85,7 +88,7 @@ export function LessonRoadmap({
 		window.addEventListener(kbdEventForAction("open-model-picker"), onOpen);
 		return () => window.removeEventListener(kbdEventForAction("open-model-picker"), onOpen);
 	}, [onOpenChange]);
-	const label = roadmapLabel(steps);
+	const label = roadmapLabel(steps, task);
 	// A lesson with no plan (practice) draws no strip, but ⌘K still opens
 	// the way up from where the strip would be (round 7: ⌘K did nothing).
 	if (label === null) {

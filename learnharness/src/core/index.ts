@@ -24,6 +24,8 @@ export * from "./question-core.ts";
 export * from "./events.ts";
 export * from "./plan-tree.ts";
 export * from "./lesson-place.ts";
+// task-session.ts: the task his Continue picked up, and where the session left it (pure).
+export * from "./task-session.ts";
 export * from "./session-opening.ts";
 export { sessionTitleOf } from "./session-naming.ts";
 export * from "./phases.ts";

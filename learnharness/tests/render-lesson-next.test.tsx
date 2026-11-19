@@ -115,7 +115,7 @@ describe("lesson cards", () => {
 	});
 
 	it("a given-up problem opens its model solution, with no tutor bookkeeping", () => {
-		const html = renderToStaticMarkup(<ProseConclude toolCallId="c2" input={{ outcome: "surrendered", verdict: "You read the rows by eye.", rung: "R2", missClass: "execution" }} output={{}} reveal="Eliminate." />);
+		const html = renderToStaticMarkup(<ProseConclude state="output-available" toolCallId="c2" input={{ outcome: "surrendered", verdict: "You read the rows by eye.", rung: "R2", missClass: "execution" }} output={{}} reveal="Eliminate." />);
 		assert.match(html, /Model solution/);
 		assert.match(html, /Eliminate\./);
 		assert.doesNotMatch(html, /Surrendered|Details|rung|Miss class/i);

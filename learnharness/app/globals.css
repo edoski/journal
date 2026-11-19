@@ -350,6 +350,12 @@ body {
 [data-slot="topic-attempt-text"] .katex { white-space: normal; }
 [data-slot="course-topic-title"] .katex { white-space: normal; }
 
+/* In an Earlier row a formula that fits the row is one box, so it moves to
+   the next line whole; only one wider than the row is narrowed to it and
+   breaks inside (round 18, m21: "correctly to c =" ended a line, and "1/10"
+   sat alone under it). */
+[data-slot="topic-attempt-text"] .katex { display: inline-block; max-width: 100%; }
+
 /* The pieces between a bracket and its close stay on one line wherever a
    formula may wrap (math-text.tsx, `holdBrackets`): "P(X =" | "0)" broke
    inside one (round 14, m37). */

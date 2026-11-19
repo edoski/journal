@@ -275,6 +275,15 @@ function saveAnswerSaves(id: string, links: Readonly<Record<string, readonly str
 	writeChat(record);
 }
 
+/** Keep its topics' titles as its course is deleted. Silent, and not
+ * conversation activity: updatedAt stays put. */
+function saveTopicTitles(id: string, titles: Readonly<Record<string, string>>): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	record.topicTitles = { ...(record.topicTitles ?? {}), ...titles };
+	writeChat(record);
+}
+
 /** Link the session to a course. Not conversation activity, and not a
  * list-shape change: updatedAt stays put and nothing is announced. */
 function linkCourse(id: string, course: CourseLink): void {
@@ -376,4 +385,5 @@ export const chatStore: ChatStore = {
 	appendTurnUsage,
 	saveDigestLedger,
 	saveAnswerSaves,
+	saveTopicTitles,
 };

@@ -34,24 +34,24 @@ describe("the practice transcript", () => {
 	});
 
 	it("a conclusion keeps the committed solution, verbatim, behind Model solution, open after Show me", () => {
-		const closed = renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "solvedWithHints", verdict: "The pairing came after R2." }} output={{}} reveal="Pair them; each pair is even." />);
+		const closed = renderToStaticMarkup(<ProseConclude state="output-available" toolCallId="c1" input={{ outcome: "solvedWithHints", verdict: "The pairing came after R2." }} output={{}} reveal="Pair them; each pair is even." />);
 		assert.match(closed, /Model solution/);
 		assert.match(closed, /data-state="closed"/);
-		const html = renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "surrendered", verdict: "The pairing came after R2." }} output={{}} reveal="Pair them; each pair is even." />);
+		const html = renderToStaticMarkup(<ProseConclude state="output-available" toolCallId="c1" input={{ outcome: "surrendered", verdict: "The pairing came after R2." }} output={{}} reveal="Pair them; each pair is even." />);
 		assert.match(html, /Model solution/);
 		assert.match(html, /Pair them; each pair is even\./);
 	});
 
 	it("legacy records fall back to their own solutionReveal", () => {
-		const html = renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "surrendered", verdict: "Clean.", solutionReveal: "Pair them; each pair is even." }} output={{}} reveal={undefined} />);
+		const html = renderToStaticMarkup(<ProseConclude state="output-available" toolCallId="c1" input={{ outcome: "surrendered", verdict: "Clean.", solutionReveal: "Pair them; each pair is even." }} output={{}} reveal={undefined} />);
 		assert.match(html, /Pair them; each pair is even\./);
 	});
 
 	it("a dismissal is one muted line, a skip or set aside by Done for today", () => {
-		const skipped = renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "dismissed" }} output={{}} reveal="" />);
+		const skipped = renderToStaticMarkup(<ProseConclude state="output-available" toolCallId="c1" input={{ outcome: "dismissed" }} output={{}} reveal="" />);
 		assert.match(skipped, /You skipped this problem/);
 		assert.doesNotMatch(skipped, /Model solution/);
-		const left = renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "dismissed" }} output={{ outcome: "dismissed", problemCallId: "p1", reason: "tonight" }} reveal="" />);
+		const left = renderToStaticMarkup(<ProseConclude state="output-available" toolCallId="c1" input={{ outcome: "dismissed" }} output={{ outcome: "dismissed", problemCallId: "p1", reason: "tonight" }} reveal="" />);
 		assert.equal(left, "", "set aside by Done for today: no marker above the close that says it (round 16, m15), and never an empty Left for next time (round 15, 3 m1)");
 	});
 

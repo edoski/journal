@@ -148,10 +148,10 @@ export function MaterialList({ refs }: { refs: readonly TopicRef[] }) {
 	return (
 		<ul className="flex flex-col">
 			{refs.map((ref, i) => (
-				<li key={`${ref.source}#${ref.locator ?? i}`} data-slot="pickup-material" className={cn(ref.locator ? TWO_LINE_ROW : ONE_LINE_ROW, "mx-0 w-full pr-0 has-[>svg]:pr-0", GUTTER)}>
+				<li key={`${ref.source}#${ref.locator ?? i}`} data-slot="pickup-material" className={cn(ref.locator && ref.source ? TWO_LINE_ROW : ONE_LINE_ROW, "mx-0 w-full pr-0 has-[>svg]:pr-0", GUTTER)}>
 					<BookOpenIcon aria-hidden className={ICON} />
 					<span className="col-span-2 truncate text-body text-foreground">{ref.locator ?? ref.source}</span>
-					{ref.locator && <span className="col-span-2 col-start-2 truncate text-callout text-muted-foreground">{ref.source}</span>}
+					{ref.locator && ref.source && <span className="col-span-2 col-start-2 truncate text-callout text-muted-foreground">{ref.source}</span>}
 				</li>
 			))}
 		</ul>

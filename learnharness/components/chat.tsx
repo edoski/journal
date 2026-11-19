@@ -35,6 +35,7 @@ import {
 	firstSourceTextParts,
 	messageAnchorId,
 	sessionModeOf,
+	taskSessionOf,
 	textPartMessageId,
 	kbdEventForAction as kbdEventForChat,
 	type ChatInput,
@@ -233,7 +234,11 @@ export function Chat({
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
 	const { messages, nativeMessages, hasConfirmedConversation, compacting, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, stopReply, clearError, outlivedFailure, recoverDroppedStream, resumeStream, setReattachSettled } =
-		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
+		// Continue on a task starts its turn as the page opens: the last
+		// turn's failure is not this one's, so the line never shows it
+		// (round 18, m25: "The tutor stopped before replying. Try again"
+		// flashed as Continue opened, until the turn's start cleared it).
+		useChatSession({ chatId, initialMessages, initialError: continueTask && !initiallyInFlight && taskTurnOwed(initialMessages) ? undefined : initialError, initiallyInFlight });
 
 	// The question is the tutor's words and the one composer answers it
 	// (components/lesson/prose/prose.md). Esc while something is open turns
@@ -982,7 +987,10 @@ export function Chat({
 	const dropped = status === "error" && droppedError(error);
 	const [healFailed, setHealFailed] = useState(false);
 	useEffect(() => setHealFailed(false), [error]);
-	const tryAgain = pending || activeProblem || gone || courseGone ? undefined : replyCut ? () => void send({ type: "continue" }) : dropped ? () => healDroppedStreamRef.current().then((healed) => setHealFailed(!healed)) : retryable && !claudeLimit ? retryFailedTurn : undefined;
+	// An open problem keeps its box, which runs the same Try again from its
+	// empty field (round 18, m19); the window's Enter leaves it to that box.
+	const turnRetry = pending || gone || courseGone ? undefined : replyCut ? () => void send({ type: "continue" }) : dropped ? () => healDroppedStreamRef.current().then((healed) => setHealFailed(!healed)) : retryable && !claudeLimit ? retryFailedTurn : undefined;
+	const tryAgain = activeProblem ? undefined : turnRetry;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
 	 * kind, nothing active, nothing in flight, and at least one problem
@@ -1173,10 +1181,13 @@ export function Chat({
 	const leftBelow = useMemo(() => leftAskedBelow(messages), [messages]);
 	const spoken = useMemo(() => spokenAbove(messages), [messages]);
 	const openingAt = useMemo(() => appOpeningAt(messages, appOpening), [messages, appOpening]);
+	// A task picked up with Continue: a plan written before it was another
+	// lesson's, so the strip waits for the task's own (round 18, m22).
+	const taskSession = useMemo(() => taskSessionOf(nativeMessages), [nativeMessages]);
 	const steps = useMemo(() => {
-		if (!planTree) return [];
+		if (!planTree || (taskSession && !taskSession.planned)) return [];
 		return lessonRoadmapSteps(planTree, messages as Parameters<typeof lessonRoadmapSteps>[1], new Set(anchors.values()));
-	}, [planTree, messages, anchors]);
+	}, [planTree, messages, anchors, taskSession]);
 	// A step's place in the transcript: scroll to where it was first taught
 	// and mark it as a passage link lands (session-navigation.tsx).
 	const jumpToStep = useCallback((stepId: string) => {
@@ -1712,6 +1723,7 @@ export function Chat({
 						roadmap={
 							<LessonRoadmap
 								steps={steps}
+								task={taskSession}
 								place={place}
 								course={course && !courseGone ? { title: course.title, workspace: course.workspace } : undefined}
 								open={planOpen}
@@ -1785,7 +1797,7 @@ export function Chat({
 													<Fragment key={pi}>
 														{doneMarks.before.get(mi)?.map(({ message, part: at }) => {
 															const conclude = messages[message]!.parts[at]!;
-															return <ProseConclude key={`${message}:${at}`} toolCallId={conclude.toolCallId!} input={conclude.input} output={conclude.output} reveal={conclude.reveal} />;
+															return <ProseConclude key={`${message}:${at}`} toolCallId={conclude.toolCallId!} input={conclude.input} output={conclude.output} reveal={conclude.reveal} state={conclude.state} />;
 														})}
 														<DoneTonightLine />
 													</Fragment>
@@ -1899,7 +1911,7 @@ export function Chat({
 														}
 														if (part.type === "tool-conclude") {
 															if (doneMarks.moved.has(partKey(mi, pi))) return null;
-															return <ProseConclude key={pi} toolCallId={part.toolCallId!} input={part.input} output={part.output} reveal={part.reveal} />;
+															return <ProseConclude key={pi} toolCallId={part.toolCallId!} input={part.input} output={part.output} reveal={part.reveal} state={part.state} />;
 														}
 														// Artifact extension point (contracts.ts): job
 														// parts and future artifacts render via the
@@ -1988,7 +2000,7 @@ export function Chat({
 								sendAllowed,
 								nextProblem: nextReady,
 								onNext: sendNext,
-								onEmptyEnter: tryAgain,
+								onEmptyEnter: turnRetry,
 								placeholder: pausePlaceholder(nextReady, !!tryAgain),
 								photos: composerPhotos,
 								compact: readingUp,

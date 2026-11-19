@@ -112,6 +112,25 @@ export type DisputeDraft = Pick<DisputeDetails, "said" | "proposed" | "proposedH
 const PICKS: readonly MarkResult[] = ["correct", "partial", "incorrect"];
 const HOW_PICKS: readonly DisputedHow[] = ["ownWork", "withHelp"];
 
+/** Where the dialog's choices start: on one try, the card's own mark and
+ *  how it counted, so a change shows as one; on several, nothing picked. */
+export function disputeStart(rows: readonly MarkRow[]): { result: MarkResult | ""; how: DisputedHow | "" } {
+	if (rows.length !== 1) return { result: "", how: "" };
+	const how = markHow(rows[0]!);
+	return { result: rows[0]!.result, how: how === "ownWork" || how === "withHelp" ? how : "" };
+}
+
+/** What Send sends: his words, and each choice he moved off the card's;
+ *  null while nothing differs from the card, so Send waits (round 18, m20:
+ *  Send on an untouched dialog did nothing, silently). Pure. */
+export function disputeDraft(start: { result: MarkResult | ""; how: DisputedHow | "" }, said: string, proposed: MarkResult | "", proposedHow: DisputedHow | ""): DisputeDraft | null {
+	const words = said.trim();
+	const result = proposed && proposed !== start.result ? proposed : null;
+	const how = proposedHow && proposedHow !== start.how ? proposedHow : null;
+	if (!words && !result && !how) return null;
+	return { ...(words ? { said: words } : {}), ...(result ? { proposed: result } : {}), ...(how ? { proposedHow: how } : {}) };
+}
+
 /** The dispute: a sentence on what's wrong, the mark he thinks is right,
  *  or how he thinks it should count (round 6: help could be argued only
  *  in words). ↑ from the start of the field reaches the choices, ↑ ↓ move
@@ -124,16 +143,17 @@ export function DisputeDialog({ rows, ...props }: { rows: readonly MarkRow[] | n
 /** One opening of the dispute: its own draft, so the next opening starts
  *  clean. */
 function DisputeForm({ open, rows, onClose, onSend }: { open: boolean; rows: readonly MarkRow[]; onClose: () => void; onSend: (draft: DisputeDraft) => void }) {
+	const start = disputeStart(rows);
 	const [said, setSaid] = useState("");
-	const [proposed, setProposed] = useState<MarkResult | "">("");
-	const [proposedHow, setProposedHow] = useState<DisputedHow | "">("");
+	const [proposed, setProposed] = useState<MarkResult | "">(start.result);
+	const [proposedHow, setProposedHow] = useState<DisputedHow | "">(start.how);
 	const fieldRef = useRef<HTMLTextAreaElement>(null);
 	const groupRef = useRef<HTMLDivElement>(null);
 	const howRef = useRef<HTMLDivElement>(null);
-	const ready = said.trim().length > 0 || proposed !== "" || proposedHow !== "";
+	const draft = disputeDraft(start, said, proposed, proposedHow);
+	const ready = draft !== null;
 	const send = () => {
-		if (!ready) return;
-		onSend({ ...(said.trim() ? { said: said.trim() } : {}), ...(proposed ? { proposed } : {}), ...(proposedHow ? { proposedHow } : {}) });
+		if (draft) onSend(draft);
 	};
 	const marked = markedWords(rows);
 	const focusGroup = (group: HTMLDivElement | null) => (group?.querySelector<HTMLButtonElement>('[data-state="on"]') ?? group?.querySelector<HTMLButtonElement>("[data-pick]"))?.focus();

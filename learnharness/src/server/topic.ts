@@ -17,6 +17,7 @@ import { planDays, plannedOf } from "./calendar.ts";
 import type { CourseResult } from "../core/contracts/course.ts";
 import { listCourses } from "./courses.ts";
 import { stores } from "./stores.ts";
+import { courseSourceTitles, recordTitle } from "./source-titles.ts";
 import { homeMap } from "./study.ts";
 
 /** The most sessions one read names. */
@@ -67,30 +68,23 @@ function attemptOf(id: string, entry: unknown): { attempt: TopicAttempt; correct
 	};
 }
 
-/** The topic's `refs` as places in his material: each source named by
- *  its title (`sourceName`), with its locator; a ref to no listed source
- *  is left out. Pure. */
-function refsOf(topic: Record<string, unknown>, sources: Record<string, unknown>): TopicRef[] {
+/** The topic's `refs` as places in his material: each source named as he
+ *  reads it (`titles`, from `courseSourceTitles`; without them, the
+ *  record's title when it is a real one), with its locator. A source with
+ *  no name of its own shows only the place in it (round 18, m23), and a ref
+ *  to no listed source, or to an unnamed one with no place, is left out.
+ *  Pure. */
+function refsOf(topic: Record<string, unknown>, sources: Record<string, unknown>, titles?: ReadonlyMap<string, string | null>): TopicRef[] {
 	const refs = Array.isArray(topic.refs) ? topic.refs : [];
 	return refs.flatMap((entry) => {
 		const ref = record(entry);
 		const key = str(ref?.source);
 		const source = key ? record(sources[key]) : null;
-		return key && source ? [{ source: sourceName(key, source), locator: str(ref?.locator) }] : [];
+		if (!key || !source) return [];
+		const name = titles?.has(key) ? titles.get(key)! : recordTitle(key, str(source.title), str(source.path));
+		const locator = str(ref?.locator);
+		return name || locator ? [{ source: name, locator }] : [];
 	});
-}
-
-/** A source as he reads it: the title `show` gives it, unless that title
- *  is only its file's name or its handle, as a course made from files gets
- *  ("hefferon-linear-algebra"); that name is then said in words
- *  ("Hefferon linear algebra"), so the book and its answers still read
- *  apart (round 17, m24). Pure. */
-export function sourceName(handle: string, source: Record<string, unknown>): string {
-	const title = str(source.title);
-	const file = str(source.path)?.split("/").pop()?.replace(/\.[^.]+$/, "");
-	if (title && title !== file && title !== handle) return title;
-	const words = (title ?? file ?? handle).replace(/[-_]+/g, " ").trim();
-	return words ? words[0]!.toLocaleUpperCase() + words.slice(1) : handle;
 }
 
 /** Which session saved each observation, from the sessions' transcripts:
@@ -114,7 +108,7 @@ export function savedBy(chats: readonly ChatRecord[]): Map<string, string> {
  * Each attempt names the session that saved it (`saved`, from `savedBy`),
  * or saved an attempt it corrects. Pure.
  */
-export function topicRecordOf(show: unknown, handle: string, taskKeys: readonly string[], saved: ReadonlyMap<string, string> = new Map()): TopicRecord | null {
+export function topicRecordOf(show: unknown, handle: string, taskKeys: readonly string[], saved: ReadonlyMap<string, string> = new Map(), titles?: ReadonlyMap<string, string | null>): TopicRecord | null {
 	const items = record(record(show)?.items);
 	const topic = record(items?.[handle]);
 	if (!items || !topic || topic.kind !== "topic") return null;
@@ -124,7 +118,7 @@ export function topicRecordOf(show: unknown, handle: string, taskKeys: readonly 
 	const sessionOf = (id: string, corrects: readonly string[]) => saved.get(id) ?? corrects.map((c) => saved.get(c)).find((s) => s !== undefined) ?? null;
 	return {
 		attempts: scored.filter((s) => !corrected.has(s.attempt.id)).map((s) => ({ ...s.attempt, session: sessionOf(s.attempt.id, s.corrects) })),
-		refs: refsOf(topic, record(record(show)?.sources) ?? {}),
+		refs: refsOf(topic, record(record(show)?.sources) ?? {}, titles),
 		tasks: taskKeys.flatMap((key) => {
 			const task = record(items[key]);
 			return task?.kind === "task" ? [{ key, updated: str(task.updated) }] : [];
@@ -235,6 +229,7 @@ export async function topicRead(
 		return chat && chat.course?.workspace === workspace ? [chat] : [];
 	});
 	const plans = chats.flatMap((chat) => sessionPlanOf(chat) ?? []);
-	const record = shown.ok ? topicRecordOf(shown.json, handle, taskKeys, savedBy(chats)) : null;
-	return { status: 200, body: { ok: true, record, plans, ...(plan ? { firstReview: plan.ok ? firstReviewOf(plan.json, handle) : null } : {}) } };
+	const titles = shown.ok ? await courseSourceTitles(workspace, record(record(shown.json)?.sources) ?? {}, course.title) : undefined;
+	const topic = shown.ok ? topicRecordOf(shown.json, handle, taskKeys, savedBy(chats), titles) : null;
+	return { status: 200, body: { ok: true, record: topic, plans, ...(plan ? { firstReview: plan.ok ? firstReviewOf(plan.json, handle) : null } : {}) } };
 }

@@ -829,7 +829,7 @@ export function concludedByDismissalPair(
  *  subject is the call, not a dangling result). */
 /** The ids of tool calls whose results are CLEAN (not errored) — the only
  *  calls that ever happened, per the honest-activation ruling. */
-function cleanToolCallIds(messages: readonly LhMessage[]): Set<string> {
+export function cleanToolCallIds(messages: readonly LhMessage[]): Set<string> {
 	const ids = new Set<string>();
 	for (const m of messages) {
 		if ((m as { role?: string }).role !== "toolResult") continue;
@@ -844,7 +844,7 @@ const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filt
 /** A course_save's changes as the engine read them: the tool takes an
  *  object, and also its JSON text, which the tutor often sends. Null when
  *  neither. Pure. */
-function saveChanges(args: Record<string, unknown>): Record<string, unknown> | null {
+export function saveChanges(args: Record<string, unknown>): Record<string, unknown> | null {
 	let changes = args.changes;
 	if (typeof changes === "string") {
 		try {

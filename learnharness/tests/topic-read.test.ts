@@ -82,12 +82,11 @@ describe("the engine's show as the topic's record", () => {
 		};
 		assert.deepEqual(topicRecordOf(show, "poisson", [])!.refs, [
 			{ source: "Blitzstein and Hwang", locator: "Section 4.7" },
-			{ source: "Notes", locator: null },
-		]);
+		], "a source with no title and no place in it has nothing to show (round 18, m23)");
 		assert.deepEqual(topicRecordOf(SHOW_MANY, "matmul", [])!.refs, [], "a topic its record points nowhere for");
 	});
 
-	it("names a source in words, never by its bare file name (round 17, m24)", () => {
+	it("never names a source by its file's name, cased or not: with no title of its own, its row is the place in it (round 17, m24; round 18, m23)", () => {
 		// The seeded Linear Algebra course, as the New course flow writes it: each title its file's stem.
 		const show = {
 			items: { invertibility: { kind: "topic", title: "Invertible matrices", observations: [], refs: [{ source: "hefferon-linear-algebra", locator: "Three.IV.4, PDF pp. 264–271" }, { source: "hefferon-answers", locator: "Three.IV.4, PDF pp. 226–233" }, { source: "problem-sheets", locator: "Sheet 6" }, { source: "syllabus", locator: "Week 8" }] } },
@@ -98,9 +97,11 @@ describe("the engine's show as the topic's record", () => {
 				syllabus: { path: "material/syllabus.md", title: "syllabus" },
 			},
 		};
-		const named = (topicRecordOf(show, "invertibility", [])?.refs ?? []).map((r) => r.source);
-		assert.deepEqual(named, ["Hefferon linear algebra", "Hefferon answers", "Problem sheets", "Syllabus"]);
-		for (const [handle, source] of Object.entries(show.sources)) assert.ok(!named.includes(source.title) && !named.includes(handle), `${handle} is said in words`);
+		const refs = topicRecordOf(show, "invertibility", [])?.refs ?? [];
+		assert.deepEqual(refs.map((r) => r.source), [null, null, null, null], "the record's titles are the files' stems");
+		assert.deepEqual(refs.map((r) => r.locator), ["Three.IV.4, PDF pp. 264–271", "Three.IV.4, PDF pp. 226–233", "Sheet 6", "Week 8"]);
+		const titles = new Map([["hefferon-linear-algebra", "Linear Algebra"], ["hefferon-answers", "Linear Algebra: Answers"], ["problem-sheets", "Problem sheets"], ["syllabus", null]]);
+		assert.deepEqual((topicRecordOf(show, "invertibility", [], new Map(), titles)?.refs ?? []).map((r) => r.source), ["Linear Algebra", "Linear Algebra: Answers", "Problem sheets", null], "the documents' own titles, where they have one");
 	});
 
 	it("names the method he reached for in the topic's place", () => {

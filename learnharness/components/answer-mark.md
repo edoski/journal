@@ -21,7 +21,7 @@ A practice problem with two attempts reads two rows, First try and Then; rows sp
 
 ## The dialog
 
-shadcn Dialog, 448 wide: "Dispute this mark", the current mark ("First try: marked Partly right · On your own" for one row of several) and one line, the three marks as a segmented toggle (optional), a field for what's wrong, Cancel and Send to the tutor (needs words or a pick). The field takes focus; ↑ from its start reaches the marks, ← → move between them, ↓ comes back, ⌘↵ sends, Esc closes.
+shadcn Dialog, 448 wide: "Dispute this mark", the current mark ("First try: marked Partly right · On your own" for one row of several) and one line, the three marks and how it counted as segmented toggles, on one try starting at the card's own (round 18, m20), a field for what's wrong, Cancel and Send to the tutor (off until he writes words or moves a choice off the card's; only what he moved is sent). The field takes focus; ↑ from its start reaches the marks, ← → move between them, ↓ comes back, ⌘↵ sends, Esc closes.
 
 ## What happens
 
