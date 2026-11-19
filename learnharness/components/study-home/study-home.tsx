@@ -71,7 +71,7 @@ export function restArc(course: StudyCourse | undefined, rows: readonly TodayRow
 }
 
 export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
-	const { rows, courses, chats, done, exam, busy, onContinue } = ready;
+	const { rows, courses, chats, done, exam, misfit, busy, onContinue } = ready;
 	const router = useRouter();
 	const [chosen, setChosen] = useState<Chosen | null>(null);
 	// The line he points at, once the pointer rests or the focus lands, moves the map to its course and lights its
@@ -131,6 +131,7 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 						rows={rows}
 						done={done}
 						exam={exam}
+						misfit={misfit}
 						busy={busy}
 						onContinue={onContinue}
 						pointed={pointed}
