@@ -12,7 +12,7 @@ import type { StudyWindow } from "../core/contracts/calendar.ts";
 import { lessonTopics } from "../core/course-map-build.ts";
 import { listCoursesRead } from "./courses.ts";
 import { stores } from "./stores.ts";
-import { scheduleOf } from "./study-schedule.ts";
+import { scheduleOf, usualHoursOf } from "./study-schedule.ts";
 
 function record(value: unknown): Record<string, unknown> | null {
 	return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -120,12 +120,14 @@ export function withSessionStudy(course: StudyCourse, sessions: readonly string[
 	return { ...course, lastActiveDaysAgo: course.lastActiveDaysAgo === null ? newest : Math.min(course.lastActiveDaysAgo, newest) };
 }
 
-/** Today's study windows in his Journal, from the listing's
- *  `plan --all --days 1` (its `today` and `journal.upcoming_schedule`); none
- *  on a day off or without a Journal. Pure. */
+/** Today's study hours from his Journal, from the listing's
+ *  `plan --all --days 1` (its `today` and `journal.upcoming_schedule`). On a
+ *  day off his usual hours, the DEFAULT row: he studies daily, the Journal's
+ *  day off included. None without a Journal. Pure. */
 export function todayHours(all: unknown): StudyWindow[] {
 	const today = record(all)?.today;
-	return [...(scheduleOf(all).find((day) => day.date === today)?.windows ?? [])];
+	const windows = scheduleOf(all).find((day) => day.date === today)?.windows ?? [];
+	return windows.length > 0 ? [...windows] : usualHoursOf(all);
 }
 
 export async function studyStatus(): Promise<StudyListing> {

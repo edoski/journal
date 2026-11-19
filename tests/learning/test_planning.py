@@ -273,6 +273,10 @@ def test_upcoming_schedule_resolves_overrides_and_excludes_lunch(
             "workout_start": "17:00",
         },
     ]
+    assert result["usual_study_windows"] == [
+        {"start": "09:00", "end": "12:00"},
+        {"start": "13:00", "end": "17:00"},
+    ]
     assert result["total_study_minutes"] is None
 
 

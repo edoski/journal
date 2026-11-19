@@ -2,7 +2,8 @@
  * The days he studies, from `plan`'s output: the weekdays the engine has
  * learned he studies, and the Journal's study windows for each day ahead
  * (`journal.upcoming_schedule`). The calendar draws them; Home's read
- * gives today's windows, the hours the Mac app's morning notice keeps to.
+ * gives today's windows, the hours the Mac app's morning notice keeps to,
+ * and on a day off his usual ones (the DEFAULT row): he studies daily.
  */
 
 import { CALENDAR_DAYS, type ScheduledDay, type StudyWindow } from "../core/contracts/calendar.ts";
@@ -26,6 +27,13 @@ const TIME = /^\d{2}:\d{2}$/;
 function windowOf(value: unknown): StudyWindow | null {
 	const { start, end } = record(value) ?? {};
 	return typeof start === "string" && typeof end === "string" && TIME.test(start) && TIME.test(end) ? { start, end } : null;
+}
+
+/** His usual study windows, the Journal's DEFAULT row
+ *  (`journal.usual_study_windows`); empty without a Journal. Pure. */
+export function usualHoursOf(plan: unknown): StudyWindow[] {
+	const usual = record(record(plan)?.journal)?.usual_study_windows;
+	return (Array.isArray(usual) ? usual : []).map(windowOf).filter((w) => w !== null);
 }
 
 function weekday(day: string): number {

@@ -17,30 +17,28 @@ from sync.readers.study import parse_study_table
 _STUDY_COLUMNS = ["TIME", "ACTIVITY", "DURATION", "INTERRUPT", "BREAK"]
 
 
-def _scheduled_day(day: date, profile: DayScheduleProfile) -> dict[str, object]:
+def _study_windows(profile: DayScheduleProfile) -> list[dict[str, str]]:
+    """A profile's study hours split around lunch, ignoring whether it is OFF."""
+    start, end = profile.study_start, profile.study_end
+    lunch_start, lunch_end = profile.lunch_start, profile.lunch_end
+    if lunch_end <= start or lunch_start >= end:
+        return [{"start": start.strftime("%H:%M"), "end": end.strftime("%H:%M")}]
     windows = []
-    if not profile.is_off_day:
-        start, end = profile.study_start, profile.study_end
-        lunch_start, lunch_end = profile.lunch_start, profile.lunch_end
-        if lunch_end <= start or lunch_start >= end:
-            windows.append(
-                {"start": start.strftime("%H:%M"), "end": end.strftime("%H:%M")}
-            )
-        else:
-            if start < lunch_start:
-                windows.append(
-                    {
-                        "start": start.strftime("%H:%M"),
-                        "end": lunch_start.strftime("%H:%M"),
-                    }
-                )
-            if lunch_end < end:
-                windows.append(
-                    {"start": lunch_end.strftime("%H:%M"), "end": end.strftime("%H:%M")}
-                )
+    if start < lunch_start:
+        windows.append(
+            {"start": start.strftime("%H:%M"), "end": lunch_start.strftime("%H:%M")}
+        )
+    if lunch_end < end:
+        windows.append(
+            {"start": lunch_end.strftime("%H:%M"), "end": end.strftime("%H:%M")}
+        )
+    return windows
+
+
+def _scheduled_day(day: date, profile: DayScheduleProfile) -> dict[str, object]:
     return {
         "date": day.isoformat(),
-        "study_windows": windows,
+        "study_windows": [] if profile.is_off_day else _study_windows(profile),
         "is_off_day": profile.is_off_day,
         "workout_start": None
         if profile.is_off_day
@@ -109,6 +107,7 @@ def journal_summary(
 
     schedule: dict[str, object] | None = None
     upcoming: list[dict[str, object]] | None = None
+    usual: list[dict[str, str]] | None = None
     protocol = journal / "PROTOCOL.md"
     try:
         protocol_lines = protocol.read_text(encoding="utf-8").splitlines()
@@ -118,6 +117,7 @@ def journal_summary(
         try:
             rules = parse_schedule_rules(protocol_lines)
             profile = rules.resolve_day(end)
+            usual = _study_windows(rules.default_profile)
             upcoming = [
                 _scheduled_day(day, rules.resolve_day(day))
                 for offset in range(horizon)
@@ -161,5 +161,7 @@ def journal_summary(
         "session_count_semantics": "displayed study rows; Flow sessions may be merged",
         "schedule": schedule,
         "upcoming_schedule": upcoming,
+        # The DEFAULT row's windows: the hours he keeps on a Journal day off too.
+        "usual_study_windows": usual,
         "schedule_semantics": "scheduled study windows excluding lunch, not confirmed free time; today is not reduced by elapsed time or recorded study",
     }

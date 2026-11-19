@@ -25,7 +25,7 @@ const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.sl
 
 /** Whether `now` falls in today's study hours: from the first window's
  *  start to the last one's end (a lunch break between them included). No
- *  hours (the Journal's day off, or no Journal), never. */
+ *  hours (no Journal), never. */
 export function inStudyHours(hours: readonly StudyWindow[], now: Date): boolean {
 	if (hours.length === 0) return false;
 	const at = now.getHours() * 60 + now.getMinutes();
