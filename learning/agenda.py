@@ -1645,7 +1645,11 @@ def structure(record: dict[str, Any]) -> dict[str, str]:
     tutor set; under ``""`` its exam, path and preferences. His answers,
     starts and lessons are dated and replayed (``as_of``), and a topic's
     words move nothing."""
-    exam = {k: v for k, v in record.get("exam", {}).items() if k != "final_review"}
+    exam = {
+        k: v
+        for k, v in record.get("exam", {}).items()
+        if k not in ("final_review", "past")
+    }
     path = {k: v for k, v in record.get("path", {}).items() if k != "current"}
     found = {
         "": json.dumps(
