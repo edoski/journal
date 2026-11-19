@@ -64,6 +64,18 @@ npm run dev        # http://localhost:3000
 npm test           # deterministic, no LLM, no network
 ```
 
+### Open it from Spotlight
+
+`scripts/launcher/install.sh` builds `~/Applications/LearnHarness.app` (run it once; the name comes from `electron/product.cjs`). Opening it runs the app in dev mode from the repository's main checkout:
+
+- **Always on the latest main.** A checkout on `main` with no tracked changes runs `git fetch origin main` and `git merge --ff-only origin/main`, then `npm ci` if `package-lock.json` changed. Any other checkout opens as it is, with one notification saying why it wasn't updated.
+- **Live.** `next dev` runs on 127.0.0.1:4747 and the window reloads on every change to pages, server routes and the engine. A change to `electron/` needs a relaunch.
+- **One instance.** Opening it again focuses the window. Quitting stops the server. Logs go to `~/Library/Logs/LearnHarness/`.
+- **The same data** as `npm run desktop:dev`: `data/` in the checkout, the engine's courses, and `~/Library/Application Support/LearnHarness-dev`. The window's own preferences (localStorage: sidebar, last course, drafts) are kept per address, so they start fresh at 127.0.0.1:4747.
+- **Its API is closed to other programs**, as in the packaged app: only the window holds the per-launch key.
+
+For a test run, `LH_CHECKOUT`, `LH_LAUNCH_PORT`, `LH_LAUNCH_LOGS` and `LH_DATA_DIR` override the checkout, port, logs and data, and `LH_USER_DATA_DIR` the userData folder (the shell adds `-dev`): `open -a LearnHarness --env NAME=value`.
+
 See the [development guide](docs/development.md), [architecture](docs/architecture.md), and [desktop build guide](docs/desktop-release.md).
 
 Questions, bug reports, and feature requests: [GitHub Issues](https://github.com/amosblomqvist/learnharness/issues).
