@@ -103,6 +103,36 @@ describe("work he started", () => {
 		assert.deepEqual(heard, [{ type: "work-finished", kind: "lesson", chatId: "chat_1", title: "Poisson distribution" }]);
 	});
 
+	it("is announced when the opening made the lesson's plan (its plan-block lands after the answer)", () => {
+		const messages = [{ role: "user" }];
+		const store = { getChat: (id: string) => ({ id, title: "Poisson distribution", messages }) } as unknown as ChatStore;
+		const heard: ServerEvent[] = [];
+		const offHeard = subscribe((event) => event.type === "work-finished" && heard.push(event));
+		const off = onLessonOpenings(store);
+		emit("turn-started", { chatId: "chat_3" });
+		messages.push({ role: "assistant", stopReason: "stop" } as never, { role: "custom", customType: "plan-block" } as never);
+		emit("turn-settled", { chatId: "chat_3" });
+		off();
+		offHeard();
+		assert.deepEqual(heard, [{ type: "work-finished", kind: "lesson", chatId: "chat_3", title: "Poisson distribution" }]);
+	});
+
+	it("is not announced when the opening failed or he stopped it: there is no turn of his yet", () => {
+		for (const stopReason of ["error", "aborted"]) {
+			const messages = [{ role: "user" }];
+			const store = { getChat: (id: string) => ({ id, title: "Failed", messages }) } as unknown as ChatStore;
+			const heard: ServerEvent[] = [];
+			const offHeard = subscribe((event) => event.type === "work-finished" && heard.push(event));
+			const off = onLessonOpenings(store);
+			emit("turn-started", { chatId: "chat_4" });
+			messages.push({ role: "assistant", stopReason } as never);
+			emit("turn-settled", { chatId: "chat_4" });
+			off();
+			offHeard();
+			assert.deepEqual(heard, [], stopReason);
+		}
+	});
+
 	it("is not announced when the opening stopped before the tutor answered", () => {
 		const messages: { role: string }[] = [{ role: "user" }];
 		const store = { getChat: (id: string) => ({ id, title: "Stopped", messages }) } as unknown as ChatStore;

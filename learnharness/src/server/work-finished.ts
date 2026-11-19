@@ -11,7 +11,21 @@
  */
 
 import type { ChatStore } from "../core/ports.ts";
+import type { LhMessage } from "../core/native-messages.ts";
 import { emit, subscribe } from "../core/events.ts";
+
+/** Whether a turn ended on the tutor's answer: its last message, past the
+ *  markers a turn lands after it (the lesson's plan-block, a compaction),
+ *  is his reply, not a failure or a stop (input-events.ts
+ *  `failedResponseAtEnd` skips the same markers). */
+function endsOnAnswer(messages: readonly LhMessage[]): boolean {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "custom" && (m.customType === "plan-block" || m.customType === "compaction")) continue;
+		return m.role === "assistant" && m.stopReason !== "error" && m.stopReason !== "aborted";
+	}
+	return false;
+}
 
 /** Announce each new lesson's opening turn as it settles with the tutor's
  *  answer. A lesson opens on a turn that starts with no answer of the
@@ -25,7 +39,7 @@ export function onLessonOpenings(chatStore: ChatStore): () => void {
 		} else if (event.type === "turn-settled") {
 			if (!opening.delete(event.chatId)) return;
 			const record = chatStore.getChat(event.chatId);
-			if (record?.messages.at(-1)?.role !== "assistant") return;
+			if (!record || !endsOnAnswer(record.messages)) return;
 			emit("work-finished", { kind: "lesson", chatId: record.id, title: record.title });
 		}
 	});
