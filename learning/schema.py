@@ -108,6 +108,7 @@ _HANDLES = "handles"
 _IDS = "ids"
 _REFS = "refs"
 _DAY = "day"
+_DAYS = "days"
 _FLAG = "flag"
 _KIND = "kind"
 _RESULT = "result"
@@ -128,6 +129,7 @@ POINT_CHARS = 200
 FIELDS: dict[str, dict[str, str]] = {
     "exam": {
         "date": _DAY,
+        "sessions": _DAYS,
         "format": _TEXT,
         "coverage": _TEXT,
         "criteria": _TEXTS,
@@ -221,7 +223,7 @@ FIELDS: dict[str, dict[str, str]] = {
     },
 }
 HELPERS: dict[str, dict[str, str]] = {
-    "exam": {"final_review": _DAY},
+    "exam": {"final_review": _DAY, "past": _DAY},
     "topic": {"judged": _DAY},
     "review": {"by": _BY},
     "observation": {"recorded": _STAMP, "due_topics": _HANDLES},
@@ -372,7 +374,9 @@ class Task(TypedDict, total=False):
 
 class Exam(TypedDict, total=False):
     date: str
+    sessions: list[str]
     final_review: str
+    past: str
     format: str
     coverage: str
     criteria: list[str]
@@ -582,6 +586,15 @@ def _day(value: Any, path: str, patch: bool) -> str:
     raise ValueError(f"{path} must be a date in YYYY-MM-DD form, not {value!r}")
 
 
+def _days(value: Any, path: str, patch: bool) -> list[str] | None:
+    """Days in ascending order, each once: an exam's listed sessions."""
+    items = _list(value, path, "dates in YYYY-MM-DD form")
+    days = [_day(item, f"{path}[{index}]", False) for index, item in enumerate(items)]
+    if days != sorted(set(days)):
+        raise ValueError(f"{path} must list each day once, earliest first")
+    return days or None
+
+
 def _flag(value: Any, path: str, patch: bool) -> bool | None:
     if type(value) is not bool:
         raise ValueError(f"{path} must be true or false")
@@ -683,6 +696,7 @@ _RULES: dict[str, Callable[[Any, str, bool], Any]] = {
     _IDS: _ids,
     _REFS: _refs,
     _DAY: _day,
+    _DAYS: _days,
     _FLAG: _flag,
     _KIND: _choice(KINDS),
     _RESULT: _choice(RESULTS),
@@ -1281,6 +1295,16 @@ def _arc_log(value: Any) -> list[dict[str, Any]]:
     return log
 
 
+def _check_sessions(exam: dict[str, Any]) -> None:
+    """An exam that lists its sessions aims at one of them (``exam.date``)."""
+    sessions = exam.get("sessions")
+    if sessions and exam.get("date") not in sessions:
+        raise ValueError(
+            "exam.date must be one of exam.sessions: the session he is aiming "
+            f"at ({', '.join(sessions)}); set exam.date to it, or list it"
+        )
+
+
 def validate_record(record: Any, *, placing: bool = False) -> dict[str, Any]:
     """Check a whole stored course record and return its canonical form.
 
@@ -1302,6 +1326,7 @@ def validate_record(record: Any, *, placing: bool = False) -> dict[str, Any]:
         if name in record:
             result[name] = _text(record[name], name, False)
     if "exam" in record and (exam := entry("exam", record["exam"], "exam")):
+        _check_sessions(exam)
         result["exam"] = exam
     if "journal" in record:
         result["journal"] = _text(record["journal"], "journal", False)
@@ -1961,6 +1986,10 @@ def apply_patch(
                 merged = _merged(
                     merged, {"leaves_out": changes[name].get("leaves_out")}
                 )
+            if merged and name == "exam" and "date" in changes[name]:
+                # His word on the session he aims at replaces the plan's move
+                # past one gone by (``progress.aimed``).
+                merged.pop("past", None)
             if merged:
                 result[name] = merged
             else:

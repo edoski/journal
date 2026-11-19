@@ -373,11 +373,15 @@ def check_exam_patch(
 ) -> None:
     """H7: a changed or removed exam date states the new exam's scope: in a
     course with arcs, ``exam.arcs``; in one without, ``exam.leaves_out`` when
-    the old exam left topics out."""
+    the old exam left topics out. A move from one of the exam's listed
+    sessions to another is the same exam on another day: its scope stands."""
     if not change or "date" not in change:
         return
     old = before.get("exam", {})
     if change["date"] == old.get("date"):
+        return
+    listed = {*old.get("sessions", ()), *after.get("exam", {}).get("sessions", ())}
+    if change["date"] in listed and old.get("date") in listed:
         return
     if after["arcs"] and "arcs" not in change:
         raise ValueError(
