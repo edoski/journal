@@ -1,0 +1,5 @@
+{
+	"name": "learnharness-launcher",
+	"private": true,
+	"main": "main.cjs"
+}
