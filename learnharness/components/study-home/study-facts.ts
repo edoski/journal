@@ -210,6 +210,27 @@ function covers(chat: ChatListItem, step: NextStep): boolean {
  *  up with nothing planned, or an item on a later day is not. Pure. */
 const planned = (step: NextStep) => !laterOnly(step) && (step.kind === "review" || (step.kind === "topic" && step.planned));
 
+/** A course whose plan for today keeps the starts today's study moved
+ *  off it while the session whose saves moved them (`startsMoved`) is
+ *  still open: each topic not started whose start the plan gave today as
+ *  yesterday ended, moved by his study today (the engine's `moved`). Home and the sidebar keep its
+ *  "Start … · Planned today" line until that session closes, and the close
+ *  says where it went (round 18, M4: "Start Expectation and linearity" left
+ *  Home and the sidebar at a hinted save, before any answer settled it).
+ *  Pure. */
+export function withKeptStarts(course: StudyCourse, open: readonly ChatListItem[], today: string): StudyCourse {
+	const { map } = course;
+	const live = new Set(open.filter((c) => c.course?.workspace === map.workspace && lastDay(c) >= today && OPEN_NOW.has(sessionState(c))).flatMap((c) => c.startsMoved ?? []));
+	if (live.size === 0) return course;
+	const kept = map.topics.filter((t) => live.has(t.handle) && t.level === "new" && t.moved?.by === "study" && t.moved.day === "today" && t.moved.from === today && !course.newToday.includes(t.handle)).map((t) => t.handle);
+	return kept.length > 0 ? { ...course, newToday: [...course.newToday, ...kept] } : course;
+}
+
+/** The states of a session still open: it waits on him, the tutor writes
+ *  in it, or a reply was cut off. One left for next time or finished has
+ *  closed. */
+const OPEN_NOW: ReadonlySet<SessionState> = new Set(["your-turn", "working", "paused"]);
+
 /** The learner's own calendar day of a session's last turn. Pure. */
 const lastDay = (chat: ChatListItem) => localDay(new Date(chat.updatedAt));
 
@@ -278,7 +299,7 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 		// The course's lessons with a line today, waiting on him or left on an earlier day.
 		const lessons = [...waiting, ...leftovers].filter((c) => c.course?.workspace === course.map.workspace && c.kind !== "practice" && !isReviewSession(c));
 		const opened = reviewed(course.map.workspace);
-		for (const whole of todaySteps(course)) {
+		for (const whole of todaySteps(withKeptStarts(course, open, today))) {
 			let step = whole;
 			// While a topic's lesson is open, today's review of the topic is that lesson's line, in the review's place
 			// (his answers there count as it), unless he opened a review of it (round 15, m6: "Review Linear maps · Due

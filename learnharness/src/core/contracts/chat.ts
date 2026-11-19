@@ -534,6 +534,10 @@ export interface ChatSummary {
 	 *  its map and what it left are that topic's alone, never its other
 	 *  topics' (round 18, M2). Absent otherwise. */
 	retaught?: string;
+	/** The topics whose start its saves moved (`startsMovedOf`): while it
+	 *  is open, Home keeps a start it moved off today (round 18, M4).
+	 *  Absent when none. */
+	startsMoved?: readonly string[];
 	/** He studied in it (`studiedIn`): he answered something, or wrote
 	 *  after its opening. The list always sets it; a summary made elsewhere
 	 *  may leave it out, which reads as not studied. */

@@ -17,7 +17,7 @@ import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, Sessi
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
-import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, isQuestionRepose, opensTurn, savedAnswerTimesOf, savedAnswerTopicsOf, savedTaskTimesOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, isQuestionRepose, opensTurn, savedAnswerTimesOf, savedAnswerTopicsOf, savedTaskTimesOf, startsMovedOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
 import { leftQuestionRepose, offersStop, sessionEndOf } from "../core/session-end.ts";
 import { lessonTakenUp, openedAsReview, retaughtTopicOf } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
@@ -152,6 +152,7 @@ function listChats(): ChatSummary[] {
 						...((t) => (t ? { taskTitle: t } : {}))(sessionTaskTitleOf(messages)),
 						review: openedAsReview({ title: summary.title, topics: summary.topics, messages }),
 						...((t) => (t ? { retaught: t } : {}))(retaughtTopicOf({ ...summary, messages })),
+						...((moved) => (moved.length > 0 ? { startsMoved: moved } : {}))(startsMovedOf(messages)),
 						studied: studiedIn(messages),
 						...inputTimes(messages),
 					};

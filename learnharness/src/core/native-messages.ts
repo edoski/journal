@@ -1264,6 +1264,21 @@ export function firstStartedTopicOf(messages: readonly LhMessage[]): string | nu
 	return null;
 }
 
+/** The topics whose start the session's saves moved: each key of a
+ *  `starts_moved` in the receipt of a save that went through, in order.
+ *  Pure. */
+export function startsMovedOf(messages: readonly LhMessage[]): string[] {
+	const moved = new Set<string>();
+	for (const m of messages) {
+		if (m.role !== "toolResult" || m.isError || m.toolName !== "course_save") continue;
+		let receipt: unknown;
+		try { receipt = JSON.parse(resultText(m)); } catch { continue; }
+		const starts = (receipt as { starts_moved?: unknown } | null)?.starts_moved;
+		for (const key of typeof starts === "object" && starts !== null ? Object.keys(starts) : []) moved.add(key);
+	}
+	return [...moved];
+}
+
 /** The goal topic of each plan that went through, in order. Pure. */
 export function plannedTopicsOf(messages: readonly LhMessage[]): string[] {
 	const clean = cleanToolCallIds(messages);
