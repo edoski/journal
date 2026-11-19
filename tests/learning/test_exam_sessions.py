@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from learning import agenda, capacity, records, retrieval, schema
+from learning import agenda, capacity, planning, records, retrieval, schema
 from learning.workspace import Workspace
 
 SESSIONS = ["2026-12-21", "2027-01-19", "2027-02-03"]
@@ -189,3 +189,17 @@ def test_his_answer_on_the_session_moves_no_day_the_aim_already_moved() -> None:
     aimed = {**schema.empty(), "exam": {"date": SESSIONS[1], "past": SESSIONS[0]}}
     confirmed = {**schema.empty(), "exam": {"date": SESSIONS[1]}}
     assert agenda.structure(aimed) == agenda.structure(confirmed)
+
+
+def test_the_plan_and_the_map_name_the_sessions_and_the_one_gone_by(
+    workspace: Workspace, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    on(monkeypatch, "2026-11-19")
+    records.save(workspace, course())
+    on(monkeypatch, "2026-12-22")
+    shown = {"date": SESSIONS[1], "sessions": SESSIONS, "past": SESSIONS[0]}
+    entry = planning.plan(workspace, tmp_path / "vault", everywhere=False, days=3)
+    exam = entry["courses"][0]["exam"]
+    assert {key: exam[key] for key in shown} == shown
+    exam = retrieval.course_map(workspace)["exam"]
+    assert {key: exam[key] for key in shown} == shown
