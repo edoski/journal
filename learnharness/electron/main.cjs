@@ -33,7 +33,7 @@ const path = require("node:path");
 // renderer owns the number; this is the IPC widen target).
 const SIDEBAR_AUTOCLOSE = 928;
 
-const PRODUCT_NAME = "LearnHarness";
+const { PRODUCT_NAME } = require("./product.cjs");
 
 // APP NAME → userData (owner, 2026-10-10): the Application Support dir is
 // exactly "LearnHarness" in dev AND packaged. Packaged Electron would
@@ -423,13 +423,17 @@ async function main() {
 	// (guards, menu, single instance).
 	const devUrl = process.env.LH_DEV_URL;
 	const url = devUrl ?? `http://127.0.0.1:${await freePort()}`;
-	if (!devUrl) {
-		desktopAPISecret = randomBytes(32).toString("hex");
+	// A dev server started with a capability (scripts/launcher) checks it like
+	// the packaged one; plain `npm run desktop:dev` runs without one.
+	desktopAPISecret = devUrl ? (process.env.LH_DESKTOP_API_SECRET ?? null) : randomBytes(32).toString("hex");
+	if (desktopAPISecret) {
 		const ownedOrigin = new URL(url).origin;
 		// All URLs, not only /api: remove the header again on external redirects.
 		session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ["<all_urls>"] }, (details, callback) => {
 			callback({ requestHeaders: desktopAPIHeaders(details, ownedOrigin, desktopAPISecret, [...trustedAppWindows]) });
 		});
+	}
+	if (!devUrl) {
 		log(`starting server: ${serverEntry()}`);
 		log(`data dir: ${DATA_DIR()}`);
 		const server = await startServer(new URL(url).port);
