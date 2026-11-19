@@ -5,7 +5,7 @@ Evidence is what the learner did, kept apart from knowledge about the course and
 ## What counts
 
 - A graded question is free response: the learner answers in their own words with their reasoning, rough and unedited. Diagnose from the reasoning; the same wrong answer can come from different gaps.
-- A prediction before a plot, a simulation or a run of code, about what has been taught, is an attempt; what the run reveals is not. A prediction before a step not yet taught is recorded too, as it went, with `predicted: true`: it stays in the history and on the answer, and never counts for levels or reviews, since before the teaching a wrong guess is expected. An answer on a topic given inside another topic's lesson is saved `aside`: it stays in the history, counts once the topic has an answer of its own, and never starts the topic.
+- A prediction before a plot, a simulation or a run of code, about what has been taught, is an attempt; what the run reveals is not. A prediction before a step not yet taught is recorded too, as it went, with `predicted: true`: it stays in the history and on the answer, and never counts for levels or reviews, since before the teaching a wrong guess is expected. An answer inside another topic's lesson on a topic not begun yet is saved `aside`: it stays in the history, counts once the topic has an answer of its own, and never starts the topic.
 - Your explanations, the learner's questions, "I understand", a finished task and hours studied are not evidence.
 
 ## Observations

@@ -874,6 +874,21 @@ def test_a_check_in_a_side_question_keeps_its_topic_s_first_lesson(
     )
     kept = [o for o in record["observations"].values() if o.get("aside")]
     assert [o["topics"] for o in kept] == [["similarity"]], "kept in his history"
+    review = {
+        "topics": ["eigen"],
+        "text": "Found the eigenvalues of a 2 x 2 matrix",
+        "response": "3 and -1",
+        "result": "correct",
+        "help": "none",
+        "aside": True,
+    }
+    save(review)
+    record = json.loads(
+        (seeded.roots["linear-algebra"] / ".study" / "course.json").read_text()
+    )
+    latest = record["observations"][f"o{record['next_observation'] - 1}"]
+    assert latest["text"] == review["text"]
+    assert "aside" not in latest, "an answer on a topic he began is an ordinary one"
     save(
         {**check, "text": "Showed similar matrices share a trace", "sure": "confident"}
     )

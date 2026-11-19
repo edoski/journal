@@ -1842,6 +1842,20 @@ def _content(observation: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _begun(record: dict[str, Any], topic: str) -> bool:
+    """A topic taught, answered in a way that counts, or held by a lesson he
+    began: an answer on it inside another topic's lesson is an ordinary
+    answer, never ``aside`` (a due review taken at a lesson's start)."""
+    return (
+        "introduced" in record["topics"].get(topic, {})
+        or any(
+            counts(item) and topic in item["topics"]
+            for item in record["observations"].values()
+        )
+        or any(topic in task.get("topics", ()) for task in record["tasks"].values())
+    )
+
+
 def _append_observations(
     record: dict[str, Any],
     additions: list[dict[str, Any]],
@@ -1857,6 +1871,8 @@ def _append_observations(
         item = {**addition}
         item.setdefault("date", _default_day(item, record, today))
         _check_new(item, path, record, tasks, today)
+        if item.get("aside") and any(_begun(record, t) for t in item["topics"]):
+            del item["aside"]
         if "disputed" in item:
             item = _sure_as_given(item, record["observations"][item["corrects"][0]])
         duplicate = next(
