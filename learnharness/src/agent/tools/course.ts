@@ -20,6 +20,7 @@ import { engineConfidence } from "../../core/engine-confidence.ts";
 import { RUNG_HELP } from "../../core/practice-attempts.ts";
 import type { AnsweredQuestion } from "../../core/native-messages.ts";
 import { studyDay, withDayWords } from "../../core/day-words.ts";
+import { DOUBT } from "../../core/voice-check.ts";
 
 /** What the course tools close over. */
 export interface CourseToolContext {
@@ -155,6 +156,18 @@ function questionAsText(o: Record<string, unknown>, answer: AnsweredQuestion): b
 	return text.endsWith("?") || (answer.asked !== undefined && text.toLowerCase() === answer.asked.toLowerCase());
 }
 
+/** The sentence of doubt his answer held beside a Confident meter that
+ *  the saved response leaves out, or null (round 18, m3: on sheet part
+ *  (c), Confident, he wrote "Honestly not sure, gut feeling.", and o132's
+ *  response dropped it; the card and `sure: confident` were right). */
+function doubtDropped(o: Record<string, unknown>, answer: AnsweredQuestion): string | null {
+	if (answer.confidence !== "confident" || !answer.words || !recordsAnAnswer(o)) return null;
+	const said = answer.words.split(/(?<=[.!?])\s+|\n+/).find((s) => DOUBT.test(s));
+	if (!said) return null;
+	const response = typeof o.response === "string" ? o.response : "";
+	return DOUBT.test(response) ? null : said.trim();
+}
+
 /** The answers each session's saves named in this turn, after they went
  *  through: the session's record holds them only from the next turn. */
 const savedThisTurn = new WeakMap<CourseToolContext, Set<string>>();
@@ -263,6 +276,12 @@ function namedQuestions(
 			refuse(`observations[${i}].question: ${JSON.stringify(named)} is already saved, so it is not saved again. Leave it out and send the rest; a re-mark of it names its attempt with corrects.`);
 		}
 		const ruled: Record<string, unknown> = { ...rest };
+		const doubt = doubtDropped(rest, answer);
+		if (doubt) {
+			refuse(
+				`observations[${i}].response: he wrote ${JSON.stringify(doubt)} with his meter on Confident, and the response leaves it out. His words of doubt stay in response, as he wrote them, beside his answer: the meter sets \`sure\`, his words say what he doubted. Send it again with them.`,
+			);
+		}
 		if (questionAsText(rest, answer)) {
 			refuse(
 				`observations[${i}].text: a not-right answer's text says what went wrong, in a line he reads in his Mistakes list days later ("Took $(1,2)$ as a vector of $E_2$; it gives $2x+y=4$, not $0$"), never the question. Send it again with that text.`,

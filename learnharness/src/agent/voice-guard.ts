@@ -42,7 +42,7 @@ import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
 import { studyDay } from "../core/day-words.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, HIS_MESSAGE, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, partialDay, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, recordMarkWords, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { DOUBT, adviceSentences, partialDay, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, recordMarkWords, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -105,9 +105,6 @@ const GUESS_INVITE = /\b(?:go ahead(?:,| and)?\s+guess|guess (?:first|away)|(?:t
  *  computing anything…". */
 const ASKS_A_GUESS = /\b(?:guess(?:es|ing)?|expect(?:s|ed|ing)?|predict(?:s|ion)?|hunch|bet|intuition|instinct|suspect)\b|\bwhat do you (?:think|imagine)\b|\bbefore (?:computing|calculating|working|checking|trying|we|you)\b/i;
 
-
-/** Words in his answer that say he is not sure of it or of its reason. */
-const DOUBT = /\b(?:not sure|unsure|no idea|i think|i guess|i'?m guessing|maybe|probably|don'?t (?:know|see|get)|why (?:i'?m|am i|is it|does it|can i))\b/i;
 
 /** Why his answer reads unsure, or undefined. */
 function unsureOf(details: Record<string, unknown>, words: string | null): string | undefined {
