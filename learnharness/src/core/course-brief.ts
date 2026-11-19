@@ -386,6 +386,18 @@ function lessonBuildsOn(plan: CoursePlans | undefined, lesson: readonly string[]
 	return first.length > 0 ? `${named} builds on ${first.join(", ")}: ${first.length > 1 ? "their reviews come" : "its review comes"} first, opened with one plain line naming it. ${left}` : `${named} builds on none of them, so it opens on the lesson. ${left}`;
 }
 
+/** An exam held in several sessions, after its day in the record line:
+ *  every session, and the one gone by that he has not said how it went
+ *  (the engine's `exam.past`), so the tutor saves his word on it. */
+function sessionsWords(exam: Record<string, unknown>): string {
+	const sessions = Array.isArray(exam.sessions) ? exam.sessions.filter((d): d is string => typeof d === "string") : [];
+	if (sessions.length < 2) return "";
+	const days = sessions.map(longDay);
+	const listed = `${days.slice(0, -1).join(", ")} and ${days.at(-1)}`;
+	const past = typeof exam.past === "string" ? `; ${longDay(exam.past)} has gone by and he has not said how it went` : "";
+	return `, the session he aims at (sessions: ${listed}${past})`;
+}
+
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
@@ -399,7 +411,7 @@ export function projectCourseBrief(
 	const due = list(r.due);
 
 	const lines: string[] = [];
-	const examLine = typeof exam.date === "string" ? ` · exam on ${longDay(exam.date)}` : "";
+	const examLine = typeof exam.date === "string" ? ` · exam on ${longDay(exam.date)}${sessionsWords(exam)}` : "";
 	lines.push(`[Course record] ${str(course.title) ?? "Untitled course"} · today ${dayWithWeekday(str(r.today))}${examLine}`);
 	if (str(course.goal)) lines.push(`About the course, in his words: ${course.goal}`);
 	if (studied) lines.push(studiedLine(studied));

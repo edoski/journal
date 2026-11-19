@@ -114,6 +114,27 @@ def exam_plan(record: dict[str, Any]) -> Exam | None:
     return Exam(day, date.fromisoformat(start))
 
 
+def aimed(record: dict[str, Any], today: date) -> dict[str, Any]:
+    """The record aimed at the exam session ahead: once the day it aims at
+    has gone by and the exam lists a later session (``exam.sessions``), the
+    next one from ``today``, with the latest session gone by as ``past``
+    until he says how that one went (a patch that sets ``exam.date``). The day passing
+    is what moves it, never a stored schedule: he stays ready for the next
+    session. The final review kept for the day gone by is that exam's, so
+    the next one's is read again (``capacity.final_reviews``)."""
+    exam = record.get("exam", {})
+    when = exam.get("date")
+    if not when or when >= today.isoformat():
+        return record
+    sessions = exam.get("sessions", ())
+    ahead = [day for day in sessions if day >= today.isoformat()]
+    if not ahead:
+        return record
+    past = max(day for day in (when, *sessions) if day < today.isoformat())
+    moved = {k: v for k, v in exam.items() if k != "final_review"}
+    return {**record, "exam": {**moved, "date": ahead[0], "past": past}}
+
+
 def examining(record: dict[str, Any]) -> Callable[[str], Exam | None]:
     """Each topic's exam: the course's, for a topic the next exam examines;
     None for one outside its scope (``arc_rules.examined``), which is

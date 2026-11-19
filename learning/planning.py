@@ -180,7 +180,12 @@ def _course(
             "workspace": str(workspace.directory),
             "title": record.get("title"),
             "exam": compact(
-                {"date": countdown.get("date"), "days_left": countdown.get("days_left")}
+                {
+                    "date": countdown.get("date"),
+                    "days_left": countdown.get("days_left"),
+                    "sessions": countdown.get("sessions"),
+                    "past": countdown.get("past"),
+                }
             )
             if countdown
             else None,

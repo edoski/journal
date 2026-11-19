@@ -1,7 +1,7 @@
 import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
-import { dayAndNearWords, distanceWords, heldExamWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
+import { dayAndNearWords, distanceWords, heldExamWords, longDayWords, nextSessionWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { courseMove, nextStepOf, titleList, todaySteps, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 import { nowLine } from "@/components/study-home/needs-you";
@@ -32,6 +32,8 @@ export type CalendarEntry =
 			day: string;
 			title: string;
 			course: CourseRef;
+			/** The session after this one, in words, when the exam lists one (`nextSessionWords`). */
+			nextSession: string | null;
 			road: readonly RoadWeek[];
 			finalReview: string | null;
 			doesNotFit: readonly string[];
@@ -376,7 +378,7 @@ export function calendarEntries({
 				const reason = reasons[h];
 				return reason ? { title: titleOf(h), reason } : { title: titleOf(h) };
 			});
-			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, road, finalReview, doesNotFit: doesNotFit.map(titleOf), unreviewed, allStarted, next });
+			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, nextSession: nextSessionWords(map.exam), road, finalReview, doesNotFit: doesNotFit.map(titleOf), unreviewed, allStarted, next });
 		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, chats) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) => {
@@ -499,16 +501,9 @@ export function studyTimeWords(day: ScheduledDay | undefined): string | null {
 	return day.windows.length > 0 ? `Study ${day.windows.map(windowWords).join(", ")}` : null;
 }
 
-const LONG_DAY = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
-
-/** "Sunday 29 November". */
-export function longDayWords(day: string): string {
-	return LONG_DAY.format(new Date(`${day}T00:00:00Z`)).replace(",", "");
-}
-
-/** How far a day is from the engine's, in the app's one form
+/** A day, and how far it is from the engine's, in the app's one form
  *  (`study-words.ts`). */
-export { dayAndNearWords, distanceWords };
+export { dayAndNearWords, distanceWords, longDayWords };
 
 const SHORT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 const short = (day: string) => SHORT.format(new Date(`${day}T00:00:00Z`));

@@ -14,6 +14,7 @@ import { ArcLabel } from "@/components/course-map/arc-label";
 import { arcOnPage } from "@/components/course-page/course-head/course-head";
 import type { ExamReady } from "@/components/course-page/standing/standing-model";
 import { ReadyWords } from "@/components/course-page/standing/ready-line";
+import { nextSessionWords } from "@/components/study-words";
 import { cn } from "@/lib/utils";
 
 
@@ -43,7 +44,7 @@ export function ContextButton({ course, open: shown, onOpenChange }: { course: S
 }
 
 /** "Exam in 11 days", pressed: the exam's run-up as the engine plans it.
- *  The day, whether he is ready in the head's own words (`ready`, the
+ *  The day, the next session when the exam lists one after it, whether he is ready in the head's own words (`ready`, the
  *  readiness line's, so the two never disagree), each week's new topics,
  *  the final review, and the calendar one press away. */
 export function ExamFact({ course, runup, words, ready, className }: { course: StudyCourse; runup: CalendarCourse | null; words: string; ready: ExamReady | null; className?: string }) {
@@ -65,6 +66,11 @@ export function ExamFact({ course, runup, words, ready, className }: { course: S
 					<p className="text-callout text-muted-foreground">
 						{dayAndNearWords(exam.date, longDayWords(exam.date), map.today)}
 					</p>
+					{nextSessionWords(exam) && (
+						<p data-slot="course-exam-next-session" className="text-callout text-muted-foreground">
+							{nextSessionWords(exam)}
+						</p>
+					)}
 					{ready && (
 						<p data-slot="course-exam-ready" data-kind={ready.kind} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-callout", ready.kind === "short" ? "text-warning" : "text-muted-foreground")}>
 							<ReadyWords ready={ready} workspace={map.workspace} />

@@ -75,6 +75,9 @@ const answerFields = {
 		Type.Object({
 			coverage: Type.Optional(Type.String({ description: "What the exam covers, as the material states it." })),
 			format: Type.Optional(Type.String({ description: "The exam's format, as the material states it." })),
+			sessions: Type.Optional(
+				Type.Array(Type.String(), { description: "Only when the material lists more than one session (sitting) of this exam: every day it lists, YYYY-MM-DD." }),
+			),
 		}),
 	),
 	unread: Type.Optional(Type.Array(Type.Object({ source: Type.String(), reason: Type.String() }), { description: "Sources you could not read, each with why." })),

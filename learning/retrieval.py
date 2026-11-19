@@ -708,7 +708,8 @@ def show(
 def _runup(
     record: dict[str, Any], countdown: dict[str, Any], planned: agenda.When
 ) -> dict[str, Any]:
-    """The exam and its run-up: when the final review starts, the path topics
+    """The exam and its run-up: its listed ``sessions`` and the ``past`` one
+    the plan moved on from (``progress.aimed``), when the final review starts, the path topics
     the plan cannot start before it (``does_not_fit``), the taught ones its
     final review has no room for (``unreviewed``), and why the plan leaves
     each of those out (``reasons``, ``agenda.Reason``); with a scope, its
@@ -725,6 +726,8 @@ def _runup(
         {
             "date": countdown["date"],
             "days_left": countdown["days_left"],
+            "sessions": countdown.get("sessions"),
+            "past": countdown.get("past"),
             "arcs": countdown.get("arcs"),
             "leaves_out": countdown.get("leaves_out"),
             "needed": needed or None,

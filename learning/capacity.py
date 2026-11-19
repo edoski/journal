@@ -444,12 +444,15 @@ def _new_short(
 def exam_days(records: Iterable[dict[str, Any]]) -> frozenset[date]:
     """The days he sits an exam, of every course: the plan holds nothing on
     them, of any course, since the exam is that day's work. Nothing he does
-    or leaves that day reads as his limit or his study days."""
+    or leaves that day reads as his limit or his study days. Of an exam with
+    several sessions, each up to the one he aims at: those gone by were his
+    to sit, and the later ones are not his yet."""
     return frozenset(
         day
         for record in records
         if (when := record.get("exam", {}).get("date"))
-        and _kept((day := date.fromisoformat(when)), record)
+        for held in {when, *record["exam"].get("sessions", ())}
+        if held <= when and _kept((day := date.fromisoformat(held)), record)
     )
 
 
@@ -776,7 +779,9 @@ def began(days: Mapping[date, Done], today: date) -> dict[date, Done]:
 def final_reviews(
     records: Mapping[Name, dict[str, Any]], today: date
 ) -> dict[Name, dict[str, Any]]:
-    """Every course read with the plan: each exam's final review from his pace
+    """Every course read with the plan, each aimed at its exam session ahead
+    (``progress.aimed``, with its engine dates re-derived for it at once):
+    each exam's final review from his pace
     as the record now shows it (``final_review_days``), nearest exam first,
     with the dates the engine set re-derived from it (``progress.redated``).
     A final review a course preference sets, or one that has begun
@@ -792,12 +797,18 @@ def final_reviews(
     (``_kept``), so its final review is its shortest form too.
     """
 
+    aimed = {name: progress.aimed(record, today) for name, record in records.items()}
+    moved = {name for name, record in aimed.items() if record is not records[name]}
+    records = aimed
+
     def exam_day(name: Name) -> date:
         return date.fromisoformat(records[name]["exam"]["date"])
 
     result = {
         name: progress.with_final_review(record, exam_day(name))
         if progress.unplanned(record)
+        else progress.redated(record, today)
+        if name in moved
         else record
         for name, record in records.items()
     }

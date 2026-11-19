@@ -640,6 +640,40 @@ export function startsWhyShort(why: StartsWhy, map: StartsMap): string {
 	return arc ? `Back to ${arc}` : startsWhyWords(why, map);
 }
 
+/** An exam held in several sessions (Edo, 19 Nov 2026). Home asks once
+ *  how the session gone by went (`pastSessionWords`); his answer is one of
+ *  these, saved to the record. */
+export const EXAM_SESSION_WORDS = {
+	passed: "Passed",
+	notThisTime: "Not this time",
+} as const;
+
+const LONG_DAY = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+
+/** "Sunday 29 November". */
+export function longDayWords(day: string): string {
+	return LONG_DAY.format(new Date(`${day}T00:00:00Z`)).replace(",", "");
+}
+
+type Sessions = { date: string; sessions?: readonly string[]; past?: string };
+
+/** The session after the one he aims at, as a plain second line beside the
+ *  exam's day ("Next session: Wednesday 3 February"); null when none is
+ *  listed. Pure. */
+export function nextSessionWords(exam: Sessions): string | null {
+	const next = exam.sessions?.find((day) => day > exam.date);
+	return next ? `Next session: ${longDayWords(next)}` : null;
+}
+
+/** Home's one ask once a session has gone by, saying truly what moved the
+ *  plan: "Your Artificial Intelligence exam on Monday 21 December has gone
+ *  by, so the plan now aims at the next session, Tuesday 19 January. How
+ *  did it go?" Null while no session has gone by unanswered. Pure. */
+export function pastSessionWords(course: string, exam: Sessions): string | null {
+	if (!exam.past) return null;
+	return `Your ${course} exam on ${longDayWords(exam.past)} has gone by, so the plan now aims at the next session, ${longDayWords(exam.date)}. How did it go?`;
+}
+
 /** A day beside the engine's, one form wherever a day shows (an exam, a
  *  planned review): "Today", "Tomorrow" or "Yesterday", else null, since
  *  the day itself says when and a count is not his words (round 14, m9:

@@ -1,5 +1,6 @@
 import { courseLabel, type ChatListItem, type StudyCourse } from "@/src/core";
 import { localDay } from "@/components/day-change";
+import { pastSessionWords } from "@/components/study-words";
 
 /**
  * What he studied today, from the session records (spec: today.md, "A day
@@ -94,6 +95,22 @@ export function homeExams(courses: readonly StudyCourse[]): NearExam[] {
 		const misfits = doesNotFit.flatMap((h) => map.topics.find((t) => t.handle === h) ?? []);
 		const fell = misfits.filter((t) => t.moved !== undefined && t.moved.from < date);
 		return [{ course: map.title, date, daysLeft, workspace: map.workspace, wontFit: misfits.map((t) => t.title), fellToday: fell.map((t) => t.title) }];
+	});
+}
+
+/** Home's ask on an exam session gone by: the course, and the words that
+ *  say what moved the plan and ask how it went (`pastSessionWords`). */
+export interface SessionAsk {
+	workspace: string;
+	words: string;
+}
+
+/** Each course's exam session gone by with no word from him yet, which
+ *  Home asks about until he answers. Pure. */
+export function sessionAsks(courses: readonly StudyCourse[]): SessionAsk[] {
+	return courses.flatMap(({ map }) => {
+		const words = map.exam ? pastSessionWords(map.title, map.exam) : null;
+		return words ? [{ workspace: map.workspace, words }] : [];
 	});
 }
 
