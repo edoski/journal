@@ -18,7 +18,7 @@ import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
 import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, isQuestionRepose, opensTurn, savedAnswerTimesOf, savedAnswerTopicsOf, savedTaskTimesOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
-import { leftQuestionRepose, sessionEndOf } from "../core/session-end.ts";
+import { leftQuestionRepose, offersStop, sessionEndOf } from "../core/session-end.ts";
 import { lessonTakenUp, openedAsReview, retaughtTopicOf } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
 import { stoppedByHim } from "../core/turn-cut.ts";
@@ -143,7 +143,8 @@ function listChats(): ChatSummary[] {
 						pendingProblem: activeProblemOf(messages) !== null,
 						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages), ...own])],
 						ownTopics: own,
-						ended: endedBy(sessionEndOf(messages, tree, summary.kind, own), summary.updatedAt, danglingQuestionOf(messages) !== null || leftQuestionRepose(messages).length > 0 || activeProblemOf(messages) !== null),
+						// The tutor's offer to go on, one of whose options stops for today, asks nothing of him: left where it is (round 18, m4).
+						ended: offersStop(messages) ? "left" : endedBy(sessionEndOf(messages, tree, summary.kind, own), summary.updatedAt, danglingQuestionOf(messages) !== null || leftQuestionRepose(messages).length > 0 || activeProblemOf(messages) !== null),
 						...(stoppedByHim(messages) ? { stopped: true as const } : {}),
 						...(failedResponseAtEnd(messages) ? { failed: true as const } : {}),
 						...(learnerWords(messages).length <= 1 ? { untouched: true as const } : {}),

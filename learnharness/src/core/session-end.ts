@@ -2,7 +2,7 @@ import type { PlanTree } from "./contracts/plan.ts";
 import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, lessonProgressOf } from "./contracts/plan.ts";
 import type { SessionEnd, SessionMode } from "./contracts/chat.ts";
 import { activeProblemOf, danglingQuestionOf, endsInDismissal, nativeInputCause, isQuestionRepose, needsContinuation, NEUTRAL_MARKERS, newQuestionRepose, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, problemInputForConclude, sessionModeOf, sessionTaskStatesOf, type LhMessage } from "./native-messages.ts";
-import { picksStop } from "./question-core.ts";
+import { parseOptionsIfString, picksStop } from "./question-core.ts";
 import { phaseAt3Lh } from "./phases.ts";
 import { topicResults, type PracticeConclusion } from "./practice-attempts.ts";
 
@@ -100,6 +100,19 @@ function leftOpen(messages: readonly LhMessage[], at: number, tree: PlanTree | u
 	if (sessionModeOf(before, initial) === "practice" && !activeProblemOf(before) && practiceUnfinished(before, topics)) return true;
 	const end = before.length > 0 ? sessionEndOf(before, tree, initial, topics) : "closed";
 	return end === "mid-lesson" || end === "cut";
+}
+
+/** Whether the question waiting on him is the tutor's offer to go on: a
+ *  choice one of whose options stops for today (`stops`). Nothing is asked
+ *  of him, so the session is left where it is, "Left off today", and
+ *  Home's Today lists no row for it (round 18, m4: "Practise eigenvalue
+ *  problems now? 1 Yes… 2 Stop here for today" read "Your turn" on Home and
+ *  in the sidebar). Pure. */
+export function offersStop(messages: readonly LhMessage[]): boolean {
+	const open = danglingQuestionOf(messages);
+	if (open?.tool !== "ask_user_question") return false;
+	const options = parseOptionsIfString((open.input as { options?: unknown } | null)?.options as string | undefined);
+	return Array.isArray(options) && options.some((o) => (o as { stops?: unknown } | null)?.stops === true);
 }
 
 /** Whether the message before index `at` is his pick of an option the
