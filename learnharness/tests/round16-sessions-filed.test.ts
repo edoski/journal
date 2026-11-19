@@ -136,6 +136,25 @@ describe("a review whose probe starts another topic is that topic's lesson, befo
 		chatStore.saveMessages(planned.id, [newUserMessage("Review Conditional probability"), ...call("plan_init", { mermaid: "graph TD\n  a[Bayes again]", goal: { title: "Conditional probability", topic: "conditional" } }), ...receipt({ expectation: { from: "new", to: "attempted" } })({ observations: [{ topics: ["expectation"], text: "A side question on E(X)", result: "correct", help: "none" }] })] as never);
 		assert.equal(lessonTakenUp(chatStore.getChat(planned.id)!), null);
 	});
+
+	it("a review whose plan re-taught its own topic takes up the topic a later plan teaches (round 17, M5 live)", () => {
+		// The live Probability review: its plan re-taught Inclusion-exclusion, he asked to start Expectation,
+		// the tutor planned it and he answered its first question; the session stayed the review.
+		const retaught = chatStore.createChat("Review Binomial distribution, Inclusion-exclusion principle", course, ["binomial", "inclusion-exclusion"]);
+		const opening = [newUserMessage("Review Binomial distribution, Inclusion-exclusion principle"), ...call("plan_init", { mermaid: "graph TD\n  a[Pairwise overlaps]", goal: { title: "Inclusion-exclusion review", topic: "inclusion-exclusion" } })];
+		chatStore.saveMessages(retaught.id, opening as never);
+		assert.equal(lessonTakenUp(chatStore.getChat(retaught.id)!), null, "re-teaching its own topic keeps the review");
+		chatStore.saveMessages(retaught.id, [...opening, newUserMessage("Can we start Expectation and linearity now instead?"), ...call("plan_init", { mermaid: "graph TD\n  a[Long-run average]", goal: { title: "Expectation and linearity", topic: "expectation" } }), ...receipt({ expectation: { from: "new", to: "assisted" } })({ observations: [{ topics: ["expectation"], text: "Said a die's average settles near 3.5", result: "correct", help: "none" }] })] as never);
+		assert.equal(lessonTakenUp(chatStore.getChat(retaught.id)!), "expectation");
+		assert.deepEqual(listed(retaught.id).ownTopics, ["expectation"], "Expectation's page resumes it");
+		assert.equal(listed(retaught.id).review, false, "its close saves the lesson's task");
+	});
+
+	it("a lesson keeps its topic when a later plan repairs a prerequisite", () => {
+		const lesson = chatStore.createChat("Invertible matrices lesson", course, ["invertibility"]);
+		chatStore.saveMessages(lesson.id, [newUserMessage("Start Invertible matrices"), ...call("plan_init", { mermaid: "graph TD\n  a[Two-sided inverses]", goal: { title: "Invertible matrices", topic: "invertibility" } }), ...call("plan_init", { mermaid: "graph TD\n  a[Rank again]", goal: { title: "Rank", topic: "rank" } })] as never);
+		assert.equal(lessonTakenUp(chatStore.getChat(lesson.id)!), null);
+	});
 });
 
 describe("when he worked in a session (round 16, m8, m9)", () => {

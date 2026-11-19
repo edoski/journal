@@ -1254,6 +1254,20 @@ export function firstStartedTopicOf(messages: readonly LhMessage[]): string | nu
 	return null;
 }
 
+/** The goal topic of each plan that went through, in order. Pure. */
+export function plannedTopicsOf(messages: readonly LhMessage[]): string[] {
+	const clean = cleanToolCallIds(messages);
+	return messages.flatMap((m) =>
+		m.role !== "assistant"
+			? []
+			: m.content.flatMap((block) => {
+					if (block.type !== "toolCall" || block.name !== "plan_init" || !clean.has(block.id)) return [];
+					const topic = ((block.arguments as { goal?: { topic?: unknown } } | null)?.goal ?? null)?.topic;
+					return typeof topic === "string" && topic.trim() ? [topic.trim()] : [];
+				}),
+	);
+}
+
 /** When the session's saved answers on each topic came: the time of the
  *  newest message whose save went through with an answer on it, by topic.
  *  Pure. */

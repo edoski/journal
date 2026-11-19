@@ -10,7 +10,7 @@
  */
 
 import type { TopicReview } from "./contracts/course-map.ts";
-import { firstStartedTopicOf, sessionPlanTopicOf, sessionTaskTopicsOf, type LhMessage } from "./native-messages.ts";
+import { firstStartedTopicOf, sessionPlanTopicOf, sessionTaskTopicsOf, plannedTopicsOf, type LhMessage } from "./native-messages.ts";
 
 /** The opening a review is started with: "Review " and the titles. */
 const REVIEW_OPENING = /^Review\s+\S/;
@@ -78,10 +78,20 @@ function reviewOpening(record: { title?: string; topics?: readonly string[]; mes
  *  Poisson, taught a Poisson lesson that stayed filed under the review,
  *  with no task and no Resume on Poisson's page; round 17, M5: the same
  *  while still in its probe, since the probe is the first lesson's start).
- *  Null otherwise. Pure. */
-export function lessonTakenUp(record: { topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): string | null {
+ *  A review may re-teach one of its own topics first: the first topic not
+ *  among them that a later plan teaches is then its lesson, never one a
+ *  side answer started
+ *  (round 17, M5 live: the Probability review's plan re-taught
+ *  Inclusion-exclusion, he asked to start Expectation and answered its
+ *  question, and the session stayed the review). A lesson keeps the topic
+ *  it opened on when a later plan repairs a prerequisite. Null otherwise.
+ *  Pure. */
+export function lessonTakenUp(record: { title?: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): string | null {
 	const messages = record.messages as readonly LhMessage[];
-	return planTakesUp(record, sessionPlanTopicOf(messages) ?? firstStartedTopicOf(messages));
+	const first = planTakesUp(record, sessionPlanTopicOf(messages) ?? firstStartedTopicOf(messages));
+	if (first || !reviewOpening(record)) return first;
+	const opened = record.topics ?? [];
+	return plannedTopicsOf(messages).find((topic) => !opened.includes(topic)) ?? null;
 }
 
 /** The topic a session opened on topics takes up as its lesson when its
