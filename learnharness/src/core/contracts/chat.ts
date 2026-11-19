@@ -330,7 +330,7 @@ const DONE_DAYS = "and the day each topic he answered in this session comes back
  *  with its new day and its cause (round 18, M4: a hinted, then partly
  *  right, answer moved Expectation off today, every receipt carried it in
  *  `starts_moved`, and the close named only the review days). */
-const DONE_MOVED = "a start planned for today that his answers moved (a save's `starts_moved` whose `moved.from` is today) is named too, by its title, with its new day and its cause";
+const DONE_MOVED = "a start planned for today that his answers moved (a save's `starts_moved` whose `moved.from` is today) is named too, by its title, with its new day and its cause, its day said even when the other days are left to his calendar";
 /** Where his half answer waits, and a start's title inside a sentence
  *  (round 18, m15: "…is waiting for you there. Because that lesson is
  *  unfinished, Any matrix represents a linear map moved …, and later

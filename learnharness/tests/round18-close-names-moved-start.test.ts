@@ -71,6 +71,14 @@ describe("a close names each start his study moved off today (round 18, M4)", ()
 		assert.deepEqual(refusedRules(guard, words).filter((r) => r === "moved-start"), []);
 	});
 
+	it("refuses a close that names the move but leaves its new day to the calendar (integration live check)", () => {
+		const guard = new VoiceGuard([saved("c2", EXPECTATION), newDoneTonightMessage("prober")]);
+		const live = "Your Inclusion-exclusion principle review picks up at its open question, still due today, and Random variables and distributions comes back tomorrow, Monday 9 November. Binomial distribution and the start of “Expectation and linearity”, moved from today since Random variables and distributions is not solid yet, are on your calendar.";
+		assert.ok(refusedRules(guard, live).includes("moved-start"));
+		const dated = live.replace("are on your calendar.", "are on your calendar; Expectation and linearity now starts on Sunday 15 November.");
+		assert.deepEqual(refusedRules(new VoiceGuard([saved("c2", EXPECTATION), newDoneTonightMessage("prober")]), dated).filter((r) => r === "moved-start"), []);
+	});
+
 	it("asks nothing of a start a later save put back, or of one moved off another day", () => {
 		assert.deepEqual(refusedRules(new VoiceGuard([saved("c2", EXPECTATION), saved("c3", {}), newDoneTonightMessage("prober")]), LENS_CLOSE).filter((r) => r === "moved-start"), []);
 		assert.deepEqual(refusedRules(new VoiceGuard([saved("c2", LATER), newDoneTonightMessage("teacher")]), LENS_CLOSE).filter((r) => r === "moved-start"), []);

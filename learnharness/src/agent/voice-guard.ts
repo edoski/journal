@@ -804,8 +804,20 @@ const NAMES_A_DAY = /\b(?:today|tomorrow|(?:mon|tues|wednes|thurs|fri|satur|sun)
 
 /** Whether `text` names a start by its title, read past emphasis and quotes. */
 function namesTitle(text: string, title: string): boolean {
-	const plain = (s: string) => s.replace(/[*_"“”‘’]/g, "").replace(/\s+/g, " ").toLowerCase();
-	return plain(text).includes(plain(title));
+	return plainWords(text).includes(plainWords(title));
+}
+
+const plainWords = (s: string) => s.replace(/[*_"“”‘’]/g, "").replace(/\s+/g, " ").toLowerCase();
+
+/** Whether `text` names a moved start by its title and its new day, the
+ *  receipt's "Sunday 15 November" read as "15 November" or "15 Nov"
+ *  (integration, round 18: a close said Expectation's start "moved from
+ *  today … is on your calendar", and he could not tell when it starts). */
+function namesMove(text: string, moved: MovedStart): boolean {
+	if (!namesTitle(text, moved.title)) return false;
+	const day = /(\d{1,2}) ([a-z]{3})[a-z]*/i.exec(moved.starts_words);
+	const tomorrow = /^tomorrow\b/i.test(moved.starts_words) && /\btomorrow\b/i.test(text);
+	return !day || tomorrow || new RegExp(`\\b${day[1]} ${day[2]}`, "i").test(plainWords(text));
 }
 
 function movedWords(moved: MovedStart): string {
@@ -1696,9 +1708,9 @@ export class VoiceGuard {
 	}
 
 	/** The starts moved off today that neither `text` nor an earlier
-	 *  message of this turn names. */
+	 *  message of this turn names with its new day. */
 	private unnamedMoves(text: string): MovedStart[] {
-		return this.moved.filter((m) => ![text, ...this.toldNow].some((t) => namesTitle(t, m.title)));
+		return this.moved.filter((m) => ![text, ...this.toldNow].some((t) => namesMove(t, m)));
 	}
 
 	/** Words that point at a demo this turn called for: it is built after
