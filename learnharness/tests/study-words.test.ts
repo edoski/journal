@@ -165,8 +165,9 @@ describe("why a review waits", () => {
 		assert.equal(heldWords({ kind: "due", date: "2026-11-08", overdue: 0 }), null);
 		assert.equal(heldWords(null), null);
 	});
-	it("says since when a held review was due, so weeks late never reads as 'Back in 25d'", () => {
-		assert.equal(reviewWords(late, "2026-11-08"), "Due 1 Oct, back 3 Dec", "with the day the plan brings it back (round 8: Calculus gave none)");
+	it("says the day a held review comes back, never the day memory asked for beside it (round 18, m1: \"Due 6 Nov, back 16 Nov\")", () => {
+		assert.equal(reviewWords(late, "2026-11-08"), "Back Thu 3 Dec", "with the day the plan brings it back (round 8: Calculus gave none)");
+		assert.equal(reviewWords({ kind: "scheduled", date: "2026-11-16", held: { exam: null, since: "2026-11-06" } }, "2026-11-08"), "Back Mon 16 Nov", "Uniform distribution (round 18, m1)");
 		assert.equal(reviewWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), "Back Thu 3 Dec");
 		assert.equal(reviewWords({ ...behind, held: { exam: "Probability", since: "2026-11-13" } }, "2026-11-08"), "Back Fri 20 Nov", "memory's day is still ahead");
 		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "Due 5 Nov");

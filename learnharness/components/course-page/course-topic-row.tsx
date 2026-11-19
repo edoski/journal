@@ -68,7 +68,7 @@ export function CourseTopicRow({
 					)}
 				</span>
 				{/* Its fact's words whole on every row (round 11, 1 N8: a bare arrow, bookmark or check-circle beside rows with words);
-				    the row says its shortest words ("Due 6 Nov"), the hint the whole sentence ("Due 6 Nov, back 20 Nov"). */}
+				    the row says its shortest words ("Due 6 Nov"), the hint the whole sentence. */}
 				{row.fact && (
 					<Hint label={row.fact.words} side="left">
 						<StatusMark data-slot="course-topic-fact" fact={row.fact} words={row.factWords ?? row.fact.words} whole className="h-5 shrink-0" />

@@ -26,7 +26,7 @@ One form each, wherever it shows.
 | a review come due | Due today, Due 3 Nov (its day, never a count, round 9; never "Due since", which with its icon left a sidebar card no room for its course's name, round 16) |
 | a review dated ahead | its day, never a count: Back Tue 10 Nov (`returnWords`) |
 | unfinished work holds it | Left off today, else its day, Left off 6 Nov (never a count, round 9; never "yesterday", which left a sidebar card no room for its course's name, round 16, m4); Unfinished when no day is known. Never the tutor's step text. |
-| a review the plan holds back | the engine's held words (`heldWords`, from the plan's `held`): Waits for your Probability exam when another course's final review came first, else Earlier days are full; once memory's day has passed, since when it was due first and the day the plan brings it back (`reviewWords`): Due 21 Oct, back 4 Dec; never "Moved from" a memory day still ahead, which nobody told him |
+| a review the plan holds back | the engine's held words (`heldWords`, from the plan's `held`): Waits for your Probability exam when another course's final review came first, else Earlier days are full; once memory's day has passed, the day the plan brings it back (`reviewWords`): Back Fri 4 Dec, never the day memory asked for beside it (round 18, m1); never "Moved from" a memory day still ahead, which nobody told him |
 | a topic not started, on its page's Now row | First lesson (`FIRST_LESSON`): the head already says Not started; under it the day the plan starts it, once (Planned today, Planned Wed 11 Nov) |
 
 ### Which one a topic says

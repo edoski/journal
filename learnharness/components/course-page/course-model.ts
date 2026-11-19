@@ -117,8 +117,8 @@ function courseRows(course: StudyCourse, chats: readonly ChatListItem[], courses
 }
 
 /** A row's fact in the words the sidebar and the map's card say it, so a
- *  review reads one way on every surface ("Due 6 Nov", "Due 13
- *  Nov, back 23 Dec"; round 15, m10: "Due 6 Nov" in the arc list beside
+ *  review reads one way on every surface ("Due 6 Nov", "Back Wed
+ *  23 Dec"; round 15, m10: "Due 6 Nov" in the arc list beside
  *  "Due since 6 Nov" in the Now row, "Back 23 Dec" against the card's "Due
  *  since 13 Nov, back 23 Dec"), a method he mixed up as "Mixed up". */
 function shownWords(fact: TopicFact | null): string | null {

@@ -292,14 +292,14 @@ export function movedWords(review: CourseMapTopic["review"], today: string, told
 	return review.held.since < today ? dueWords(review.held.since) : null;
 }
 
-/** A review that is due: "Due today", "Due 5 Nov"; one the plan holds
- *  past a day memory asked for already says since when, so a review weeks
- *  late never reads as spacing, and the day the plan brings it back, "Due 1
- *  Oct, back 3 Dec" (round 8: Calculus' rows gave no return day);
- *  any other dated review "Back in 5d". `today` is the engine's day. */
+/** A review that is due: "Due today", "Due 5 Nov"; any review the plan
+ *  has a day for, one it holds past a day memory asked for included, the
+ *  day it comes back, "Back Mon 16 Nov": what will happen, never the day
+ *  memory asked for beside it (round 18, m1: "Due 6 Nov, back 16 Nov" on
+ *  Uniform distribution said nothing he could act on; the hint says why
+ *  it waits, `heldWords`). `today` is the engine's day. */
 export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
 	if (review.kind === "due") return overdueWords(review.overdue, today);
-	if (review.held && review.held.since < today) return `${dueWords(review.held.since)}, back ${shortDay(review.date)}`;
 	return returnWords(review.date);
 }
 
@@ -490,10 +490,14 @@ function finalReviewName(exam: Pick<CourseExam, "finalReview">, today: string): 
 	return exam.finalReview && exam.finalReview > today ? `the final review from ${shortDay(exam.finalReview)}` : "the final review";
 }
 
-/** The taught topics the final review has no room for, standing alone
- *  (the calendar's "No room in it for" reads under its final review). */
+/** The taught topics the final review has no room for, standing alone,
+ *  as what happens to them: they are not revisited in it (round 18, m1:
+ *  "No room in the final review from 27 Nov for Similar matrices and
+ *  Diagonalization" beside their rows planned 24 and 25 Nov read as if
+ *  they had no day; the calendar's "No room in it for" reads under its
+ *  final review). */
 export function finalReviewMissWords(titles: readonly string[], exam: Pick<CourseExam, "finalReview">, today: string): string {
-	return `No room in ${finalReviewName(exam, today)} for ${listWords(titles)}`;
+	return `${listWords(titles)} ${titles.length === 1 ? "is" : "are"} not revisited in ${finalReviewName(exam, today)}`;
 }
 
 /** His opening words in a lesson Ask the tutor starts, naming the topics. */
@@ -541,7 +545,7 @@ export const EXAM_GAP_TOPIC_WORDS: {
 		none: "",
 		no_study_day: ", no study day is left in it",
 		not_ready: "",
-		full: " at your pace",
+		full: ", full at your pace",
 		too_late: "", // the start, not the room: TOO_LATE_FOR_A_REVIEW
 	},
 };
@@ -559,7 +563,11 @@ export function examGapTopicWords(topic: Pick<CourseMapTopic, "handle">, exam: P
 	// review has room, his start comes too late for it (round 17, 3 m4: "Planned
 	// Wed 18 Nov · No room in the final review from 15 Nov, it starts too close
 	// to the exam" read as if it were not planned).
-	if (exam.unreviewed?.includes(topic.handle)) return reason === "too_late" ? TOO_LATE_FOR_A_REVIEW : `No room in ${finalReviewName(exam, today)}${EXAM_GAP_TOPIC_WORDS.review[reason]}`;
+	// One planned before the final review is reviewed then, and only the
+	// final review leaves it out: "Not revisited in the final review from 27
+	// Nov, full at your pace" says what happens (round 18, m1: "Planned Wed
+	// 25 Nov · No room in the final review from 27 Nov at your pace").
+	if (exam.unreviewed?.includes(topic.handle)) return reason === "too_late" ? TOO_LATE_FOR_A_REVIEW : `Not revisited in ${finalReviewName(exam, today)}${EXAM_GAP_TOPIC_WORDS.review[reason]}`;
 	return null;
 }
 
