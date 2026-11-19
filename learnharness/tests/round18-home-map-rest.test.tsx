@@ -67,7 +67,7 @@ describe("Home's map at rest (round 18, m8)", () => {
 	});
 
 	it("opens on the first Today row's arc in a course with no You are here", async () => {
-		const nowhere: StudyCourse = { ...LINALG_ARCS, map: { ...LINALG_ARCS.map, current: null, currentArc: null } };
+		const nowhere: StudyCourse = { ...LINALG_ARCS, map: { ...LINALG_ARCS.map, current: null, currentArc: undefined } };
 		const rows = await mount([nowhere, PROB], CHATS);
 		const first = rows.find((row) => row.course?.map.workspace === nowhere.map.workspace)!;
 		const place = lessonOf(first).place?.handle;

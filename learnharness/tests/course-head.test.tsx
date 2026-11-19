@@ -268,7 +268,7 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 	it("leaves out of Or another the topics the plan starts before the exam, on the 17 Nov world (round 18, m6)", () => {
 		const c = course({
 			today: "2026-11-17",
-			exam: { date: "2026-11-19", daysLeft: 2, finalReview: "2026-11-17", doesNotFit: [h("poisson")], unreviewed: [h("rv"), h("stirling"), h("geometric")], reasons: { poisson: "full", rv: "full", stirling: "too_late", geometric: "too_late" } },
+			exam: { date: "2026-11-19", daysLeft: 2, finalReview: "2026-11-17", doesNotFit: [h("poisson")], unreviewed: [h("rv"), h("stirling"), h("geometric")], reasons: { poisson: "full", rv: "full", stirling: "too_late", geometric: "too_late" } as Record<TopicHandle, ExamGapReason> },
 			topics: [
 				topic("bayes", { level: "assisted", introduced: "2026-11-01", review: { kind: "due", date: "2026-11-17", overdue: 0 } }),
 				topic("rv", { title: "Random variables", level: "assisted", introduced: "2026-11-05" }),
