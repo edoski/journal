@@ -35,6 +35,7 @@ import {
 	firstSourceTextParts,
 	messageAnchorId,
 	sessionModeOf,
+	taskSessionOf,
 	textPartMessageId,
 	kbdEventForAction as kbdEventForChat,
 	type ChatInput,
@@ -1176,10 +1177,13 @@ export function Chat({
 	const leftBelow = useMemo(() => leftAskedBelow(messages), [messages]);
 	const spoken = useMemo(() => spokenAbove(messages), [messages]);
 	const openingAt = useMemo(() => appOpeningAt(messages, appOpening), [messages, appOpening]);
+	// A task picked up with Continue: a plan written before it was another
+	// lesson's, so the strip waits for the task's own (round 18, m22).
+	const taskSession = useMemo(() => taskSessionOf(nativeMessages), [nativeMessages]);
 	const steps = useMemo(() => {
-		if (!planTree) return [];
+		if (!planTree || (taskSession && !taskSession.planned)) return [];
 		return lessonRoadmapSteps(planTree, messages as Parameters<typeof lessonRoadmapSteps>[1], new Set(anchors.values()));
-	}, [planTree, messages, anchors]);
+	}, [planTree, messages, anchors, taskSession]);
 	// A step's place in the transcript: scroll to where it was first taught
 	// and mark it as a passage link lands (session-navigation.tsx).
 	const jumpToStep = useCallback((stepId: string) => {
@@ -1715,6 +1719,7 @@ export function Chat({
 						roadmap={
 							<LessonRoadmap
 								steps={steps}
+								task={taskSession}
 								place={place}
 								course={course && !courseGone ? { title: course.title, workspace: course.workspace } : undefined}
 								open={planOpen}
