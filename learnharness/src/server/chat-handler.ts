@@ -38,6 +38,7 @@ import { askPrestart, claimPrestart, prestart } from "./prestart.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
 import { activeProblemOf, answeredQuestionsOf, danglingQuestionOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
 import { remarkableOf } from "../core/answer-marks.ts";
+import { continuedTaskOf } from "../core/lesson-place.ts";
 import { lessonTopicsOf, reviewRecord } from "../core/session-opening.ts";
 import { compactionInstructions, planTreeToText } from "../core/compaction.ts";
 import { PATHS } from "../../config.ts";
@@ -430,9 +431,12 @@ export async function handleChatInput(
 	const learnerInput = input.type !== "steers" && input.type !== "retry" && input.type !== "retry-question" && input.type !== "continue";
 	// A mode handoff starts the other agent, whose brief differs.
 	const handoffWake = input.type === "steers" && input.steers.some((s) => s.role === "custom" && s.customType === "mode-handoff");
-	const [courseBrief, courseArcs] = await Promise.all([
+	// Continue on a task: its title and step, as the engine's map names
+	// them, drawn the moment he presses (round 17, M8).
+	const [courseBrief, courseArcs, maps] = await Promise.all([
 		learnerInput || handoffWake ? fetchCourseBrief(record) : null,
 		fetchCourseArcs(record),
+		input.type === "task" ? keptCourseMaps() : null,
 	]);
 	const freshRecord = stores.chatStore.getChat(chatId);
 	if (!freshRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
@@ -466,7 +470,7 @@ export async function handleChatInput(
 		appends =
 			input.type === "steers"
 				? input.steers.filter((s) => !steerDelivered(record.messages, s.id)).map((s) => withProbeFeedback(s, record.messages))
-				: inputAppends(record, input);
+				: inputAppends(record, input.type === "task" ? { type: "task", task: continuedTaskOf(maps?.find((m) => m.workspace === record.course?.workspace), record.messages) } : input);
 	} catch (err) {
 		if (err instanceof ChatInputError) {
 			return Response.json({ error: err.message }, { status: 400 });

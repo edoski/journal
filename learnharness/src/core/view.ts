@@ -538,8 +538,9 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			return;
 		}
 		case "task-continue": {
-			// His Continue on the task: a seam that draws nothing, as a
-			// session's resume draws nothing. The model reads the content.
+			// His Continue on the task: its title and the step he left it at
+			// when the record names them (TaskContinueLine), else a seam that
+			// draws nothing, as a session's resume. The model reads the content.
 			out.push({
 				id: marker.id,
 				role: "user",

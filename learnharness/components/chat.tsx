@@ -49,7 +49,7 @@ import { GraphContextCard, type GraphContextData } from "@/components/graph-cont
 import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
 import type { ArtifactPartProps, Confidence, Photo, JobRecord, LessonPlace, PracticeRequest, PracticeRequestDetails, QuestionAnswerData } from "@/src/core";
-import type { CourseLink, DisputeDetails, LhViewMessage, MarkRow, SessionMode } from "@/src/core";
+import type { ContinuedTask, CourseLink, DisputeDetails, LhViewMessage, MarkRow, SessionMode } from "@/src/core";
 import {
 	activeProblemOf,
 	gaveUpOn,
@@ -86,6 +86,7 @@ import { isCourseDeletedRefusal, isSignedOutLine, parseProviderKeyRefusal, refus
 import { pausePlaceholder, practicePause } from "@/components/lesson/practice-pause";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
+import { TaskContinueLine } from "@/components/lesson/task-continue-line";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
@@ -149,6 +150,14 @@ export function retryFailedResponse(
 
 /** A wake-pipeline steer message: user-role delivery whose metadata marks it
  * as a sub-agent result — rendered as an artifact card, never a bubble. */
+/** The task his Continue picked up, as its marker names it: its title and
+ *  step, or null for any other message and for a marker that names none. */
+function continuedTaskIn(m: LhViewMessage): ContinuedTask | null {
+	if (m.role !== "user") return null;
+	const data = m.parts.find((p) => p.type === "data-task-continue")?.data as Partial<ContinuedTask> | undefined;
+	return typeof data?.title === "string" ? { title: data.title, step: data.step ?? null } : null;
+}
+
 function isSubagentSteer(m: LhViewMessage): boolean {
 	return (m.metadata as { subagentResult?: unknown } | undefined)?.subagentResult != null;
 }
@@ -527,7 +536,7 @@ export function Chat({
 		if (!continueTask || continuedTask.current) return;
 		continuedTask.current = true;
 		window.history.replaceState(window.history.state, "", `/chat/${chatId}`);
-		if (!turnInFlight && taskTurnOwed(initialMessages)) void send({ type: "task" });
+		if (!turnInFlight && taskTurnOwed(initialMessages)) void send({ type: "task", task: place?.task ?? null });
 		// mount-only by design, as the continuation above
 	}, []);
 
@@ -1741,6 +1750,10 @@ export function Chat({
 								// Review, a topic's name) are its instruction to the
 								// tutor, not his message: no bubble (round 9).
 								null
+							) : continuedTaskIn(m) ? (
+								// His Continue on a task: where he picks it up, before the
+								// tutor's turn writes the step out (round 17, M8).
+								<TaskContinueLine key={m.id || `m-${mi}`} {...continuedTaskIn(m)!} />
 							) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume" || p.type === "data-task-continue" || p.type === "data-probe-handoff" || p.type === "data-mode-handoff") ? (
 								// The seams between the opening questions, planning, teaching
 								// and practice draw nothing: the lesson names no phase (Edo,

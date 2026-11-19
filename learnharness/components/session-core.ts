@@ -24,6 +24,8 @@ import {
 	newNextMessage,
 	newProblemDismissedMarker,
 	newThinkingMessage,
+	newTaskContinueMessage,
+	sessionTasksOf,
 	newPracticeRequestMessage,
 	newUserMessage,
 	projectView,
@@ -782,6 +784,10 @@ export class SessionModel {
 			for (const m of tonightAppends({ messages: [...this.base, ...this.tail].filter((m) => m.id !== streaming) })) {
 				if (m.role === "custom" || (m.role === "toolResult" && isQuestionTool(m.toolName))) optimistic.push({ ...m, id: localId() });
 			}
+		} else if (input.type === "task" && input.task) {
+			// Continue on a task: its title and the step he left it at land at
+			// once, while the turn writes the step out (round 17, M8).
+			optimistic.push({ ...newTaskContinueMessage(sessionTasksOf([...this.base, ...this.tail]), input.task), id: localId() });
 		} else if (input.type === "dispute") {
 			// His dispute row lands at once; the record refuses one with no mark.
 			try {

@@ -687,17 +687,27 @@ export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT): Lh
 	};
 }
 
+/** The task Continue picks up, as the engine's record names it: its title
+ *  and the step he left it at. */
+export interface ContinuedTask {
+	title: string;
+	step: string | null;
+}
+
 /** His Continue on an open task the session holds, with nothing in it
  *  waiting on him (round 13, 2 M1): the turn carries on at the task's step.
- *  The transcript draws nothing for it; the tutor's step is the reply. */
-export function newTaskContinueMessage(tasks: readonly string[]): LhMarkerMessage {
+ *  With the task's record (`task`), the transcript draws its title and the
+ *  step he left it at the moment he presses, before the tutor's turn writes
+ *  that step out (round 17, M8: Continue Problem sheet 4 showed "Thinking…"
+ *  for 42 s before part (c)). The model reads the content alone. */
+export function newTaskContinueMessage(tasks: readonly string[], task?: ContinuedTask | null): LhMarkerMessage {
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "task-continue",
 		content: taskContinueText(tasks),
 		display: true,
-		details: { tasks: [...tasks] },
+		details: { tasks: [...tasks], ...(task ? { title: task.title, step: task.step } : {}) },
 		timestamp: Date.now(),
 	};
 }

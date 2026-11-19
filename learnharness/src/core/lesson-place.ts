@@ -7,6 +7,7 @@
 
 import { currentArc, namedArc, type NamedArc } from "./contracts/course-arcs.ts";
 import type { CourseMap } from "./contracts/course-map.ts";
+import { sessionTasksOf, type ContinuedTask, type LhMessage } from "./native-messages.ts";
 
 export interface LessonPlace {
 	/** The topic the lesson belongs to, as the course map names it; null
@@ -14,6 +15,18 @@ export interface LessonPlace {
 	topic: { handle: string; title: string } | null;
 	/** The topic's arc, in a course with arcs; null otherwise. */
 	arc: NamedArc | null;
+	/** The open task the session holds, as the map names it, for its
+	 *  Continue (`continuedTaskOf`); absent when the page read none. */
+	task?: ContinuedTask | null;
+}
+
+/** The open task a session holds, as the course map names it: the first
+ *  of the session's open tasks the map lists, with its title and the step
+ *  he left it at. Null when the map lists none of them. Pure. */
+export function continuedTaskOf(map: Pick<CourseMap, "tasks"> | undefined, messages: readonly LhMessage[]): ContinuedTask | null {
+	if (!map) return null;
+	const task = sessionTasksOf(messages).map((key) => map.tasks.find((t) => t.key === key)).find((t) => t !== undefined);
+	return task ? { title: task.title, step: task.step } : null;
 }
 
 /** The lesson's place: the first of its candidate topics the map lists

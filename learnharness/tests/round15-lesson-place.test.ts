@@ -53,7 +53,7 @@ describe("a lesson opens on the map Home read (round 15, P7)", () => {
 		await studyStatus();
 		const place = await lessonPlace({ course: { workspace: W, title: "Algebra" }, topics: ["kernel"], messages: [] });
 		assert.deepEqual(asked, ["eigen", "eigen"], "Home and the lesson asked for one map");
-		assert.deepEqual(place, { topic: { handle: "kernel", title: "Kernel" }, arc: { number: 1, handle: "spaces", title: "Spaces" } });
+		assert.deepEqual(place, { topic: { handle: "kernel", title: "Kernel" }, arc: { number: 1, handle: "spaces", title: "Spaces" }, task: null }, "a session holding no task has none to continue");
 	});
 
 	it("reads the map without the lesson in progress where the place's arc would come from it", async () => {
