@@ -3,7 +3,7 @@
  * arcs into arcs (core/arc-pass.ts holds the rules). A judge and one reader
  * per topic settle the prerequisites with the prerequisite test alone, never
  * seeing an arc. Then an agent cuts the settled graph from the material's
- * units with arcs.md's *Forming arcs*, and cannot change a prerequisite. Each answers
+ * units with arcs.md's *Forming arcs*, and changes no stored prerequisite. Each answers
  * with one submit call, which the app checks and the engine dry-runs
  * (`save --check`) before it counts; the saves go to the record as it is
  * when they are made.
@@ -35,10 +35,12 @@ import {
 	passDue,
 	purposeAnswerProblems,
 	purposeProblems,
+	withdrawal,
 	purposeQuiz,
 	sortAnswerProblems,
 	sortMisses,
 	sortProblems,
+	standingMisses,
 	sortQuiz,
 	storedEdges,
 	type ArcPassView,
@@ -186,6 +188,17 @@ const purposeSchema = Type.Object({
 			description: "Each arc name that fails to name the one idea its topics serve; leave out or send an empty list when none does.",
 		}),
 	),
+	splits: Type.Optional(
+		Type.Array(
+			Type.Object({
+				arc: Type.String({ description: "The arc's name, exactly as listed." }),
+				question: Type.String({ description: "The focus question most of its topics serve." }),
+				apart: Type.Array(Type.String({ description: "A topic's id: t1, t2, …" }), { description: "The topics that serve the other question instead." }),
+				other: Type.String({ description: "The question the topics apart serve." }),
+			}),
+			{ description: "Each arc whose topics answer no one focus question; leave out or send an empty list when every arc's do." },
+		),
+	),
 });
 
 const arcSchema = Type.Object({
@@ -207,6 +220,11 @@ const arcSchema = Type.Object({
 	leavesOut: Type.Optional(Type.Array(Type.String(), { description: "Topics the stated exam leaves out, each in an arc after examArcs." })),
 	doubts: Type.Optional(
 		Type.Array(Type.Object({ topic: Type.String(), need: Type.String(), reason: Type.String() }), { description: "Stored prerequisites you think false: kept, and recorded with your reason." }),
+	),
+	withdraw: Type.Optional(
+		Type.Array(Type.Object({ topic: Type.String(), need: Type.String(), reason: Type.String({ description: "Why an exercise on the topic can be worked without it." }) }), {
+			description: "Added, proposed or implied needs that fail the prerequisite test: dropped, so the cut need not hold them.",
+		}),
 	),
 	none: Type.Optional(Type.String({ description: "Only when the course should get no arcs: why, by the size rules." })),
 	basis: Type.String({ description: "The material's units the cut follows, then each place the cut departs from them, with its reason: a topic homed outside its unit, a unit merged or re-cut, an order other than the material's, a count outside four to eight arcs." }),
@@ -263,7 +281,8 @@ export const ARC_LOOPS_INSTRUCTIONS = `You settle the loops in a course's prereq
 export const ARC_CUT_INSTRUCTIONS = `You group a course's topics into arcs, following *Forming arcs* below. You answer with one ${ARCS_TOOL} call; the app saves it.
 
 How this differs from the text below:
-- The prerequisites are settled and you cannot change them: your answer has no field for needs. A stored edge you think false goes under doubts with its reason; it is recorded and kept.
+- The stored prerequisites are settled and you cannot change them. A stored edge you think false goes under doubts with its reason; it is recorded and kept.
+- A topic's added and proposed needs are ones the edge step found just now, each from a reader's step on one exercise or example. Test each added or proposed need of the topics you place with the prerequisite test: could the learner work the exercises the material sets for the topic without it? When only a one-off brings it in (one example, a checkpoint, an odd exercise or two) while the topic's method and its standard exercises are worked without it, list it under withdraw with that reason; it is dropped and the cut need not hold it. A topic's implied needs are ones its readers found that were set aside because another of its needs leads to them: one comes back as a need of its own when you withdraw the only need that led to it, and the cut then holds it, unless it fails the same test: then list it under withdraw too. Judge it by the test alone, never by the order it would force; never withdraw a stored need.
 - A topic's proposed needs are prerequisites the edge step found, waiting for the learner's yes. Cut as if they were stored: no topic sits in an arc before the arc holding one of its needs, stored or proposed, so the arcs hold whichever proposals the learner accepts.
 - Read the material's units before you cut: the sources' tables of contents with read_material, headings with search_material, and the unit each topic's reference locator names. A source the course cannot open is listed as such; then the locators are the material you have.
 - List the arcs in study order, and each arc's topics in study order. Every topic listed below, left-out ones too, goes in exactly one arc's topics.
@@ -287,6 +306,7 @@ export const PURPOSE_INSTRUCTIONS = `You read a course's arcs the way a student 
   - it promises an idea none of its topics teaches, as a chapter title can when the course keeps only part of the chapter; or
   - read cold, it hides the idea the arc is built on: a student would not expect the topics most of the others build on, while the heading of the unit it cites names them ("Shortest paths" for an arc whose unit is "Graph search" and whose first topics are breadth-first and depth-first search).
   A name taken from a unit's heading, one that shares a word with a topic's title, and two phrases joined by "and" that the material treats together are fine.
+- Then read the arc's topics alone, as if its name and line were covered, and write the focus question a chapter on just them would answer: the one question every topic helps answer. Under splits, list the arc only when no one such question holds them all: some of its topics answer a question unrelated to the others', so that a question covering both must join the two with "and", or be so broad that it would hold the topics of the course's other arcs too. A tool and the topics that use it, or a method and its cases, answer one question.
 A line that is broad but true, plain and concrete is fine. Answer with one ${PURPOSE_TOOL} call.`;
 
 function purposePrompt(quiz: PurposeQuiz): string {
@@ -381,15 +401,19 @@ function courseHead(title: string, record: unknown, material: PassMaterial): str
 }
 
 /** The topics in path order, each with what the step reads of it. */
-function topicLines(view: MapCourseView & Pick<ArcPassView, "proposed">, withNeeds: boolean): string[] {
+function topicLines(view: MapCourseView & Pick<ArcPassView, "proposed" | "added" | "implied">, withNeeds: boolean): string[] {
 	const listed = [...view.order.filter((k) => k in view.topics), ...Object.keys(view.topics).filter((k) => !view.order.includes(k))];
 	return listed.map((handle) => {
 		const t = view.topics[handle]!;
 		const proposed = view.proposed?.[handle] ?? [];
-		const stored = t.needs.filter((n) => !proposed.includes(n));
+		const added = view.added?.[handle] ?? [];
+		const stored = t.needs.filter((n) => !proposed.includes(n) && !added.includes(n));
+		const implied = (view.implied ?? []).filter((i) => i.topic === handle).map((i) => i.need);
 		const facts = [
 			withNeeds && stored.length > 0 ? `needs ${stored.join(", ")}` : "",
+			withNeeds && added.length > 0 ? `added needs ${added.join(", ")}` : "",
 			withNeeds && proposed.length > 0 ? `proposed needs ${proposed.join(", ")}` : "",
+			withNeeds && implied.length > 0 ? `implied needs ${implied.join(", ")}` : "",
 			t.contrasts.length > 0 ? `contrasts ${t.contrasts.join(", ")}` : "",
 			t.refs.length > 0 ? `refs ${refWords(t.refs)}` : "",
 			t.aliases.length > 0 ? `also called ${t.aliases.join(", ")}` : "",
@@ -501,6 +525,11 @@ export interface EdgeRun {
 	kinds: KindVerdict[] | null;
 	/** Candidates sorted into a kind that makes no prerequisite: left out. */
 	refused: EdgeAdd[];
+	/** Adds the cut withdrew as failing the prerequisite test, with its
+	 *  reason: dropped with the arcs, or no longer proposed. */
+	withdrawn: EdgeDiff[];
+	/** Implied needs the withdrawals brought back, saved or proposed with the arcs. */
+	restored: EdgeAdd[];
 }
 
 export type ArcPassResult =
@@ -748,6 +777,8 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			implied: settledAnswer.implied,
 			kinds,
 			refused: heard.refused,
+			withdrawn: [],
+			restored: [],
 		};
 		if (options.edges === "apply" && diffs.length > 0) {
 			const merged = edgeChanges(diffs, (await viewNow(workspace)).view);
@@ -760,13 +791,20 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			} else edges.skipped = diffs;
 		}
 
+		const added: Record<string, string[]> = {};
+		for (const d of edges.applied) if (d.change === "add") (added[d.topic] ??= []).push(d.need);
 		const settled = async () => {
 			const read = await viewNow(workspace);
-			return options.edges === "propose" && options.cutOn !== "stored" ? { ...read, view: withProposed(read.view, diffs) } : read;
+			// A cut on stored edges withdraws nothing, so it gets no implied needs to bring back.
+			const implied = edges.implied.length > 0 && !(options.edges === "propose" && options.cutOn === "stored") ? { implied: edges.implied } : {};
+			const view = { ...read.view, ...(edges.applied.length > 0 ? { added } : {}), ...implied };
+			return { ...read, view: options.edges === "propose" && options.cutOn !== "stored" ? withProposed(view, diffs) : view };
 		};
 		const cut = await settled();
 		const edgesEntry = edges.applied.length > 0 ? lastEdgesEntry(cut.record) : undefined;
 		let sorted: SortMiss[] | null = null;
+		/** Every miss this run's readers found, for standingMisses. */
+		let seen: SortMiss[] = [];
 		const blindSort = async (a: ArcSubmit, formation: Formation): Promise<string | null> => {
 			const quiz = sortQuiz(a, cut.view, formation);
 			const reader = () => runSubmitAgent<SortAnswer>({
@@ -790,7 +828,9 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			});
 			const reads = (await Promise.all(Array.from({ length: SORT_READERS }, reader))).filter((r): r is SortAnswer => r !== null);
 			if (reads.length > 0) {
-				sorted = mergeMisses(...reads.map((read) => sortMisses(quiz, read, a)));
+				const now = mergeMisses(...reads.map((read) => sortMisses(quiz, read, a)));
+				sorted = standingMisses(seen, now, a);
+				seen = mergeMisses(seen, now);
 				log({ step: "sort", kind: "sorted", misses: sorted });
 				const misses = sortProblems(sorted, a);
 				if (misses) return misses;
@@ -799,12 +839,13 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			const purposeRead = await runSubmitAgent<PurposeAnswer>({
 				role: "teacher",
 				toolName: PURPOSE_TOOL,
-				toolDescription: "Submit the topics a purpose line is false of, and the names that are lists.",
+				toolDescription: "Submit the topics a purpose line is false of, the names that are lists, and the arcs that answer two questions.",
 				parameters: purposeSchema,
 				fill: (input: Json) => ({
 					false: (input.false as PurposeAnswer["false"] | undefined) ?? [],
 					lines: (input.lines as PurposeAnswer["lines"] | undefined) ?? [],
 					names: (input.names as PurposeAnswer["names"] | undefined) ?? [],
+					splits: (input.splits as PurposeAnswer["splits"] | undefined) ?? [],
 				}),
 				validate: (answer) => purposeAnswerProblems(answer, purposes),
 				systemPrompt: PURPOSE_INSTRUCTIONS,
@@ -837,6 +878,11 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 
 		const now = await settled();
 		if (recordHasArcs(now.record)) return { status: "failed", reason: "the course got arcs while the pass read it", edges, answer };
+		const out = new Set((answer.withdraw ?? []).map((w) => `${w.topic}\u0000${w.need}`));
+		const withdrawnAs = (d: EdgeAdd): EdgeDiff => ({ ...d, change: "add", reason: answer.withdraw!.find((w) => w.topic === d.topic && w.need === d.need)!.reason.trim() });
+		edges.withdrawn = [...edges.diffs.filter((d) => d.change === "add"), ...edges.implied].filter((d) => out.has(`${d.topic}\u0000${d.need}`)).map(withdrawnAs);
+		edges.restored = withdrawal(now.view, answer).restored;
+		if (options.edges === "propose") edges.diffs = [...edges.diffs.filter((d) => !edges.withdrawn.some((w) => w.topic === d.topic && w.need === d.need)), ...edges.restored.map((r) => ({ ...r, change: "add" as const }))];
 		const formation = arcPassChanges(answer, now.view, { edgesEntry, asked: options.asked, reason: options.reason });
 		if (!formation) return { status: "none", reason: "the answer formed no arcs", edges, answer };
 		const saved = await save("cut", formation.changes);

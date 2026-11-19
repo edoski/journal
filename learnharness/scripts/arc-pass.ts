@@ -108,8 +108,8 @@ async function copyRun(): Promise<void> {
 	const topicArcs = Object.fromEntries(Object.entries(obj(record.topics)).flatMap(([k, t]) => (typeof obj(t).arc === "string" ? [[k, obj(t).arc as string]] : [])));
 	const arcOrder = Array.isArray(obj(record.path).arcs) ? (obj(record.path).arcs as string[]) : [];
 	if (result.edges) {
-		const { mode, submit, diffs, applied, skipped, readings, loops, aside, implied, kinds, refused } = result.edges;
-		write(out, "edges.json", { mode, ...submit, diffs, applied, skipped, loops, aside, implied, kinds, refused, readings, ...(mode === "propose" ? { against_cut: againstCut(diffs, topicArcs, arcOrder) } : {}) });
+		const { mode, submit, diffs, applied, skipped, readings, loops, aside, implied, kinds, refused, withdrawn, restored } = result.edges;
+		write(out, "edges.json", { mode, ...submit, diffs, applied, skipped, loops, aside, implied, kinds, refused, withdrawn, restored, readings, ...(mode === "propose" ? { against_cut: againstCut(diffs, topicArcs, arcOrder) } : {}) });
 	}
 	if (result.answer) write(out, "answer.json", result.answer);
 	if (result.status === "formed") write(out, "patch.json", result.formation.changes);
