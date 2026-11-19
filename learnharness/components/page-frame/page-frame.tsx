@@ -7,8 +7,10 @@ import { cn } from "@/lib/utils";
 
 /** The column every page sits in: centred, up to 80rem, 24px sides, 24px
  *  above the window's foot. Home wears it too, so moving between pages no
- *  edge moves. */
-export const PAGE_COLUMN = "mx-auto w-full max-w-[80rem] px-6 pb-6";
+ *  edge moves. In the Mac app with the sidebar folded its left edge keeps
+ *  clear of the open button beside the traffic lights (`.lh-page-column`,
+ *  app/globals.css). */
+export const PAGE_COLUMN = "lh-page-column mx-auto w-full max-w-[80rem] px-6 pb-6";
 
 /**
  * The page frame (spec: page-frame.md) every page with a head and a body

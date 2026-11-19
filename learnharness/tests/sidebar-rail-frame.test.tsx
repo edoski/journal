@@ -151,8 +151,9 @@ describe("the folded sidebar", () => {
 	});
 
 	it("starts the page's band content past the button while folded in the Mac app", () => {
-		const gutter = rule('.lh-electron main[data-sidebar="folded"] .lh-band-start');
-		assert.equal(RAIL + px(gutter["padding-left"]), 90 + 28 + 12, "the toggle's right edge plus T3 Code's 12px gap");
+		const gutter = rule('.lh-electron main[data-sidebar="folded"]')["--lh-band-gutter"];
+		assert.equal(RAIL + px(gutter), 90 + 28 + 12, "the toggle's right edge plus T3 Code's 12px gap");
+		assert.equal(rule('.lh-electron main[data-sidebar="folded"] .lh-band-start')["padding-left"], "var(--lh-band-gutter)", "the band's content takes the gutter");
 		const bar = parseHTML(`<html><body>${renderToStaticMarkup(<TopBar size="slim" />)}</body></html>`).document.querySelector("header");
 		assert.ok(classes(bar).includes("lh-band-start"), "the lesson's top bar takes the gutter");
 		assert.ok(read("../components/calendar/calendar-view.tsx").includes('data-slot="calendar-toolbar" className="lh-band-start'), "the calendar's toolbar takes it");

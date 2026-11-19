@@ -594,8 +594,24 @@ body {
 	width: calc(100% + 1px);
 	background: var(--color-background);
 }
+/* Folded in the Mac app, the page's band content starts 12px past the open
+   button: from the page's left edge, the button's 90px in (physical), its
+   28px, the 12px gap, less the 48px rail. */
+.lh-electron main[data-sidebar="folded"] {
+	--lh-band-gutter: calc(90px / var(--lh-zoom) + 1.75rem + 0.75rem - 3rem);
+}
 .lh-electron main[data-sidebar="folded"] .lh-band-start {
-	padding-left: calc(90px / var(--lh-zoom) + 1.75rem + 0.75rem - 3rem);
+	padding-left: var(--lh-band-gutter);
+}
+/* The pages' centred column (PAGE_COLUMN: Home, the course page, a topic
+   page) has its first row in the band too, so its edge never comes nearer
+   than the gutter: its own 24px side, or more where the window is narrower
+   than the column plus its margins (round 19, Edo: "broken in collapsed
+   state on desktop": below ~1440px, or zoomed in, Home's tabs and the
+   course title slid under the open button). The column's centring margin is
+   half of the page's width (the window less the rail) beyond 80rem. */
+.lh-electron main[data-sidebar="folded"] .lh-page-column {
+	padding-left: max(1.5rem, calc(var(--lh-band-gutter) - max(0px, (100vw - 3rem - 80rem) / 2)));
 }
 
 /* The sidebar's fold (unit-inbox.md, "Folded"): the panel's edge sweeps

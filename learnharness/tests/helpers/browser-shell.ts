@@ -20,6 +20,8 @@ const lights = main.match(/const TRAFFIC_LIGHTS = \{ x: ([\d.]+), y: ([\d.]+) \}
 const lightSize = Number(main.match(/const LIGHT_SIZE = ([\d.]+);/)?.[1]);
 /** The traffic lights' centre in the Mac app, from electron/main.cjs. */
 export const LIGHTS_CENTRE = Number(lights?.[2]) + lightSize / 2;
+/** The three traffic lights' box in the Mac app, in points: 14pt lights 9pt apart (electron/main.cjs). */
+export const LIGHTS = { left: Number(lights?.[1]), top: Number(lights?.[2]), right: Number(lights?.[1]) + 3 * lightSize + 2 * 9, bottom: Number(lights?.[2]) + lightSize };
 
 /** T3 Code's preview: Electron's Chrome, as its user agent says. */
 const T3_PREVIEW_UA =
@@ -28,7 +30,9 @@ const T3_PREVIEW_UA =
 export type Window = "browser" | "t3-preview" | "mac-app";
 
 export interface Shell {
-	open(window: Window, options?: { sidebar?: "open" | "folded"; reducedMotion?: boolean; search?: string }): Promise<Page>;
+	/** `width`: the window's width in points (1512 by default, Edo's); `zoom`: the Mac app's ⌘± factor, which
+	 *  scales every CSS px while the traffic lights stay where AppKit draws them. */
+	open(window: Window, options?: { sidebar?: "open" | "folded"; reducedMotion?: boolean; search?: string; width?: number; zoom?: number }): Promise<Page>;
 	close(): Promise<void>;
 }
 
@@ -70,17 +74,17 @@ export async function startShell({ entry = "tests/helpers/app-shell-page.tsx", r
 	const browser: Browser = await puppeteer.launch({ executablePath, headless: true, args: ["--force-device-scale-factor=1"] });
 
 	return {
-		async open(window, { sidebar = "folded", reducedMotion = false, search = "" } = {}) {
+		async open(window, { sidebar = "folded", reducedMotion = false, search = "", width = 1512, zoom = 1 } = {}) {
 			const page = await browser.newPage();
-			await page.setViewport({ width: 1512, height: 982 });
+			await page.setViewport({ width: Math.round(width / zoom), height: Math.round(982 / zoom), deviceScaleFactor: zoom });
 			// tsx names a test's functions with an `__name` helper, which a
 			// function sent to page.evaluate carries into the page.
 			await page.evaluateOnNewDocument("globalThis.__name = (fn) => fn");
 			if (window !== "browser") await page.setUserAgent({ userAgent: T3_PREVIEW_UA });
 			if (window === "mac-app") {
-				await page.evaluateOnNewDocument((centre: number) => {
-					(globalThis as unknown as { lh: unknown }).lh = { expandWindow() {}, onZoom: () => () => {}, getZoom: async () => 1, lightsCentre: centre };
-				}, LIGHTS_CENTRE);
+				await page.evaluateOnNewDocument((centre: number, factor: number) => {
+					(globalThis as unknown as { lh: unknown }).lh = { expandWindow() {}, onZoom: () => () => {}, getZoom: async () => factor, lightsCentre: centre };
+				}, LIGHTS_CENTRE, zoom);
 			}
 			await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: reducedMotion ? "reduce" : "no-preference" }]);
 			await page.goto(`${origin}/?open=${sidebar === "open" ? 1 : 0}${search}`, { waitUntil: "load" });
