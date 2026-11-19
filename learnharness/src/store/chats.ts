@@ -19,7 +19,7 @@ import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
 import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, isQuestionRepose, opensTurn, savedAnswerTimesOf, savedAnswerTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
 import { leftQuestionRepose, sessionEndOf } from "../core/session-end.ts";
-import { lessonTakenUp, openedAsReview } from "../core/session-opening.ts";
+import { lessonTakenUp, openedAsReview, retaughtTopicOf } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
 import { stoppedByHim } from "../core/turn-cut.ts";
 import { failedResponseAtEnd } from "../core/input-events.ts";
@@ -150,6 +150,7 @@ function listChats(): ChatSummary[] {
 						tasks: sessionTasksOf(messages),
 						...((t) => (t ? { taskTitle: t } : {}))(sessionTaskTitleOf(messages)),
 						review: openedAsReview({ title: summary.title, topics: summary.topics, messages }),
+						...((t) => (t ? { retaught: t } : {}))(retaughtTopicOf({ ...summary, messages })),
 						studied: studiedIn(messages),
 						...inputTimes(messages),
 					};
@@ -188,7 +189,8 @@ function workOf(messages: readonly LhMessage[]): Work {
 function closedByNewerReview(chat: ChatSummary, all: readonly ChatSummary[], work: ReadonlyMap<string, Work>): ChatSummary {
 	if (!chat.review || !chat.pendingQuestion) return chat;
 	const since = work.get(chat.id)?.last ?? 0;
-	const newer = all.some((other) => other.id !== chat.id && other.course?.workspace === chat.course?.workspace && (chat.ownTopics ?? []).some((t) => (work.get(other.id)?.answered.get(t) ?? 0) > since));
+	const open = chat.retaught ? [chat.retaught] : (chat.ownTopics ?? []);
+	const newer = all.some((other) => other.id !== chat.id && other.course?.workspace === chat.course?.workspace && open.some((t) => (work.get(other.id)?.answered.get(t) ?? 0) > since));
 	return newer ? { ...chat, pendingQuestion: false, ended: "closed" } : chat;
 }
 

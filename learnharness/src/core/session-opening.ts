@@ -122,6 +122,20 @@ export function reviewRecord(record: { title: string; topics?: readonly string[]
 	return lessonTakenUp(record) === null && (openedAsReview(record) || isReviewSession(record));
 }
 
+/** The one of a review's topics its plan re-teaches: the topic its newest
+ *  plan names, when that is one of the review's own, so its map and its
+ *  open question are that topic's alone (round 18, M2: the Probability
+ *  review re-taught Inclusion-exclusion, and Random variables' and
+ *  Binomial's pages drew its map and read "Left off 8 Nov"). Null for a
+ *  session not a review, a review of one topic, or one whose plan names
+ *  none. Pure. */
+export function retaughtTopicOf(record: { title: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): string | null {
+	const opened = record.topics ?? [];
+	if (opened.length < 2 || !reviewRecord(record)) return null;
+	const topic = plannedTopicsOf(record.messages as readonly LhMessage[]).at(-1);
+	return topic && opened.includes(topic) ? topic : null;
+}
+
 /** The topics a session teaches as its lesson: the topics a session not a
  *  review was opened on, the topic its plan teaches and the topics of the
  *  task it took up. None for a review, which asks across its topics and may
