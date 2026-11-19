@@ -4,7 +4,19 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { MathText } from "@/components/ui/math-text";
 import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords, finalReviewMissWords, pressWord } from "@/components/study-words";
 import { examGapAskCreation, topicPress } from "@/components/unit-inbox/start-unit";
@@ -41,8 +53,9 @@ export function examGapWhich(course: StudyCourse, gaps: ExamGaps): string[] {
  * then a way in (`ways`: today's plan for the course first, then the
  * topics left out). Start it (or Review it) today opens a lesson on the one
  * topic the line names; otherwise the first is the pick, named on its press
- * ("Review Binomial distribution today"), and Or another opens a menu of
- * the rest; with none he can take today, Ask alone. A topic he began
+ * ("Review Binomial distribution today"), and Or another opens a menu
+ * that marks the pick and folds the rest behind More (round 18, m6); with
+ * none he can take today, Ask alone. A topic he began
  * reads Continue and opens its session, as its topic page does
  * (`topicPress`; round 12, 1 D5). Ask the tutor opens a lesson that asks,
  * in his words, how to fit them in. Each starts through the page's one
@@ -111,25 +124,36 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 				{others.length > 0 && (
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<Button variant="quiet" size="xs" className={PRESS} disabled={starting !== null}>
+						<Button variant="quiet" size="xs" data-slot="exam-gaps-another" className={PRESS} disabled={starting !== null}>
 							{EXAM_GAP_WORDS.another}
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start">
-						{/* Marked by what they are: the plan's own for today, then the topics it leaves out (round 17, m6:
-						    16 options with none marked). */}
-						{[{ label: EXAM_GAP_WORDS.planned, ways: others.filter((way) => way.planned) }, { label: EXAM_GAP_WORDS.leftOut, ways: others.filter((way) => !way.planned) }].map((group) =>
-							group.ways.length === 0 ? null : (
-								<DropdownMenuGroup key={group.label} data-slot="exam-gaps-group">
-									<DropdownMenuLabel>{group.label}</DropdownMenuLabel>
-									{group.ways.map((way) => (
-										<DropdownMenuItem key={way.topic.handle} onSelect={() => open(way.topic)}>
-											<MathText>{`${pressWord(verb(way))} ${way.topic.title}`}</MathText>
-										</DropdownMenuItem>
-									))}
-								</DropdownMenuGroup>
-							),
-						)}
+						{/* One option marked, the head's own way in, and the rest folded behind More (round 18, m6: 17
+						    options with none marked); behind it, each by what it is, the plan's own for today, then the
+						    topics it leaves out (round 17, m6). */}
+						<DropdownMenuRadioGroup value={pick!.topic.handle}>
+							<DropdownMenuRadioItem value={pick!.topic.handle} data-slot="exam-gaps-marked" onSelect={() => open(pick!.topic)}>
+								<MathText>{`${pressWord(verb(pick!))} ${pick!.topic.title}`}</MathText>
+							</DropdownMenuRadioItem>
+						</DropdownMenuRadioGroup>
+						<DropdownMenuSub>
+							<DropdownMenuSubTrigger data-slot="exam-gaps-more">{EXAM_GAP_WORDS.more}</DropdownMenuSubTrigger>
+							<DropdownMenuSubContent>
+								{[{ label: EXAM_GAP_WORDS.planned, ways: others.filter((way) => way.planned) }, { label: EXAM_GAP_WORDS.leftOut, ways: others.filter((way) => !way.planned) }].map((group) =>
+									group.ways.length === 0 ? null : (
+										<DropdownMenuGroup key={group.label} data-slot="exam-gaps-group">
+											<DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+											{group.ways.map((way) => (
+												<DropdownMenuItem key={way.topic.handle} onSelect={() => open(way.topic)}>
+													<MathText>{`${pressWord(verb(way))} ${way.topic.title}`}</MathText>
+												</DropdownMenuItem>
+											))}
+										</DropdownMenuGroup>
+									),
+								)}
+							</DropdownMenuSubContent>
+						</DropdownMenuSub>
 					</DropdownMenuContent>
 				</DropdownMenu>
 				)}

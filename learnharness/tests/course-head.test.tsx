@@ -258,6 +258,29 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.ok(bare.querySelector("[data-slot=exam-gaps-which-press]") === null, "no Which topics with nothing more to show");
 	});
 
+	/**
+	 * Round 18, m6 (1 n4, `76b`, `77-topic-stirling-d17`): on 17 Nov "Left
+	 * out before the exam" offered Start Stirling's formula and Start
+	 * Geometric distribution, which the plan starts on Wed 18 Nov, the day
+	 * before the exam. The topics left out are only those that do not start
+	 * before it.
+	 */
+	it("leaves out of Or another the topics the plan starts before the exam, on the 17 Nov world (round 18, m6)", () => {
+		const c = course({
+			today: "2026-11-17",
+			exam: { date: "2026-11-19", daysLeft: 2, finalReview: "2026-11-17", doesNotFit: [h("poisson")], unreviewed: [h("rv"), h("stirling"), h("geometric")], reasons: { poisson: "full", rv: "full", stirling: "too_late", geometric: "too_late" } },
+			topics: [
+				topic("bayes", { level: "assisted", introduced: "2026-11-01", review: { kind: "due", date: "2026-11-17", overdue: 0 } }),
+				topic("rv", { title: "Random variables", level: "assisted", introduced: "2026-11-05" }),
+				topic("poisson"),
+				topic("stirling", { title: "Stirling's formula", starts: "2026-11-18" }),
+				topic("geometric", { title: "Geometric distribution", starts: "2026-11-18" }),
+			],
+		});
+		const ways = examGaps(c.map)!.ways.map((w) => `${w.starts ? "Start" : "Review"} ${w.topic.handle}${w.planned ? " (planned)" : ""}`);
+		assert.deepEqual(ways, ["Review bayes (planned)", "Review rv", "Start poisson"], "Stirling and Geometric start on 18 Nov, before the exam: not left out");
+	});
+
 	it("shows when a topic has no room, and nothing when every topic fits", () => {
 		assert.ok(gapLine(gapped(["variance"], [], { variance: "no_study_day" })));
 		assert.ok(gapLine(course()) === null);

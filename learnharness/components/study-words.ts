@@ -379,6 +379,8 @@ export const EXAM_GAP_WORDS = {
 	review: "Review it today",
 	/** The menu of the other topics he can take up today, beside the pick. */
 	another: "Or another",
+	/** Where that menu folds every way but the pick, which it marks (round 18, m6: 17 options with none marked). */
+	more: "More",
 	/** A topic he began, whose press picks its session or task up (round 12, 1 D5). */
 	continue: "Continue it today",
 	ask: "Ask the tutor",
