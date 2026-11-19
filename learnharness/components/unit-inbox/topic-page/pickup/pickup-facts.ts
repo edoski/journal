@@ -87,7 +87,9 @@ export interface PickupSections {
 export function plannedWords(facts: TopicFacts): string | null {
 	const { starts, startsAfter, excluded, moved } = facts.topic;
 	// The plan starts no topic the course leaves out; its reason says why (round 5: Covariance read as ordinary work).
-	if (!starts) return excluded ?? null;
+	// An exam topic the plan has no day for in its window says the exam's words too (round 18, M1's seed:
+	// Diagonalization read only "First lesson" while the course head said no room before the exam to start it).
+	if (!starts) return excluded ?? facts.exam ?? null;
 	const day = starts <= facts.today ? "Planned today" : `Planned ${dayOf(starts)}`;
 	// The exam is why it comes when it does, whatever else it waits behind (round 13, 1 N1: Geometric read only
 	// "Planned Sat 28 Nov" while the head said no room before the exam to start it).
