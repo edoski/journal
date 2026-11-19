@@ -5,9 +5,11 @@
  *
  * It keys on the question itself, never its topic (round 4: a cold answer
  * to a brand-new question on the same topic was saved as helped). A
- * question's solution is shown when he answers it (the committed answer is
- * revealed on submit) and when a practice problem ends (the committed
- * solution is revealed, unless he left it for today). The same words asked
+ * question's solution is shown once the record keeps his answer to it as
+ * an attempt, which the tutor's reply then grades, or he pressed Show me,
+ * and when a practice problem ends (the committed solution is revealed,
+ * unless he left it for today). A question he typed into the answer box is
+ * no attempt and shows nothing (fix round 18). The same words asked
  * again later, as a new question or a re-posed problem, were seen: an
  * attempt on them saved as unaided takes the shown solution as its help.
  * A different question on the same idea is his own work. Pure.

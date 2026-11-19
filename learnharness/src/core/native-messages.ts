@@ -1029,7 +1029,14 @@ const UNSAVED_CONCLUDE = /The attempt was not saved|The attempt could not be rec
 function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { key: string; seen: boolean; predicted: boolean }>; answered: Map<string, AnsweredQuestion> } {
 	const clean = cleanToolCallIds(messages);
 	const revealed = new Set<string>();
-	const posed = new Map<string, { key: string; seen: boolean; predicted: boolean }>();
+	// His answers to each question's words: one shows the solution once the
+	// record keeps it as his attempt, so a question he typed into the answer
+	// box, which the tutor answered and asked again unsaved, shows nothing
+	// (fix round 18: the re-ask's answer was saved "solution shown").
+	const answeredOn = new Map<string, string[]>();
+	const posed = new Map<string, { key: string; seen: boolean; predicted: boolean; shownBy: string[] }>();
+	// A problem's conclude, by the call that posed the problem.
+	const concludedFrom = new Map<string, string>();
 	const answered = new Map<string, AnsweredQuestion>();
 	// Each save's named answers, until its result says whether it went
 	// through; an answer in words stands for his newest message then.
@@ -1044,7 +1051,7 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 	const pose = (callId: string, text: unknown, type?: unknown) => {
 		if (typeof text !== "string") return;
 		const key = sameQuestionKey(text);
-		posed.set(callId, { key, seen: revealed.has(key), predicted: normalizeQuestionType(type) === "predict" });
+		posed.set(callId, { key, seen: revealed.has(key), predicted: normalizeQuestionType(type) === "predict", shownBy: [...(answeredOn.get(key) ?? [])] });
 	};
 	for (const m of messages) {
 		if (m.role === "user") {
@@ -1067,11 +1074,13 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 					problem = block.id;
 					posedSinceSaid = true;
 				} else if (block.name === PRACTICE_CONCLUDE_TOOL && clean.has(block.id) && problem) {
-					const asked = posed.get(problem);
+					const poseCall = problem;
+					const asked = posed.get(poseCall);
 					problem = null;
 					if (!asked || args.outcome === "dismissed") continue;
 					revealed.add(asked.key);
-					answered.set(block.id, { tool: PRACTICE_CONCLUDE_TOOL, seenBefore: asked.seen, predicted: false, recorded: false });
+					concludedFrom.set(block.id, poseCall);
+					answered.set(block.id, { tool: PRACTICE_CONCLUDE_TOOL, seenBefore: false, predicted: false, recorded: false });
 				}
 			}
 		} else if (m.role === "toolResult" && !m.isError && m.toolName === "course_save") {
@@ -1085,15 +1094,19 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 		} else if (m.role === "toolResult" && GRADED_QUESTION_TOOLS.includes(m.toolName) && !m.isError && isRealAnswer(m.details)) {
 			const asked = posed.get(m.toolCallId);
 			if (!asked) continue;
-			revealed.add(asked.key);
 			const details = m.details as { confidence?: unknown; showMe?: unknown; text?: unknown };
+			// A Show me shows its answer, whatever is saved of it.
+			if (details.showMe === true) revealed.add(asked.key);
+			else answeredOn.set(asked.key, [...(answeredOn.get(asked.key) ?? []), m.toolCallId]);
 			const confidence = chosenConfidence(details.confidence) ?? null;
 			const words = typeof details.text === "string" && details.text.trim() ? { words: details.text } : {};
-			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, ...words, recorded: false });
+			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: false, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, ...words, recorded: false });
 		}
 	}
+	for (const asked of posed.values()) asked.seen ||= asked.shownBy.some((id) => recorded.has(id));
 	for (const [key, answer] of answered) {
 		answer.recorded = recorded.has(key);
+		answer.seenBefore = posed.get(concludedFrom.get(key) ?? key)?.seen === true;
 		const replay = unsaved.get(key);
 		if (replay && !answer.recorded) answer.replay = replay;
 	}
