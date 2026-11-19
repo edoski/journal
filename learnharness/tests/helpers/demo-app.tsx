@@ -113,6 +113,8 @@ export interface HomeLine {
 	status: string;
 	/** The kind of a new topic's reason its mark gives in place of its plain words (`data-starts`), else null. */
 	starts: string | null;
+	/** The topics the line takes up (`data-topics`): a review named as its course's names none. */
+	topics: string[];
 	text: string;
 }
 
@@ -401,7 +403,8 @@ export async function openDemoApp(day = "2026-11-08") {
 			const [course, title] = [...el.children].filter((c) => c.matches("span.block")).map(text);
 			const status = text(el.querySelector('[data-slot="why-mark"], [data-slot="today-standing"], [data-slot="today-why"]'));
 			const starts = el.querySelector('[data-slot="today-why"]')?.getAttribute("data-starts") ?? null;
-			return { el, course: course ?? "", title: title ?? "", status, starts, text: text(el) };
+			const topics = (el.getAttribute("data-topics") ?? "").split(" ").filter(Boolean);
+			return { el, course: course ?? "", title: title ?? "", status, starts, topics, text: text(el) };
 		});
 	}
 

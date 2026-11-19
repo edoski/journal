@@ -141,10 +141,79 @@ describe("the exam eve at the new world's size (round 17, M3)", () => {
 		const why = await page.evaluate(() => document.querySelector('[data-slot="exam-gaps-why"]')?.textContent ?? "");
 		assert.ok(why.split(/\s+/).length <= 30, `the why is short: "${why}"`);
 		assert.doesNotMatch(why, /Variance|Martingales|Geometric/, "it lists no topic");
-		await page.click('[data-slot="exam-gaps-which-press"]');
-		const which = await page.evaluate(() => document.querySelector('[data-slot="exam-gaps-which"]')?.textContent ?? "");
-		assert.match(which, /Geometric distribution.*Variance of sums/, "Which topics names them all");
+		// Round 18, m7 (1 n5): Which topics repeated the head's line word for word. The head's line names every topic
+		// with no room here, so the answer has nothing behind Which topics and says no sentence of the line.
+		const answer = await page.evaluate(() => ({
+			head: document.querySelector('[data-slot="course-ready-fact"]')?.textContent ?? "",
+			popover: document.querySelector('[data-slot="course-ready-detail"]')?.textContent ?? "",
+			whichPress: document.querySelector('[data-slot="exam-gaps-which-press"]') !== null,
+		}));
+		assert.equal(answer.whichPress, false, "no Which topics with nothing the head's line does not say");
+		assert.ok(!answer.popover.includes(answer.head), "no sentence of the head's line in its answer");
+		assert.doesNotMatch(answer.popover, /\bOne starts\b|\bsome start\b/i, "no topic left unnamed");
 		await page.close();
 		assert.ok(pick.order.every((line, i) => i === 0 || line >= pick.order[i - 1]!), `the pick's words read in order, line by line, never in columns: ${pick.order.join(" ")}`);
+	});
+});
+
+/**
+ * Round 18, m9 (1 n7, `41`, `75`): when the 17 Nov head wrapped, "Studied
+ * 10 Nov" went to a line of its own with the facts' divider still in front
+ * of it. The facts are apart by the line's gap, never a divider, so a fact
+ * that wraps starts on the line's left edge.
+ */
+describe("the head's facts when they wrap (round 18, m9)", () => {
+	it("puts Studied on its own line at the line's left edge, with no divider before it", async () => {
+		const page = await shell.open("browser", { sidebar: "open", search: "&case=eve" });
+		await page.waitForSelector('[data-slot="course-studied"]');
+		const m = await page.evaluate(() => {
+			// The head's lines' left edge, where every line starts.
+			const lineLeft = document.querySelector('[data-slot="page-lines"]')!.getBoundingClientRect().left;
+			const clip = document.querySelector('[data-slot="page-standing"]')!.getBoundingClientRect();
+			const ready = document.querySelector('[data-slot="course-ready-fact"]')!.getBoundingClientRect();
+			const studied = document.querySelector('[data-slot="course-studied"]')!;
+			const box = studied.getBoundingClientRect();
+			const before = getComputedStyle(studied, "::before");
+			const drawn = before.content !== "none" && before.content !== "normal" && parseFloat(before.width) > 0;
+			// A hairline placed inside the fact's flow is drawn; one placed left of the clip is cut away.
+			const shown = drawn && (before.position !== "absolute" || box.left + parseFloat(before.left) + parseFloat(before.width) > clip.left);
+			return { lineLeft, iconLeft: studied.querySelector("svg")!.getBoundingClientRect().left, wrapped: box.top >= ready.bottom - 0.5, divider: shown };
+		});
+		await page.close();
+		assert.ok(m.wrapped, "Studied wraps under the readiness line at 1512 px");
+		assert.equal(m.divider, false, "no divider drawn before a fact");
+		assert.ok(Math.abs(m.iconLeft - m.lineLeft) < 0.5, `Studied's mark starts on the line's left edge (${m.iconLeft} against ${m.lineLeft})`);
+	});
+});
+
+/**
+ * Round 18, m6 (1 n4, `76b`): on the 17 Nov exam eve, "Or another" listed
+ * 17 options with none marked. It opens on one, marked: the head's own way
+ * in, its pick; the rest fold behind More.
+ */
+describe("Or another on the exam eve (round 18, m6)", () => {
+	it("marks the head's own way in and folds the rest behind More", async () => {
+		const page = await shell.open("browser", { sidebar: "open", search: "&case=eve" });
+		await page.waitForSelector('[data-slot="course-topic-row"]');
+		await page.click('[data-slot="course-ready-fact"]');
+		await page.waitForSelector('[data-slot="exam-gaps-another"]');
+		const pick = await page.evaluate(() => document.querySelector('[data-slot="exam-gaps-pick"]')!.textContent);
+		await page.click('[data-slot="exam-gaps-another"]');
+		await page.waitForSelector('[data-slot="dropdown-menu-content"]');
+		const top = await page.evaluate(() => {
+			const menu = document.querySelector('[data-slot="dropdown-menu-content"]')!;
+			const rows = [...menu.querySelectorAll('[role^="menuitem"]')].filter((row) => row.closest('[data-slot="dropdown-menu-content"]') === menu);
+			return rows.map((row) => ({ words: row.textContent, checked: row.getAttribute("aria-checked"), more: row.getAttribute("aria-haspopup") === "menu" }));
+		});
+		assert.equal(top.length, 2, `one marked option and More: ${JSON.stringify(top)}`);
+		assert.equal(top[0]!.checked, "true", "the first is marked");
+		assert.equal(`${top[0]!.words} today`, pick, "the marked one is the head's own way in");
+		assert.ok(top[1]!.more && top[1]!.words === "More", "the rest are behind More");
+		await page.click('[data-slot="exam-gaps-more"]');
+		await page.waitForSelector('[data-slot="dropdown-menu-sub-content"]');
+		const rest = await page.evaluate(() => [...document.querySelectorAll('[data-slot="dropdown-menu-sub-content"] [role="menuitem"]')].map((row) => row.textContent));
+		await page.close();
+		assert.equal(rest.length, 9, `the nine topics with no room, behind More: ${rest.join(", ")}`);
+		assert.ok(!rest.some((words) => `${words} today` === pick), "the marked one is not again behind More");
 	});
 });

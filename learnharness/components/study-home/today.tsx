@@ -19,15 +19,16 @@ import { useStartScope } from "@/components/start/start-scope";
  * holds today, each its course and its lesson; the whole line opens it.
  * The title names an exam in the coming week (`nearExam`), and says when
  * nothing is left today; under it, the exam's topics with no room before
- * it, by name, with Ask the tutor (`ExamMisfit`). The lines are agenda's
+ * it, by name, with Ask the tutor (`ExamMisfit`): the coming week's exam,
+ * else one further off on the day a topic fell past it (`misfitExam`). The lines are agenda's
  * hybrid rows (agenda-rows/hybrid/hybrid.md).
  */
-export function Today({ done, exam = null, ...props }: RowsProps & { done: readonly string[]; exam?: NearExam | null }) {
+export function Today({ done, exam = null, misfit = exam, ...props }: RowsProps & { done: readonly string[]; exam?: NearExam | null; misfit?: NearExam | null }) {
 	const words = doneWords(done);
 	return (
 		<section aria-labelledby="today-heading" data-slot="today" className="flex shrink-0 flex-col gap-2">
 			<DayHeading id="today-heading" studied={words !== null} exam={exam} empty={props.rows.length === 0} />
-			{exam && <ExamMisfit exam={exam} />}
+			{misfit && <ExamMisfit exam={misfit} />}
 			{words && (
 				<p data-slot="today-done" className="-mt-1 flex h-5 min-w-0 items-center gap-1.5 text-callout text-muted-foreground">
 					<CircleCheckIcon aria-hidden="true" className="size-3.5 shrink-0" />

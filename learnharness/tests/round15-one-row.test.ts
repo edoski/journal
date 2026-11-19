@@ -45,7 +45,7 @@ describe("Home on 10 Nov: the Linear maps lesson left yesterday, its topic's rev
 
 	it("keeps the review's line when no lesson on the topic is open", () => {
 		const rows = todayRows([course], openSessions([]), D10);
-		assert.deepEqual(rows.map(lessonTitle), ["Review Linear maps and their matrices, Matrix multiplication as composition", "Continue Linear maps and their matrices lesson"]);
+		assert.deepEqual(rows.map(lessonTitle), ["Linear Algebra review", "Continue Linear maps and their matrices lesson"]);
 	});
 });
 

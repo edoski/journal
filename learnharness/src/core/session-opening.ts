@@ -83,7 +83,9 @@ function reviewOpening(record: { title?: string; topics?: readonly string[]; mes
  *  side answer started
  *  (round 17, M5 live: the Probability review's plan re-taught
  *  Inclusion-exclusion, he asked to start Expectation and answered its
- *  question, and the session stayed the review). A lesson keeps the topic
+ *  question, and the session stayed the review), else the first topic not
+ *  among them that a task it saved holds (round 18, M3: that plan gave no
+ *  topic, and its close's Expectation task is what said so). A lesson keeps the topic
  *  it opened on when a later plan repairs a prerequisite. Null otherwise.
  *  Pure. */
 export function lessonTakenUp(record: { title?: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): string | null {
@@ -91,7 +93,8 @@ export function lessonTakenUp(record: { title?: string; topics?: readonly string
 	const first = planTakesUp(record, sessionPlanTopicOf(messages) ?? firstStartedTopicOf(messages));
 	if (first || !reviewOpening(record)) return first;
 	const opened = record.topics ?? [];
-	return plannedTopicsOf(messages).find((topic) => !opened.includes(topic)) ?? null;
+	const outside = (topic: string) => !opened.includes(topic);
+	return plannedTopicsOf(messages).find(outside) ?? sessionTaskTopicsOf(messages).find(outside) ?? null;
 }
 
 /** The topic a session opened on topics takes up as its lesson when its
@@ -117,6 +120,20 @@ export function isReviewSession(chat: { title: string; review?: boolean; ownTopi
  *  tools and the digest read a review the same way. */
 export function reviewRecord(record: { title: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): boolean {
 	return lessonTakenUp(record) === null && (openedAsReview(record) || isReviewSession(record));
+}
+
+/** The one of a review's topics its plan re-teaches: the topic its newest
+ *  plan names, when that is one of the review's own, so its map and its
+ *  open question are that topic's alone (round 18, M2: the Probability
+ *  review re-taught Inclusion-exclusion, and Random variables' and
+ *  Binomial's pages drew its map and read "Left off 8 Nov"). Null for a
+ *  session not a review, a review of one topic, or one whose plan names
+ *  none. Pure. */
+export function retaughtTopicOf(record: { title: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): string | null {
+	const opened = record.topics ?? [];
+	if (opened.length < 2 || !reviewRecord(record)) return null;
+	const topic = plannedTopicsOf(record.messages as readonly LhMessage[]).at(-1);
+	return topic && opened.includes(topic) ? topic : null;
 }
 
 /** The topics a session teaches as its lesson: the topics a session not a

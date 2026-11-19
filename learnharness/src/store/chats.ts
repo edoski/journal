@@ -17,9 +17,9 @@ import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, Sessi
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
-import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, isQuestionRepose, opensTurn, savedAnswerTimesOf, savedAnswerTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
-import { leftQuestionRepose, sessionEndOf } from "../core/session-end.ts";
-import { lessonTakenUp, openedAsReview } from "../core/session-opening.ts";
+import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, isQuestionRepose, opensTurn, savedAnswerTimesOf, savedAnswerTopicsOf, savedTaskTimesOf, startsMovedOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
+import { leftQuestionRepose, offersStop, sessionEndOf } from "../core/session-end.ts";
+import { lessonTakenUp, openedAsReview, retaughtTopicOf } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
 import { stoppedByHim } from "../core/turn-cut.ts";
 import { failedResponseAtEnd } from "../core/input-events.ts";
@@ -143,13 +143,16 @@ function listChats(): ChatSummary[] {
 						pendingProblem: activeProblemOf(messages) !== null,
 						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages), ...own])],
 						ownTopics: own,
-						ended: endedBy(sessionEndOf(messages, tree, summary.kind, own), summary.updatedAt, danglingQuestionOf(messages) !== null || leftQuestionRepose(messages).length > 0 || activeProblemOf(messages) !== null),
+						// The tutor's offer to go on, one of whose options stops for today, asks nothing of him: left where it is (round 18, m4).
+						ended: offersStop(messages) ? "left" : endedBy(sessionEndOf(messages, tree, summary.kind, own), summary.updatedAt, danglingQuestionOf(messages) !== null || leftQuestionRepose(messages).length > 0 || activeProblemOf(messages) !== null),
 						...(stoppedByHim(messages) ? { stopped: true as const } : {}),
 						...(failedResponseAtEnd(messages) ? { failed: true as const } : {}),
 						...(learnerWords(messages).length <= 1 ? { untouched: true as const } : {}),
 						tasks: sessionTasksOf(messages),
 						...((t) => (t ? { taskTitle: t } : {}))(sessionTaskTitleOf(messages)),
 						review: openedAsReview({ title: summary.title, topics: summary.topics, messages }),
+						...((t) => (t ? { retaught: t } : {}))(retaughtTopicOf({ ...summary, messages })),
+						...((moved) => (moved.length > 0 ? { startsMoved: moved } : {}))(startsMovedOf(messages)),
 						studied: studiedIn(messages),
 						...inputTimes(messages),
 					};
@@ -160,7 +163,7 @@ function listChats(): ChatSummary[] {
 			})
 			.filter((s) => s !== null)
 			.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-		return listed.map((s) => closedByNewerReview(s, listed, work));
+		return listed.map((s) => closedByNewerWork(s, listed, work));
 	} catch {
 		return [];
 	}
@@ -172,23 +175,35 @@ function listChats(): ChatSummary[] {
 interface Work {
 	last: number;
 	answered: ReadonlyMap<string, number>;
+	/** When its saves wrote each task (`savedTaskTimesOf`). */
+	tasked: ReadonlyMap<string, number>;
 }
 
 function workOf(messages: readonly LhMessage[]): Work {
 	const last = messages.reduce((at, m) => (isQuestionRepose(m) || typeof m.timestamp !== "number" ? at : Math.max(at, m.timestamp)), 0);
-	return { last, answered: savedAnswerTimesOf(messages) };
+	return { last, answered: savedAnswerTimesOf(messages), tasked: savedTaskTimesOf(messages) };
 }
 
-/** A review left with a question open closes once a newer review of one
- *  of its topics is done: another session of its course saved an answer on
- *  that topic after his last word in this one. Every list reads it closed,
- *  so Home, Sessions and the topic page keep no stale "Left off" row (Edo,
- *  18 Nov 2026, round 17 m10: the 9 Nov review's "1 to 105" question stayed
- *  "Left off 9 Nov" after the 10 Nov review answered its topic). */
-function closedByNewerReview(chat: ChatSummary, all: readonly ChatSummary[], work: ReadonlyMap<string, Work>): ChatSummary {
-	if (!chat.review || !chat.pendingQuestion) return chat;
+/** A session left with a question open closes once newer work took its
+ *  place: for a review, another session of its course saved an answer on
+ *  one of its topics after his last word in this one; for a lesson that
+ *  holds a task, another session wrote that task after it, so the lesson
+ *  goes on there. Every list reads it closed, so Home, Sessions and the
+ *  topic page keep no stale "Left off" row and one open session per lesson
+ *  (Edo, 18 Nov 2026, round 17 m10: the 9 Nov review's "1 to 105" question
+ *  stayed "Left off 9 Nov" after the 10 Nov review answered its topic;
+ *  round 18, m5: after "Yes" to picking up the Expectation lesson, the Ask
+ *  session carried it on, and the 10 Nov lesson's lottery question stayed
+ *  open as a second "Expectation and linearity lesson"). */
+function closedByNewerWork(chat: ChatSummary, all: readonly ChatSummary[], work: ReadonlyMap<string, Work>): ChatSummary {
+	if (!chat.pendingQuestion) return chat;
 	const since = work.get(chat.id)?.last ?? 0;
-	const newer = all.some((other) => other.id !== chat.id && other.course?.workspace === chat.course?.workspace && (chat.ownTopics ?? []).some((t) => (work.get(other.id)?.answered.get(t) ?? 0) > since));
+	const open = chat.review ? (chat.retaught ? [chat.retaught] : (chat.ownTopics ?? [])) : [];
+	const tasks = chat.review ? [] : (chat.tasks ?? []);
+	const newer = all.some((other) => {
+		const theirs = other.id !== chat.id && other.course?.workspace === chat.course?.workspace ? work.get(other.id) : undefined;
+		return theirs !== undefined && (open.some((t) => (theirs.answered.get(t) ?? 0) > since) || tasks.some((k) => (theirs.tasked.get(k) ?? 0) > since));
+	});
 	return newer ? { ...chat, pendingQuestion: false, ended: "closed" } : chat;
 }
 

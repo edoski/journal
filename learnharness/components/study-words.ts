@@ -369,7 +369,8 @@ export const ARC_EXAM_WORDS = {
  *  why, in the engine's reasons (`EXAM_GAP_WHY`), then a way in. "Today",
  *  since a press starts it now. */
 export const EXAM_GAP_WORDS = {
-	/** The readiness answer's list of the topics left out, behind its press (round 17, m6). */
+	/** The readiness answer's list of the topics left out that the head's line and the why do not name, behind its
+	 *  press (round 17, m6; round 18, m7). */
 	which: "Which topics",
 	/** "Or another"'s groups: the plan's own for today, then the topics it leaves out (round 17, m6). */
 	planned: "Planned today",
@@ -378,6 +379,8 @@ export const EXAM_GAP_WORDS = {
 	review: "Review it today",
 	/** The menu of the other topics he can take up today, beside the pick. */
 	another: "Or another",
+	/** Where that menu folds every way but the pick, which it marks (round 18, m6: 17 options with none marked). */
+	more: "More",
 	/** A topic he began, whose press picks its session or task up (round 12, 1 D5). */
 	continue: "Continue it today",
 	ask: "Ask the tutor",
@@ -425,9 +428,11 @@ const startsWord = (titles: readonly string[]) => (titles.length === 1 ? "starts
  * has more than one reason; a topic that starts too late is always named.
  * Your pace is said once: a final review full at your pace is the same
  * cause as study days full at your pace. With `names` false it names no
- * topic, the one consequence alone, for the readiness answer, whose list
- * is behind Which topics (round 17, m6: a 90-word paragraph of 11 topics
- * on the exam eve). Null with nothing left out. Pure.
+ * topic but one that starts too late, the one consequence alone, for the
+ * readiness answer, whose list is behind Which topics (round 17, m6: a
+ * 90-word paragraph of 11 topics on the exam eve; round 18, m7: "One
+ * starts too close to the exam", one what?). Null with nothing left out.
+ * Pure.
  */
 export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly ExamGapTopic[], names = true): string | null {
 	const by = (topics: readonly ExamGapTopic[], reason: ExamGapReason) => topics.filter((t) => t.reason === reason).map((t) => t.title);
@@ -449,7 +454,8 @@ export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly
 	const second = sentence([
 		...(noDay.length > 0 ? [named ? `no study day is left in the final review for ${listWords(noDay)}` : "no study day is left in the final review"] : []),
 		...(full.length > 0 ? [named ? `the final review has no room for ${listWords(full)}${paceSaid ? "" : " at your pace"}` : paceSaid ? "the final review is full too" : "your pace fills every day of the final review"] : []),
-		...(late.length > 0 ? [names ? `${listWords(late)} ${startsWord(late)} too close to the exam for a review` : `${late.length === 1 ? "one starts" : "some start"} too close to the exam for a review`] : []),
+		// A topic that starts too late is always named, names or not (round 18, m7: "One starts too close…", one what?).
+		...(late.length > 0 ? [`${listWords(late)} ${startsWord(late)} too close to the exam for a review`] : []),
 	]);
 	const both = [first, second].filter((s): s is string => s !== null);
 	return both.length > 0 ? both.join(" ") : null;

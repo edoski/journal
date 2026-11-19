@@ -12,7 +12,7 @@ import { Today } from "@/components/study-home/today";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
 import { PAGE_COLUMN } from "@/components/page-frame/page-frame";
-import type { TopicHandle } from "@/src/core";
+import { currentArc, type ArcHandle, type StudyCourse, type TopicHandle } from "@/src/core";
 import { useMapTie, type PointBy } from "@/components/course-map/use-map-tie";
 import { useListWalk } from "@/components/list-walk/use-list-walk";
 import { HomeComposer } from "@/components/course-page/course-composer";
@@ -57,8 +57,21 @@ const HOME_FRAME = cn(PAGE_COLUMN, "pt-[calc(var(--lh-band-centre)-1rem)]");
 /** What picks the map's course: a Today line he points at, or a tab he chose. */
 type Chosen = { by: "line"; key: string } | { by: "tab"; workspace: string };
 
+/** The arc Home's map opens on at rest, before he points at a line: the
+ *  arc of You are here, else the arc of the course's first Today row's
+ *  topics; null with neither (round 18, m8: at rest it followed the session
+ *  he last wrote in, and on 8 and 9 Nov opened on Linear Algebra's arc 2,
+ *  with neither You are here, in arc 8, nor a Today topic in view). Pure. */
+export function restArc(course: StudyCourse | undefined, rows: readonly TodayRow[]): ArcHandle | null {
+	if (!course) return null;
+	const here = currentArc(course.map);
+	if (here) return here;
+	const first = rows.find((row) => row.course?.map.workspace === course.map.workspace);
+	return first ? (lessonOf(first).place?.handle ?? null) : null;
+}
+
 export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
-	const { rows, courses, chats, done, exam, busy, onContinue } = ready;
+	const { rows, courses, chats, done, exam, misfit, busy, onContinue } = ready;
 	const router = useRouter();
 	const [chosen, setChosen] = useState<Chosen | null>(null);
 	// The line he points at, once the pointer rests or the focus lands, moves the map to its course and lights its
@@ -107,7 +120,7 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 					highlight={tie.lights.lit ?? followedTopics}
 					marked={tie.lights.glow}
 					framed={enlarged ? null : tie.lights.framed}
-					arc={lesson?.place?.handle ?? null}
+					arc={chosen?.by === "line" ? (lesson?.place?.handle ?? null) : restArc(courses.find((c) => c.map.workspace === workspace), rows)}
 					enlarged={enlarged}
 					onEnlarge={onEnlarge}
 				/>
@@ -118,6 +131,7 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 						rows={rows}
 						done={done}
 						exam={exam}
+						misfit={misfit}
 						busy={busy}
 						onContinue={onContinue}
 						pointed={pointed}

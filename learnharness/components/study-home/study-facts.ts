@@ -1,4 +1,4 @@
-import { isReviewSession, taskTopics, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
+import { courseReviewName, isReviewSession, taskTopics, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
 import { continueMove, sessionState, type SessionState } from "@/components/nav/session-state";
 import { SOLID, taskSessions, topicSessions } from "@/components/unit-inbox/units";
@@ -132,6 +132,17 @@ export function continueWords(title: string): string {
 	return /^Continue\s/.test(title) ? title : `Continue ${title}`;
 }
 
+/** The step as a line names it: a review of more than one topic by its
+ *  course's review ("Probability review"), as the session it opens is
+ *  named, never the list of its topics (round 18, m10: Home's row and its
+ *  sidebar card read "Review Binomial distribution, Inclusion-exclusion
+ *  principle, Random variables and distributions", clamped at "…and…");
+ *  else its instruction (`stepWords`), which the session opens with.
+ *  Pure. */
+export function stepTitle(step: NextStep, courseTitle: string): string {
+	return step.kind === "review" && step.titles.length > 1 ? courseReviewName(courseTitle) : stepWords(step);
+}
+
 /** The step as a short instruction: "Review Linear independence, Rank",
  *  "Continue Problem sheet 4", "Start Poisson distribution" for a topic not
  *  started. Pure. */
@@ -198,6 +209,27 @@ function covers(chat: ChatListItem, step: NextStep): boolean {
  *  new topics the plan starts today. An open task, the current topic taken
  *  up with nothing planned, or an item on a later day is not. Pure. */
 const planned = (step: NextStep) => !laterOnly(step) && (step.kind === "review" || (step.kind === "topic" && step.planned));
+
+/** A course whose plan for today keeps the starts today's study moved
+ *  off it while the session whose saves moved them (`startsMoved`) is
+ *  still open: each topic not started whose start the plan gave today as
+ *  yesterday ended, moved by his study today (the engine's `moved`). Home and the sidebar keep its
+ *  "Start … · Planned today" line until that session closes, and the close
+ *  says where it went (round 18, M4: "Start Expectation and linearity" left
+ *  Home and the sidebar at a hinted save, before any answer settled it).
+ *  Pure. */
+export function withKeptStarts(course: StudyCourse, open: readonly ChatListItem[], today: string): StudyCourse {
+	const { map } = course;
+	const live = new Set(open.filter((c) => c.course?.workspace === map.workspace && lastDay(c) >= today && OPEN_NOW.has(sessionState(c))).flatMap((c) => c.startsMoved ?? []));
+	if (live.size === 0) return course;
+	const kept = map.topics.filter((t) => live.has(t.handle) && t.level === "new" && t.moved?.by === "study" && t.moved.day === "today" && t.moved.from === today && !course.newToday.includes(t.handle)).map((t) => t.handle);
+	return kept.length > 0 ? { ...course, newToday: [...course.newToday, ...kept] } : course;
+}
+
+/** The states of a session still open: it waits on him, the tutor writes
+ *  in it, or a reply was cut off. One left for next time or finished has
+ *  closed. */
+const OPEN_NOW: ReadonlySet<SessionState> = new Set(["your-turn", "working", "paused"]);
 
 /** The learner's own calendar day of a session's last turn. Pure. */
 const lastDay = (chat: ChatListItem) => localDay(new Date(chat.updatedAt));
@@ -267,7 +299,7 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 		// The course's lessons with a line today, waiting on him or left on an earlier day.
 		const lessons = [...waiting, ...leftovers].filter((c) => c.course?.workspace === course.map.workspace && c.kind !== "practice" && !isReviewSession(c));
 		const opened = reviewed(course.map.workspace);
-		for (const whole of todaySteps(course)) {
+		for (const whole of todaySteps(withKeptStarts(course, open, today))) {
 			let step = whole;
 			// While a topic's lesson is open, today's review of the topic is that lesson's line, in the review's place
 			// (his answers there count as it), unless he opened a review of it (round 15, m6: "Review Linear maps · Due

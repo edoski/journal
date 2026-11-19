@@ -2,7 +2,7 @@ import { isReviewSession, markHow, namedArc, topicOpening, type ArcHandle, type 
 import { slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, lessonBegun, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyShort, startsWhyTells, startsWhyWords, studiedDaysWords, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
-import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
+import { daysBetween, shelfOf, taskSessions, topicSessions, worksOn } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { continueWords } from "@/components/study-home/study-facts";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
@@ -57,7 +57,7 @@ export type Pickup =
 
 export interface SessionEntry {
 	chat: ChatListItem;
-	/** It belongs to the topic (`ownsTopic`), rather than only touching it:
+	/** Its work is on the topic (`worksOn`), rather than only touching it:
 	 *  only such a session is the page's Now, Next or first map. */
 	own: boolean;
 	state: SessionState;
@@ -241,13 +241,13 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
  * for already, Study opens that review, `topicOpening`). Continue picks up the lesson that holds
  * the task, or the topic's newest lesson, as the session model says
  * (`continueMove`). `chats` are every session; the topic's are those that
- * belong to it (`ownsTopic`), never one that only touched it on the way
+ * work on it (`worksOn`), never one that only touched it on the way
  * (round 7: Kernel's page resumed the Eigen lesson). A review he closed
  * with Done for today is no session to resume (`closedReview`): it waits
  * for the topic's next review, whose press opens it (round 10, 1 m7).
  */
 export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): TopicAction {
-	const sessions = topicSessions(chats, map.workspace, topic.handle).filter((chat) => ownsTopic(chat, topic.handle));
+	const sessions = topicSessions(chats, map.workspace, topic.handle).filter((chat) => worksOn(chat, topic.handle));
 	const active = resumableSession(sessions.filter((chat) => !closedReview(chat)), chats);
 	if (active) return { kind: sessionState(active) === "working" ? "open" : "resume", chat: active };
 	if (topic.review?.kind === "due") {
@@ -318,7 +318,7 @@ export function sessionEntries(sessions: readonly ChatListItem[], plans: readonl
 	return sessions.map((chat) => {
 		const local = localDay(chat.updatedAt);
 		const day = local > today ? today : local;
-		return { chat, own: ownsTopic(chat, handle), state: sessionState(chat), day, when: agoWords(daysBetween(day, today), today), plan: plans.find((plan) => plan.id === chat.id) ?? null };
+		return { chat, own: worksOn(chat, handle), state: sessionState(chat), day, when: agoWords(daysBetween(day, today), today), plan: plans.find((plan) => plan.id === chat.id) ?? null };
 	});
 }
 

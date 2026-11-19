@@ -1267,6 +1267,21 @@ export function firstStartedTopicOf(messages: readonly LhMessage[]): string | nu
 	return null;
 }
 
+/** The topics whose start the session's saves moved: each key of a
+ *  `starts_moved` in the receipt of a save that went through, in order.
+ *  Pure. */
+export function startsMovedOf(messages: readonly LhMessage[]): string[] {
+	const moved = new Set<string>();
+	for (const m of messages) {
+		if (m.role !== "toolResult" || m.isError || m.toolName !== "course_save") continue;
+		let receipt: unknown;
+		try { receipt = JSON.parse(resultText(m)); } catch { continue; }
+		const starts = (receipt as { starts_moved?: unknown } | null)?.starts_moved;
+		for (const key of typeof starts === "object" && starts !== null ? Object.keys(starts) : []) moved.add(key);
+	}
+	return [...moved];
+}
+
 /** The goal topic of each plan that went through, in order. Pure. */
 export function plannedTopicsOf(messages: readonly LhMessage[]): string[] {
 	const clean = cleanToolCallIds(messages);
@@ -1295,6 +1310,23 @@ export function savedAnswerTimesOf(messages: readonly LhMessage[]): Map<string, 
 			for (const o of Array.isArray(changes?.observations) ? changes.observations : []) {
 				for (const t of strings((o as { topics?: unknown } | null)?.topics)) at.set(t, Math.max(at.get(t) ?? 0, m.timestamp));
 			}
+		}
+	}
+	return at;
+}
+
+/** When the session's saves wrote each engine task: the time of the newest
+ *  message whose save went through with that task in it, by key, a task
+ *  removed included. Pure. */
+export function savedTaskTimesOf(messages: readonly LhMessage[]): Map<string, number> {
+	const clean = cleanToolCallIds(messages);
+	const at = new Map<string, number>();
+	for (const m of messages) {
+		if (m.role !== "assistant" || typeof m.timestamp !== "number") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const tasks = saveChanges(block.arguments as Record<string, unknown>)?.tasks;
+			for (const key of typeof tasks === "object" && tasks !== null ? Object.keys(tasks) : []) at.set(key, Math.max(at.get(key) ?? 0, m.timestamp));
 		}
 	}
 	return at;

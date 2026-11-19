@@ -12,6 +12,7 @@ import type { CalendarCourse } from "../src/core/contracts/calendar.ts";
 import type { CourseMap, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { calendarEntries, lookOf, lookWords } from "../components/calendar/calendar-facts.ts";
 import { needsYouNow, nowLine } from "../components/study-home/needs-you.ts";
+import { lessonTitle } from "../components/study-home/agenda-rows/row-facts.ts";
 import { chat, topic } from "./fixtures/round8-home.ts";
 
 const TODAY = "2026-11-09";
@@ -89,7 +90,7 @@ describe("the rest of a lesson left today (round 17, m14)", () => {
 
 	it("shows on the next planned study day, opening the lesson", () => {
 		const next = calendarEntries({ courses: [withPlan()], chats: [lesson], scope: null }).filter((e) => e.day === "2026-11-10" && e.kind === "task");
-		assert.deepEqual(next.map((e) => e.title), ["Invertible matrices lesson"]);
+		assert.deepEqual(next.map((e) => e.title), ["Continue Invertible matrices lesson"]);
 		const entry = next[0]!;
 		assert.ok(entry.kind === "task" && entry.move.kind === "open" && entry.move.chat.id === "inv");
 	});
@@ -97,5 +98,30 @@ describe("the rest of a lesson left today (round 17, m14)", () => {
 	it("not for a lesson he finished", () => {
 		const done = { ...lesson, ended: "closed" as const };
 		assert.deepEqual(calendarEntries({ courses: [withPlan()], chats: [done], scope: null }).filter((e) => e.day === "2026-11-10" && e.kind === "task"), []);
+	});
+});
+
+/**
+ * Round 18, m12 (3 n4, `28`): the rest of the Invertible matrices lesson
+ * read "Invertible matrices lesson · Unfinished" on Mon 9, while Home's row
+ * for it read "Continue Invertible matrices lesson · Left off today". The
+ * calendar's entry now says Home's title and Home's status.
+ */
+describe("a left lesson on the calendar says Home's words (round 18, m12)", () => {
+	const INV = { key: "invertible-lesson", title: "Invertible matrices lesson", step: "Two-sided inverses", updated: TODAY, topics: ["invertible" as TopicHandle] };
+	const withPlan = (): CalendarCourse => ({
+		...course({ tasks: [INV], topics: [topic("invertible", "Invertible matrices", { level: "attempted", tasks: ["invertible-lesson"] }), topic("rank", "Rank", { level: "independent" })] }),
+		planned: [{ date: "2026-11-10", reviews: ["rank" as TopicHandle], new: [] }] as never,
+	});
+	const lesson = chat({ id: "inv", title: "Invertible matrices lesson", ended: "left", topics: ["invertible"], ownTopics: ["invertible"], tasks: ["invertible-lesson"], updatedAt: `${TODAY}T11:00:00.000Z` });
+
+	it("reads Continue Invertible matrices lesson with Home's status, never Unfinished", () => {
+		const entry = calendarEntries({ courses: [withPlan()], chats: [lesson], scope: null }).find((e) => e.day === "2026-11-10" && e.kind === "task")!;
+		const row = { kind: "session" as const, chat: lesson, course: withPlan() };
+		assert.equal(entry.title, lessonTitle(row), "Home's row's title");
+		assert.equal(entry.title, "Continue Invertible matrices lesson");
+		const words = lookWords(entry, TODAY);
+		assert.notEqual(words, "Unfinished");
+		assert.equal(words, nowLine(row).slot, "Home's row's status");
 	});
 });

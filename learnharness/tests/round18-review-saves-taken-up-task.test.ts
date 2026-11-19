@@ -25,7 +25,7 @@ function saving(opts: { plan: boolean; opened?: readonly string[] }) {
 		} as CourseToolContext["records"],
 		arcs: false,
 		review: true,
-		...(opts.opened ? { opened: opts.opened } : {}),
+		...(opts.opened ? { reviewTopics: opts.opened } : {}),
 		planSteps: () => (opts.plan ? [{ id: "wheel", title: "What a wheel's sectors pay on average" }] : []),
 	};
 	const save = async (changes: Record<string, unknown>) => {

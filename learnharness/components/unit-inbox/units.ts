@@ -105,7 +105,7 @@ export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): s
  *  is "Your turn" on its own topic alone; `course` as `currentSessions`
  *  reads it. Pure. */
 export function nowOf(sessions: readonly ChatListItem[], handle: string, course: readonly ChatListItem[] = []): UnitNow {
-	return sessionsNow(sessions.filter((c) => ownsTopic(c, handle)), course);
+	return sessionsNow(sessions.filter((c) => worksOn(c, handle)), course);
 }
 
 /** The session a topic's row resumes: of those that belong to it
@@ -115,7 +115,7 @@ export function nowOf(sessions: readonly ChatListItem[], handle: string, course:
  *  under On your own, since the sheet's first check was on vectors).
  *  Pure. */
 export function rowResume(unit: Pick<Unit, "sessions" | "topic">): ChatListItem | null {
-	return resumableSession(unit.sessions.filter((c) => ownsTopic(c, unit.topic.handle)));
+	return resumableSession(unit.sessions.filter((c) => worksOn(c, unit.topic.handle)));
 }
 
 /** What any of these sessions is doing now: one waits on the learner, the
@@ -246,14 +246,14 @@ export function unitStatus(unit: Unit, today: string, asked = false): UnitStatus
 	// Today does not review the topic: Home has no line for it and the close
 	// said where he picks up, so it says it is left off, never "Mistake to
 	// fix" while Today asks nothing (round 13, 3 N4).
-	const leftToday = unit.now === "left" && unit.sessions.some((c) => ownsTopic(c, topic.handle) && sessionState(c) === "left" && dayOf(c.updatedAt) >= today);
+	const leftToday = unit.now === "left" && unit.sessions.some((c) => worksOn(c, topic.handle) && sessionState(c) === "left" && dayOf(c.updatedAt) >= today);
 	if (slip && topic.signals.mistake && unit.now !== "working" && !(leftToday && !asked)) return slip;
 	if (unit.now === "left") {
-		const left = unit.sessions.find((c) => ownsTopic(c, topic.handle) && sessionState(c) === "left");
+		const left = unit.sessions.find((c) => worksOn(c, topic.handle) && sessionState(c) === "left");
 		return { kind: "task", words: left ? leftWords(left, today) : leftOffWords(null, today) };
 	}
 	if (unit.now === "paused") {
-		const cut = unit.sessions.find((c) => ownsTopic(c, topic.handle) && sessionState(c) === "paused");
+		const cut = unit.sessions.find((c) => worksOn(c, topic.handle) && sessionState(c) === "paused");
 		return { kind: "stopped", words: pausedWords(cut ?? {}) };
 	}
 	if (unit.now) return { kind: unit.now };
@@ -307,6 +307,14 @@ export function topicSessions(chats: readonly ChatListItem[], workspace: string,
  *  named after it, never one that only touched it on the way. Pure. */
 export function ownsTopic(chat: ChatListItem, handle: string): boolean {
 	return (chat.ownTopics ?? []).includes(handle);
+}
+
+/** Whether a session's work is on a topic: it belongs to it (`ownsTopic`),
+ *  and a review whose plan re-teaches one of its topics (`retaught`) works
+ *  on that one alone, so only that topic resumes it, reads "Left off" for
+ *  it and draws its map (round 18, M2). Pure. */
+export function worksOn(chat: ChatListItem, handle: string): boolean {
+	return ownsTopic(chat, handle) && (chat.retaught === undefined || chat.retaught === handle);
 }
 
 /** The sessions in a course that hold an open task, newest first. Pure. */

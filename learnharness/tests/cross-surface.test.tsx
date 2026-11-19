@@ -213,8 +213,8 @@ function dayClaims(s: Survey): Claims {
 		}
 		// Home's Today: a course line's topics are planned today.
 		for (const line of s.home) {
-			if (line.course !== course.map.title || !/^(Review|Start) /.test(line.title)) continue;
-			for (const topic of titled) if (names(line.title, topic.title)) claim(keyOf(ws, topic.handle), "Home", s.today);
+			if (line.course !== course.map.title || !/^(Review|Start) |^.* review$/.test(line.title)) continue;
+			for (const topic of titled) if (names(line.title, topic.title) || line.topics.includes(topic.handle)) claim(keyOf(ws, topic.handle), "Home", s.today);
 		}
 		// The topic page: a review it starts now is today's; else its Now note's day, else Scheduled's.
 		for (const topic of course.map.topics) {
@@ -481,7 +481,7 @@ function assertNeedsYouOnToday(s: Survey) {
 			if (!topic) continue;
 			const asked = s.home.some((line) => {
 				if (line.course !== course.map.title) return false;
-				if (names(line.title, topic.title)) return true;
+				if (names(line.title, topic.title) || line.topics.includes(topic.handle)) return true;
 				const chat = s.chats.find((c) => c.id === chatOf(line.opens));
 				if (chat && [...(chat.ownTopics ?? []), ...(chat.topics ?? [])].includes(topic.handle)) return true;
 				const task = course.map.tasks.find((t) => line.title === `Continue ${t.title}`);
@@ -731,7 +731,8 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 
 	it("Sun 8 Nov, after the Probability review from Home (lens 1, step 9)", async () => {
 		await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 });
-		const line = app.homeLines().find((l) => l.course === "Probability" && l.title.startsWith("Review "));
+		// Round 18, m10: a review of several topics is named as its session, "Probability review".
+		const line = app.homeLines().find((l) => l.course === "Probability" && l.title === "Probability review");
 		assert.ok(line, "Home offers the Probability review");
 		const opened = await app.press(line.el);
 		assert.ok(opened?.startsWith("/chat/"), `the review opens a session (${opened})`);
@@ -749,11 +750,11 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 			const prob = s.courses.find((c) => c.map.title === "Probability")!;
 			const rest = (prob.due ?? []).filter((h) => h !== "binomial").map((h) => prob.map.topics.find((t) => t.handle === h)!);
 			assert.ok(rest.length > 0, "the seeded Probability review holds topics beside Binomial");
-			const line = s.home.find((l) => l.course === "Probability" && l.title.startsWith("Review "));
+			const line = s.home.find((l) => l.course === "Probability" && (l.title === "Probability review" || l.title.startsWith("Review ")));
 			assert.ok(line, `Home keeps the review of the topics he did not answer today (${rest.map((t) => t.title).join(", ")}): ${s.home.map((l) => l.title).join(" | ")}`);
 			assert.ok(opensChat(line.opens, id), `the line picks up the review he left: it opens ${line.opens}`);
-			for (const topic of rest.filter((t) => !t.title.includes("$"))) assert.ok(names(line.title, topic.title), `the line names ${topic.title}: "${line.title}"`);
-			assert.ok(!names(line.title, "Binomial distribution"), `the line leaves out Binomial, answered today: "${line.title}"`);
+			for (const topic of rest) assert.ok(line.topics.includes(topic.handle), `the line takes up ${topic.title}: ${line.topics.join(", ")}`);
+			assert.ok(!line.topics.includes("binomial"), `the line leaves out Binomial, answered today: ${line.topics.join(", ")}`);
 		});
 	});
 
@@ -766,7 +767,7 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 });
 		// Eigen's review is due today, and the Eigen lesson left yesterday is open on it, so the review is that lesson's
 		// line, where his answers count as it (round 15, m6).
-		const line = app.homeLines().find((l) => l.course === "Linear Algebra" && (l.title.startsWith("Review ") || l.title.startsWith("Continue Eigenvalues and eigenvectors")));
+		const line = app.homeLines().find((l) => l.course === "Linear Algebra" && (l.title.startsWith("Review ") || l.title === "Linear Algebra review" || l.title.startsWith("Continue Eigenvalues and eigenvectors")));
 		assert.ok(line, `Home offers a Linear Algebra review: ${app.homeLines().map((l) => l.title).join(" | ")}`);
 		assert.ok(app.homeLines().filter((l) => /Eigenvalues and eigenvectors/.test(l.title)).length === 1, `one line for Eigen: ${app.homeLines().map((l) => `${l.title} · ${l.status}`).join(" | ")}`);
 		const opened = await app.press(line.el);

@@ -20,7 +20,8 @@ export function namesWords(names: readonly string[]): string {
  *  the order Home and the tutor take it: first today's plan for the course,
  *  its reviews then its starts (`planned`; round 11, 1 N10: the head picked
  *  "Review Conditional probability today" while Home and the tutor began
- *  with Binomial), then the topics left out: review a taught topic, start
+ *  with Binomial), then the topics left out, never one the plan starts
+ *  before the exam (round 18, m6): review a taught topic, start
  *  one whose prerequisites are all taught; a topic that needs one not
  *  taught yet offers nothing. Of those, reviews come first: a taught topic
  *  checked before the exam counts there, a start that does not fit will
@@ -51,8 +52,10 @@ export function examGaps(map: Pick<CourseMap, "exam" | "topics" | "edges" | "tod
 		...map.topics.filter((t) => t.review?.kind === "due").map((topic) => ({ topic, starts: false, planned: true })),
 		...map.topics.filter((t) => t.starts === map.today).map((topic) => ({ topic, starts: true, planned: true })),
 	];
+	// A topic the plan starts before the exam is not left out before it (round 18, m6: Stirling's formula, planned
+	// for the day before the exam, under "Left out before the exam").
 	const left = [...start, ...review]
-		.filter((topic) => !today.some((way) => way.topic.handle === topic.handle))
+		.filter((topic) => !today.some((way) => way.topic.handle === topic.handle) && !(topic.starts && topic.starts < exam.date))
 		.flatMap((topic) => (topic.introduced !== null ? [{ topic, starts: false, planned: false }] : startable(topic) ? [{ topic, starts: true, planned: false }] : []))
 		.sort((a, b) => Number(a.starts) - Number(b.starts));
 	const ways = [...today, ...left];

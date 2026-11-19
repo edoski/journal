@@ -2,6 +2,7 @@ import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
 import { CourseBadge } from "@/components/study-home/agenda-rows/course-badge";
 import { courseTitle, foldLines, lessonTitle, lineKey, pointProps, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
+import { lineTopics } from "@/components/study-home/needs-you";
 import { rowStatus, rowWords, type RowStatus } from "@/components/study-home/agenda-rows/row-standing";
 import { reasonMark } from "@/components/unit-inbox/fact-icon";
 import { StatusMark } from "@/components/unit-inbox/status-mark";
@@ -35,7 +36,7 @@ export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 		<ul data-slot="hybrid-rows" className="flex flex-col">
 			{shown.map((row) => (
 				<li key={lineKey(row)} className={HAIRLINE}>
-					<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, COLUMNS)} {...pointProps(row, point)}>
+					<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" data-topics={lineTopics(row).join(" ")} className={cn(ROW, COLUMNS)} {...pointProps(row, point)}>
 						{/* The course's badge at the row's height with its progress round its edge, where a lone ring read as a checkbox. */}
 						<span className="row-span-2 self-center">{row.course && <CourseBadge course={row.course} />}</span>
 						<MathLine className="col-span-2 text-callout text-muted-foreground">{courseTitle(row)}</MathLine>

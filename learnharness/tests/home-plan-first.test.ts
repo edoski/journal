@@ -190,6 +190,6 @@ describe("a review left today keeps its line for the topics it did not answer (r
 
 	it("keeps a topic answered on an earlier day in the same session", () => {
 		const older = { ...left, answeredOn: { eigen: "2026-11-08" } };
-		assert.deepEqual(todayRows([course], openSessions([older]), TODAY).map(lessonTitle), ["Review Eigenvalues and eigenvectors, Linear maps and their matrices", "Start Inner products and orthogonality"]);
+		assert.deepEqual(todayRows([course], openSessions([older]), TODAY).map(lessonTitle), ["Linear Algebra review", "Start Inner products and orthogonality"]);
 	});
 });

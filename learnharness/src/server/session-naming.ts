@@ -11,6 +11,7 @@ import { subscribe } from "../core/events.ts";
 import type { ChatStore, CourseRecords } from "../core/ports.ts";
 import { firstTurnTopics, onFirstTurn } from "../core/session-naming.ts";
 import { lessonTakenUp } from "../core/session-opening.ts";
+import { sessionTaskTitleOf, sessionTasksOf } from "../core/native-messages.ts";
 
 export interface SessionNamingDeps {
 	chatStore: ChatStore;
@@ -50,11 +51,31 @@ export async function nameTakenUpLesson(deps: SessionNamingDeps, chatId: string)
 	return true;
 }
 
+/** Name a session opened on no topic after the lesson it carries on: its
+ *  saves wrote an open task they did not title, so it took up a lesson
+ *  begun elsewhere and is named as that task is in every list (round 18,
+ *  m5: "Yes" to picking up the Expectation lesson from Ask the tutor went
+ *  on in the Ask session, "Fitting the exam's topics in" in Earlier and
+ *  Sessions, "Expectation and linearity lesson" on the topic page). The
+ *  store keeps a name he gave it. Returns whether it named it. */
+export async function nameAfterHeldTask(deps: SessionNamingDeps, chatId: string): Promise<boolean> {
+	const record = deps.chatStore.getChat(chatId);
+	if (!record?.course || record.renamed || record.appOpening || sessionTaskTitleOf(record.messages)) return false;
+	const [held] = sessionTasksOf(record.messages);
+	if (!held) return false;
+	const mapped = await deps.courseRecords.map(record.course.workspace);
+	const title = mapped.ok ? mapped.map.tasks.find((t) => t.key === held)?.title : undefined;
+	if (!title) return false;
+	deps.chatStore.takeUpLesson(chatId, title);
+	return true;
+}
+
 /** Subscribe to settled turns. Returns the unsubscribe. */
 export function onSessionNaming(deps: SessionNamingDeps): () => void {
 	return subscribe((event) => {
 		if (event.type !== "turn-settled") return;
 		void nameFromFirstTurn(deps, event.chatId).catch(() => {});
 		void nameTakenUpLesson(deps, event.chatId).catch(() => {});
+		void nameAfterHeldTask(deps, event.chatId).catch(() => {});
 	});
 }
