@@ -40,6 +40,7 @@ import { normalizeQuestionType, PREDICT_RULE } from "../core/question-core.ts";
 import { sameQuestionKey } from "../core/shown-help.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
+import { studyDay } from "../core/day-words.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, HIS_MESSAGE, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
 import { adviceSentences, partialDay, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, recordMarkWords, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
@@ -103,6 +104,7 @@ const GUESS_INVITE = /\b(?:go ahead(?:,| and)?\s+guess|guess (?:first|away)|(?:t
  *  prediction, and why"): "What do you expect…", "Guess…", "Before
  *  computing anything…". */
 const ASKS_A_GUESS = /\b(?:guess(?:es|ing)?|expect(?:s|ed|ing)?|predict(?:s|ion)?|hunch|bet|intuition|instinct|suspect)\b|\bwhat do you (?:think|imagine)\b|\bbefore (?:computing|calculating|working|checking|trying|we|you)\b/i;
+
 
 /** Words in his answer that say he is not sure of it or of its reason. */
 const DOUBT = /\b(?:not sure|unsure|no idea|i think|i guess|i'?m guessing|maybe|probably|don'?t (?:know|see|get)|why (?:i'?m|am i|is it|does it|can i))\b/i;
@@ -629,6 +631,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `Never tell him an answer is not saved: every answer in the record stays saved, an earlier day's included, and the app itself says when his record can't be read: ${quoted(b.excerpt)}. Leave it out.`;
 		case "guess":
 			return `${b.excerpt.startsWith("he wrote ") ? `He asked to guess first (${b.excerpt})` : `You invited a guess (${quoted(b.excerpt)})`}, so his answer is a guess before he is told, never a counted attempt: pose it as a prediction, \`type: predict\`, tagged with the step it grows from, so it is kept and never counts. Ask the open question again once his guess is answered.`;
+		case "moved-start":
+			return `His answers today moved a start planned for today, and the close never says so: ${b.excerpt}. Name it in the close, by its title, with its new day and its cause as the receipt gives it.`;
 		case "day-part":
 			return `A day you name with what it holds is named whole, or by itself alone: ${b.excerpt.replace(/: /, " also holds ")}. Name every item of that day from the close's \`day_items\`, or only the day.`;
 		case "card": {
@@ -671,6 +675,64 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 }
 
 type DayItems = Record<string, { day_words: string; items: string[]; lesson: string[] }>;
+
+/** A start planned for today that his study today moved, as the save's
+ *  receipt gives it (`starts_moved`): its title, its new day in words and
+ *  the topics it waits on, by title. */
+type MovedStart = { title: string; starts_words: string; waits_on: string[]; past_exam: boolean };
+
+/** The starts planned for `today` that the session's saves moved: the
+ *  last receipt's `starts_moved` (each lists every start his study today
+ *  moved, so a later save that put one back drops it), those whose
+ *  `moved.from` is today. Every close he asks for with Done for today
+ *  names them (round 18, M4: a hinted, then partly right, Random variables
+ *  answer moved Expectation off today, and a missed Homomorphisms answer
+ *  moved Linear maps off today; every save receipt carried the move and
+ *  neither close named it). */
+function movedToday(result: { content: ReadonlyArray<{ type: string; text?: string }> }, today: string): MovedStart[] | null {
+	const text = result.content.find((c) => c.type === "text")?.text;
+	let receipt: unknown;
+	try {
+		receipt = text ? JSON.parse(text) : null;
+	} catch {
+		return null;
+	}
+	if (!isRecord(receipt)) return null;
+	const moved = isRecord(receipt.starts_moved) ? receipt.starts_moved : {};
+	return Object.values(moved).flatMap((entry) => {
+		if (!isRecord(entry) || !isRecord(entry.moved) || entry.moved.from !== today || typeof entry.title !== "string") return [];
+		const waits = Array.isArray(entry.moved.waits_on) ? entry.moved.waits_on.filter((t): t is string => typeof t === "string") : [];
+		return [{ title: entry.title, starts_words: typeof entry.starts_words === "string" ? entry.starts_words : "", waits_on: waits, past_exam: entry.past_exam === true }];
+	});
+}
+
+/** The session's last receipt's starts moved off today (`movedToday`). */
+function movedTodayOf(messages: readonly LhMessage[], today: string): MovedStart[] {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "toolResult" || m.toolName !== SAVE_TOOL || m.isError) continue;
+		const found = movedToday(m, today);
+		if (found) return found;
+	}
+	return [];
+}
+
+/** A close that names a day he studies on. */
+const NAMES_A_DAY = /\b(?:today|tomorrow|(?:mon|tues|wednes|thurs|fri|satur|sun)day)\b/i;
+
+/** Whether `text` names a start by its title, read past emphasis and quotes. */
+function namesTitle(text: string, title: string): boolean {
+	const plain = (s: string) => s.replace(/[*_"“”‘’]/g, "").replace(/\s+/g, " ").toLowerCase();
+	return plain(text).includes(plain(title));
+}
+
+function movedWords(moved: MovedStart): string {
+	const why = moved.waits_on.length > 0 ? `, since it waits on ${moved.waits_on.join(" and ")}` : "";
+	return `${moved.title} was planned for today and now starts ${moved.starts_words}${moved.past_exam ? ", after the exam" : ""}${why}`;
+}
+
+const MOVED_START_NOTE = (moved: MovedStart[]) =>
+	`Your close never said that his answers today moved a start planned for today: ${moved.map(movedWords).join("; ")}. Send him one sentence that says it, with its new day and its cause as the receipt gives it.`;
 
 /** The close result's `day_items` (lesson_progress), or null. */
 function dayItemsIn(result: AgentToolResult<unknown>): DayItems | null {
@@ -994,6 +1056,13 @@ export class VoiceGuard {
 	private heldRulingSaid = false;
 	/** The close's `day_items`: what each day it names holds. */
 	private dayItems: DayItems | null = null;
+	/** The turn is his Done for today's close, and the starts planned for
+	 *  today that the session's saves moved, which it names
+	 *  (`movedToday`); whether the turn's end was held for them. */
+	private readonly closing: boolean;
+	private moved: MovedStart[];
+	private readonly today = studyDay();
+	private heldMoved = false;
 
 	constructor(
 		messages: readonly LhMessage[],
@@ -1004,6 +1073,9 @@ export class VoiceGuard {
 		saves = false,
 	) {
 		this.input = turnInputOf(messages);
+		const opened = messages[messages.findLastIndex(opensTurn)];
+		this.closing = opened?.role === "custom" && opened.customType === "done-tonight";
+		this.moved = movedTodayOf(messages, this.today);
 		this.standing = standingQuestion(messages);
 		this.firstTry = review ? null : firstTryAtCheck(messages);
 		this.secondTry = review ? null : retryAtCheck(messages);
@@ -1070,6 +1142,13 @@ export class VoiceGuard {
 			this.noted.add(OWED_END_NOTE);
 			return OWED_END_NOTE;
 		}
+		if (this.closing && this.sent > 0 && !this.heldMoved && !this.owed) {
+			const unnamed = this.unnamedMoves(this.toldNow.join("\n"));
+			if (unnamed.length > 0) {
+				this.heldMoved = true;
+				return MOVED_START_NOTE(unnamed);
+			}
+		}
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
 		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
@@ -1097,6 +1176,7 @@ export class VoiceGuard {
 				const result = await tool.execute(toolCallId, params, signal, onUpdate);
 				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
 				if (tool.name === LESSON_PROGRESS_TOOL && !result.isError) this.dayItems = dayItemsIn(result) ?? this.dayItems;
+				if (tool.name === SAVE_TOOL && !result.isError) this.moved = movedToday(result, this.today) ?? this.moved;
 				if (this.saveFailed(tool.name, params, result)) this.verdictOwed = !this.toldNow.some((t) => VERDICT_SAID.test(t));
 				else if (tool.name === SAVE_TOOL && !result.isError && savedObservations(isRecord(params) ? params : {}).length > 0) this.verdictOwed = false;
 				if (this.kept?.call.id === toolCallId) {
@@ -1370,6 +1450,8 @@ export class VoiceGuard {
 		if (sure) out.push({ rule: "confidence", excerpt: sure });
 		const part = this.dayItems ? partialDay(text, this.dayItems) : null;
 		if (part) out.push({ rule: "day-part", excerpt: part });
+		const unnamed = this.closing && NAMES_A_DAY.test(text) ? this.unnamedMoves(text) : [];
+		if (unnamed.length > 0) out.push({ rule: "moved-start", excerpt: unnamed.map(movedWords).join("; ") });
 		if (this.owed && this.lengthDraft && !out.some((b) => b.rule === "length")) {
 			const { words, clauses } = clausesOf(text);
 			const draft = this.lengthDraft;
@@ -1400,6 +1482,12 @@ export class VoiceGuard {
 		const boxed = restatingCallout(text);
 		if (boxed) out.push({ rule: "repeat", excerpt: `callout ${quoted(boxed.said)}, said above as ${quoted(boxed.before)}` });
 		return [...out, ...this.letters(text), ...this.repeats(text, true), ...this.unbuilt(text)];
+	}
+
+	/** The starts moved off today that neither `text` nor an earlier
+	 *  message of this turn names. */
+	private unnamedMoves(text: string): MovedStart[] {
+		return this.moved.filter((m) => ![text, ...this.toldNow].some((t) => namesTitle(t, m.title)));
 	}
 
 	/** Words that point at a demo this turn called for: it is built after

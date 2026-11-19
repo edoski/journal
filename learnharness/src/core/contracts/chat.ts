@@ -322,7 +322,12 @@ const DONE_GRADED = "An answer he sent before pressing it is still graded and sa
  *  Conditional probability's, and Binomial, Random variables and
  *  Inclusion-exclusion got none). */
 const DONE_DAYS = "and the day each topic he answered in this session comes back, by its topic: topics on one day together, and with three days or more, the soonest and that the rest are on his calendar";
-const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one, ${DONE_DAYS}; a topic not started is one he starts, never a review; a question he left a half answer on (\`draftKept\`) is his half answer waiting for him there. ${DONE_LIMITS}`;
+/** A start planned for today that the session's saves moved is named,
+ *  with its new day and its cause (round 18, M4: a hinted, then partly
+ *  right, answer moved Expectation off today, every receipt carried it in
+ *  `starts_moved`, and the close named only the review days). */
+const DONE_MOVED = "a start planned for today that his answers moved (a save's `starts_moved` whose `moved.from` is today) is named too, by its title, with its new day and its cause";
+const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one, ${DONE_DAYS}; ${DONE_MOVED}; a topic not started is one he starts, never a review; a question he left a half answer on (\`draftKept\`) is his half answer waiting for him there. ${DONE_LIMITS}`;
 /** Practice keeps nothing of a problem dropped at Done for today, so its
  *  close names only what the record keeps (round 9, 3 m7: "You still have
  *  the kernel problem you closed … to pick up"), and only this session's:
@@ -331,7 +336,7 @@ const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, 
  *  problem he left open is named once, as set aside (round 14, m31: "Your
  *  Rank and the column space review is on Wednesday 11 November." left the
  *  4 × 6 system unnamed). */
-const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: a problem he left open, named once by what it is on (the 4 × 6 system), as set aside, never as something he picks up; then only what his record keeps for next time from this session, an open task this session worked on at its place (part (c) of the sheet), never another session's open work, and the day of his next review when the plan gives one, never by what it asks, ${DONE_DAYS}; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
+const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: a problem he left open, named once by what it is on (the 4 × 6 system), as set aside, never as something he picks up; then only what his record keeps for next time from this session, an open task this session worked on at its place (part (c) of the sheet), never another session's open work, and the day of his next review when the plan gives one, never by what it asks, ${DONE_DAYS}; ${DONE_MOVED}; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
 
 export const DONE_TONIGHT_TEXT = {
 	prober:

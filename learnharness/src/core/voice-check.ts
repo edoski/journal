@@ -67,6 +67,7 @@ export type VoiceRule =
 	| "card-words"
 	| "unbuilt"
 	| "day-part"
+	| "moved-start"
 	| "below"
 	| "pointer"
 	| "arrival"
