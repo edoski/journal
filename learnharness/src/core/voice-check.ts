@@ -78,7 +78,10 @@ export type VoiceRule =
 	| "verdict-words"
 	| "begun"
 	| "vector"
-	| "nothing-above";
+	| "nothing-above"
+	| "half-answer"
+	| "title-comma"
+	| "vague-moves";
 
 export interface VoiceBreak {
 	rule: VoiceRule;

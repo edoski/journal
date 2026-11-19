@@ -730,6 +730,12 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `The demo you called for this turn is still being built, so it is not on his screen: ${quoted(b.excerpt)}. It appears where you called for it once it is built, and a message tells you then. Until that message, say nothing of it and ask nothing that needs it: teach the step in words now, and point him at the demo, and ask what needs it, once it has arrived.`;
 		case "due-reviews":
 			return `A lesson opens on its first step, and his reviews due today are already on Home: ${quoted(b.excerpt)}. Leave the reviews out and open on the lesson.`;
+		case "half-answer":
+			return `Say where his half answer waits, by the session's name, never "there": ${quoted(b.excerpt)}. Name it ("Your half answer to the kernel question waits in your Invertible matrices lesson, which continues tomorrow, Monday 9 November.").`;
+		case "title-comma":
+			return `A topic's title straight after a comma reads as a new sentence: ${quoted(b.excerpt)}. Open the sentence on it, or set it off in quotes ("Starting “${b.excerpt}” moves to …").`;
+		case "vague-moves":
+			return `Later moves said with nothing he can act on: ${quoted(b.excerpt)}. Name each move with its new day, or leave out the ones the close is not about.`;
 		case "nothing-above":
 			return `No question or problem is open above him, so this points at nothing: ${quoted(b.excerpt)}. Leave it out.`;
 		case "undisputed":
@@ -758,6 +764,60 @@ function dayItemsIn(result: AgentToolResult<unknown>): DayItems | null {
 	} catch {
 		return null;
 	}
+}
+
+/** The topic titles a result names: the first lessons a save moved
+ *  (`starts_moved`, in a save's receipt or a conclude's "Course record:")
+ *  and what the close's days hold (`day_items`). */
+function titlesIn(result: AgentToolResult<unknown>): string[] {
+	const text = result.content.find((c): c is { type: "text"; text: string } => c.type === "text")?.text ?? "";
+	const at = text.indexOf("{");
+	if (at < 0) return [];
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text.slice(at));
+	} catch {
+		return [];
+	}
+	if (!isRecord(parsed)) return [];
+	const moved = isRecord(parsed.starts_moved) ? Object.values(parsed.starts_moved).flatMap((m) => (isRecord(m) && typeof m.title === "string" ? [m.title] : [])) : [];
+	const days = isRecord(parsed.day_items) ? Object.values(parsed.day_items).filter(isRecord) : [];
+	const held = days.flatMap((d) => [...(Array.isArray(d.items) ? d.items : []), ...(Array.isArray(d.lesson) ? d.lesson : [])]).flatMap((t) => (typeof t === "string" ? [t.replace(/ (?:review|starts|lesson continues)$/, "")] : []));
+	return [...moved, ...held];
+}
+
+/** A topic title set straight after a comma, where its capital reads as a
+ *  new sentence ("Because that lesson is unfinished, Any matrix represents
+ *  a linear map moved…", round 18, m15). A title after another title, in
+ *  a list, reads as one; so does one set off in quotes or opening a
+ *  sentence. The title, or null. */
+export function titleAfterComma(text: string, titles: readonly string[]): string | null {
+	const capital = [...new Set(titles)].filter((t) => /^[A-Z]/.test(t)).sort((a, b) => b.length - a.length);
+	for (const title of capital) {
+		let from = 0;
+		for (let at = text.indexOf(title, from); at >= 0; at = text.indexOf(title, from)) {
+			from = at + title.length;
+			const before = text.slice(0, at);
+			if (!/[,;]\s+$/.test(before)) continue;
+			const clause = before.replace(/[,;]\s+$/, "");
+			if (capital.some((other) => clause.endsWith(other))) continue;
+			return title;
+		}
+	}
+	return null;
+}
+
+/** Later moves waved at with nothing he can act on ("and later starts
+ *  moved too", round 18, m15): each move is named with its day, or the
+ *  rest are on his calendar, or they are left out. */
+const VAGUE_MOVES = /\b(?:later|other|more|further) (?:starts|lessons|topics|reviews)\b(?![^.?!]*\bcalendar\b)[^.?!]{0,30}\b(?:moved|move|shifted|shift|too)\b|\b(?:starts|lessons|reviews|topics) (?:after it |after that |behind it )?(?:moved|move|shift(?:ed)?) too\b/i;
+
+/** A half answer he left, said with no session to find it in, or as
+ *  "there" (round 18, m15: "Your half answer in the Linear maps and their
+ *  matrices lesson is waiting for you there", in that lesson; "Your half
+ *  answer to the wheel question is waiting for you", naming none). */
+function halfAnswerUnplaced(text: string): string | null {
+	return sentences(text).map((s) => s.trim()).find((s) => /\bhalf(?:-finished)? answer\b/i.test(s) && (/\bthere\b/i.test(s) || !/\b(?:lesson|review|sheet|practice)\b/i.test(s))) ?? null;
 }
 
 /** The refusal the tutor reads: what broke and how to send it again. The
@@ -1076,6 +1136,8 @@ export class VoiceGuard {
 	 *  worded one differently was held back (once a turn). */
 	private readonly rulings: string[] = [];
 	private heldRulingSaid = false;
+	/** The topic titles this turn's results named. */
+	private readonly titles: string[] = [];
 	/** The close's `day_items`: what each day it names holds. */
 	private dayItems: DayItems | null = null;
 
@@ -1186,6 +1248,7 @@ export class VoiceGuard {
 				const result = await tool.execute(toolCallId, params, signal, onUpdate);
 				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
 				if (tool.name === LESSON_PROGRESS_TOOL && !result.isError) this.dayItems = dayItemsIn(result) ?? this.dayItems;
+				if (!result.isError) this.titles.push(...titlesIn(result));
 				if (this.saveFailed(tool.name, params, result)) this.verdictOwed = !this.toldNow.some(opensOnVerdict);
 				if (tool.name === SAVE_TOOL && result.isError && remarksUnasked(params) && !this.input.ruling) this.remarkedUnasked = true;
 				else if (tool.name === SAVE_TOOL && !result.isError && savedObservations(isRecord(params) ? params : {}).length > 0) this.verdictOwed = false;
@@ -1473,6 +1536,12 @@ export class VoiceGuard {
 		if (below) out.push({ rule: "below", excerpt: below });
 		const pointer = (this.posedLast || this.posedSinceInput) && this.sent === 0 ? sentences(text).map((s) => s.trim()).find((s) => POINTS_ABOVE.test(s) && !/\bquestion above\b/i.test(s)) : undefined;
 		if (pointer) out.push({ rule: "pointer", excerpt: pointer });
+		const unplaced = halfAnswerUnplaced(text);
+		if (unplaced) out.push({ rule: "half-answer", excerpt: unplaced });
+		const commaTitle = titleAfterComma(text, this.titles);
+		if (commaTitle) out.push({ rule: "title-comma", excerpt: commaTitle });
+		const vague = VAGUE_MOVES.exec(text);
+		if (vague) out.push({ rule: "vague-moves", excerpt: sentences(text).find((s) => VAGUE_MOVES.test(s))?.trim() ?? vague[0] });
 		const nothingAbove = !this.openAbove && !this.posed ? sentences(text).map((s) => s.trim()).find((s) => POINTS_ABOVE.test(s)) : undefined;
 		if (nothingAbove) out.push({ rule: "nothing-above", excerpt: nothingAbove });
 		// A lesson's opening teaches: the reviews due today are Home's to
