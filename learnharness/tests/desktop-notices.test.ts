@@ -221,6 +221,7 @@ describe("the shell shows each notice at most once", () => {
 		assert.deepEqual(s.shown, []);
 		assert.ok(s.logged.some((l) => l.includes("notice held: plan:2026-11-19 (a window is focused)")), s.logged.join("\n"));
 		assert.equal(s.files.has("/fixture/LearnHarness/notices.json"), false);
+		// Later that day the Mac unlocks with another app in front: offered again.
 		window.focused = false;
 		s.show(plan);
 		assert.equal(s.shown.length, 1);
