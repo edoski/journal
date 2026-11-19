@@ -982,7 +982,10 @@ export function Chat({
 	const dropped = status === "error" && droppedError(error);
 	const [healFailed, setHealFailed] = useState(false);
 	useEffect(() => setHealFailed(false), [error]);
-	const tryAgain = pending || activeProblem || gone || courseGone ? undefined : replyCut ? () => void send({ type: "continue" }) : dropped ? () => healDroppedStreamRef.current().then((healed) => setHealFailed(!healed)) : retryable && !claudeLimit ? retryFailedTurn : undefined;
+	// An open problem keeps its box, which runs the same Try again from its
+	// empty field (round 18, m19); the window's Enter leaves it to that box.
+	const turnRetry = pending || gone || courseGone ? undefined : replyCut ? () => void send({ type: "continue" }) : dropped ? () => healDroppedStreamRef.current().then((healed) => setHealFailed(!healed)) : retryable && !claudeLimit ? retryFailedTurn : undefined;
+	const tryAgain = activeProblem ? undefined : turnRetry;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
 	 * kind, nothing active, nothing in flight, and at least one problem
@@ -1785,7 +1788,7 @@ export function Chat({
 													<Fragment key={pi}>
 														{doneMarks.before.get(mi)?.map(({ message, part: at }) => {
 															const conclude = messages[message]!.parts[at]!;
-															return <ProseConclude key={`${message}:${at}`} toolCallId={conclude.toolCallId!} input={conclude.input} output={conclude.output} reveal={conclude.reveal} />;
+															return <ProseConclude key={`${message}:${at}`} toolCallId={conclude.toolCallId!} input={conclude.input} output={conclude.output} reveal={conclude.reveal} state={conclude.state} />;
 														})}
 														<DoneTonightLine />
 													</Fragment>
@@ -1899,7 +1902,7 @@ export function Chat({
 														}
 														if (part.type === "tool-conclude") {
 															if (doneMarks.moved.has(partKey(mi, pi))) return null;
-															return <ProseConclude key={pi} toolCallId={part.toolCallId!} input={part.input} output={part.output} reveal={part.reveal} />;
+															return <ProseConclude key={pi} toolCallId={part.toolCallId!} input={part.input} output={part.output} reveal={part.reveal} state={part.state} />;
 														}
 														// Artifact extension point (contracts.ts): job
 														// parts and future artifacts render via the
@@ -1988,7 +1991,7 @@ export function Chat({
 								sendAllowed,
 								nextProblem: nextReady,
 								onNext: sendNext,
-								onEmptyEnter: tryAgain,
+								onEmptyEnter: turnRetry,
 								placeholder: pausePlaceholder(nextReady, !!tryAgain),
 								photos: composerPhotos,
 								compact: readingUp,
