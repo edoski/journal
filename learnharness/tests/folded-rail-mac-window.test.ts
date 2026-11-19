@@ -12,6 +12,7 @@
  * page and a topic page draw (`WindowPage`, `PageFrame`, `PageHead`).
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import { LIGHTS, startShell, type Shell } from "./helpers/browser-shell.ts";
 
@@ -82,4 +83,11 @@ describe("the folded sidebar in the Mac app keeps the window's band clear", () =
 			}
 		});
 	}
+});
+
+describe("Next's dev badge stays off the folded rail", () => {
+	it("sits bottom-right, never over the rail's Settings at the window's bottom-left (Edo runs the Mac app on next dev)", () => {
+		const config = readFileSync(new URL("../next.config.ts", import.meta.url), "utf8");
+		assert.match(config, /devIndicators: \{ position: "bottom-right" \}/);
+	});
 });
