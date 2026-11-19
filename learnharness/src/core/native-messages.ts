@@ -1297,6 +1297,23 @@ export function savedAnswerTimesOf(messages: readonly LhMessage[]): Map<string, 
 	return at;
 }
 
+/** When the session's saves wrote each engine task: the time of the newest
+ *  message whose save went through with that task in it, by key, a task
+ *  removed included. Pure. */
+export function savedTaskTimesOf(messages: readonly LhMessage[]): Map<string, number> {
+	const clean = cleanToolCallIds(messages);
+	const at = new Map<string, number>();
+	for (const m of messages) {
+		if (m.role !== "assistant" || typeof m.timestamp !== "number") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const tasks = saveChanges(block.arguments as Record<string, unknown>)?.tasks;
+			for (const key of typeof tasks === "object" && tasks !== null ? Object.keys(tasks) : []) at.set(key, Math.max(at.get(key) ?? 0, m.timestamp));
+		}
+	}
+	return at;
+}
+
 /** The topics the session's saved answers were on: each observation's
  *  `topics` in the saves that went through, in order. Pure. */
 export function savedAnswerTopicsOf(messages: readonly LhMessage[]): string[] {
