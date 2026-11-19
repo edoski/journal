@@ -34,7 +34,7 @@ export interface Shell {
 
 /** `entry`, the page to bundle (the app's frame by default), and `ready`,
  *  the selector its first frame shows. */
-export async function startShell({ entry = "tests/helpers/app-shell-page.tsx", ready = '[data-testid="sidebar"]' }: { entry?: string; ready?: string } = {}): Promise<Shell> {
+export async function startShell({ entry = "tests/helpers/app-shell-page.tsx", ready = '[data-testid="sidebar"]', sheets = [] }: { entry?: string; ready?: string; sheets?: string[] } = {}): Promise<Shell> {
 	const bundle = await build({
 		entryPoints: [`${root}${entry}`],
 		bundle: true,
@@ -50,7 +50,8 @@ export async function startShell({ entry = "tests/helpers/app-shell-page.tsx", r
 	const js = bundle.outputFiles[0]!.text;
 	const classes = new Scanner({}).scanFiles([{ content: js, extension: "js" }]);
 	const compiler = await compile(readFileSync(`${root}app/globals.css`, "utf8"), { base: `${root}app/`, onDependency() {} });
-	const css = optimize(compiler.build(classes)).code;
+	// `sheets`: stylesheets the app's layout loads before its own (KaTeX's), by path from the app's root.
+	const css = sheets.map((sheet) => readFileSync(`${root}${sheet}`, "utf8")).join("\n") + optimize(compiler.build(classes)).code;
 	const html = '<!doctype html><html lang="en" class="dark"><head><link rel="stylesheet" href="/shell.css"></head><body class="min-h-dvh antialiased"><div id="root"></div><script type="module" src="/shell.js"></script></body></html>';
 	const server: Server = createServer((req, res) => {
 		const path = new URL(req.url ?? "/", "http://x").pathname;
