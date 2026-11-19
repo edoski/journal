@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import os
 
 TODAY_VARIABLE = "LEARNING_TODAY"
+SHIFT_VARIABLE = "LEARNING_CLOCK_SHIFT"
 
 
 def today() -> date:
@@ -22,11 +23,17 @@ def today() -> date:
 
 
 def now() -> datetime:
-    """The current UTC instant; when pinned, the current local time on the pinned day."""
+    """The current UTC instant; when pinned, the current local time on the pinned day.
+
+    A pinned day's clock runs ``LEARNING_CLOCK_SHIFT`` seconds ahead of the
+    machine's, so a simulated day keeps its own time of day whenever it is
+    played (the app's ``studyNow`` reads the same shift).
+    """
     current = datetime.now(timezone.utc)
     if not os.environ.get(TODAY_VARIABLE):
         return current
-    wall = current.astimezone().time()
+    shift = float(os.environ.get(SHIFT_VARIABLE) or 0)
+    wall = (current + timedelta(seconds=shift)).astimezone().time()
     return datetime.combine(today(), wall).astimezone().astimezone(timezone.utc)
 
 

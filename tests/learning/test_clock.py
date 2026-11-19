@@ -42,6 +42,19 @@ def test_a_pinned_day_keeps_the_local_time_of_day(
     assert clock.today() == date.fromisoformat(pinned)
 
 
+@pytest.mark.usefixtures("rome")
+def test_a_shifted_pinned_day_keeps_its_own_time_of_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(clock, "datetime", _Winter)
+    monkeypatch.setenv(clock.TODAY_VARIABLE, "2026-11-08")
+    # The machine reads 23:30 in Rome; the shift opens the day at 10:00.
+    monkeypatch.setenv(clock.SHIFT_VARIABLE, str(-13.5 * 3600))
+    assert clock.now() == datetime(2026, 11, 8, 9, 0, tzinfo=timezone.utc)
+    monkeypatch.delenv(clock.TODAY_VARIABLE)
+    assert clock.now() == _Winter.now(timezone.utc)
+
+
 def test_unpinned_clock_is_the_real_day(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(clock.TODAY_VARIABLE, raising=False)
     assert clock.today() == date.today()
