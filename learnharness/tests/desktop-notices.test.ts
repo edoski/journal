@@ -69,8 +69,8 @@ describe("today's plan", () => {
 		const dayOff = { today: "2026-11-08", journal: { upcoming_schedule: [{ date: "2026-11-08", study_windows: [], is_off_day: true }], usual_study_windows: usual } };
 		assert.deepEqual(todayHours(dayOff), usual);
 		assert.notEqual(planNotice(["Review Binomial distribution"], todayHours(dayOff), "2026-11-08", at("10:00")), null);
-		const learnedOff = { ...dayOff, capacity: { study_days: ["mon"] } };
-		assert.deepEqual(todayHours(learnedOff), usual, "a weekday the engine learned he skips keeps his usual hours too");
+		const learnedOff = { today: "2026-11-08", capacity: { study_days: ["mon"] }, journal: { upcoming_schedule: [{ date: "2026-11-08", study_windows: HOURS, is_off_day: false }], usual_study_windows: usual } };
+		assert.deepEqual(todayHours(learnedOff), HOURS, "a weekday the engine learned he skips keeps the Journal's hours for it");
 		assert.deepEqual(todayHours({ today: "2026-11-08", journal: { upcoming_schedule: [{ date: "2026-11-08", study_windows: [], is_off_day: true }] } }), []);
 	});
 });

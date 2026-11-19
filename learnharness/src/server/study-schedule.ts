@@ -46,12 +46,10 @@ export function addDays(day: string, days: number): string {
 	return date.toISOString().slice(0, 10);
 }
 
-/** The days ahead: off on a weekday the engine has learned he does not
- *  study, else the Journal's windows (`journal.upcoming_schedule`) or its
- *  day off. Without a Journal schedule, the engine's study days alone;
- *  empty when neither says anything. Pure. */
-export function scheduleOf(plan: unknown): ScheduledDay[] {
-	const studies = studyWeekdaysOf(plan);
+/** The Journal's own days ahead (`journal.upcoming_schedule`) by date:
+ *  its day off and study windows, before the engine's learned weekdays.
+ *  Pure. */
+export function journalDaysOf(plan: unknown): Map<string, { off: boolean; windows: StudyWindow[] }> {
 	const upcoming = record(record(plan)?.journal)?.upcoming_schedule;
 	const journal = new Map<string, { off: boolean; windows: StudyWindow[] }>();
 	for (const entry of Array.isArray(upcoming) ? upcoming : []) {
@@ -60,6 +58,16 @@ export function scheduleOf(plan: unknown): ScheduledDay[] {
 		const windows = (Array.isArray(day.study_windows) ? day.study_windows : []).map(windowOf).filter((w) => w !== null);
 		journal.set(day.date, { off: day.is_off_day === true, windows });
 	}
+	return journal;
+}
+
+/** The days ahead: off on a weekday the engine has learned he does not
+ *  study, else the Journal's windows (`journal.upcoming_schedule`) or its
+ *  day off. Without a Journal schedule, the engine's study days alone;
+ *  empty when neither says anything. Pure. */
+export function scheduleOf(plan: unknown): ScheduledDay[] {
+	const studies = studyWeekdaysOf(plan);
+	const journal = journalDaysOf(plan);
 	const today = record(plan)?.today;
 	const dates =
 		journal.size > 0 ? [...journal.keys()] : studies && typeof today === "string" ? Array.from({ length: CALENDAR_DAYS }, (_, n) => addDays(today, n)) : [];

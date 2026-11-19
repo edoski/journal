@@ -12,7 +12,7 @@ import type { StudyWindow } from "../core/contracts/calendar.ts";
 import { lessonTopics } from "../core/course-map-build.ts";
 import { listCoursesRead } from "./courses.ts";
 import { stores } from "./stores.ts";
-import { scheduleOf, usualHoursOf } from "./study-schedule.ts";
+import { journalDaysOf, usualHoursOf } from "./study-schedule.ts";
 
 function record(value: unknown): Record<string, unknown> | null {
 	return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -121,13 +121,14 @@ export function withSessionStudy(course: StudyCourse, sessions: readonly string[
 }
 
 /** Today's study hours from his Journal, from the listing's
- *  `plan --all --days 1` (its `today` and `journal.upcoming_schedule`). On a
+ *  `plan --all --days 1` (its `today` and `journal.upcoming_schedule`), as
+ *  the Journal gives them whatever weekdays the engine has learned. On a
  *  day off his usual hours, the DEFAULT row: he studies daily, the Journal's
  *  day off included. None without a Journal. Pure. */
 export function todayHours(all: unknown): StudyWindow[] {
 	const today = record(all)?.today;
-	const windows = scheduleOf(all).find((day) => day.date === today)?.windows ?? [];
-	return windows.length > 0 ? [...windows] : usualHoursOf(all);
+	const windows = typeof today === "string" ? (journalDaysOf(all).get(today)?.windows ?? []) : [];
+	return windows.length > 0 ? windows : usualHoursOf(all);
 }
 
 export async function studyStatus(): Promise<StudyListing> {
