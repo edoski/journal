@@ -141,6 +141,7 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 	const lines: string[] = [];
 	if (entry.kind === "exam") {
 		lines.push(dayAndNearWords(entry.day, longDayWords(entry.day), today));
+		if (entry.nextSession) lines.push(entry.nextSession);
 		const misfit = misfitWords(entry.doesNotFit);
 		if (misfit) lines.push(misfit);
 		if (entry.allStarted) lines.push("Every topic started");

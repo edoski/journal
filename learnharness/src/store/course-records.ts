@@ -197,11 +197,15 @@ function mapExamOf(value: unknown, listed: ReadonlySet<string>, block: ArcBlock)
 	const unreviewed = handles(e.unreviewed);
 	const arcs = block.arcs && Array.isArray(e.arcs) ? strings(e.arcs).flatMap((a) => block.arcOf(a) ?? []) : null;
 	const leavesOut = handles(e.leaves_out);
+	const sessions = strings(e.sessions);
+	const past = str(e.past);
 	const reasons = Object.fromEntries(
 		Object.entries(record(e.reasons) ?? {}).filter(([h, r]) => listed.has(h) && EXAM_GAP_REASONS.includes(r as ExamGapReason)),
 	) as Partial<Record<TopicHandle, ExamGapReason>>;
 	return {
 		...exam,
+		...(sessions.length > 0 ? { sessions } : {}),
+		...(past ? { past } : {}),
 		...(finalReview ? { finalReview } : {}),
 		...(doesNotFit.length > 0 ? { doesNotFit } : {}),
 		...(unreviewed.length > 0 ? { unreviewed } : {}),

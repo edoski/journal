@@ -224,6 +224,32 @@ export async function renameCourse(workspace: string, title: string): Promise<Co
 	return { ok: true };
 }
 
+/** How the exam session gone by went, his answer to Home's ask. */
+export type SessionOutcome = "passed" | "not-this-time";
+
+/** The exam's patch for his answer on the session gone by (`exam.past`):
+ *  passed keeps the exam on that session and drops the later ones, which
+ *  ends its run-up; not this time confirms the session the plan aims at.
+ *  Null when no session has gone by unanswered. Pure. */
+export function sessionPatch(exam: { date: string; sessions?: readonly string[]; past?: string } | null, outcome: SessionOutcome): Record<string, unknown> | null {
+	if (!exam?.past) return null;
+	const past = exam.past;
+	if (outcome === "not-this-time") return { exam: { date: exam.date } };
+	return { exam: { date: past, sessions: (exam.sessions ?? [past]).filter((day) => day <= past) } };
+}
+
+/** Save his answer on the exam session gone by. The engine's save
+ *  announces the course's change, so every view reads it again. */
+export async function answerExamSession(workspace: string, outcome: SessionOutcome): Promise<CourseChange> {
+	const read = await stores.courseRecords.map(workspace);
+	if (!read.ok) return engineFailure("exam session", read.message);
+	const changes = sessionPatch(read.map.exam, outcome);
+	if (!changes) return { ok: false, status: 409, code: "nothing_to_answer", error: "That exam has nothing to answer now." };
+	const saved = await stores.courseRecords.run(workspace, { verb: "save", changes });
+	if (!saved.ok) return engineFailure("exam session", saved.message);
+	return { ok: true };
+}
+
 /** Delete a course's record: the engine forgets it, so it leaves every
  *  list. The folder, its material and its notes stay on disk. */
 export async function deleteCourse(workspace: string): Promise<CourseChange> {

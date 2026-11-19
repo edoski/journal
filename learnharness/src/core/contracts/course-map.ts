@@ -168,8 +168,15 @@ export const EXAM_GAP_REASONS: readonly ExamGapReason[] = ["no_study_day", "not_
  *  exam, the taught ones its final review has no room for, and why each
  *  of those is left out. */
 export interface CourseExam {
+	/** The session he aims at. */
 	date: string;
 	daysLeft: number;
+	/** Every day the exam is held, earliest first, `date` among them;
+	 *  absent for an exam held once. */
+	sessions?: readonly string[];
+	/** The session gone by that the plan moved on from, until he says how
+	 *  it went (the engine's `exam.past`). */
+	past?: string;
 	finalReview?: string;
 	doesNotFit?: readonly TopicHandle[];
 	unreviewed?: readonly TopicHandle[];
