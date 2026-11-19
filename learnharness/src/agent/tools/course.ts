@@ -48,6 +48,9 @@ export interface CourseToolContext {
 	 *  here keeps no task (round 9, 2 m4: a review turned into teaching saved
 	 *  "Re-learn checking independence"). */
 	review?: boolean;
+	/** The topics the session was opened on (`ChatRecord.topics`): a
+	 *  review's own. Absent: none. */
+	opened?: readonly string[];
 	/** The topics this session teaches as its lesson when a save runs
 	 *  (session-opening.ts `lessonTopicsOf`): an answer on none of them is
 	 *  saved `aside`, so a check in a side question never starts its topic
@@ -101,9 +104,24 @@ export const REVIEW_TASK_REFUSED =
 
 function reviewTaskRefused(ctx: CourseToolContext, patch: Record<string, unknown> | null): string | null {
 	if (!ctx.review || !patch) return null;
-	const tasks = patch.tasks;
-	const kept = tasks !== null && typeof tasks === "object" && Object.values(tasks).some((t) => t !== null);
-	return kept || (typeof patch.focus === "string" && patch.focus !== "") ? REVIEW_TASK_REFUSED : null;
+	const tasks = isObject(patch.tasks) ? patch.tasks : {};
+	const kept = Object.entries(tasks).filter(([, t]) => t !== null);
+	const lesson = kept.filter(([, t]) => takesUp(ctx, t)).map(([key]) => key);
+	const refused = kept.some(([key]) => !lesson.includes(key)) || (typeof patch.focus === "string" && patch.focus !== "" && !lesson.includes(patch.focus));
+	return refused ? REVIEW_TASK_REFUSED : null;
+}
+
+/** Whether a task a review saves is the lesson the session took up: the
+ *  session wrote a lesson plan, and the task is on topics outside the
+ *  review's, which the plan teaches (round 18, M3: a review of
+ *  Inclusion-exclusion began Expectation's lesson on his ask, with a plan
+ *  that named no goal, and its close's save of the Expectation lesson's
+ *  task was refused, so its page had no Resume). What is left of the
+ *  review's own topics stays with them. */
+function takesUp(ctx: CourseToolContext, task: unknown): boolean {
+	const topics = isObject(task) && Array.isArray(task.topics) ? task.topics.filter((t): t is string => typeof t === "string") : [];
+	const opened = ctx.opened ?? [];
+	return (ctx.planSteps?.() ?? []).length > 0 && topics.length > 0 && topics.every((t) => !opened.includes(t));
 }
 
 /** A patch as the engine reads it: the object, or its JSON text, which the
