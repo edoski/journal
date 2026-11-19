@@ -82,6 +82,17 @@ describe("course map merge", () => {
 		assert.equal(merged.summary, "4 new topics, 2 prerequisites, 1 pair of competing methods, 4 references, 1 topic left out of the exam");
 	});
 
+	it("lists the exam's sessions the material gives, keeping the day he aims at among them, and never moves that day", () => {
+		const listed = { ...answer, exam: { sessions: ["2027-02-03", "2026-12-21", "2027-01-19"] } };
+		const merged = mapChanges(listed, view({ exam: { date: "2027-01-19" } }));
+		assert.deepEqual(merged?.changes.exam, { sessions: ["2026-12-21", "2027-01-19", "2027-02-03"] });
+		const his = mapChanges(listed, view({ exam: { date: "2027-03-01" } }));
+		assert.deepEqual(his?.changes.exam, { sessions: ["2026-12-21", "2027-01-19", "2027-02-03", "2027-03-01"] }, "his own day stays the one aimed at");
+		assert.equal(mapChanges(listed, view())?.changes.exam, undefined, "no exam day to aim at");
+		assert.equal(mapChanges(listed, view({ exam: { date: "2027-01-19", sessions: ["2027-01-19"] } }))?.changes.exam, undefined, "the record lists them already");
+		assert.equal(mapChanges({ ...answer, exam: { sessions: ["2027-01-19"] } }, view({ exam: { date: "2027-01-19" } }))?.changes.exam, undefined, "one day is no list");
+	});
+
 	it("changes nothing when the same answer meets the map it built", () => {
 		const built = view({
 			topics: {
