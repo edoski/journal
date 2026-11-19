@@ -21,6 +21,12 @@
  *   window.lh.pickFolder() — the system folder picker for Context's Link a
  *   folder; resolves to the folder's path, or null when cancelled.
  *
+ *   window.lh.notify(notice) / onInUse(cb) / onOpen(cb) — the study
+ *   notifications (components/desktop-notice-bridge.tsx): the renderer
+ *   offers a notice, the shell shows it at most once (`showNotice` in
+ *   electron/main.cjs); "lh:in-use" when the Mac wakes or unlocks; "lh:open"
+ *   with the place a clicked notice names.
+ *
  * Channel names are mirrored in electron/main.cjs — keep them in sync.
  */
 const { contextBridge, ipcRenderer } = require("electron");
@@ -35,6 +41,17 @@ contextBridge.exposeInMainWorld("lh", {
 	getZoom: () => ipcRenderer.invoke("lh:zoom:get"),
 	lightsCentre: Number(process.argv.find((arg) => arg.startsWith("--lh-lights-centre="))?.split("=")[1]),
 	pickFolder: () => ipcRenderer.invoke("lh:pick-folder"),
+	notify: (notice) => ipcRenderer.send("lh:notify", notice),
+	onInUse: (cb) => {
+		const listener = () => cb();
+		ipcRenderer.on("lh:in-use", listener);
+		return () => ipcRenderer.removeListener("lh:in-use", listener);
+	},
+	onOpen: (cb) => {
+		const listener = (_event, href) => cb(href);
+		ipcRenderer.on("lh:open", listener);
+		return () => ipcRenderer.removeListener("lh:open", listener);
+	},
 	/** The machine woke from sleep; returns unsubscribe. */
 	onResume: (cb) => {
 		const listener = () => cb();

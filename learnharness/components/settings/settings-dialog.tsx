@@ -29,11 +29,14 @@ import {
 } from "react";
 import {
 	CURRENT_SETTINGS_VERSION,
+	notificationsOn,
 	type AppearanceSettings,
+	type NotificationSettings,
 	type UserSettings,
 } from "@/src/core";
 import { useAppearance } from "./appearance.tsx";
-import { SettingsGroup, SettingsRow, SettingsSection } from "./controls.tsx";
+import { SettingsGroup, SettingsRow, SettingsSection, Toggle } from "./controls.tsx";
+import { NOTICE_WORDS } from "@/components/study-words";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { notifySettingsSaved } from "@/components/settings-signal";
@@ -154,7 +157,7 @@ export function SettingsDialogBody({
 	 *  schema mistake caught by the validation surface). */
 	const write = useCallback(
 		async (
-			section: "appearance",
+			section: "appearance" | "notifications",
 			body: object,
 		) => {
 			setError(null);
@@ -180,7 +183,7 @@ export function SettingsDialogBody({
 					stored ?? ({ ...(prev ?? {}), [section]: body }) as UserSettings,
 			);
 			notifySettingsSaved(section);
-			onAppearanceChange(body as AppearanceSettings);
+			if (section === "appearance") onAppearanceChange(body as AppearanceSettings);
 		},
 		[onAppearanceChange],
 	);
@@ -211,6 +214,18 @@ export function SettingsDialogBody({
 									title="General"
 									testid="section-general"
 								>
+									{/* Only the Mac app sends them (its preload's bridge, `window.lh`). */}
+									{typeof window !== "undefined" && window.lh !== undefined && (
+										<SettingsGroup label="Notifications">
+											<SettingsRow label={NOTICE_WORDS.setting} hint={NOTICE_WORDS.settingHint} testid="row-notifications">
+												<Toggle
+													label={NOTICE_WORDS.setting}
+													checked={notificationsOn(record)}
+													onChange={(enabled) => void write("notifications", { enabled } satisfies NotificationSettings)}
+												/>
+											</SettingsRow>
+										</SettingsGroup>
+									)}
 									<SettingsGroup label="About">
 										<SettingsRow label="Version" testid="row-version">
 											<span className="text-body tabular-nums text-muted-foreground">{APP_VERSION || "unknown"}</span>

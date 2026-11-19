@@ -8,9 +8,11 @@ import type { CourseMap, TopicHandle } from "../core/contracts/course-map.ts";
 import type { ChatSummary } from "../core/contracts/chat.ts";
 import { courseLabel, type CourseSummary, type UnreadableCourse } from "../core/contracts/course.ts";
 import type { StudyCourse, StudyListing } from "../core/contracts/study.ts";
+import type { StudyWindow } from "../core/contracts/calendar.ts";
 import { lessonTopics } from "../core/course-map-build.ts";
 import { listCoursesRead } from "./courses.ts";
 import { stores } from "./stores.ts";
+import { scheduleOf } from "./study-schedule.ts";
 
 function record(value: unknown): Record<string, unknown> | null {
 	return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -68,7 +70,7 @@ export function ownPlanOf(all: unknown, workspace: string): unknown {
  *  list, or whose map could not be read, is in `failed`. */
 export async function readCourses(
 	days: number | ((course: CourseSummary) => number) = 1,
-): Promise<{ available: true; read: CourseRead[]; failed: UnreadableCourse[] } | { available: false; reason: string }> {
+): Promise<{ available: true; read: CourseRead[]; failed: UnreadableCourse[]; all?: unknown } | { available: false; reason: string }> {
 	const chats = stores.chatStore.listChats();
 	const mapOf = (workspace: string) => homeMap(workspace, chats);
 	// Each registered course's map starts beside the listing's plan, not after
@@ -95,6 +97,7 @@ export async function readCourses(
 		available: true,
 		read: read.flatMap((c) => ("map" in c ? [c] : [])),
 		failed: [...listing.unreadable, ...read.flatMap((c) => ("map" in c ? [] : [c]))],
+		all,
 	};
 }
 
@@ -117,10 +120,18 @@ export function withSessionStudy(course: StudyCourse, sessions: readonly string[
 	return { ...course, lastActiveDaysAgo: course.lastActiveDaysAgo === null ? newest : Math.min(course.lastActiveDaysAgo, newest) };
 }
 
+/** Today's study windows in his Journal, from the listing's
+ *  `plan --all --days 1` (its `today` and `journal.upcoming_schedule`); none
+ *  on a day off or without a Journal. Pure. */
+export function todayHours(all: unknown): StudyWindow[] {
+	const today = record(all)?.today;
+	return [...(scheduleOf(all).find((day) => day.date === today)?.windows ?? [])];
+}
+
 export async function studyStatus(): Promise<StudyListing> {
 	const listing = await readCourses();
 	if (!listing.available) return listing;
 	const chats = stores.chatStore.listChats().filter((c) => c.course && c.messageCount > 0);
 	const daysOf = (workspace: string) => chats.filter((c) => c.course!.workspace === workspace).map((c) => localDay(c.updatedAt));
-	return { available: true, courses: listing.read.map((c) => withSessionStudy(studyCourseOf(c.map, c.plan), daysOf(c.map.workspace))), failed: listing.failed };
+	return { available: true, courses: listing.read.map((c) => withSessionStudy(studyCourseOf(c.map, c.plan), daysOf(c.map.workspace))), failed: listing.failed, hours: todayHours(listing.all) };
 }

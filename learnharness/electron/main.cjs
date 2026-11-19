@@ -402,6 +402,85 @@ function installMenu() {
 	Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+/* ── Study notifications (Edo, 19 Nov 2026: "VERY sparingly") ─────────────
+ * The renderer decides what to say, in Home's words
+ * (components/desktop-notice-bridge.tsx); the shell only shows it, at most
+ * once: today's plan once a day (the id names the day, kept in userData so
+ * a relaunch never repeats it), work he started once per job, and that only
+ * while no window of the app is focused. macOS's own permission and Focus
+ * apply. Every notice shown or held is logged (userData/logs/main.log). */
+
+/** The day's plan already shown, by its id ("plan:2026-11-19"). */
+function noticesFile() {
+	return path.join(app.getPath("userData"), "notices.json");
+}
+
+function shownPlan() {
+	try {
+		return JSON.parse(fs.readFileSync(noticesFile(), "utf8")).plan ?? null;
+	} catch {
+		return null;
+	}
+}
+
+/** Work notices shown in this run; a job finishes once, so a relaunch never repeats one. */
+const shownNotices = new Set();
+/** Notifications on screen: held so their click handlers outlive garbage collection. */
+const liveNotices = new Set();
+
+/** A click opens the place the notice names, in the app's window. */
+function openNoticePlace(href, url) {
+	const win = [...trustedAppWindows].find((w) => !w.isDestroyed());
+	if (!win) {
+		createWindow(new URL(href, url).toString());
+		return;
+	}
+	if (win.isMinimized()) win.restore();
+	win.show();
+	win.focus();
+	win.webContents.send("lh:open", href);
+}
+
+function showNotice(notice, url) {
+	const { Notification } = require("electron");
+	const { id, title, body, href, away } = notice ?? {};
+	if (![id, title, body, href].every((v) => typeof v === "string") || !href.startsWith("/") || href.startsWith("//")) return;
+	const plan = id.startsWith("plan:");
+	if (shownNotices.has(id) || (plan && shownPlan() === id)) return log(`notice held: ${id} (already shown)`);
+	if (away && BrowserWindow.getFocusedWindow()) return log(`notice held: ${id} (a window is focused)`);
+	if (!Notification.isSupported()) return log(`notice held: ${id} (notifications unsupported)`);
+	const shown = new Notification({ title, body });
+	liveNotices.add(shown);
+	shown.on("click", () => openNoticePlace(href, url));
+	shown.on("close", () => liveNotices.delete(shown));
+	shown.show();
+	shownNotices.add(id);
+	if (plan) {
+		try {
+			fs.writeFileSync(noticesFile(), JSON.stringify({ plan: id }));
+		} catch (err) {
+			log(`notices.json: ${err}`);
+		}
+	}
+	log(`notice shown: ${id} "${title}" — ${body} → ${href}`);
+}
+
+/** The renderer's offers, from the app's own windows only, and the moments
+ *  the app comes back into use: the Mac waking or unlocking. */
+function installNotices(url) {
+	const origin = new URL(url).origin;
+	ipcMain.on("lh:notify", (event, notice) => {
+		const win = BrowserWindow.fromWebContents(event.sender);
+		if (!win || !trustedAppWindows.has(win) || new URL(event.senderFrame?.url ?? "about:blank").origin !== origin) return;
+		showNotice(notice, url);
+	});
+	const inUse = () => {
+		for (const win of trustedAppWindows) if (!win.isDestroyed()) win.webContents.send("lh:in-use");
+	};
+	powerMonitor.on("resume", inUse);
+	powerMonitor.on("unlock-screen", inUse);
+}
+
 async function main() {
 	// macOS convention: the app stays resident, reactivated from the Dock.
 	// Without a listener Electron quits when the last window closes.
@@ -464,6 +543,7 @@ async function main() {
 		if (width < target) win.setBounds({ x, y, width: target, height });
 	});
 	reopenWindow = () => createWindow(url);
+	installNotices(url);
 	app.on("activate", () => {
 		if (BrowserWindow.getAllWindows().length === 0) reopenWindow();
 	});

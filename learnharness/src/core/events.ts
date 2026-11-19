@@ -61,6 +61,11 @@ export interface ServerEvents {
 	 *  its working line meanwhile (round 8: about 10 s of nothing before
 	 *  practice woke). */
 	"turn-waking": { chatId: string; waking: boolean };
+	/** Work he started finished (server/work-finished.ts): a course's topic
+	 *  map saved (`at`, when: one build, one notice), or a new lesson's
+	 *  opening turn settled. The Mac app tells him while none of its windows
+	 *  is focused. */
+	"work-finished": { kind: "course-map"; workspace: string; title: string; at: string } | { kind: "lesson"; chatId: string; title: string };
 }
 
 export type ServerEventType = keyof ServerEvents;
@@ -83,6 +88,7 @@ export const SERVER_EVENT_TYPES = [
 	"course-changed",
 	"record-changed",
 	"turn-waking",
+	"work-finished",
 ] as const satisfies readonly ServerEventType[];
 
 /** One notification: the type discriminates the payload (distributed over

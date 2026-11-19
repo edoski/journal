@@ -79,7 +79,7 @@ describe("SETTINGS_SECTIONS (the route's section map)", () => {
 	it("maps exactly the record sections: no agent section, so its PUT is an unknown section", () => {
 		assert.deepEqual(
 			Object.keys(SETTINGS_SECTIONS),
-			["appearance", "claude"],
+			["appearance", "claude", "notifications"],
 		);
 	});
 });

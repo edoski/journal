@@ -5,7 +5,7 @@
  * discipline); sections are independent, so partial writes can never
  * clobber each other.
  *
- *   section ∈ agent | appearance | claude
+ *   section ∈ appearance | claude | notifications
  *   Body: the complete desired section object. Parse + validate strictly
  *   (server/settings-body.ts): a bad shape/type is a 400 carrying the
  *   supported list where one exists. The claude section's account must be
