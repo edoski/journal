@@ -155,7 +155,7 @@ function remarkRefused(o: Record<string, unknown>, i: number, remarkable: Course
 	if ((o.kind ?? "attempt") === "self_report" || !Array.isArray(o.corrects)) return null;
 	const targets = o.corrects.filter((id): id is string => typeof id === "string");
 	if (!("disputed" in o)) {
-		return `observations[${i}].corrects: he did not dispute ${targets.join(", ") || "it"}, so ${targets.length > 1 ? "they stand" : "it stands"} as recorded: never re-mark an answer on your own, and never tell him a mark changed. Leave the re-mark out; a new answer is simply a new attempt.`;
+		return `observations[${i}].corrects: he did not dispute ${targets.join(", ") || "it"}, so ${targets.length > 1 ? "they stand" : "it stands"} as recorded: never re-mark an answer on your own, and say nothing to him of its mark or its help: not that it was wrong, not what it should have been, and never that a mark changed. Leave the re-mark out; a new answer is simply a new attempt.`;
 	}
 	const outside = targets.filter((id) => !remarkable?.disputed.has(id));
 	return outside.length === 0 ? null : `observations[${i}].corrects: he disputed no mark of ${outside.join(", ")}. A ruling re-marks only the attempts his dispute named.`;

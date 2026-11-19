@@ -273,10 +273,31 @@ const SAVE_TOOL = "course_save";
  *  those two card marks myself, but disputing them from the cards gets
  *  them re-marked."). */
 const MARK_TALK = /\bre-mark(?:ed|ing|s)?\b|\bdisput(?:e|ed|es|ing)\b|\b(?:change|fix|correct)(?:s|ed|ing)? (?:(?:those|these|the|its|their|your|that|this|two|both|earlier|card)\s+)*marks?\b|\bmarks? (?:are|is|was|were|look|looks) (?:wrong|off|mistaken)\b|\bkeeps? (?:their|its) marks?\b/i;
+/** Words on how an earlier answer was marked or helped: its mark, a hint
+ *  it had or lacked, that it was right or reached on his own (round 18,
+ *  m13: with the record unreadable, Next problem opened "No hint was given
+ *  on the ordered-field problem or the √n/(n+1) problem, so marking them
+ *  as solved 'with the hint' was my error. Your bound by 1/√n was a
+ *  complete, right answer, reached on your own.", over the cards that
+ *  still read "With help"). In a turn that answers nothing of his, or
+ *  after a save that re-marked an answer unasked was refused, they can be
+ *  about an earlier answer only. */
+const EARLIER_MARK = /\bmark(?:ed|ing|s)?\b|\bwith (?:the |a |one |any )?(?:hint|help|nudge)s?\b|\bno hint was (?:given|needed)\b|\bI (?:never|didn't|did not) (?:give|gave|offer) you (?:a |any )?(?:hint|help|nudge)\b|\b(?:reached|found|solved|got|did|answered|managed|worked)\b[^.?!]{0,40}\b(?:on your own|unaided|without (?:a |any )?(?:hint|help|nudge))\b|\b(?:was|were) (?:a |an )?(?:[a-z]+,? ){0,3}(?:right|correct)(?: answers?)?\b/i;
 /** His words about a mark: then a reply may answer them. */
 const HIS_MARK_WORDS = /\b(?:mark(?:s|ed)?|dispute|re-?mark|card)\b/i;
-/** A reply that says how his answer was judged. */
-const VERDICT_SAID = /\b(?:right|correct|wrong|incorrect)\b/i;
+/** His words about how his answers went or were saved: then a reply may
+ *  say their marks ("was I right?", "can you save my answers now?"). */
+const HIS_ANSWER_WORDS = /\b(?:mark(?:s|ed)?|dispute|re-?mark|card|right|wrong|correct|hints?|help(?:ed)?|on my own|sav(?:e|ed|ing))\b/i;
+/** A message that opens on how his answer was judged: the verdict his
+ *  card cannot show while the record can't be read ("Right, with one
+ *  nudge.", "Not right. …"). A verdict word later in the message, or about
+ *  another answer, is not it (round 18, m13: "Your bound by 1/√n was a
+ *  complete, right answer" stood for a verdict). */
+const VERDICT_OPENING = /^(?:(?:that|this|it|your (?:answer|map|work|proof|bound))(?:'s| is) )?(?:not (?:quite )?|partly |half )?(?:right|correct|wrong|incorrect)\b|^(?:yes|no)\b/i;
+const opensOnVerdict = (text: string): boolean => VERDICT_OPENING.test(sentences(text)[0]?.trim() ?? "");
+/** The rules that refuse grading in words, which the verdict owed while
+ *  his card shows no mark is exempt from. */
+const GRADING_RULES: ReadonlySet<VoiceRule> = new Set(["echo", "feedback", "card"]);
 
 /** Words that start the lesson he is closing (round 17, m19: "…waits
  *  for you in Linear maps and their matrices, which you start tomorrow"
@@ -315,6 +336,22 @@ function savedObservations(args: Record<string, unknown>): Record<string, unknow
 	}
 	const listed = isRecord(changes) && Array.isArray(changes.observations) ? changes.observations : [];
 	return listed.filter((o): o is Record<string, unknown> => isRecord(o) && !("corrects" in o));
+}
+
+/** Whether a save re-marks an answer he never disputed (`corrects` with
+ *  no `disputed`), which course_save refuses. */
+function remarksUnasked(args: unknown): boolean {
+	if (!isRecord(args)) return false;
+	let changes: unknown = args.changes;
+	if (typeof changes === "string") {
+		try {
+			changes = JSON.parse(changes);
+		} catch {
+			return false;
+		}
+	}
+	const listed = isRecord(changes) && Array.isArray(changes.observations) ? changes.observations : [];
+	return listed.some((o) => isRecord(o) && "corrects" in o && !("disputed" in o) && o.kind !== "self_report");
 }
 
 /** The results a save or a conclude records for his answers. */
@@ -396,7 +433,7 @@ const REPAIRED = (correct: string): AgentToolResult<unknown> => ({
 	isError: true,
 	details: { withheld: "repaired" },
 });
-const VERDICT_NOTE = "His answer's save failed, so his card shows no mark, and nothing you sent says how his answer was judged. Send him the verdict in words, opening on it (\"Right, …\", \"Not right: …\").";
+const VERDICT_NOTE = "His answer's save failed, so his card shows no mark, and nothing you sent says how his answer was judged. Send him the verdict in words, opening on it (\"Right, with one nudge.\", \"Not right. …\").";
 const REPAIRED_NOTE = "His second try at your check was not right either, and nothing you sent writes its right answer. Send the repair ending on the right answer, written out in its maths.";
 
 /** The rulings a save records on a dispute (`ruling` on each re-mark). */
@@ -656,9 +693,9 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 		case "due-reviews":
 			return `A lesson opens on its first step, and his reviews due today are already on Home: ${quoted(b.excerpt)}. Leave the reviews out and open on the lesson.`;
 		case "undisputed":
-			return `He disputed no mark, so say nothing of one, nor of how to dispute it: ${quoted(b.excerpt)}. Leave it out; every mark he has not disputed stands as recorded.`;
+			return `He disputed no mark, so say nothing of an earlier answer's mark or help, nor of how to dispute one, even where you think it wrong: ${quoted(b.excerpt)}. Leave it out; every mark he has not disputed stands as recorded, and his card shows it.`;
 		case "verdict-words":
-			return `His answer's save failed, so his card shows no mark, and this reply never says how his answer was judged: ${quoted(b.excerpt)}. Open on the verdict in words ("Right, …", "Not right: …", "Partly right: …"), then the rest.`;
+			return `His answer's save failed, so his card shows no mark, and this reply never opens on how his answer was judged: ${quoted(b.excerpt)}. Open on the verdict in words ("Right, with one nudge.", "Not right.", "Partly right."), then the rest.`;
 		case "begun":
 			return `This lesson began today, so at its close it continues, never starts: ${quoted(b.excerpt)}. Say it continues on its day ("which you continue tomorrow, Monday 9 November").`;
 		case "vector":
@@ -952,6 +989,9 @@ export class VoiceGuard {
 	/** A save of his answer failed this turn, and no message has said its
 	 *  verdict: his card shows no mark while the record can't be read. */
 	private verdictOwed = false;
+	/** A save this turn re-marked an earlier answer he never disputed, and
+	 *  was refused: its words are what the tutor wanted to tell him. */
+	private remarkedUnasked = false;
 	/** The turn opens a lesson: nothing was said in the session before it. */
 	private readonly opening: boolean;
 	/** Ordinary text this turn took out of a reply, and whether the turn
@@ -1031,7 +1071,10 @@ export class VoiceGuard {
 	/** Whether a tool's calls pass through the guard: the probe's end too,
 	 *  which it reads only once the probe has ended. */
 	guards(toolName: string): boolean {
-		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || toolName === SAVE_TOOL || toolName === DEMO_TOOL || toolName === LESSON_PROGRESS_TOOL || this.endsTurn(toolName);
+		// A problem's conclude saves his answer: one the record would not take
+		// owes its verdict in words (round 18, m13: unwrapped, a failed
+		// conclude owed nothing, and "…is what made it work" stood as one).
+		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || toolName === SAVE_TOOL || toolName === PRACTICE_CONCLUDE_TOOL || toolName === DEMO_TOOL || toolName === LESSON_PROGRESS_TOOL || this.endsTurn(toolName);
 	}
 
 	/** Read a call as it finishes streaming. A refused message's text leaves
@@ -1097,7 +1140,8 @@ export class VoiceGuard {
 				const result = await tool.execute(toolCallId, params, signal, onUpdate);
 				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
 				if (tool.name === LESSON_PROGRESS_TOOL && !result.isError) this.dayItems = dayItemsIn(result) ?? this.dayItems;
-				if (this.saveFailed(tool.name, params, result)) this.verdictOwed = !this.toldNow.some((t) => VERDICT_SAID.test(t));
+				if (this.saveFailed(tool.name, params, result)) this.verdictOwed = !this.toldNow.some(opensOnVerdict);
+				if (tool.name === SAVE_TOOL && result.isError && remarksUnasked(params) && !this.input.ruling) this.remarkedUnasked = true;
 				else if (tool.name === SAVE_TOOL && !result.isError && savedObservations(isRecord(params) ? params : {}).length > 0) this.verdictOwed = false;
 				if (this.kept?.call.id === toolCallId) {
 					if (result.isError) this.letGo();
@@ -1165,7 +1209,7 @@ export class VoiceGuard {
 			this.lengthDraft = null;
 			if (this.kept || this.waiting.size > 0) this.releasing = call.id;
 			this.toldNow.push(text);
-			if (VERDICT_SAID.test(text)) this.verdictOwed = false;
+			if (opensOnVerdict(text)) this.verdictOwed = false;
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
 			this.said.push(text);
 			this.asked.push(...sentences(text).filter((s) => s.trim().endsWith("?")));
@@ -1386,9 +1430,11 @@ export class VoiceGuard {
 		// A lesson's opening teaches: the reviews due today are Home's to
 		// offer (round 17, m15: every new lesson, a Linear Algebra one
 		// included, opened by listing four due Probability reviews).
-		const markTalk = !this.input.ruling && !HIS_MARK_WORDS.test(this.input.words ?? "") ? sentences(text).find((s) => MARK_TALK.test(s)) : undefined;
+		const earlierOnly = !this.input.answers || this.remarkedUnasked;
+		const words = this.input.words ?? "";
+		const markTalk = this.input.ruling ? undefined : sentences(text).find((s) => (MARK_TALK.test(s) && !HIS_MARK_WORDS.test(words)) || (earlierOnly && EARLIER_MARK.test(s) && !HIS_ANSWER_WORDS.test(words)));
 		if (markTalk) out.push({ rule: "undisputed", excerpt: markTalk.trim() });
-		if (this.verdictOwed && !VERDICT_SAID.test(text)) out.push({ rule: "verdict-words", excerpt: first });
+		if (this.verdictOwed && !opensOnVerdict(text)) out.push({ rule: "verdict-words", excerpt: first });
 		const startsBegun = kind === "close" && !this.review && this.earlier.length > this.told.length ? sentences(text).find((s) => STARTS_IT.test(s)) : undefined;
 		if (startsBegun) out.push({ rule: "begun", excerpt: startsBegun.trim() });
 		const dueSaid = this.opening && kind !== "close" && !asksPlan ? DUE_REVIEWS.exec(text) : null;
@@ -1399,7 +1445,8 @@ export class VoiceGuard {
 		if (shownBefore) out.push({ rule: "repeat", excerpt: `display ${shownBefore}` });
 		const boxed = restatingCallout(text);
 		if (boxed) out.push({ rule: "repeat", excerpt: `callout ${quoted(boxed.said)}, said above as ${quoted(boxed.before)}` });
-		return [...out, ...this.letters(text), ...this.repeats(text, true), ...this.unbuilt(text)];
+		const breaks = [...out, ...this.letters(text), ...this.repeats(text, true), ...this.unbuilt(text)];
+		return this.verdictOwed ? breaks.filter((b) => !GRADING_RULES.has(b.rule)) : breaks;
 	}
 
 	/** Words that point at a demo this turn called for: it is built after

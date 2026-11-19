@@ -53,7 +53,7 @@ const dispute = (messages: LhMessage[]) => [...messages, newDisputeMessage({ ans
 describe("no mark changes unasked (round 14, m12)", () => {
 	it("the recorded re-mark of a seeded answer this session saved is refused, and saves nothing", async () => {
 		const { saves, save } = saving(SEEDED);
-		assert.match((await save([remark])) ?? "", /he did not dispute o37, so it stands as recorded: never re-mark an answer on your own, and never tell him a mark changed/);
+		assert.match((await save([remark])) ?? "", /he did not dispute o37, so it stands as recorded: never re-mark an answer on your own, and say nothing to him of its mark or its help: not that it was wrong, not what it should have been, and never that a mark changed/);
 		assert.equal(saves.length, 0);
 	});
 
