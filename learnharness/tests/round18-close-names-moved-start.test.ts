@@ -88,7 +88,7 @@ describe("a close names each start his study moved off today (round 18, M4)", ()
 
 	it("leaves a message that names no day alone, and holds a turn that never names the move", () => {
 		const guard = new VoiceGuard([saved("c2", EXPECTATION), newDoneTonightMessage("prober")]);
-		assert.deepEqual(refusedRules(guard, "The three-set count was right; the four-set one adds the quadruple intersection back.").filter((r) => r === "moved-start"), []);
+		assert.deepEqual(refusedRules(guard, "The four-set count adds the quadruple intersection back.").filter((r) => r === "moved-start"), []);
 		assert.match(guard.beforeEnd() ?? "", /Expectation and linearity was planned for today and now starts Sunday 15 November, since it waits on Random variables and distributions/);
 		assert.equal(guard.beforeEnd(), undefined, "held once a turn");
 	});
