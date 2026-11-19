@@ -231,6 +231,44 @@ function posedLast(messages: readonly LhMessage[]): boolean {
 	return false;
 }
 
+/** Whether the open question or problem was posed after the input this
+ *  turn answers: the turn goes on after posing it, with nothing new from
+ *  him, so a pointer to it tells him nothing, whatever was said under it
+ *  (round 18, m14: "Your Homomorphisms review is still open above, and
+ *  your answer goes in its thinking field." in a turn that went on after
+ *  the problem and its "This one is your Homomorphisms review."). */
+function posedSinceInput(messages: readonly LhMessage[]): boolean {
+	const failed = failedOutputCallIds(messages);
+	const posing: readonly string[] = [...QUESTION_TOOLS, PRACTICE_PROBLEM_TOOL];
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "assistant") {
+			if (opensTurn(m)) return false;
+			continue;
+		}
+		const call = m.content.findLast((b): b is ToolCall => b.type === "toolCall" && !failed.has(b.id) && (posing.includes(b.name) || b.name === PRACTICE_CONCLUDE_TOOL));
+		if (call) return posing.includes(call.name);
+	}
+	return false;
+}
+
+/** Whether a question or a practice problem is open above this turn,
+ *  answered or not: a pointer "above" needs one there. */
+function openAbove(messages: readonly LhMessage[]): boolean {
+	if (standingQuestion(messages)) return true;
+	const failed = failedOutputCallIds(messages);
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "assistant") continue;
+		const call = m.content.findLast((b): b is ToolCall => b.type === "toolCall" && !failed.has(b.id) && (b.name === PRACTICE_PROBLEM_TOOL || b.name === PRACTICE_CONCLUDE_TOOL));
+		if (call) return call.name === PRACTICE_PROBLEM_TOOL;
+	}
+	return false;
+}
+
+/** A sentence that points at an open question above him. */
+const POINTS_ABOVE = /\b(?:still )?open above\b|\babove,? (?:still )?open\b|\bis (?:still )?(?:waiting|there) above\b|\b(?:question|problem|check|review|part) above\b/i;
+
 /** Every text he read from the tutor before this turn: its delivered
  *  messages and the questions it posed, each marked which it is. */
 function earlierTexts(messages: readonly LhMessage[]): Array<{ text: string; asked: boolean }> {
@@ -692,6 +730,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `The demo you called for this turn is still being built, so it is not on his screen: ${quoted(b.excerpt)}. It appears where you called for it once it is built, and a message tells you then. Until that message, say nothing of it and ask nothing that needs it: teach the step in words now, and point him at the demo, and ask what needs it, once it has arrived.`;
 		case "due-reviews":
 			return `A lesson opens on its first step, and his reviews due today are already on Home: ${quoted(b.excerpt)}. Leave the reviews out and open on the lesson.`;
+		case "nothing-above":
+			return `No question or problem is open above him, so this points at nothing: ${quoted(b.excerpt)}. Leave it out.`;
 		case "undisputed":
 			return `He disputed no mark, so say nothing of an earlier answer's mark or help, nor of how to dispute one, even where you think it wrong: ${quoted(b.excerpt)}. Leave it out; every mark he has not disputed stands as recorded, and his card shows it.`;
 		case "verdict-words":
@@ -922,6 +962,10 @@ export class VoiceGuard {
 	private readonly standing: boolean;
 	/** The open question or problem is the last thing he read. */
 	private readonly posedLast: boolean;
+	/** The open question or problem was posed after this turn's input. */
+	private readonly posedSinceInput: boolean;
+	/** A question or a problem is open above this turn. */
+	private readonly openAbove: boolean;
 	private readonly earlier: string[];
 	/** The messages he read before this turn, questions aside. */
 	private readonly told: string[];
@@ -1052,6 +1096,8 @@ export class VoiceGuard {
 		// A guess he asks to make first is the guess rule's: it is posed as a prediction.
 		this.setAside = aside && !this.input.guess && !(this.input.words && TAUGHT_INSTEAD.test(this.input.words)) ? aside : null;
 		this.posedLast = posedLast(messages);
+		this.posedSinceInput = posedSinceInput(messages);
+		this.openAbove = openAbove(messages);
 		this.stepsAhead = stepsNotDone(messages);
 		this.unsaved = saves ? unsavedAnswerOf(messages) : null;
 		const earlier = earlierTexts(messages);
@@ -1425,8 +1471,10 @@ export class VoiceGuard {
 		if (this.input.demo && this.sent === 0 && !POINTS_AT_DEMO.test(text)) out.push({ rule: "demo-unused", excerpt: first });
 		const below = this.standing ? questionBelow(text) : null;
 		if (below) out.push({ rule: "below", excerpt: below });
-		const pointer = this.posedLast && this.sent === 0 ? sentences(text).map((s) => s.trim()).find((s) => /\b(?:still )?open above\b|\babove,? (?:still )?open\b|\bis (?:still )?(?:waiting|there) above\b/i.test(s)) : undefined;
+		const pointer = (this.posedLast || this.posedSinceInput) && this.sent === 0 ? sentences(text).map((s) => s.trim()).find((s) => POINTS_ABOVE.test(s) && !/\bquestion above\b/i.test(s)) : undefined;
 		if (pointer) out.push({ rule: "pointer", excerpt: pointer });
+		const nothingAbove = !this.openAbove && !this.posed ? sentences(text).map((s) => s.trim()).find((s) => POINTS_ABOVE.test(s)) : undefined;
+		if (nothingAbove) out.push({ rule: "nothing-above", excerpt: nothingAbove });
 		// A lesson's opening teaches: the reviews due today are Home's to
 		// offer (round 17, m15: every new lesson, a Linear Algebra one
 		// included, opened by listing four due Probability reviews).

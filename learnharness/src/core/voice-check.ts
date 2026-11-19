@@ -77,7 +77,8 @@ export type VoiceRule =
 	| "undisputed"
 	| "verdict-words"
 	| "begun"
-	| "vector";
+	| "vector"
+	| "nothing-above";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -125,7 +126,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "backref", re: /\b(?:the )?same as (?:before|last time|above|earlier|the last (?:one|question|problem))\b|\bas (?:before|last time)\b/i },
 	// The app's own parts are nothing he talks about (round 9: "Your message
 	// arrived in the answer field…, so that question is now closed").
-	{ rule: "machinery", re: /\b(?:answer|input|text|message) (?:field|box)\b|\bthe dock\b/i },
+	// Round 18, m14: "your answer goes in its thinking field", the prompts'
+	// own name for his box.
+	{ rule: "machinery", re: /\b(?:answer|input|text|message|thinking) (?:fields?|box(?:es)?)\b|\bthe dock\b/i },
 	// The open question stays above, unchanged, and the app shows no copy of
 	// it (round 11, 4 minor 6: "Here is the question again." and nothing).
 	// Every answer in the record stays saved, an earlier day's included, and
