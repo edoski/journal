@@ -1250,14 +1250,12 @@ def _hits(
 
 def _readable(workspace: Workspace) -> dict[str, dict[str, Any]]:
     """Every course's stored record, by directory; a course whose record
-    cannot be read is left out of the others' plan, as ``plan`` leaves it
-    out."""
+    cannot be read is planned as it was last read (``records.for_plan``), as
+    ``plan`` plans it, and left out when it never was."""
     readable: dict[str, dict[str, Any]] = {}
     for target in records.courses(workspace):
-        try:
-            readable[str(target.directory)] = records.read(target)
-        except (ValueError, OSError):
-            continue
+        if (found := records.for_plan(target)) is not None:
+            readable[str(target.directory)] = found
     return readable
 
 
