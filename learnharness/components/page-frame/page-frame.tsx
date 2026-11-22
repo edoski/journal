@@ -120,8 +120,8 @@ export function PageHead({
 					</div>
 				)}
 				{standing && (
-					// The clip, with 2px of room on every side for a fact's focus ring.
-					<div data-slot="page-standing" className="-m-0.5 min-w-0 overflow-hidden p-0.5">
+					// The clip, with room on every side for a fact's focus ring and its offset (`PRESS`, 2px each).
+					<div data-slot="page-standing" className="-m-1 min-w-0 overflow-hidden p-1">
 						<div className={cn("flex min-h-5 min-w-0 flex-wrap items-center gap-y-1 text-body text-muted-foreground tabular-nums", BETWEEN_FACTS)}>{standing}</div>
 					</div>
 				)}
