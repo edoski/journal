@@ -140,17 +140,28 @@ function answerProblem(topics: readonly string[], answer: GradedAnswer, statemen
 	return null;
 }
 
-/** Why the answers a conclusion saves have no line of their own: a
- *  not-right answer's `record` is what he did, read in his topic's history
- *  days later, never the problem, which stands in when it is missing
- *  (round 18, m2: o123's text was the whole statement, so Independence's
- *  Earlier read "In ℝ³, let u = (1,0,2)… For which value of k … · Sure, but
- *  wrong"). Read once the conclusion holds only the answers it saves. */
+/** Why the answers a conclusion saves have no line of their own: every
+ *  answer's `record` is what he did, read in his topic's history days
+ *  later, never the problem (round 18, m2: o123's text was the whole
+ *  statement, so Independence's Earlier read "In ℝ³, let u = (1,0,2)… For
+ *  which value of k … · Sure, but wrong"; round 19, m3: right answers too,
+ *  o133 to o136 "Let G = (1 2; 3 2). Find the eigenvalues…"). Read once the
+ *  conclusion holds only the answers it saves. */
 export function recordLineProblem(c: PracticeConclusion, statement: string): string | null {
-	const bare = (answer: GradedAnswer) => answer.result !== "correct" && (!answer.record?.trim() || sameText(answer.record, statement));
-	const label = c.result !== null && bare({ ...c, result: c.result }) ? "" : c.firstTry && bare(c.firstTry) ? "firstTry." : null;
+	const bare = (answer: { record?: string }) => !answer.record?.trim() || sameText(answer.record, statement);
+	// A right first try is the final answer itself, never saved on its own.
+	const label = c.result !== null && bare(c) ? "" : c.firstTry && c.firstTry.result !== "correct" && bare(c.firstTry) ? "firstTry." : null;
 	if (label === null) return null;
-	return `${label}record: a not-right answer's record says what he did, in one line he reads in his topic's history days later ("Took the third entry of $v$ as $0$ and got $k = 5$"), never the problem's statement`;
+	return `${label}record: an answer's record says what he did, in one line he reads in his topic's history days later ("Took the third entry of $v$ as $0$ and got $k = 5$", "Found both eigenvalues from the trace and determinant"), never the problem's statement`;
+}
+
+/** The attempts a practice problem's save recorded, kept under the call
+ *  that posed it the moment the engine took them (`answerSaves`), so a
+ *  problem saved by a turn a restart cut short reads as concluded (round
+ *  19, M3: o135 saved his answer again after a kill). Empty when it was
+ *  never saved. Pure. */
+export function concludedSavesOf(record: { readonly answerSaves?: Readonly<Record<string, readonly string[]>> }, poseCallId: string): string[] {
+	return [...(record.answerSaves?.[poseCallId] ?? [])];
 }
 
 /** Why a conclusion cannot be recorded as given, or null when it can. A
@@ -186,7 +197,7 @@ function answerObservations(
 	return [...groups].map(([result, topics]) => {
 		const chose = answer.chose && result !== "correct" ? answer.chose : undefined;
 		const gaveUp = marks.gave_up && result === "incorrect" ? { gave_up: true } : {};
-		return { topics, text: answer.record?.trim() || pose.statement, response: answer.response, help, result, ...(chose ? { chose } : {}), ...(marks.sure ? { sure: marks.sure } : {}), ...(marks.shown ? { shown: true } : {}), ...gaveUp };
+		return { topics, text: answer.record?.trim() ?? "", response: answer.response, help, result, ...(chose ? { chose } : {}), ...(marks.sure ? { sure: marks.sure } : {}), ...(marks.shown ? { shown: true } : {}), ...gaveUp };
 	});
 }
 

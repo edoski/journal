@@ -258,15 +258,20 @@ def plan(
         {
             **records.history(),
             **{
-                str(target.directory): record
+                str(target.directory): found
                 for target, record, _ in loaded
-                if record is not None
+                # A course that can't be read keeps its room in the others'
+                # days as it was last read (round 19, m5).
+                if (
+                    found := record if record is not None else records.last_read(target)
+                )
+                is not None
             },
         },
         today,
     )
     loaded = [
-        (target, readable.get(str(target.directory)), error)
+        (target, readable.get(str(target.directory)) if error is None else None, error)
         for target, _, error in loaded
     ]
     ahead = [

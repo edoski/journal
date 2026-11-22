@@ -280,16 +280,15 @@ export function heldExamWords(review: CourseMapTopic["review"]): string | null {
 	return review?.kind === "scheduled" && review.held?.exam ? HELD_WORDS.exam(review.held.exam) : null;
 }
 
-/** A day that moved, from when: one he was told ("Moved from 10 Nov after
- *  your Probability study today", round 7: a told day moved in silence),
- *  else a review the plan holds past a day memory asked for that has
- *  passed, "Due 1 Oct"; null otherwise. Memory's day still ahead was
- *  never a day he was told, so nothing moved "from" it (round 8: "Moved
- *  from 11 Nov" named a day he never heard). */
-export function movedWords(review: CourseMapTopic["review"], today: string, told?: TopicMoved): string | null {
-	if (told) return `Moved from ${shortDay(told.from)}${movedWhy(told, today, shortDay)}`;
-	if (review?.kind !== "scheduled" || !review.held) return null;
-	return review.held.since < today ? dueWords(review.held.since) : null;
+/** A day he was told that moved, from when ("Moved from 10 Nov after
+ *  your Probability study today", round 7: a told day moved in silence);
+ *  null otherwise. Memory's day was never a day he was told, passed or
+ *  ahead, so nothing moved "from" it and no row names it beside the day
+ *  the plan gives (round 8: "Moved from 11 Nov" named a day he never
+ *  heard; round 19, m2: RV's Scheduled row read "Review · Mon 9 Nov" over
+ *  "Due 7 Nov" while its course row said "Back Mon 9 Nov"). */
+export function movedWords(told: TopicMoved, today: string): string {
+	return `Moved from ${shortDay(told.from)}${movedWhy(told, today, shortDay)}`;
 }
 
 /** A review that is due: "Due today", "Due 5 Nov"; any review the plan

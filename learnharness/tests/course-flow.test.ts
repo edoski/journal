@@ -314,7 +314,7 @@ describe("a course-linked turn", () => {
 			() => fauxAssistantMessage([
 				fauxToolCall("conclude", {
 					outcome: "solvedWithHints", verdict: "Correct after one nudge.", rung: "R1", missClass: "cue", retest: false,
-					result: "correct", response: "1, the rows are dependent", firstTry: { result: "incorrect", response: "2", record: "Counted both rows, missing that row 2 is twice row 1", sure: "guessing" },
+					result: "correct", response: "1, the rows are dependent", record: "Found the rank as 1 after the nudge", firstTry: { result: "incorrect", response: "2", record: "Counted both rows, missing that row 2 is twice row 1", sure: "guessing" },
 				}, { id: "c1" }),
 			], { stopReason: "toolUse" }),
 			() => fauxAssistantMessage([fauxText("Clean.")]),
@@ -346,7 +346,7 @@ describe("a course-linked turn", () => {
 		assert.deepEqual(JSON.parse(save.stdin), {
 			observations: [
 				{ topics: ["rank"], text: "Counted both rows, missing that row 2 is twice row 1", response: "2", help: "none", result: "incorrect", sure: "guess" },
-				{ topics: ["rank"], text: statement, response: "1, the rows are dependent", help: "Hint R1: re-described the pattern class", result: "correct", sure: "confident" },
+				{ topics: ["rank"], text: "Found the rank as 1 after the nudge", response: "1, the rows are dependent", help: "Hint R1: re-described the pattern class", result: "correct", sure: "confident" },
 			],
 		}, "conclude is the single write: the first unaided try, then the assisted success");
 		const ack = chatStore.getChat(id)!.messages.find((m) => (m as { toolName?: string }).toolName === "conclude") as { isError: boolean; content: Array<{ text: string }> };
@@ -373,7 +373,7 @@ describe("a course-linked turn", () => {
 				})) as unknown as FauxResponseStep,
 			(context: TranscriptContext) => {
 				histories.push(JSON.stringify(context.messages));
-				return fauxAssistantMessage([fauxToolCall("conclude", { outcome: "solved", verdict: "Right: row 2 is twice row 1.", rung: null, missClass: null, retest: false, result: "correct", response: "1" }, { id: "c1" })], { stopReason: "toolUse" });
+				return fauxAssistantMessage([fauxToolCall("conclude", { outcome: "solved", verdict: "Right: row 2 is twice row 1.", rung: null, missClass: null, retest: false, result: "correct", response: "1", record: "Found the rank as 1: row 2 is twice row 1" }, { id: "c1" })], { stopReason: "toolUse" });
 			},
 			() => sendToUser("Your Rank review comes back on Thursday."),
 			() => fauxAssistantMessage(""),
@@ -415,7 +415,7 @@ describe("a course-linked turn", () => {
 			() => fauxAssistantMessage([fauxToolCall("problem", pose, { id: "p1" })], { stopReason: "toolUse" }),
 			() => sendToUser("Look at the rows."),
 			() => fauxAssistantMessage(""),
-			() => fauxAssistantMessage([fauxToolCall("conclude", { outcome: "solved", verdict: "Right.", rung: null, missClass: null, retest: false, result: "correct", response: "1, the rows are dependent" }, { id: "c1" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage([fauxToolCall("conclude", { outcome: "solved", verdict: "Right.", rung: null, missClass: null, retest: false, result: "correct", response: "1, the rows are dependent", record: "Found the rank as 1 from the dependent rows" }, { id: "c1" })], { stopReason: "toolUse" }),
 			() => sendToUser("Send it as your answer when you're ready."),
 			() => fauxAssistantMessage(""),
 			() => fauxAssistantMessage([fauxToolCall("conclude", { outcome: "surrendered", verdict: "Given up.", rung: null, missClass: null, retest: false, result: "incorrect", response: "no answer", record: "Gave up before finding the rank" }, { id: "c2" })], { stopReason: "toolUse" }),

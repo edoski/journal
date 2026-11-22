@@ -36,6 +36,7 @@ const conclusion = {
 	retest: false,
 	result: "correct" as const,
 	response: "The limit is $1/e < 1$, so it converges",
+	record: "Found the limit $1/e < 1$ by the root test after the nudge",
 	firstTry: { result: "incorrect" as const, response: "The limit is $e$, so it diverges", sure: "confident" as const, record: "Took the limit of the base alone as $e$" },
 };
 

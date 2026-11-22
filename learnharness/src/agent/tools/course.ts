@@ -69,6 +69,38 @@ export interface CourseToolContext {
 	 *  each day whole across his courses (round 15, m3). Absent: this
 	 *  course's alone. */
 	courses?: () => Promise<readonly CourseMap[]>;
+	/** The question his Done for today left a half answer on, by its words
+	 *  (session-end.ts `halfAnswerLeft`); null or absent: none. */
+	halfAnswer?: () => string | null;
+}
+
+/** An attempt's line that names a slip in his answer (round 19, m1: o95
+ *  read "the arithmetic slipped to 0.31 instead of 0.25" and was saved
+ *  `correct`). */
+const SLIP = /\bslip(?:s|ped)?\b|\b(?:arithmetic|computation(?:al)?|calculation|rounding|sign) (?:error|mistake|slip)s?\b|\b(?:got|gets|came to|reached|wrote|gave|giving)\s[^.;]{1,40}?\binstead of\b/i;
+
+/** Why attempts cannot be saved as given: one marked right names a slip.
+ *  An answer whose final value differs from the right one is partly right
+ *  at most, however right its method. Null when none does. */
+export function slipMarkedRight(observations: readonly unknown[]): string | null {
+	const i = observations.findIndex((o) => isObject(o) && o.result === "correct" && typeof o.text === "string" && SLIP.test(o.text));
+	if (i < 0) return null;
+	const text = (observations[i] as { text: string }).text;
+	return `observations[${i}]: its line names a slip ("${text}"), yet its result is correct. An answer whose final value differs from the right one is partial at most, never correct, however right its method: save it as partial, or, when his final value was right, write the line without a slip.`;
+}
+
+/** A task step that says he wrote nothing, read past its wording. */
+const WROTE_NOTHING = /\b(?:wrote|written|writing) nothing\b|\bbefore writing anything\b|\bnothing (?:written|yet)\b|\b(?:did not|didn't|has not|hasn't|had not|hadn't) (?:yet )?(?:written|write|started|start) (?:anything|an answer)\b|\bno answer (?:yet|written)\b/i;
+
+/** Why a save is refused: a task step says he wrote nothing while his half
+ *  answer is kept for him (round 19, m4: the Invertible lesson's step read
+ *  "You stopped before writing anything." under his kept half answer). */
+function halfAnswerDenied(ctx: CourseToolContext, patch: Record<string, unknown> | null): string | null {
+	const half = ctx.halfAnswer?.();
+	if (!half || !patch || !isObject(patch.tasks)) return null;
+	const denied = Object.entries(patch.tasks).filter(([, t]) => isObject(t) && typeof t.step === "string" && WROTE_NOTHING.test(t.step)).map(([key]) => key);
+	if (denied.length === 0) return null;
+	return `tasks.${denied[0]}.step: he left a half answer on "${half}", kept in his box for when he comes back, so the step never says he wrote nothing. Name it as his half answer ("Finish your half answer on the … question"), and send the save again.`;
 }
 
 /** A save that creates a course topic out of a step of the session's own
@@ -363,10 +395,12 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 
 async function saveRuled(ctx: CourseToolContext, changes: unknown, problem?: { id: string; seen: boolean }): Promise<CourseResult> {
 	const patch = patchOf(changes);
-	const reviewTask = reviewTaskRefused(ctx, patch) ?? planStepAsTopic(ctx, patch);
+	const reviewTask = reviewTaskRefused(ctx, patch) ?? planStepAsTopic(ctx, patch) ?? halfAnswerDenied(ctx, patch);
 	if (reviewTask) return { ok: false, kind: "validation", message: reviewTask };
 	const listed = patch && Array.isArray(patch.observations) ? patch.observations : null;
 	if (!patch || !listed) return ctx.records.run(ctx.course.workspace, { verb: "save", changes });
+	const slip = slipMarkedRight(listed);
+	if (slip) return { ok: false, kind: "validation", message: slip };
 	const answers = ctx.answers ?? new Map<string, AnsweredQuestion>();
 	const saved = savedThisTurn.get(ctx) ?? new Set<string>();
 	savedThisTurn.set(ctx, saved);

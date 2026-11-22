@@ -154,7 +154,8 @@ describe("calendar entries", () => {
 			reviews.map((e) => e.kind === "review" && [e.title, e.day, e.since, e.waits]),
 			[
 				["Bayes' rule", "2026-11-09", null, null],
-				["Limits", "2026-12-03", "Due 1 Oct", "Waits for your Probability exam"],
+				// Memory's day is never named beside the day the plan gives (round 19, m2).
+				["Limits", "2026-12-03", null, "Waits for your Probability exam"],
 				["Limits", "2026-12-20", null, null],
 			],
 		);

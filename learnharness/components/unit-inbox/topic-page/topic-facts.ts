@@ -201,9 +201,10 @@ export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
 		});
 }
 
-/** Why the review waits past the day memory asked for it, after from
- *  when (`movedWords`): "Due 1 Oct, waits for your Probability exam",
- *  "Due 1 Oct"; an exam is the only why it names (`heldExamWords`). */
+/** Why a scheduled review comes when it does, under its day: the day he
+ *  was told that it moved from (`movedWords`), else the exam it waits for
+ *  (`heldExamWords`); never memory's day, which he was never told (round
+ *  19, m2). */
 /** What the exam ahead means for the topic: it leaves it out, or its plan
  *  has no room to start or review it; null otherwise. */
 const examWords = (topic: CourseMapTopic, map: CourseMap) => leftOutWords(topic, map.exam) ?? examGapTopicWords(topic, map.exam, map.today);
@@ -217,10 +218,8 @@ function startsReason(topic: CourseMapTopic, map: CourseMap): StartsReason | nul
 }
 
 function waitsWords(topic: CourseMapTopic, today: string): string | null {
-	if (topic.moved && topic.review) return movedWords(topic.review, today, topic.moved);
-	const why = heldExamWords(topic.review);
-	const moved = movedWords(topic.review, today);
-	return why && moved ? `${moved}, ${why.charAt(0).toLowerCase()}${why.slice(1)}` : (why ?? moved);
+	if (topic.moved && topic.review) return movedWords(topic.moved, today);
+	return heldExamWords(topic.review);
 }
 
 /** The open tasks that hold the topic: the focused one first, then the
@@ -417,7 +416,7 @@ export function topicFacts({
 		// A topic the exam leaves out stays left out once he starts it: its review says so (the demo world's
 		// Simulation of continuous probabilities, introduced by a probe two days before the exam, read only "Left off today").
 		waits: (topic.level !== "new" ? examWords(topic, map) : null) ?? waitsWords(topic, map.today),
-		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : topic.moved ? movedWords(null, map.today, topic.moved) : startsAfterWords(topic.startsAfter) } : null,
+		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : topic.moved ? movedWords(topic.moved, map.today) : startsAfterWords(topic.startsAfter) } : null,
 		firstReview: lessonBegun(topic) ? (read?.firstReview ?? null) : null,
 		startsWhy: topic.level === "new" ? startsReason(topic, map) : null,
 		exam: topic.level === "new" ? examWords(topic, map) : null,
