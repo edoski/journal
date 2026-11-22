@@ -973,6 +973,11 @@ const OWED_END_NOTE = "Not shown to him: your message was refused and you sent n
 const NEXT_ACTION_NOTE = "He has nothing to do next. End this turn on one question for him with your question tool, or, once he has answered your check, hand the session back to the problems with practice.";
 /** A reply to his work that leaves the problem open with nothing for him
  *  to do (round 8: "It breaks at the line −3x + 2y = 0" and nothing after). */
+/** A lesson turn that graded his answer and stopped there: the step it
+ *  leads to and its question are owed (round 19, 1 N1: after a prediction's
+ *  mark and its resolution the turn ended with nothing to answer, so the
+ *  lesson left Home, the sidebar and its topic page). */
+const NEXT_STEP_NOTE = "He has nothing to answer: you graded his answer, and the lesson goes on. Send the rest of this turn now: the teaching his answer leads to, then the next step's question with your question tool. A review asks its next question.";
 const NUDGE_NOTE = "His work broke and the problem is still open, but your reply gives him no way on. Send one more message with send_to_user: the smallest nudge toward his next move, as one question or instruction he can act on, never the correction.";
 /** A call that would end the turn before his answer this turn was saved
  *  (round 10, 1 m1: a wrong prediction got a rebuttal and the same
@@ -1223,6 +1228,8 @@ export class VoiceGuard {
 	private heldRuling = false;
 	/** This turn called for a demo, which is built after the turn moves on. */
 	private building = false;
+	/** The plan steps this turn's `lesson_progress` marked done. */
+	private readonly doneNow = new Set<string>();
 	/** A message shown this turn ended on a question: it stays the turn's
 	 *  last ask. */
 	private lastAsked = false;
@@ -1310,6 +1317,7 @@ export class VoiceGuard {
 			this.sentAtConclude = this.sent;
 			if (savedResults(call.name, call.arguments).includes("partial")) this.savedPartial = true;
 		}
+		if (call.name === LESSON_PROGRESS_TOOL && isRecord(call.arguments) && Array.isArray(call.arguments.done)) for (const id of call.arguments.done) if (typeof id === "string") this.doneNow.add(id);
 		if (call.name === SAVE_TOOL || call.name === PRACTICE_CONCLUDE_TOOL) for (const result of savedResults(call.name, call.arguments)) this.savedVerdicts.add(result);
 		const refused = this.decide(call);
 		if (refused && call.name === SEND_TO_USER_TOOL) call.arguments = {};
@@ -1357,10 +1365,20 @@ export class VoiceGuard {
 			return VERDICT_NOTE;
 		}
 		const unrepaired = this.repairOwed && !writesAnswer(this.secondTry!, this.toldNow);
-		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.retryOwed ? RETRY_NOTE : unrepaired ? REPAIRED_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
+		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.retryOwed ? RETRY_NOTE : unrepaired ? REPAIRED_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : this.nextStepOwed() ? NEXT_STEP_NOTE : undefined;
 		if (!note || this.noted.has(note)) return undefined;
 		this.noted.add(note);
 		return note;
+	}
+
+	/** This turn graded his answer and posed nothing, with the lesson not
+	 *  done: its plan has a step left, or his review answer was not right,
+	 *  which a later question in the review tries again. Never his Done for
+	 *  today, nor his work on a practice problem. */
+	private nextStepOwed(): boolean {
+		if (this.closing || this.owed || !this.input.answers || this.input.work || this.savedVerdicts.size === 0) return false;
+		if (this.stepsAhead.some((step) => !this.doneNow.has(step.id))) return true;
+		return this.review && [...this.savedVerdicts].some((result) => result !== "correct");
 	}
 
 	/** The tool, refusing the calls `screen` refused, and deciding the ones
