@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo } from "react";
-import { CalendarOffIcon, CircleCheckIcon, CircleDotDashedIcon, TriangleAlertIcon } from "lucide-react";
+import { CalendarOffIcon, CircleCheckIcon, CircleDotDashedIcon, SproutIcon, TriangleAlertIcon } from "lucide-react";
 import type { CourseStanding } from "@/src/core";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Hint } from "@/components/ui/hint";
 import { MathText } from "@/components/ui/math-text";
-import { READY_FACT_WORDS, noExamWords } from "@/components/study-words";
+import { READY_FACT_WORDS, SELF_STUDY_WORDS, closingCheckWords, noExamWords } from "@/components/study-words";
+import { Button } from "@/components/ui/button";
+import { useStartScope } from "@/components/start/start-scope";
 import type { CourseView } from "@/components/course-page/course-model";
 import { FACT, MARK, PRESS } from "@/components/course-page/course-head/head-parts";
 import { ExamGapLine } from "@/components/course-page/course-head/exam-gaps";
@@ -42,6 +44,7 @@ export function useHeadStanding(view: CourseView, standing: CourseStanding | nul
 export function ReadyFact({ view, ready }: { view: CourseView; ready: ExamReady | null }) {
 	const { course, chats } = view;
 	const { map } = course;
+	if (map.selfStudy) return <SelfStudyFact view={view} />;
 	if (!map.exam) {
 		return (
 			<Hint label={noExamWords(map.topics)} side="bottom">
@@ -73,6 +76,53 @@ export function ReadyFact({ view, ready }: { view: CourseView; ready: ExamReady 
 					</p>
 				)}
 				<ExamGapLine course={course} chats={chats} />
+			</PopoverContent>
+		</Popover>
+	);
+}
+
+/**
+ * A self-study's fact, where a course's says whether he is ready for its
+ * exam (22 Nov 2026): "Self-study", whose hint says it has no exam and no
+ * reviews and is done once every topic is learned. Once it is, "Learned",
+ * which opens the one offer it makes, a closing check: one practice
+ * session across every topic, if he wants it.
+ */
+function SelfStudyFact({ view }: { view: CourseView }) {
+	const { map } = view.course;
+	const { start, starting } = useStartScope();
+	if (!map.selfStudy?.goalReached) {
+		return (
+			<Hint label={SELF_STUDY_WORDS.hint} side="bottom">
+				<span data-slot="course-ready-fact" data-kind="self-study" tabIndex={0} className={PRESS}>
+					<SproutIcon aria-hidden className={MARK} />
+					{SELF_STUDY_WORDS.name}
+				</span>
+			</Hint>
+		);
+	}
+	const topics = map.topics.filter((t) => t.excluded === undefined).map((t) => t.handle);
+	const title = closingCheckWords(map.title);
+	return (
+		<Popover>
+			<PopoverTrigger data-slot="course-ready-fact" data-kind="learned" className={PRESS}>
+				<CircleCheckIcon aria-hidden className={MARK} />
+				{SELF_STUDY_WORDS.reached}
+			</PopoverTrigger>
+			<PopoverContent data-slot="course-ready-detail" align="start" collisionPadding={12} className="flex flex-col gap-3">
+				<p className="text-callout text-foreground">{SELF_STUDY_WORDS.reachedLine}</p>
+				<Hint label={SELF_STUDY_WORDS.checkHint} side="bottom">
+					<Button
+						variant="quiet"
+						size="xs"
+						data-slot="closing-check"
+						disabled={starting !== null}
+						onClick={() => start({ title, kind: "practice", course: { workspace: map.workspace }, topics }, { key: "closing-check" })}
+						className="self-start text-link hover:text-link"
+					>
+						{SELF_STUDY_WORDS.check}
+					</Button>
+				</Hint>
 			</PopoverContent>
 		</Popover>
 	);

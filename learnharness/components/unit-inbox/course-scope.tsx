@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRightIcon, ListFilterIcon } from "lucide-react";
 import type { StudyCourse } from "@/src/core";
-import { examText } from "@/components/start/course-facts";
+import { courseFactText } from "@/components/start/course-facts";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { Hint } from "@/components/ui/hint";
@@ -63,7 +63,7 @@ export function CourseScope({
 									<span className="min-w-0 flex-1 truncate">
 										<MathText>{c.map.title}</MathText>
 									</span>
-									{examText(c.map.exam) && <DropdownMenuShortcut>{examText(c.map.exam)}</DropdownMenuShortcut>}
+									{courseFactText(c.map) && <DropdownMenuShortcut>{courseFactText(c.map)}</DropdownMenuShortcut>}
 								</DropdownMenuRadioItem>
 								<Hint label={page} side="right">
 									<DropdownMenuItem asChild className="size-8 shrink-0 justify-center px-0 data-[highlighted]:[&_svg]:text-foreground">

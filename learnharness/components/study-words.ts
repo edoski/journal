@@ -873,6 +873,23 @@ export const READY_WORDS = {
  *  says what it loses in its own words (`ExamReady`'s), never "Not all of
  *  it fits" (round 15, M7); not ready says for what (round 15, m10: "Not
  *  ready yet" had no object). */
+/** A self-study, wherever a course would show its exam or its reviews
+ *  (22 Nov 2026): what it is, that nothing comes back for review, and how
+ *  it ends. */
+export const SELF_STUDY_WORDS = {
+	name: "Self-study",
+	reached: "Learned",
+	hint: "Learning on your own: no exam and no reviews. It's done once you've learned every topic.",
+	reachedLine: "You've learned every topic.",
+	check: "Check yourself",
+	checkHint: "One practice session across every topic, if you want to see what stuck.",
+} as const;
+
+/** A closing check's opening and its name: "Git rebase check". */
+export function closingCheckWords(title: string): string {
+	return `${title} check`;
+}
+
 export const READY_FACT_WORDS = {
 	ready: "Ready for the exam",
 	notYet: "Not ready for the exam yet",
