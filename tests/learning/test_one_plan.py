@@ -275,7 +275,10 @@ def test_a_day_he_finished_but_one_review_moves_only_that_review(
         return any(need == left or stands_on(need) for need in needs.get(key, ()))
 
     moved = {key for key, when in now.items() if told.get(key) != when}
-    assert ("linear-algebra", "reviews", left) in moved
+    # The review he left comes on his next study day, past his limit, or
+    # keeps the day the evening gave it (round 19, M1).
+    review = ("linear-algebra", "reviews", left)
+    assert now[review] in {"2026-11-10", told[review]}, (told[review], now[review])
     assert all(
         name == "linear-algebra" and (topic == left or stands_on(topic))
         for name, _, topic in moved
@@ -488,13 +491,23 @@ def test_filling_the_final_review_keeps_every_day_he_was_told(
     Poisson had no review before the exam, and Sat 14 Nov held one item)."""
     seeded = World(tmp_path, "seed", monkeypatch, capsys, R14)
     found = seeded.plan("2026-11-08")
+    # Each has a review before the exam: Poisson in the final review's free
+    # room, Binomial on 12 Nov, before it, since what the seed's days left
+    # takes its place among them (round 19, M1).
+    before = {
+        topic
+        for day in found["probability"]["plan"]["days"]
+        if day["date"] < "2026-11-19"
+        for topic in day["reviews"]
+    }
     final = {
         topic
         for day in found["probability"]["plan"]["days"]
         if "2026-11-13" <= day["date"] < "2026-11-19"
         for topic in day["reviews"]
     }
-    assert {"binomial", "poisson"} <= final
+    assert {"binomial", "poisson"} <= before
+    assert "poisson" in final
     monkeypatch.setenv("LEARNING_TODAY", "2026-11-08")
     stored = {name: records.read(resolve(root)) for name, root in seeded.roots.items()}
     made = agenda.replay(stored, date(2026, 11, 8), WINDOW)
@@ -553,9 +566,10 @@ def test_a_slip_moves_a_start_to_the_first_final_review_day_with_room(
 
 
 def slip_basis(world: World) -> tuple[dict[str, Any], dict[str, Any]]:
-    """On 9 Nov, the day Linear maps' first lesson is planned, a wrong answer
-    on Basis and dimension, which it needs: Linear maps as the map then
-    shows it, and the save's receipt."""
+    """On 9 Nov, the day before Linear maps' first lesson is planned (10 Nov
+    since round 19's M1, when what the seed's days left took its place among
+    them), a wrong answer on Basis and dimension, which it needs: Linear maps
+    as the map then shows it, and the save's receipt."""
 
     def linear_maps() -> dict[str, Any]:
         return next(
@@ -564,7 +578,7 @@ def slip_basis(world: World) -> tuple[dict[str, Any], dict[str, Any]]:
             if topic["topic"] == "linear-maps"
         )
 
-    assert linear_maps()["starts"] == "2026-11-09"
+    assert linear_maps()["starts"] == "2026-11-10"
     answer = {
         "topics": ["basis"],
         "text": "Called four vectors spanning $\\mathbb{R}^3$ a basis",
@@ -1136,3 +1150,64 @@ def test_a_planned_start_he_did_not_take_keeps_his_pace_and_the_exam(
 
     assert lost(now) == lost(told)
     assert now["capacity"]["new_per_day"] == told["capacity"]["new_per_day"]
+
+
+R19 = json.loads(
+    (Path(__file__).parent / "golden" / "demo-world-r19.json").read_text(
+        encoding="utf-8"
+    )
+)
+
+
+def test_a_day_that_left_reviews_keeps_every_exam_topic_overnight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 19, M1 (1 M1): on 9 Nov he did the Linear Algebra review and
+    two of the Probability review's four topics, left Random variables and
+    Binomial, and took no start. The reviews he left waited for free room in
+    days already full, the starts that needed them moved, and overnight
+    Hypergeometric, Conditional expectation, Martingales, Variance and
+    Variance of sums fell past the exam. What the day left takes its place
+    among the days he was told, so every exam topic that fitted still fits,
+    and a told start moves only when the day left it or it waits on what the
+    day left."""
+    world = World(tmp_path, "d9-end", monkeypatch, capsys, R19)
+    evening, morning = world.plan("2026-11-09"), world.plan("2026-11-10")
+    for name in COURSES:
+        assert (morning[name]["plan"].get("does_not_fit") or []) == (
+            evening[name]["plan"].get("does_not_fit") or []
+        ), name
+
+    left = {
+        (name, topic)
+        for name, course in evening.items()
+        for day in course["plan"]["days"]
+        if day["date"] == "2026-11-09"
+        for topic in (*day["reviews"], *day["new"])
+    }
+    needs = {
+        (name, key): {(name, need) for need in topic.get("needs", [])}
+        for name in COURSES
+        for key, topic in (
+            R19["checkpoints"]["d9-end"].get(name) or R19["steady"][name]
+        )["topics"].items()
+    }
+
+    def waits(item: tuple[str, str], seen: frozenset = frozenset()) -> bool:
+        return item in left or any(
+            waits(need, seen | {item})
+            for need in needs.get(item, ())
+            if need not in seen
+        )
+
+    told = planned_days(evening, set())
+    now = planned_days(morning, set())
+    moved = [
+        (name, topic)
+        for (name, kind, topic), day in told.items()
+        if kind == "new" and day >= "2026-11-10" and now.get((name, kind, topic)) != day
+    ]
+    assert moved, "the start the day left moves its chain"
+    assert [item for item in moved if not waits(item)] == []

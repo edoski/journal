@@ -250,12 +250,13 @@ describe("why a topic starts then", () => {
 		assert.equal(why(plain, "invertibility"), "After Determinants as volume scaling, which it needs");
 	});
 	it("names the arc an early start comes from, or the exam's pace that took it", () => {
-		assert.equal(why(arcs, "inner-product"), "Early, from Orthogonality, while earlier topics wait on Invertible matrices");
+		assert.equal(why(arcs, "inner-product"), "Early, from Orthogonality, to keep pace with the exam");
 		assert.equal(startsWhyWords({ kind: "early", arc: "orthogonality" as ArcHandle, waitingOn: [], exam: true }, arcs), "Early, from Orthogonality, to keep pace with the exam");
-		assert.equal(why(plain, "inner-product"), "Early, ahead of its place, while earlier topics wait on Matrix multiplication as composition and Determinants as volume scaling");
-		assert.equal(startsWhyWords({ kind: "early", waitingOn: ["determinant" as TopicHandle], exam: false }, plain), "Early, ahead of its place, while earlier topics wait on Determinants as volume scaling");
+		assert.equal(why(plain, "inner-product"), "Early, ahead of its place, while earlier topics wait on Determinants as volume scaling");
+		assert.equal(startsWhyWords({ kind: "early", waitingOn: ["matmul" as TopicHandle, "determinant" as TopicHandle], exam: false }, plain), "Early, ahead of its place, while earlier topics wait on Matrix multiplication as composition and Determinants as volume scaling");
 		const orthogonality = "orthogonality" as ArcHandle;
 		assert.equal(startsWhyWords({ kind: "early", arc: orthogonality, waitingOn: [], exam: false }, arcs), "Early, from Orthogonality");
+		assert.equal(startsWhyWords({ kind: "early", arc: orthogonality, waitingOn: ["invertibility" as TopicHandle], exam: false }, arcs), "Early, from Orthogonality, while earlier topics wait on Invertible matrices");
 	});
 	it("says a topic the exam ahead leaves out is not on it, and after it when the plan starts it then", () => {
 		const exam = { date: "2026-11-19", daysLeft: 11, leavesOut: ["covariance" as TopicHandle] };

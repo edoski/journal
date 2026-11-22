@@ -337,9 +337,11 @@ def test_a_day_yesterdays_end_moves_says_why(
         run(monkeypatch, capsys, root, "save", stdin=practice)
     found = moves(monkeypatch, capsys, root)
     if studied:
-        # He studied yesterday and left Late: it takes the first day the
-        # days he was told leave, and Told keeps today.
-        assert found["late"] == (day(1), {"from": day(-1), "by": "left", "on": day(-1)})
+        # He studied yesterday and left Late: it comes today, his next study
+        # day, beside Told, past his one review a day, and Told keeps today
+        # (round 19, M1: what a day left takes its place among the days he
+        # was told). Today is a day gone by's next, so Late is due, not moved.
+        assert found["late"] == (day(0), None)
         assert found["told"] == (day(0), None)
     else:
         assert found["late"] == (day(0), None)
