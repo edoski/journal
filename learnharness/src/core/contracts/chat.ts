@@ -212,6 +212,26 @@ export const HANDOFF_TEXT =
 	`each of ${SENTENCE_WORDS} words or fewer, since a longer one counts as two, ` +
 	"then its question, never waiting for plan_init's result; I'll interrupt if I want something else.";
 
+/** The lesson's wake once the probe opened it (round 19, M7): the prober
+ *  showed the first step's teaching, written from its assessment, with the
+ *  probe's end, so he reads it while the plan's own thinking runs (22 to 33
+ *  s, the whole wait). The plan is still made from the whole assessment,
+ *  after it, never before it (round 16's plan-early started the plan before
+ *  the assessment was written, and blind judges preferred the plans it
+ *  replaced); its first step is the one on his screen, and the plan's reply
+ *  carries it on to its question. */
+export function openedHandoffText(opening: string): string {
+	return (
+		"Next: plan the full teaching arc from my current understanding to the goal understanding. " +
+		"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
+		"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
+		"Take your time here and really think this through. " +
+		`The lesson's first step is already on my screen, written from the probe's assessment so I read it while you plan: "${opening.trim()}" ` +
+		"It is the plan's first step, taught. When it's genuinely reasoned out, call plan_init and, in that same reply, pose that step's question, " +
+		`with at most one sentence of ${SENTENCE_WORDS} words or fewer before it, never saying the step's point again and never waiting for plan_init's result; I'll interrupt if I want something else.`
+	);
+}
+
 /** What the wake says of the probe's last answer, read from the record
  *  once the probe's turn has landed (round 15, m13: the first step opened
  *  "Your answer took the limit of the base alone…" under the feedback

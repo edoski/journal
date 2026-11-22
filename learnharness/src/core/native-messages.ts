@@ -42,6 +42,7 @@ import {
 	DONE_TONIGHT_TEXT,
 	SETUP_DONE_TEXT,
 	HANDOFF_TEXT,
+	openedHandoffText,
 	REVIEW_HANDOFF_TEXT,
 	TASK_HANDOFF_TEXT,
 	taskContinueText,
@@ -130,6 +131,9 @@ export function asAgentMessages(messages: readonly LhMessage[]): AgentMessage[] 
 // ─── explicit learner-facing output ─────────────────────────────────────────
 
 export const SEND_TO_USER_TOOL = "send_to_user";
+
+/** The probe's end (agent/tools/probe.ts). */
+const PROBE_DONE_TOOL = "probe_done";
 
 /** Read the output tool's message without changing the native call. Also
  * accepts partial arguments while streaming; malformed/empty inputs carry
@@ -265,8 +269,11 @@ export function newHandoffMessage(chatId: string, review = false, task = false):
  *  turn has landed (`probeFeedbackText`). Every other steer as it is. */
 export function withProbeFeedback<T extends LhMessage>(steer: T, record: readonly LhMessage[]): T {
 	if (steer.role !== "custom" || steer.customType !== "probe-handoff" || typeof steer.content !== "string") return steer;
+	// A lesson the probe opened (round 19, M7) is planned with its first step on his screen.
+	const opening = steer.content === HANDOFF_TEXT ? probeOpeningOf(record) : null;
+	const content = opening ? openedHandoffText(opening) : steer.content;
 	const line = probeFeedbackText(probeFeedbackOf(record));
-	return line ? { ...steer, content: `${steer.content} ${line}` } : steer;
+	return line ? { ...steer, content: `${content} ${line}` } : content === steer.content ? steer : { ...steer, content };
 }
 
 /** What the tutor told him after his last answer to a question: its
@@ -275,9 +282,50 @@ export function probeFeedbackOf(messages: readonly LhMessage[]): string[] | null
 	const at = messages.findLastIndex((m) => m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName) && !m.isError && isRealAnswer(m.details));
 	if (at < 0) return null;
 	const failed = failedOutputCallIds(messages);
-	return messages.slice(at + 1).flatMap((m) =>
-		m.role !== "assistant" ? [] : m.content.flatMap((b) => (b.type === "toolCall" && b.name === SEND_TO_USER_TOOL && !failed.has(b.id) ? [sendToUserText(b)].filter((t): t is string => !!t?.trim()) : [])),
-	);
+	const said: string[] = [];
+	for (const m of messages.slice(at + 1)) {
+		if (m.role !== "assistant") continue;
+		for (const b of m.content) {
+			if (b.type !== "toolCall") continue;
+			// What follows the probe's end is the lesson's opening (`probeOpeningOf`).
+			if (b.name === PROBE_DONE_TOOL) return said;
+			const text = b.name === SEND_TO_USER_TOOL && !failed.has(b.id) ? sendToUserText(b) : undefined;
+			if (text?.trim()) said.push(text);
+		}
+	}
+	return said;
+}
+
+/** The lesson's opening his screen shows from the concluded `probe_done`
+ *  (round 19, M7): the first step's teaching, written with the assessment,
+ *  which he reads while the teacher plans; or, when the voice guard left it
+ *  off the call, the message that rewrote it after the probe's end. Null
+ *  when none was shown. Pure. */
+export function probeOpeningOf(messages: readonly LhMessage[]): string | null {
+	const concluded = new Set(messages.flatMap((m) => (m.role === "toolResult" && probeDoneResultIds(messages).has(m.id) ? [m.toolCallId] : [])));
+	const failed = failedOutputCallIds(messages);
+	let ended = false;
+	for (const m of messages) {
+		if (m.role !== "assistant") continue;
+		for (const b of m.content) {
+			if (b.type !== "toolCall") continue;
+			if (b.name === PROBE_DONE_TOOL && concluded.has(b.id)) {
+				const opening = probeOpeningText(b);
+				if (opening) return opening;
+				ended = true;
+			} else if (ended && b.name === SEND_TO_USER_TOOL && !failed.has(b.id)) {
+				const text = sendToUserText(b);
+				if (text?.trim()) return text;
+			}
+		}
+	}
+	return null;
+}
+
+/** A `probe_done` call's opening, as his screen draws it, or null. */
+export function probeOpeningText(call: Pick<ToolCall, "arguments">): string | null {
+	const opening = (call.arguments as { opening?: unknown } | undefined)?.opening;
+	return typeof opening === "string" && opening.trim() ? opening : null;
 }
 
 // ─── the session's mode: teaching, practice or setup ────────────────────────

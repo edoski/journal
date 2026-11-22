@@ -40,6 +40,7 @@ import {
 	opensTurn,
 	PRACTICE_CONCLUDE_TOOL,
 	PRACTICE_PROBLEM_TOOL,
+	probeOpeningText,
 	problemInputForConclude,
 	SEND_TO_USER_TOOL,
 	sendToUserText,
@@ -238,9 +239,14 @@ export function projectView(record: readonly LhMessage[], live?: LiveTurnState):
 	// Output calls become text rather than tool parts, so read settled
 	// failures up front: a failed call must retain the normal error path.
 	const outputErrors = new Map<string, ToolResultMessage>();
+	// A probe_done the tool refused ended nothing, so its opening never shows.
+	const refusedProbes = new Set<string>();
 	for (const message of messages) {
 		if (message.role === "toolResult" && message.toolName === SEND_TO_USER_TOOL && message.isError) {
 			outputErrors.set(message.toolCallId, message);
+		}
+		if (message.role === "toolResult" && message.toolName === "probe_done" && (message.isError || (message.details as { ok?: unknown } | null)?.ok === false)) {
+			refusedProbes.add(message.toolCallId);
 		}
 	}
 
@@ -379,6 +385,10 @@ export function projectView(record: readonly LhMessage[], live?: LiveTurnState):
 						part.problemInput = problemInputForConclude(messages, block.id);
 					}
 					rest.push(part);
+					// The lesson's opening on the probe's end (round 19, M7): his
+					// first step, read while the teacher plans, as ordinary prose.
+					const opening = block.name === "probe_done" && assistant.stopReason !== "error" && assistant.stopReason !== "aborted" && !refusedProbes.has(block.id) ? probeOpeningText(block) : null;
+					if (opening) rest.push({ type: "text", id: `${m.id}-t${textN++}`, text: opening, state: streamingMessage ? "streaming" : "done" });
 				}
 			}
 			const parts: LhViewPart[] = [...reasoning, ...rest];
