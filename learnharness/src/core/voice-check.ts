@@ -84,6 +84,7 @@ export type VoiceRule =
 	| "title-comma"
 	| "vague-moves"
 	| "split-display"
+	| "self-correction"
 	| "vague-day"
 	| "half-answer-day";
 
@@ -159,6 +160,11 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// Round 18, m13: "marking them as solved 'with the hint' was my error",
 	// a slip of its own he never saw, told instead of the next problem.
 	{ rule: "own-words", re: /\bmy (?:error|mistake|slip|fault|oversight)s?\b|\bI (?:made|have made) (?:an error|a mistake|a slip|two mistakes)\b|\b(?:mistakes|errors|slips) of mine\b|\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b|\b(?:a )?correction to what I (?:said|wrote|told you)\b|\b(?:correcting|to correct) what I (?:said|wrote)\b|\bwhat I (?:said|wrote|told you) (?:earlier|before|above)\b/i },
+	// A slip caught mid-sentence and left in for him to read: one clean
+	// statement says it (round 19, m17: "…write each one as a(1,1)+b(−1,1)...
+	// rather, as a(1,1)+b(1,−1).", in a posed question, and again word for
+	// word when it was asked again).
+	{ rule: "self-correction", re: /(?:\.{2,}|…)\s*(?:or\s+)?rather\b|\bor rather\b|[,;]\s*rather[,:]|(?:^|[.!?]\s+|\n)rather,/i },
 	// What he has not done yet is no step for him: it reads as a reproach
 	// (round 16, m13: "You still haven't started Linear maps and their
 	// matrices." closing a lesson under his half answer).

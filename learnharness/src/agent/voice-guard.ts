@@ -737,6 +737,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `A topic's title straight after a comma reads as a new sentence: ${quoted(b.excerpt)}. Open the sentence on it, or set it off in quotes ("Starting “${b.excerpt}” moves to …").`;
 		case "vague-moves":
 			return `Later moves said with nothing he can act on: ${quoted(b.excerpt)}. Name each move with its new day, or leave out the ones the close is not about.`;
+		case "self-correction":
+			return `A slip corrected mid-sentence is left on his screen: ${quoted(b.excerpt)}. Write the sentence once, as it should read, with no "rather".`;
 		case "vague-day":
 			return `A topic named with no day he can act on: ${quoted(b.excerpt)}. Name its day from the close's days, copied as written, or leave the topic out.`;
 		case "half-answer-day":
