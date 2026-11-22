@@ -125,3 +125,27 @@ describe("a re-cut's save on the real engine", { skip: realEngineMissing(LEARNIN
 		assert.deepEqual(now.topics.derivative.needs, ["limit"]);
 	});
 });
+
+describe("the pass's ledger", () => {
+	it("keeps his setup words and the growth step's place through a pass that fails", async () => {
+		const { createArcPass } = await import("../src/agent/subagents/arc-former.ts");
+		const { arcPassLedgersAt } = await import("../src/store/arc-pass-ledgers.ts");
+		const ledgers = arcPassLedgersAt(path.join(TMP, "arc-passes.json"));
+		const ws = "/s/new-course";
+		ledgers.save(ws, { state: "new", at: "2026-11-22T10:00:00Z", topics: 0, asked: "Set up my course", grown: 3 });
+		const topics = Object.fromEntries(["a", "b", "c", "d"].map((k) => [k, { title: k.toUpperCase() }]));
+		const records = {
+			list: async () => ({ available: true as const, courses: [], unreadable: [] }),
+			map: async () => ({ ok: false as const, kind: "io" as const, message: "unused" }),
+			create: async () => ({ ok: false as const, kind: "io" as const, message: "unused" }),
+			run: async (_ws: string, verb: { verb: string }) => (verb.verb === "show" ? { ok: true as const, json: { title: "New course", topics, arcs: {} } } : { ok: false as const, kind: "io" as const, message: "unreadable" }),
+		};
+		const pass = createArcPass({ courseRecords: records, ledgers, engineFor: () => undefined });
+		pass.built(ws);
+		await pass.settle(ws);
+		const after = ledgers.get(ws)!;
+		assert.equal(after.state, "failed");
+		assert.equal(after.asked, "Set up my course", "his words outlive a failed pass, so a later one still forms once he has studied");
+		assert.equal(after.grown, 3);
+	});
+});

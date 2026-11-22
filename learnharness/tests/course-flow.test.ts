@@ -76,8 +76,8 @@ async function createChat(body: Record<string, unknown>): Promise<Response> {
 
 /** A new course as the setup conversation makes one (server/setup.ts), its
  *  answer as a response. */
-async function createCourse(body: { root?: string; title: string; exam?: string; material?: Array<[string, string]> }): Promise<Response> {
-	const made = await createCourseServer({ root: body.root ?? "", title: body.title, exam: body.exam ?? null, material: (body.material ?? []).map(([path, content]) => ({ path, bytes: new TextEncoder().encode(content) })) });
+async function createCourse(body: { root?: string; title: string }): Promise<Response> {
+	const made = await createCourseServer({ root: body.root ?? "", title: body.title });
 	return made.ok ? Response.json(made.course) : Response.json({ error: made.error, code: made.code }, { status: made.status });
 }
 
@@ -176,34 +176,7 @@ async function untilEvent(check: () => boolean): Promise<void> {
 }
 
 describe("new course", () => {
-	it("creates <root>/<slug> with its title and exam day, copies the material in and registers it, and the course is listed", async () => {
-		const res = await createCourse({
-			root: STUDY,
-			title: "  Measure Theory & Probability!  ",
-			exam: "2026-12-14",
-			material: [["Syllabus.pdf", "syllabus"], ["Lectures/Week 1.md", "week one"], ["Lectures/.DS_Store", "junk"], ["../../escape.txt", "kept inside"]],
-		});
-		assert.equal(res.status, 200, await res.clone().text());
-		const directory = path.join(STUDY, "measure-theory-probability");
-		const course = (await res.json()) as { workspace: string; title: string; exam: { date: string } | null };
-		assert.deepEqual([course.workspace, course.title, course.exam?.date], [directory, "Measure Theory & Probability!", "2026-12-14"]);
-		const calls = engineCalls().filter((c) => c.args[0] === "--workspace" && c.args[1] === directory);
-		const writes = calls.filter((c) => c.args[2] !== "show");
-		assert.deepEqual(writes.map((c) => c.args.slice(2)), [["init"], ["save"], ["sources", "--add", "material/Syllabus.pdf", "material/Lectures/Week 1.md", "material/escape.txt"]]);
-		const reads = () => engineCalls().some((c) => c.args[1] === directory && c.args[2] === "show" && c.args[3] === "--all");
-		await untilEvent(reads);
-		assert.ok(reads(), "its map starts building from the material in the background");
-		assert.deepEqual(JSON.parse(writes[1]!.stdin), { title: "Measure Theory & Probability!", exam: { date: "2026-12-14" } });
-		assert.equal(fs.readFileSync(path.join(directory, "material", "Lectures", "Week 1.md"), "utf-8"), "week one");
-		assert.equal(fs.existsSync(path.join(directory, "material", "Lectures", ".DS_Store")), false, "hidden files stay out");
-		assert.equal(fs.readFileSync(path.join(directory, "material", "escape.txt"), "utf-8"), "kept inside", "a path cannot climb out of the course");
-
-		assert.ok((await listed()).some((c) => c.workspace === directory && c.title === "Measure Theory & Probability!"));
-		const chat = await createChat({ title: "start", course: { workspace: directory } });
-		assert.equal(chat.status, 200, "a new course can start a session at once");
-	});
-
-	it("needs no exam and no material: init and the title save alone", async () => {
+	it("makes <root>/<slug> a course with its title alone: init and the title save", async () => {
 		const res = await createCourse({ root: LEARN, title: "Topology basics" });
 		assert.equal(res.status, 200, await res.clone().text());
 		const directory = path.join(LEARN, "topology-basics");
@@ -224,7 +197,6 @@ describe("new course", () => {
 			[{ root: STUDY, title: "Linalg" }, 409, "Linear Algebra already uses the folder for this title. Pick another title."],
 			[{ root: STUDY, title: "???" }, 400, "Use letters or numbers in the title."],
 			[{ root: STUDY, title: "   " }, 400, "Give the course a title."],
-			[{ root: STUDY, title: "Sets", exam: "14/12/2026" }, 400, "Pick the exam day from the calendar."],
 			[{ root: TMP, title: "Elsewhere" }, 400, "Pick where the course goes."],
 			[{ title: "No folder picked" }, 400, "Pick where the course goes."],
 		];
@@ -252,16 +224,6 @@ describe("new course", () => {
 		delete process.env.FAKE_ENGINE_FAIL;
 		const retried = await createCourse({ root: STUDY, title: "Topology" });
 		assert.equal(retried.status, 200, await retried.clone().text());
-	});
-
-	it("material the engine refuses undoes the course record, so nothing half-made is listed", async () => {
-		process.env.FAKE_ENGINE_FAIL = "sources";
-		const res = await createCourse({ root: STUDY, title: "Group Theory", material: [["Notes.md", "notes"]] });
-		assert.equal(res.status, 502);
-		assert.equal(((await res.json()) as { error: string }).error, "The material could not be added to the course. Try again with the files that matter most.");
-		const directory = path.join(STUDY, "group-theory");
-		assert.deepEqual(engineCalls().filter((c) => c.args[1] === directory).map((c) => c.args[2]), ["init", "save", "sources", "forget"]);
-		assert.ok(!(await listed()).some((c) => c.workspace === directory));
 	});
 });
 

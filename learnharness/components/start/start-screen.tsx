@@ -42,7 +42,8 @@ export function StartScreen() {
 	// hands it to practice when it asks for problems. With no course picked
 	// (New course or self-study), his words set something new up.
 	const send = () => {
-		if (!draft.canSend) return;
+		// Before the courses are read, no choice is known: nothing is sent.
+		if (!draft.canSend || courseChoice.state.status === "loading") return;
 		if (courseChoice.state.status === "unavailable") {
 			courseChoice.requireCourse();
 			return;

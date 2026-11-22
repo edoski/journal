@@ -881,8 +881,6 @@ export function saveChanges(args: Record<string, unknown>): Record<string, unkno
 	return typeof changes === "object" && changes !== null && !Array.isArray(changes) ? (changes as Record<string, unknown>) : null;
 }
 
-/** The sources the last turn's clean course_saves registered: material
- *  added during a lesson. Pure. */
 /** Whether the last turn saved topics to the course (a clean `course_save`
  *  with `topics`): what may have added a unit to its arcs. */
 export function topicsSavedInLastTurn(messages: readonly LhMessage[]): boolean {
@@ -892,6 +890,8 @@ export function topicsSavedInLastTurn(messages: readonly LhMessage[]): boolean {
 	return turn.some((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === "course_save" && clean.has(b.id) && saveChanges(b.arguments as Record<string, unknown>)?.topics !== undefined));
 }
 
+/** The sources the last turn's clean course_saves registered: material
+ *  added during a lesson. Pure. */
 export function sourcesRegisteredInLastTurn(messages: readonly LhMessage[]): string[] {
 	const start = messages.findLastIndex((m) => m.role === "user") + 1;
 	const turn = messages.slice(start);

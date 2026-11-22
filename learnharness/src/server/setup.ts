@@ -19,9 +19,10 @@ import path from "node:path";
 import { courseLabel, type CourseLink } from "../core/contracts/course.ts";
 import { emit } from "../core/events.ts";
 import { newSetupNoteMessage, sessionModeOf } from "../core/native-messages.ts";
-import { freeHandle, siteName, takenHandles, webAddress } from "../core/course-context.ts";
+import { freeHandle, isInside, siteName, takenHandles, webAddress } from "../core/course-context.ts";
 import { expandHome, type LearningCreated, type MaterialSurvey, type NewLearning } from "../core/setup.ts";
 import { surveyMaterial } from "../agent/subagents/material-survey.ts";
+import { backgroundRuns } from "../agent/subagents/background-runs.ts";
 import type { CourseMapStatus } from "../agent/subagents/course-map-builder.ts";
 import { claudeEngine } from "../agent/models.ts";
 import { createCourse, listCourses, titleProblem } from "./courses.ts";
@@ -56,7 +57,7 @@ export async function studyPlaces(): Promise<string[]> {
 		return `${root}: his courses are kept here, each in its own folder with its material${held.length > 0 ? `: ${held.join(", ")}` : ""}`;
 	});
 	const university = path.join(vault(), "university");
-	if (isFolder(university) && !roots.some((r) => r.startsWith(university))) places.push(`${university}: his university folders`);
+	if (isFolder(university) && !roots.some((r) => isInside(r, university))) places.push(`${university}: his university folders`);
 	const downloads = path.join(home(), "Downloads");
 	if (isFolder(downloads)) places.push(`${downloads}: his downloads`);
 	return places;
@@ -79,16 +80,26 @@ export function startSurvey(chatId: string, given: readonly string[]): { started
 	const paths = [...new Set(given.map((p) => path.resolve(expandHome(p.trim(), home()))))];
 	const folders = paths.filter(isFolder);
 	if (folders.length > 0) return { error: `${folders.map((f) => path.basename(f)).join(", ")} ${folders.length === 1 ? "is a folder" : "are folders"}: list the files in it with Glob and pass those` };
+	if (backgroundRuns().some((run) => run.id === `${chatId}#survey`)) return { error: "the material is still being read: its sorting arrives as a new message" };
 	const missing = paths.filter((p) => !fs.existsSync(p));
 	if (missing.length > 0) return { error: `no file at ${missing.join(", ")}` };
 	const label = path.basename(path.dirname(paths[0]!));
 	void surveyMaterial({ engineFor: () => claudeEngine(effectiveSettings().claude.account) }, paths, { chatId, label })
-		.catch((err: unknown) => ({ error: err instanceof Error ? err.message : String(err) }))
-		.then((survey) => {
-			if ((survey as { error?: string }).error?.includes("aborted")) return;
-			void deliverJobResult(newSetupNoteMessage(chatId, `survey_${Date.now()}`, surveyNoteText(survey)));
-		});
+		.catch((err: unknown) => ({ error: err instanceof Error && err.name === "AbortError" ? "it was stopped" : err instanceof Error ? err.message : String(err) }))
+		.then((survey) => void deliverJobResult(newSetupNoteMessage(chatId, `survey_${Date.now()}`, surveyNoteText(survey))));
 	return { started: true };
+}
+
+/** Why a folder cannot become a course, or null: it must be one course's
+ *  own folder, never his home, his downloads, a folder his courses are
+ *  kept in, or a folder inside or around a course he has. Pure. */
+export function folderProblem(folder: string, courses: readonly { workspace: string; title?: string | null }[], roots: readonly string[], homeDir = home()): string | null {
+	if (fs.existsSync(path.join(folder, ".study", "course.json"))) return `${folder} is already a course`;
+	const wide = [homeDir, path.join(homeDir, "Downloads"), path.join(homeDir, "Desktop"), path.join(homeDir, "Documents"), vault(), path.join(vault(), "university"), ...roots];
+	if (wide.includes(folder)) return `${folder} holds more than one course's material: pick the folder of this course alone, or make a new one with where`;
+	const near = courses.find((c) => isInside(folder, c.workspace) || isInside(c.workspace, folder));
+	if (near) return `${folder} is inside or around ${courseLabel({ workspace: near.workspace, title: near.title ?? null })}: pick the folder of this course alone, or make a new one with where`;
+	return null;
 }
 
 /** The folder most of his courses are kept in, for one with no folder of
@@ -114,10 +125,8 @@ export async function createLearning(chatId: string, input: NewLearning): Promis
 		const folder = path.resolve(expandHome(input.folder, home()));
 		if (!isFolder(folder)) return { ok: false, error: `no folder at ${folder}` };
 		const real = fs.realpathSync(folder);
-		if (fs.existsSync(path.join(real, ".study", "course.json"))) {
-			const owner = listing.courses.find((c) => c.workspace === real);
-			return { ok: false, error: `${real} is already a course${owner ? `: ${courseLabel(owner)}` : ""}` };
-		}
+		const refused = folderProblem(real, [...listing.courses, ...listing.unreadable], listing.roots);
+		if (refused) return { ok: false, error: refused };
 		const created = await stores.courseRecords.create(real, { title, exam: null });
 		if (!created.ok) return { ok: false, error: `the course could not be made: ${created.message}` };
 		workspace = created.workspace;
@@ -128,7 +137,7 @@ export async function createLearning(chatId: string, input: NewLearning): Promis
 	} else {
 		const root = input.where ? path.resolve(expandHome(input.where, home())) : mostUsedRoot(listing.courses, listing.roots);
 		if (!root) return { ok: false, error: "there is no study folder yet: ask him where to keep it, then pass that folder as folder" };
-		const created = await createCourse({ root, title, exam: null, material: [] });
+		const created = await createCourse({ root, title });
 		if (!created.ok) return { ok: false, error: created.error };
 		workspace = created.course.workspace;
 	}
@@ -142,6 +151,15 @@ export async function createLearning(chatId: string, input: NewLearning): Promis
 	const ledger = stores.arcPassLedgers.get(workspace);
 	stores.arcPassLedgers.save(workspace, { state: "new", at: ledger?.at ?? new Date().toISOString(), topics: ledger?.topics ?? 0, asked: input.asked.trim() });
 
+	// A self-study is marked on its own, first: nothing else it is given can
+	// take that with it if the engine refuses it.
+	const more: string[] = [];
+	let kind = input.kind;
+	if (kind === "self-study") {
+		const marked = await stores.courseRecords.run(workspace, { verb: "save", changes: { preferences: { kind: "self-study" } } });
+		if (!marked.ok) kind = "course";
+		if (!marked.ok) more.push(`it is a course for now: the record refused the self-study kind (${marked.message}); mark it with course_save`);
+	}
 	// Its facts and its websites in one save.
 	const shown = await stores.courseRecords.run(workspace, { verb: "show", handles: "all" });
 	const taken = takenHandles(shown.ok ? shown.json : {});
@@ -156,11 +174,9 @@ export async function createLearning(chatId: string, input: NewLearning): Promis
 	}
 	const facts: Record<string, unknown> = {
 		...(input.goal?.trim() ? { goal: input.goal.trim() } : {}),
-		...(input.kind === "self-study" ? { preferences: { kind: "self-study" } } : {}),
 		...(input.kind === "course" && input.exam && Object.keys(input.exam).length > 0 ? { exam: input.exam } : {}),
 		...(Object.keys(sites).length > 0 ? { sources: sites } : {}),
 	};
-	const more: string[] = [];
 	if (Object.keys(facts).length > 0) {
 		const saved = await stores.courseRecords.run(workspace, { verb: "save", changes: facts });
 		// It exists now: what the engine refused is said, and corrected with course_save.
@@ -179,7 +195,7 @@ export async function createLearning(chatId: string, input: NewLearning): Promis
 	emit("record-changed", { chatId });
 	startCourseMap(workspace);
 	if (more.length > 0) console.error(`[setup ${chatId}] ${more.join("; ")}`);
-	return { ok: true, workspace, title, kind: input.kind, ...(more.length > 0 ? { problems: more } : {}) };
+	return { ok: true, workspace, title, kind, ...(more.length > 0 ? { problems: more } : {}) };
 }
 
 /** What the setup agent reads when its course's map build ended. Pure. */

@@ -97,8 +97,15 @@ async function recut(workspace: string, started: () => string): Promise<void> {
 	if (!shown.ok || !recordHasArcs(shown.json)) return;
 	const seen = ledger.grown;
 	const logged = logLength(shown.json);
+	// A re-cut that failed or was stopped is not tried again until the log grows.
+	if (ledger.recutFailed === logged) return;
 	const units = newUnits(shown.json, seen);
-	const done = (grown: number) => stores.arcPassLedgers.save(workspace, { ...(stores.arcPassLedgers.get(workspace) ?? ledger), grown });
+	// A course deleted meanwhile has no ledger to write back.
+	const note = (fields: { grown?: number; recutFailed?: number }) => {
+		const now = stores.arcPassLedgers.get(workspace);
+		if (now) stores.arcPassLedgers.save(workspace, { ...now, ...fields });
+	};
+	const done = (grown: number) => note({ grown });
 	if (units.length === 0) {
 		if (logged !== seen) done(logged);
 		return;
@@ -127,10 +134,13 @@ async function recut(workspace: string, started: () => string): Promise<void> {
 		sessions: () => stores.chatStore.listChats(),
 		onSaved: () => emit("courses-changed", {}),
 	});
-	const result = await pass.run(workspace, { edges: "apply", signal, reason: `re-cut of the arcs not begun, around a new unit (${why})` });
+	const result = await pass.run(workspace, { edges: "apply", signal, reason: `re-cut of the arcs not begun, around a new unit (${why})` }).catch((err: unknown) => {
+		note({ recutFailed: logged });
+		throw err;
+	});
 	console.info(`[arc-growth ${workspace}] ${result.status}: ${result.status === "formed" ? result.summary : result.reason}`);
-	// A failed re-cut (a usage limit, a refusal) is tried again at the next event.
-	if (result.status === "failed") return;
+	// A failed re-cut (a usage limit, a refusal) waits for the log to grow.
+	if (result.status === "failed") return note({ recutFailed: logged });
 	const after = await stores.courseRecords.run(workspace, { verb: "show", handles: "all" });
 	done(after.ok ? logLength(after.json) : logged);
 }

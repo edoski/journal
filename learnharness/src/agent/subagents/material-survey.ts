@@ -101,11 +101,17 @@ export async function surveyMaterial(deps: MaterialSurveyDeps, paths: readonly s
 	const signal = options.signal ? AbortSignal.any([options.signal, run.controller.signal]) : run.controller.signal;
 	try {
 		const files = await measureMaterial("/", paths.map((p, i) => ({ handle: `file-${i + 1}`, path: p })));
+		// As many readers at once as the pool's width, each taking the next file
+		// as it ends, so one long book never holds the others back.
 		const results: Array<SurveyedFile | { path: string; reason: string }> = [];
-		for (let at = 0; at < files.length; at += BG_LLM_PERMITS) {
-			results.push(...(await Promise.all(files.slice(at, at + BG_LLM_PERMITS).map((f) => readOne(engine, f, signal)))));
-			if (signal.aborted) throw Object.assign(new Error("survey aborted"), { name: "AbortError" });
-		}
+		let next = 0;
+		const worker = async () => {
+			while (next < files.length) {
+				if (signal.aborted) throw Object.assign(new Error("survey aborted"), { name: "AbortError" });
+				results.push(await readOne(engine, files[next++]!, signal));
+			}
+		};
+		await Promise.all(Array.from({ length: Math.min(BG_LLM_PERMITS, files.length) }, worker));
 		return {
 			files: results.filter((r): r is SurveyedFile => "kind" in r),
 			unread: results.filter((r): r is { path: string; reason: string } => "reason" in r),

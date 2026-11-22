@@ -111,7 +111,11 @@ export function useCourseChoice({ remember = true }: { remember?: boolean } = {}
 	const choose = (next: string) => {
 		setWorkspace(next);
 		setNotice(null);
-		if (remember) localStorage.setItem(COURSE_CHOICE_KEY, next);
+		// No course (New course or self-study) is a choice for this box only.
+		if (remember) {
+			if (next) localStorage.setItem(COURSE_CHOICE_KEY, next);
+			else localStorage.removeItem(COURSE_CHOICE_KEY);
+		}
 	};
 	const add = (course: CourseSummary) => {
 		setState((s) => (s.status === "ready" ? { ...s, courses: [...s.courses, course] } : s));

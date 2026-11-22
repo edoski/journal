@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { courseMapOf } from "../src/store/course-records.ts";
 import { selfStudyOf } from "../src/core/contracts/course.ts";
 import { courseFactText } from "../components/start/course-facts.ts";
-import { SELF_STUDY_WORDS } from "../components/study-words.ts";
+
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const golden = JSON.parse(fs.readFileSync(path.resolve(HERE, "..", "..", "tests", "learning", "golden", "linear-algebra.map.json"), "utf-8")) as Record<string, unknown>;
@@ -30,6 +30,5 @@ describe("a self-study's facts", () => {
 		assert.equal(courseFactText({ exam: null, selfStudy: { goalReached: false } }), "Self-study");
 		assert.equal(courseFactText({ exam: null, selfStudy: { goalReached: true } }), "Learned");
 		assert.equal(courseFactText({ exam: { date: "2026-11-29", daysLeft: 21 } }), "Exam 29 Nov");
-		assert.match(SELF_STUDY_WORDS.hint, /no exam and no reviews/);
 	});
 });

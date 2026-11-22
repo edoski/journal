@@ -61,13 +61,15 @@ export function courseMapBuilder(): CourseMapBuilder {
 			emit("courses-changed", {});
 			// Read before the pass claims the course, which reads as building.
 			const status = courseMapBuilder().status(workspace);
-			void arcPass().settle(workspace);
-			if (status.state === "built" || status.state === "failed") {
-				// A setup conversation waits on its course's first map.
-				void import("./setup.ts").then((m) => m.noteMapBuilt(workspace, status));
-				// What the build added may be a new unit: its arcs grow.
-				void growArcs(workspace);
-			}
+			const ended = status.state === "built" || status.state === "failed";
+			// A setup conversation waits on its course's first map.
+			if (ended) void import("./setup.ts").then((m) => m.noteMapBuilt(workspace, status));
+			// The pass first (a course with no arcs yet), then what the build
+			// added may be a new unit of a course with arcs: they grow.
+			void arcPass()
+				.settle(workspace)
+				.then(() => (ended ? growArcs(workspace) : undefined))
+				.catch((err: unknown) => console.error(`[course-map ${workspace}]`, err));
 		},
 	}));
 }

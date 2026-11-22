@@ -93,10 +93,6 @@ export interface LessonComposerProps {
 export const COMPOSER_SURFACE =
 	"relative isolate w-full rounded-[16px] bg-card transition-[outline-color] after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:border after:border-white/5 after:inset-shadow-2xs after:inset-shadow-white/3 outline-1 -outline-offset-1 outline-transparent has-[textarea:focus]:outline-ring/50 motion-reduce:transition-none";
 
-/** The lesson's composer (spec: lesson-composer.md): one 16px-radius card,
- *  the field on top (14px, two lines growing to 208px), the toolbar under
- *  it with attach on the left, quiet chips on the right and one 32px round
- *  send. Its host draws no shell around it. */
 /** The paths of dropped files that are not photos, in the desktop app,
  *  whose preload reads a dropped file's path (Electron's webUtils); none
  *  in a browser, which never gives one. */
@@ -109,6 +105,10 @@ export function droppedPaths(files: FileList | null): string[] {
 		.filter((p) => p.length > 0);
 }
 
+/** The lesson's composer (spec: lesson-composer.md): one 16px-radius card,
+ *  the field on top (14px, two lines growing to 208px), the toolbar under
+ *  it with attach on the left, quiet chips on the right and one 32px round
+ *  send. Its host draws no shell around it. */
 export function LessonComposer({
 	busy,
 	value,

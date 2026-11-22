@@ -867,12 +867,6 @@ export const READY_WORDS = {
 	rest: "and the rest",
 } as const;
 
-/** Where he stands for the exam as one fact of a head, a few words (the
- *  course page's head): the whole answer opens under it. "No exam"
- *  for a course without one. When the plan cannot fit all of it, the head
- *  says what it loses in its own words (`ExamReady`'s), never "Not all of
- *  it fits" (round 15, M7); not ready says for what (round 15, m10: "Not
- *  ready yet" had no object). */
 /** A self-study, wherever a course would show its exam or its reviews
  *  (22 Nov 2026): what it is, that nothing comes back for review, and how
  *  it ends. */
@@ -890,6 +884,12 @@ export function closingCheckWords(title: string): string {
 	return `${title} check`;
 }
 
+/** Where he stands for the exam as one fact of a head, a few words (the
+ *  course page's head): the whole answer opens under it. "No exam"
+ *  for a course without one. When the plan cannot fit all of it, the head
+ *  says what it loses in its own words (`ExamReady`'s), never "Not all of
+ *  it fits" (round 15, M7); not ready says for what (round 15, m10: "Not
+ *  ready yet" had no object). */
 export const READY_FACT_WORDS = {
 	ready: "Ready for the exam",
 	notYet: "Not ready for the exam yet",

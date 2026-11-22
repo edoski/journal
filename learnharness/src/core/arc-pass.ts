@@ -66,6 +66,9 @@ export interface ArcPassLedger {
 	/** How many arc log entries the growth step has read (server/arc-growth.ts):
 	 *  a `unit` event after them starts a re-cut of the arcs not begun. */
 	grown?: number;
+	/** The arc log's length when a re-cut failed or was stopped: it is not
+	 *  tried again until the log grows past it. */
+	recutFailed?: number;
 }
 
 /** The engine's `MIN_ARCS` (arc_rules.py): one live arc is the course again. */

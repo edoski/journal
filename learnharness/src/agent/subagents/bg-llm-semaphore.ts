@@ -21,7 +21,7 @@ export const BG_LLM_PERMITS = 3;
 
 export interface LlmSlots {
 	active: number;
-	queue: { resolve: () => void; dead: boolean }[];
+	queue: { resolve: () => void; dead: boolean; first?: true }[];
 }
 
 interface LhLlmSemaphoreGlobal {
@@ -52,8 +52,10 @@ export async function withBgLlmSlot<T>(
 	if (slots.active >= BG_LLM_PERMITS) {
 		freshTake = false;
 		await new Promise<void>((resolve, reject) => {
-			const ticket: { resolve: () => void; dead: boolean } = { resolve, dead: false };
-			if (order === "first") slots.queue.unshift(ticket);
+			const ticket: { resolve: () => void; dead: boolean; first?: true } = { resolve, dead: false, ...(order === "first" ? { first: true as const } : {}) };
+			// Taken first: after the other first tickets, in their order, ahead of the rest.
+			const at = order === "first" ? slots.queue.findIndex((t) => !t.first) : -1;
+			if (at >= 0) slots.queue.splice(at, 0, ticket);
 			else slots.queue.push(ticket);
 			if (!signal) return;
 			const die = () => {

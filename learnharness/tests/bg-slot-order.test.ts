@@ -1,7 +1,8 @@
 /**
  * The background pool's order (bg-llm-semaphore.ts): a course map build
  * waits ahead of queued arc readers, so a course set up while another
- * course's arc pass runs is usable without waiting for that pass.
+ * course's arc pass runs is usable without waiting for that pass; map
+ * builds among themselves keep their order.
  */
 
 import assert from "node:assert/strict";
@@ -9,29 +10,23 @@ import { describe, it } from "node:test";
 import { BG_LLM_PERMITS, withBgLlmSlot } from "../src/agent/subagents/bg-llm-semaphore.ts";
 
 describe("the background pool", () => {
-	it("starts a ticket taken first ahead of every queued one", async () => {
+	it("starts tickets taken first ahead of every queued one, in their own order", async () => {
 		const started: string[] = [];
-		const gates: Array<() => void> = [];
-		const hold = (name: string) => () =>
-			new Promise<void>((resolve) => {
-				started.push(name);
-				gates.push(resolve);
-			});
-		const running = Array.from({ length: BG_LLM_PERMITS }, (_, i) => withBgLlmSlot(undefined, hold(`busy-${i}`)));
-		const queued = [withBgLlmSlot(undefined, hold("reader-1")), withBgLlmSlot(undefined, hold("reader-2"))];
-		const map = withBgLlmSlot(undefined, hold("map"), "first");
-		await Promise.resolve();
-		assert.deepEqual(started, Array.from({ length: BG_LLM_PERMITS }, (_, i) => `busy-${i}`));
-		gates.shift()!();
-		await running[0];
-		await new Promise((r) => setImmediate(r));
-		assert.equal(started.at(-1), "map", "the map build takes the freed permit before the queued readers");
-		while (gates.length > 0) gates.shift()!();
-		for (let i = 0; i < 4 && gates.length === 0; i++) await new Promise((r) => setImmediate(r));
-		while (gates.length > 0) gates.shift()!();
-		await new Promise((r) => setImmediate(r));
-		while (gates.length > 0) gates.shift()!();
-		await Promise.all([...running, ...queued, map]);
-		assert.deepEqual(started.slice(BG_LLM_PERMITS + 1).sort(), ["reader-1", "reader-2"]);
+		const release = new Map<string, () => void>();
+		const job = (name: string) => () => new Promise<void>((resolve) => (started.push(name), release.set(name, resolve)));
+		const settled = () => new Promise((r) => setImmediate(r));
+		const busy = Array.from({ length: BG_LLM_PERMITS }, (_, i) => withBgLlmSlot(undefined, job(`busy-${i}`)));
+		const rest = [withBgLlmSlot(undefined, job("reader-1")), withBgLlmSlot(undefined, job("map-1"), "first"), withBgLlmSlot(undefined, job("reader-2")), withBgLlmSlot(undefined, job("map-2"), "first")];
+		await settled();
+		for (let i = 0; i < BG_LLM_PERMITS; i++) {
+			release.get(`busy-${i}`)!();
+			await settled();
+		}
+		assert.deepEqual(started.slice(BG_LLM_PERMITS), ["map-1", "map-2", "reader-1"], "the map builds take the freed permits first, in their order");
+		for (const name of ["map-1", "map-2", "reader-1"]) release.get(name)!();
+		await settled();
+		release.get("reader-2")!();
+		await Promise.all([...busy, ...rest]);
+		assert.equal(started.at(-1), "reader-2");
 	});
 });
