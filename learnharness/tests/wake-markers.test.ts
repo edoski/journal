@@ -20,6 +20,8 @@ const PYTHON = path.join(TMP, "python");
 fs.writeFileSync(PYTHON, `#!/bin/sh\nexec "${process.execPath}" "${path.join(HERE, "fixtures", "fake-learning-engine.mjs")}" "$@"\n`, { mode: 0o755 });
 process.env.LH_DATA_DIR = path.join(TMP, "data");
 process.env.LH_LEARNING_ENGINE = TMP;
+// The test's own HOME: an engine run on the real one is refused (carry-in 3, round 19).
+process.env.HOME = path.join(TMP, "home");
 process.env.LH_LEARNING_PYTHON = PYTHON;
 
 const { newUserMessage } = await import("../src/core/native-messages.ts");
