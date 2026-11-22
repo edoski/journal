@@ -292,7 +292,7 @@ How this differs from the text below:
 - An arc of one topic carries single, saying why it stands alone. Two arcs citing the same unit of the material each carry shares, saying why.
 - Every arc cites in refs the unit of the material it follows, when the course has registered material.
 - Before you submit, run the name sort that rule 8 describes, and check each focus question is one question, not two joined by "and".
-- A stated exam's scope draws a boundary whether its date is ahead or past (rule 4's second signal): no arc holds both topics it examines and topics it leaves out. examArcs and leavesOut only for the next exam still ahead, when the material states its scope. A topic that exam leaves out goes in an arc after the exam's arcs, never in one with topics it examines: list it in leavesOut.
+- A stated exam's scope draws a boundary whether its date is ahead or past (rule 4's second signal): no arc holds both topics it examines and topics it leaves out, and the topics it leaves out sit in arcs after every arc of topics it examines, each joining the later arc whose question it extends rather than standing alone. examArcs and leavesOut only for the next exam still ahead, when the material states its scope. A topic that exam leaves out goes in an arc after the exam's arcs, never in one with topics it examines: list it in leavesOut.
 - When the course should get no arcs, send none with the reason and an empty arcs list.
 
 `;
