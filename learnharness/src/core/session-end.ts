@@ -55,7 +55,9 @@ export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | unde
 	// A turn that ended with no words of its own, no question and no close (`lesson_progress` with `close`), steps
 	// still ahead, ended nowhere: the lesson is left where it stopped, never finished, so every surface keeps
 	// "Continue … lesson · Left off today" (round 19, M2: after marking a prediction the tutor's turn stopped empty,
-	// and the lesson left Home, the sidebar and its page's Now). A sign-off in its own words still ends it.
+	// and the lesson left Home, the sidebar and its page's Now). A live tutor's reply always ends wordless, since the
+	// voice guard takes plain text out (`screenText`), so a sign-off sent with send_to_user leaves it too; only a
+	// reply that kept words of its own, from a run with no voice guard (the demo seed's records), reads as before.
 	return silent(last) && stepsLeft(tree, messages) ? "left" : "closed";
 }
 

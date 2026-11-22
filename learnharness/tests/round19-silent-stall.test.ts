@@ -56,7 +56,7 @@ describe("a lesson turn that stopped with no words, no question and no close, st
 		assert.equal(sessionState(lesson), "left");
 	});
 
-	it("a sign-off in its own words still ends it", () => {
+	it("a reply that kept words of its own, from a run with no voice guard (the demo seed's), reads as before", () => {
 		assert.equal(lessonEndingWith(assistant([{ type: "text", text: "Good place to stop. Practice comes next, in a day or two." }], "stop")).ended, "closed");
 	});
 });

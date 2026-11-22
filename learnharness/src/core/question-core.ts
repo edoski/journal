@@ -261,8 +261,6 @@ export const askInputSchema = Type.Object({
 
 export type AskToolInput = Static<typeof askInputSchema>;
 
-/** Whether his answer to a choices question picked an option the tutor
- *  marked as ending the session for today (`stops`). Pure. */
 /** Whether an ask's options include one that stops for today (`stops`):
  *  the tutor's offer to go on, which asks nothing of him. Pure. */
 export function offersStopIn(input: unknown): boolean {
@@ -270,6 +268,8 @@ export function offersStopIn(input: unknown): boolean {
 	return Array.isArray(options) && options.some((o) => (o as { stops?: unknown } | null)?.stops === true);
 }
 
+/** Whether his answer to a choices question picked an option the tutor
+ *  marked as ending the session for today (`stops`). Pure. */
 export function picksStop(input: unknown, answer: { answers?: ReadonlyArray<{ index?: number }> }): boolean {
 	const options = parseOptionsIfString((input as { options?: unknown } | null)?.options as string | undefined);
 	if (!Array.isArray(options)) return false;
