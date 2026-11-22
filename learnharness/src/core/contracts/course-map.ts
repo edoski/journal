@@ -188,6 +188,11 @@ export interface CourseExam {
 	past?: string;
 	finalReview?: string;
 	doesNotFit?: readonly TopicHandle[];
+	/** Of `doesNotFit`, the topics the plan still started before the exam
+	 *  as the last day he studied ended: they fell past it since he was
+	 *  last told, whatever moved them (the engine's `fell_past`; round 19,
+	 *  M1). */
+	fellPast?: readonly TopicHandle[];
 	unreviewed?: readonly TopicHandle[];
 	reasons?: Readonly<Partial<Record<TopicHandle, ExamGapReason>>>;
 	/** The arcs it examines, in arc order; absent when it covers the whole
