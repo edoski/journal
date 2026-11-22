@@ -205,6 +205,7 @@ describe("creating on the real engine", { skip: realEngineMissing(LEARNING_ENGIN
 		assert.equal(saved.exam?.date, undefined);
 		assert.deepEqual(Object.values(saved.sources as Record<string, { path: string }>).map((s) => s.path).sort(), ["https://git-scm.com/book/en/v2/Git-Branching-Rebasing", "https://git-scm.com/docs/git-rebase"], "its open websites, in the one save with its facts");
 		assert.equal(chatStore.getChat(chat.id)?.course?.workspace, made.workspace);
+		assert.equal(chatStore.getChat(chat.id)?.title, "Git rebase", "the session is named after what it set up");
 	});
 
 	it("lists his study folders, his university folder and his downloads for the agent to look in first", async () => {

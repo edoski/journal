@@ -136,6 +136,8 @@ export async function createLearning(chatId: string, input: NewLearning): Promis
 	// Linked at once, so a retry of the call finds it made, never a twin.
 	const link: CourseLink = { workspace, title };
 	stores.chatStore.linkCourse(chatId, link);
+	// Named after what it set up, never his first words; he may rename it.
+	stores.chatStore.takeUpLesson(chatId, title);
 	// The arcs may form even once he has begun studying: he asked for it set up.
 	const ledger = stores.arcPassLedgers.get(workspace);
 	stores.arcPassLedgers.save(workspace, { state: "new", at: ledger?.at ?? new Date().toISOString(), topics: ledger?.topics ?? 0, asked: input.asked.trim() });
