@@ -1,5 +1,5 @@
 import { opensTurn, sessionTaskTitleOf, type LhMessage } from "./native-messages.ts";
-import { openedAsReview } from "./session-opening.ts";
+import { answeredAsReview, openedAsReview } from "./session-opening.ts";
 
 /**
  * The course topics a session's first turn looked at, in the order it
@@ -59,7 +59,8 @@ export function onFirstTurn(messages: readonly LhMessage[]): boolean {
 
 /** A session's one name on every surface, the chat's head included: the
  *  title its saves gave the task it took up (`sessionTaskTitleOf`), else,
- *  for a review of more than one topic, its course's review ("Probability
+ *  for a review of more than one topic, or an Ask session that ran his
+ *  review (`answeredAsReview`), its course's review ("Probability
  *  review"), else the name it was created or named with; a name he gave it
  *  himself always (round 15, m5: "Problem sheet 4" in Sessions and on the
  *  calendar, "Problem sheet 4: rank and nullity" on Home; "Invertible
@@ -67,10 +68,12 @@ export function onFirstTurn(messages: readonly LhMessage[]): boolean {
  *  round 17, m5: "Review Inclusion-exclusion principle, Conditional
  *  probability, Random…" and "Matrix multiplication and 5 more" named a
  *  review by a list it cut or counted). Pure. */
-export function sessionTitleOf(record: { title: string; renamed?: true; course?: { title: string }; topics?: readonly string[]; messages: readonly LhMessage[] }): string {
+export function sessionTitleOf(record: { title: string; renamed?: true; named?: true; kind?: string; course?: { title: string }; topics?: readonly string[]; messages: readonly LhMessage[] }): string {
 	if (record.renamed) return record.title;
 	const task = sessionTaskTitleOf(record.messages);
 	if (task) return task;
+	// An Ask session that ran his review is that review by name (round 19, M5).
+	if (record.course && answeredAsReview(record)) return courseReviewName(record.course.title);
 	return record.course && (record.topics ?? []).length > 1 && openedAsReview(record) ? courseReviewName(record.course.title) : record.title;
 }
 

@@ -19,7 +19,7 @@ import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
 import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, isQuestionRepose, opensTurn, savedAnswerTimesOf, savedAnswerTopicsOf, savedTaskTimesOf, startsMovedOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
 import { leftQuestionRepose, offersStop, openWorkTopicsOf, sessionEndOf } from "../core/session-end.ts";
-import { lessonTakenUp, openedAsReview, stepsOnOf } from "../core/session-opening.ts";
+import { answeredAsReview, lessonTakenUp, openedAsReview, stepsOnOf } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
 import { stoppedByHim } from "../core/turn-cut.ts";
 import { failedResponseAtEnd } from "../core/input-events.ts";
@@ -151,7 +151,8 @@ function listChats(): ChatSummary[] {
 						...(learnerWords(messages).length <= 1 ? { untouched: true as const } : {}),
 						tasks: sessionTasksOf(messages),
 						...((t) => (t ? { taskTitle: t } : {}))(sessionTaskTitleOf(messages)),
-						review: openedAsReview({ title: summary.title, topics: summary.topics, messages }),
+						// An Ask session that ran his review is that review (round 19, M5).
+						review: openedAsReview({ title: summary.title, topics: summary.topics, messages }) || answeredAsReview({ ...summary, kind, messages }),
 						...((on) => (on ? { stepsOn: on } : {}))(stepsOn),
 						...((on) => (on.length > 0 ? { openOn: on } : {}))(openOn(messages, own, stepsOn)),
 						...((moved) => (moved.length > 0 ? { startsMoved: moved } : {}))([...new Set([...startsMovedOf(messages), ...(summary.startsMoved ?? [])])]),

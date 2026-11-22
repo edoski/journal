@@ -395,7 +395,8 @@ export type CourseMove = { kind: "open"; chat: ChatListItem } | { kind: "start";
 /**
  * A course's line, pressed: take up its step (the course's next step when
  * none is given). A review opens a session
- * on those topics that is still to pick up, else starts a review of them,
+ * on those topics that is still to pick up, else the course's newest
+ * review still to pick up, else starts a review of them,
  * named for them; never an older lesson. An open task or the current topic
  * continues the lesson that holds it, as the session model says
  * (`continueMove`), else starts one. With nothing to take up, a session
@@ -406,9 +407,19 @@ export function courseMove(course: StudyCourse, chats: readonly ChatListItem[], 
 	const opening = stepWords(step);
 	if (step.kind === "none") return { kind: "start", opening: CONTINUE_OPENING, topics: [] };
 	const held = step.kind === "task" ? taskSessions(chats, workspace, step.key) : topicSessions(chats, workspace, step.topics[0] ?? "").filter((c) => covers(c, step));
-	const move = step.kind === "review" ? (pickUp(held) ? continueMove(held) : null) : continueMove(held);
+	// A review picks up the course's newest review he can still pick up, before it starts another, so the
+	// question a close sent him back to is the one it opens (round 19, M5: three Probability sessions held open
+	// review questions while Home started a fourth).
+	const reviews = step.kind === "review" ? [...held, ...openReviews(chats, workspace)] : held;
+	const move = step.kind === "review" ? (pickUp(reviews) ? continueMove(reviews.filter((c) => PICK_UP.has(sessionState(c)))) : null) : continueMove(held);
 	if (move?.kind === "open") return { kind: "open", chat: move.chat };
 	return { kind: "start", opening, topics: step.topics, ...(move ? { from: move.from.id } : {}) };
+}
+
+/** The course's reviews he can still pick up, newest first: never one
+ *  whose course was deleted. Pure. */
+function openReviews(chats: readonly ChatListItem[], workspace: string): ChatListItem[] {
+	return chats.filter((c) => c.course?.workspace === workspace && !c.courseDeleted && isReviewSession(c) && PICK_UP.has(sessionState(c))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 /** The states a session is picked up from: it waits on the learner, the

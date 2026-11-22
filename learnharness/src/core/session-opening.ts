@@ -10,7 +10,8 @@
  */
 
 import type { TopicReview } from "./contracts/course-map.ts";
-import { firstStartedTopicOf, sessionPlanTopicOf, sessionTaskTopicsOf, plannedTopicsOf, type LhMessage } from "./native-messages.ts";
+import { firstStartedTopicOf, savedAnswerTopicsOf, sessionPlanTopicOf, sessionTaskTopicsOf, sessionTasksOf, plannedTopicsOf, type LhMessage } from "./native-messages.ts";
+import { phaseAt3Lh } from "./phases.ts";
 
 /** The opening a review is started with: "Review " and the titles. */
 const REVIEW_OPENING = /^Review\s+\S/;
@@ -61,6 +62,20 @@ export function openedByApp(record: { appOpening?: true; title: string; topics?:
  *  and as its session, "Tutor writing" on both). */
 export function openedAsReview(record: { title?: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): boolean {
 	return reviewOpening(record) && lessonTakenUp(record) === null;
+}
+
+/** Whether a session opened on no topic (Ask the tutor) ran his review: its
+ *  saves answered course topics while it taught no lesson (no probe
+ *  concluded, no plan, no task), so it is that review, by its topics and
+ *  its course's review name, and Home's review line picks it up (round
+ *  19, M5: "Yes" to the exam-eve Ask saved Binomial and Random variables
+ *  answers and left the committee question open, which the close called
+ *  "your Probability review", while Home's review line started a new
+ *  session on another question). Pure. */
+export function answeredAsReview(record: { topics?: readonly string[]; named?: true; kind?: string; messages: readonly { role: string; content?: unknown }[] }): boolean {
+	const messages = record.messages as readonly LhMessage[];
+	if ((record.topics ?? []).length > 0 || !record.named || record.kind === "practice") return false;
+	return savedAnswerTopicsOf(messages).length > 0 && phaseAt3Lh(messages) === "probe" && plannedTopicsOf(messages).length === 0 && sessionTasksOf(messages).length === 0;
 }
 
 /** Opened on topics with a review's words, whatever it did after. */
