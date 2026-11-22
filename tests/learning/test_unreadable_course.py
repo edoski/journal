@@ -86,3 +86,33 @@ def test_an_unreadable_course_keeps_its_share_of_the_days(
     )
     was = {entry["workspace"]: entry for entry in planned["courses"]}
     assert entries[str(chance)]["plan"] == was[str(chance)]["plan"]
+
+
+def test_the_newest_kept_revision_is_read_and_never_deleted_by_an_older_one(
+    tmp_path: Path,
+) -> None:
+    """Revision 10 is newer than revision 9 (copies sort by number, not by
+    name), and a process keeping an older revision leaves a newer one kept
+    meanwhile by another process."""
+    from learning import records, storage
+
+    root = tmp_path / "course"
+    root.mkdir()
+    workspace = initialize(root)
+    folder, stem = records._kept(workspace)
+    folder.mkdir(parents=True, exist_ok=True)
+    for revision in (9, 10):
+        storage.publish_text(
+            folder / f"{stem}.{revision}.json",
+            storage.encode({**records.read(workspace), "revision": revision}),
+        )
+    assert records.last_read(workspace)["revision"] == 10
+
+    records._keep_read(workspace, {**records.read(workspace), "revision": 8})
+    assert sorted(path.name for path in folder.glob(f"{stem}.*.json")) == [
+        f"{stem}.10.json",
+        f"{stem}.8.json",
+        f"{stem}.9.json",
+    ]
+    records._keep_read(workspace, {**records.read(workspace), "revision": 11})
+    assert [path.name for path in folder.glob(f"{stem}.*.json")] == [f"{stem}.11.json"]
