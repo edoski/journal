@@ -2,9 +2,9 @@
 
 import { useState, type ReactNode } from "react";
 import { LessonComposer } from "@/components/lesson/lesson-composer";
-import { lessonCreation, useStartDraft } from "@/components/start/use-lesson-start";
+import { startCreation, useStartDraft } from "@/components/start/use-lesson-start";
 import { useStartScope } from "@/components/start/start-scope";
-import { CourseControl, useCourseChoice, type CourseChoice } from "@/components/course-picker";
+import { CourseControl, NEW_LEARNING_PLACEHOLDER, useCourseChoice, type CourseChoice } from "@/components/course-picker";
 import { mathPlain } from "@/components/ui/math-text";
 import { courseLabel } from "@/src/core";
 import { keepWords, keptWords } from "@/components/lesson/kept-drafts";
@@ -17,7 +17,8 @@ const HOME_COURSE = "home:course";
 /** The field's words: New lesson's, in this course; on a topic page, on
  *  the topic, which is already chosen. */
 export function courseComposerPlaceholder(course: string, topic?: string): string {
-	return topic ? `Ask a question or paste a problem on ${mathPlain(topic)}` : `Name a topic, ask a question or paste a problem in ${mathPlain(course)}`;
+	if (topic) return `Ask a question or paste a problem on ${mathPlain(topic)}`;
+	return course ? `Name a topic, ask a question or paste a problem in ${mathPlain(course)}` : NEW_LEARNING_PLACEHOLDER;
 }
 
 /**
@@ -50,7 +51,7 @@ export function CourseComposer({ course, topic, control, box, onType, onLeave }:
 	const draft = useStartDraft(box ?? (topic ? `topic:${course.workspace}:${topic.handle}` : `course:${course.workspace}`));
 	const lesson = useStartScope();
 	const send = () => {
-		if (draft.canSend) lesson.start(lessonCreation(draft.text.trim(), course.workspace, { topics: topic ? [topic.handle] : [] }), { draft });
+		if (draft.canSend) lesson.start(startCreation(draft.text.trim(), course.workspace, { topics: topic ? [topic.handle] : [] }), { draft });
 	};
 	return (
 		<div
@@ -96,7 +97,7 @@ export function CourseComposer({ course, topic, control, box, onType, onLeave }:
  * words to another course (Edo, 18 Nov 2026). The course is kept beside
  * the draft, so words back after a reload keep theirs.
  */
-export function HomeComposer({ shown, onLeave }: { shown: { workspace: string; title: string }; onLeave?: () => void }) {
+export function HomeComposer({ shown, onLeave }: { shown: { workspace: string; title: string } | null; onLeave?: () => void }) {
 	const choice = useCourseChoice({ remember: false });
 	// Read as it mounts, before the box's own restore rewrites what it kept;
 	// Home draws it only once the courses are read, so never on the server.
@@ -105,9 +106,10 @@ export function HomeComposer({ shown, onLeave }: { shown: { workspace: string; t
 		setHeldState(course);
 		keepWords(HOME_COURSE, course ? { text: course } : null);
 	};
-	const workspace = held ?? shown.workspace;
+	// No course shown (none yet), or New course or self-study picked: his words set it up.
+	const workspace = held ?? shown?.workspace ?? "";
 	const summary = choice.state.status === "ready" ? choice.state.courses.find((c) => c.workspace === workspace) : undefined;
-	const title = summary ? courseLabel(summary) : workspace === shown.workspace ? shown.title : "";
+	const title = summary ? courseLabel(summary) : workspace && workspace === shown?.workspace ? shown.title : "";
 	const control: CourseChoice = {
 		...choice,
 		workspace,

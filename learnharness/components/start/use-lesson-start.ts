@@ -32,6 +32,18 @@ export function useStartDraft(scope: string) {
 
 export type StartDraft = ReturnType<typeof useStartDraft>;
 
+/** Something new to learn set up by conversation, from his words: a
+ *  setup session, with no course until it makes one. Pure. */
+export function setupCreation(opening: string): SessionCreation {
+	return { title: opening, kind: "setup" };
+}
+
+/** His words in a box whose course control is on a course (a lesson there)
+ *  or on New course or self-study (`workspace` empty: a setup). Pure. */
+export function startCreation(opening: string, workspace: string, options: { topics?: readonly string[] } = {}): SessionCreation {
+	return workspace ? lessonCreation(opening, workspace, options) : setupCreation(opening);
+}
+
 /** A lesson in `workspace` opened on `opening`, on `topics`, picking up
  *  the finished lesson `from`. Pure. */
 export function lessonCreation(opening: string, workspace: string, { topics = [], from }: { topics?: readonly string[]; from?: string } = {}): SessionCreation {

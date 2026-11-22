@@ -36,7 +36,7 @@ The teaching doctrine is one host-neutral text in the engine's tutor references,
 
 ## 2. No dual mode
 
-Every session is created with a course. The composer's course picker has no "No course" entry, and `POST /api/chats` refuses a session without a registered course. "Start fresh" is the picker's **New course** entry: a title and a study root. The server creates `<root>/<slug>` (refusing a folder that already exists, because `init` silently reopens an existing course and the title save would then rename it), runs the engine's `init` there, which also configures Codex for the course as `study init` always does, and saves the title so the course is listed at once.
+Every lesson is created with a course; a setup session (something new to learn, set up by conversation, 22 Nov 2026) starts with none and is linked to what it makes. The composer's course picker has no "No course" entry, and `POST /api/chats` refuses a session without a registered course. "Start fresh" is the picker's **New course** entry: a title and a study root. The server creates `<root>/<slug>` (refusing a folder that already exists, because `init` silently reopens an existing course and the title save would then rename it), runs the engine's `init` there, which also configures Codex for the course as `study init` always does, and saves the title so the course is listed at once.
 
 The study roots come from the engine. Until the engine exposes them (request E1), the app offers the parent folders of the registered courses, which on this Mac are `the-vault/university/msc` and `the-vault/learn`.
 

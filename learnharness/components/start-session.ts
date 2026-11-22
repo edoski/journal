@@ -6,7 +6,9 @@ export interface SessionCreation {
 	/** Its name in the sidebar and the breadcrumb when the opening is a
 	 *  long question the app asks for him (round 11, 1 N14). */
 	name?: string;
-	kind?: "practice";
+	/** Practice from its first turn; setup: something new to learn, set up
+	 *  by conversation, with no course yet. */
+	kind?: "practice" | "setup";
 	/** The picked course's workspace (the course chooser). */
 	course?: { workspace: string };
 	/** The course topics it is started on, by handle. */

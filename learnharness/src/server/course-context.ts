@@ -66,6 +66,11 @@ export interface CourseContexts {
 	linkedFolders(workspace: string): Promise<string[]>;
 }
 
+/** Where the engine writes the notes he asks for (learning/notes.py): never
+ *  material, even when the course's own folder is linked (a course set up
+ *  in the folder of its material). */
+const notesOf = (workspace: string) => path.join(workspace, "study-notes");
+
 export function createCourseContexts(deps: CourseContextDeps): CourseContexts {
 	const { courseRecords } = deps;
 	const open = deps.open ?? openOnMac;
@@ -105,7 +110,7 @@ export function createCourseContexts(deps: CourseContextDeps): CourseContexts {
 				continue;
 			}
 			const { directory, files } = scanned.json as { directory: string; files: { path: string; handle?: string }[] };
-			fresh.push(...files.filter((file) => file.handle === undefined).map((file) => path.join(directory, file.path)));
+			fresh.push(...files.filter((file) => file.handle === undefined).map((file) => path.join(directory, file.path)).filter((file) => !isInside(file, notesOf(workspace))));
 		}
 		if (fresh.length === 0) return [];
 		await deps.adopt(workspace, fresh);

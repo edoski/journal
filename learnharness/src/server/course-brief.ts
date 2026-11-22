@@ -35,6 +35,8 @@ export async function fetchCourseBrief(record: ChatRecord): Promise<CourseBrief 
 	if (!record.course) return null;
 	const { workspace } = record.course;
 	const role = sessionModeOf(record.messages, record.kind);
+	// Setting up something new reads no lesson brief: the course is being made.
+	if (role === "setup") return null;
 	try {
 		// The engine calls run side by side; a failed plan read drops only the
 		// daily plan, and with it practice's exam run-up, which only `plan`

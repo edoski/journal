@@ -14,6 +14,7 @@ from learning.retrieval import (
     compact,
     daily,
     exam,
+    kind,
     last_activity,
     last_studied,
     selected_task,
@@ -179,6 +180,7 @@ def _course(
         {
             "workspace": str(workspace.directory),
             "title": record.get("title"),
+            **kind(record, levels),
             "exam": compact(
                 {
                     "date": countdown.get("date"),

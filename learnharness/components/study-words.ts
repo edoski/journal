@@ -867,6 +867,23 @@ export const READY_WORDS = {
 	rest: "and the rest",
 } as const;
 
+/** A self-study, wherever a course would show its exam or its reviews
+ *  (22 Nov 2026): what it is, that nothing comes back for review, and how
+ *  it ends. */
+export const SELF_STUDY_WORDS = {
+	name: "Self-study",
+	reached: "Learned",
+	hint: "Learning on your own: no exam and no reviews. It's done once you've learned every topic.",
+	reachedLine: "You've learned every topic.",
+	check: "Check yourself",
+	checkHint: "One practice session across every topic, if you want to see what stuck.",
+} as const;
+
+/** A closing check's opening and its name: "Git rebase check". */
+export function closingCheckWords(title: string): string {
+	return `${title} check`;
+}
+
 /** Where he stands for the exam as one fact of a head, a few words (the
  *  course page's head): the whole answer opens under it. "No exam"
  *  for a course without one. When the plan cannot fit all of it, the head

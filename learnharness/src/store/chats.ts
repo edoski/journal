@@ -317,6 +317,16 @@ function linkCourse(id: string, course: CourseLink): void {
 	writeChat(record);
 }
 
+/** Take the session out of its course: it hands off to setting up
+ *  something new, which links it to what it makes. Not conversation
+ *  activity: updatedAt stays put. */
+function leaveCourse(id: string): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	delete record.course;
+	writeChat(record);
+}
+
 /** Rename a session (the header's click-to-edit title, 2026-09-17). Like
  * saveTree, a rename is NOT conversation activity: updatedAt stays put
  * so sidebar order never churns. Same fallback as createChat — the empty
@@ -402,6 +412,7 @@ export const chatStore: ChatStore = {
 	saveTree,
 	saveSession,
 	linkCourse,
+	leaveCourse,
 	renameChat,
 	nameSession,
 	takeUpLesson,

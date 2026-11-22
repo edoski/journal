@@ -242,7 +242,7 @@ class _Course:
     replayed: dict[str, progress.Replay]
     examined: frozenset[str] | None
     scope: frozenset[str] | None
-    asks: bool
+    spaced: bool
     free: frozenset[str]
     days: list[dict[str, Any]] = field(default_factory=list)
     introduced: set[str] = field(default_factory=set)
@@ -324,7 +324,7 @@ class _Course:
             replayed,
             arc_rules.examined(record),
             progress.exam_topics(record, untaught),
-            progress.asks(record),
+            progress.spaced(record),
             progress.free_arcs(record),
             gaps=_gaps(record, set(untaught)),
             lessons={
@@ -407,7 +407,7 @@ class _Course:
         if partners := [
             other
             for other in self.partners[topic]
-            if self.asks
+            if self.spaced
             and self.levels[other]["level"] != "new"
             and not solid(self.levels[other])
         ]:
@@ -475,9 +475,9 @@ class _Course:
 
     def due_items(self, day: date) -> list[dict[str, Any]]:
         """The reviews due on ``day``, in the course's own order. A course that
-        takes no questions has none."""
+        keeps no reviews (``progress.spaced``) has none."""
         if (
-            not self.asks
+            not self.spaced
             or (self.exam is not None and self.exam.day == day)
             or self.none_due(day)
         ):
@@ -501,7 +501,7 @@ class _Course:
         """Whether a topic that moves has a review due on ``day``
         (``due_items``): a day with none keeps what it holds."""
         if (
-            not self.asks
+            not self.spaced
             or not self.moving
             or (self.exam is not None and self.exam.day == day)
         ):
@@ -641,18 +641,20 @@ class _Course:
         )
 
     def met(self, need: str) -> bool:
-        """A prerequisite he can build on: solid, or, in a course that takes no
-        questions, where nothing can show it solid, taught on an earlier day."""
-        if not self.asks:
+        """A prerequisite he can build on: solid, or, in a course that keeps no
+        reviews (``progress.spaced``), taught on an earlier day. With no
+        questions nothing can show it solid; in a self-study no review comes
+        to make it solid, so gating on solid would stall every new topic."""
+        if not self.spaced:
             return self.levels[need]["level"] != "new" and need not in self.fresh
         return solid(self.levels[need]) or need in self.unsettled
 
     def ready(self, topic: str) -> bool:
         """Its prerequisites are met, and no competing method is half-learned
-        (in a course that takes no questions, nothing can show one is)."""
+        (in a course that keeps no reviews, nothing would make one solid)."""
         needs = progress.needs(self.record, topic)
         return all(self.met(need) for need in needs) and not (
-            self.asks
+            self.spaced
             and any(
                 self.levels[other]["level"] != "new"
                 and not solid(self.levels[other])
@@ -721,7 +723,7 @@ class _Course:
             "level": "introduced",
             "last": {"date": day.isoformat()},
         }
-        if self.asks:
+        if self.spaced:
             self._set_due(topic, day, progress.FIRST_RETRIEVAL_DAYS, solid=False)
 
     def related(self, topic: str, started: list[str]) -> bool:
@@ -1145,7 +1147,7 @@ def _continued(
                     while not week.studies(later) and (later - day).days < MAX_DAYS:
                         later += timedelta(days=1)
                     why["then"] = later.isoformat()
-                    if course.asks:
+                    if course.spaced:
                         course._set_due(
                             topic, later, progress.FIRST_RETRIEVAL_DAYS, solid=False
                         )

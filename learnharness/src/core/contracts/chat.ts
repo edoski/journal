@@ -23,10 +23,12 @@ import { SENTENCE_WORDS } from "../voice-check.ts";
  * is the client's own grouping fold (core/view.ts, Wave D) — a pending quiz
  * is an unanswered question tool call, which is exactly what makes
  * resume-mid-question free. */
-/** What a session is doing: teaching (the prober, then the teacher) or
- *  practice (the practice agent). It follows the transcript: the agents
- *  hand the session to each other (core/native-messages.ts sessionModeOf). */
-export type SessionMode = "teach" | "practice";
+/** What a session is doing: teaching (the prober, then the teacher),
+ *  practice (the practice agent), or setup (the setup agent: something new
+ *  to learn, a course or a self-study, set up by conversation). It follows
+ *  the transcript: the agents hand the session to each other
+ *  (core/native-messages.ts sessionModeOf). */
+export type SessionMode = "teach" | "practice" | "setup";
 
 export interface ChatRecord {
 	id: string;
@@ -275,11 +277,13 @@ export function sessionResumeText(title: string, steps: readonly { id: string; t
 /** The model-facing text of a mode handoff's wake, by the mode it starts.
  *  The new agent reads what to do from the handoff call above it: the
  *  scope to practise, or the topic to teach. */
-export const MODE_HANDOFF_TEXT: Readonly<Record<"teach" | "practice", string>> = {
+export const MODE_HANDOFF_TEXT: Readonly<Record<SessionMode, string>> = {
 	practice:
 		"[PRACTICE] — the session moves to practice, on the scope the handoff above names (a whole lesson when it lists `topics`). Choose the material as your system prompt says and pose the first problem, with no line before it about what you chose or why.",
 	teach:
 		"[TEACHING] — the session moves back to teaching, on what the handoff above names. Carry on from there as your system prompt says: what you explain is one teaching step, in two to four sentences and at most one display, then its check.",
+	setup:
+		"[SETUP] — the session moves to setting up something new to learn, from his words above. Carry on as your system prompt says: find what you can yourself, and ask him only what you cannot find, one question at a time.",
 };
 
 /** The handoff tools' ack: the turn ends at the handoff, and the next
@@ -366,6 +370,11 @@ export const DONE_TONIGHT_TEXT = {
 		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and nothing keeps it, so name it only as set aside, never as something he picks up or still has; a question he left open was never answered: don't grade either, and pose nothing more today. " +
 		`${DONE_GRADED} ${DONE_CLOSE_PRACTICE}`,
 } as const;
+
+/** Done for today in a setup session, which teaches nothing: what is set
+ *  up and what is missing, so he picks it up later in the conversation. */
+export const SETUP_DONE_TEXT =
+	"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. Ask nothing more today. In one or two sentences, say what is set up so far and what is still missing, so he can pick it up later in this conversation.";
 
 /** The mark he thinks is right, in the record's words and his. */
 const PROPOSED_WORDS: Readonly<Record<MarkResult, string>> = {

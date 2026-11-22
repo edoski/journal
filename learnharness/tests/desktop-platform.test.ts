@@ -66,7 +66,7 @@ describe("desktop window chrome", () => {
 		};
 		runInNewContext(readFileSync(new URL("../electron/preload.cjs", import.meta.url), "utf8"), context);
 		assert.deepEqual(Object.keys(bridge).sort(), [
-			"expandWindow", "getZoom", "lightsCentre", "notify", "onInUse", "onOpen", "onResume", "onZoom", "pickFolder",
+			"expandWindow", "getZoom", "lightsCentre", "notify", "onInUse", "onOpen", "onResume", "onZoom", "pathForFile", "pickFolder",
 		]);
 		assert.equal(bridge.lightsCentre, 30);
 	});

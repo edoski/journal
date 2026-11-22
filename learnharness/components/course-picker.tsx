@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDownIcon, GraduationCapIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Hint } from "@/components/ui/hint";
 import {
 	DropdownMenu,
@@ -14,22 +12,21 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useDialogSubject } from "@/components/ui/overlay";
 import { cn } from "@/lib/utils";
 import { takeHeld } from "@/components/held-asks";
-import { ExamDayField, MaterialField } from "@/components/new-course-fields";
 import { DeleteCourseDialog, RenameCourseDialog } from "@/components/course-manage-dialogs";
 import { useServerEvent } from "@/components/server-events";
-import { CourseMapStatus } from "@/components/course-map-status";
-import { newCourseForm, type MaterialPick } from "@/components/new-course-facts";
 import { courseLabel, kbdEventForAction, type CourseListing, type CourseSummary } from "@/src/core";
 
 /** Where the last picked course is remembered (per device). */
 const COURSE_CHOICE_KEY = "lh:course";
 
 export const PICK_A_COURSE = "Pick a course first";
+/** The course control on no course: what he sends sets something new up
+ *  by conversation, a course or a self-study. */
+export const NEW_LEARNING = "New course or self-study";
+/** The composer's prompt there. */
+export const NEW_LEARNING_PLACEHOLDER = "Name a course you're taking, or something you want to learn";
 
 /** What the engine said, as the composer needs it. */
 export type CourseState =
@@ -114,7 +111,11 @@ export function useCourseChoice({ remember = true }: { remember?: boolean } = {}
 	const choose = (next: string) => {
 		setWorkspace(next);
 		setNotice(null);
-		if (remember) localStorage.setItem(COURSE_CHOICE_KEY, next);
+		// No course (New course or self-study) is a choice for this box only.
+		if (remember) {
+			if (next) localStorage.setItem(COURSE_CHOICE_KEY, next);
+			else localStorage.removeItem(COURSE_CHOICE_KEY);
+		}
 	};
 	const add = (course: CourseSummary) => {
 		setState((s) => (s.status === "ready" ? { ...s, courses: [...s.courses, course] } : s));
@@ -141,38 +142,24 @@ export function useCourseChoice({ remember = true }: { remember?: boolean } = {}
 
 /** The composer toolbar's course chip. The host shows the unavailable line
  *  and the notice under the composer. Nothing while the engine is being
- *  asked or when no course can be picked. */
-export function CourseControl({ choice }: { choice: CourseChoice }) {
-	const [creating, setCreating] = useState(false);
+ *  asked or when no course can be picked. In a composer (`newLearning`),
+ *  New course or self-study takes the chip off every course, so what he
+ *  sends sets something new up by conversation (22 Nov 2026: it replaces
+ *  the New course form). */
+export function CourseControl({ choice, newLearning = true }: { choice: CourseChoice; newLearning?: boolean }) {
 	const [managing, setManaging] = useState<{ action: "rename" | "delete"; course: CourseSummary } | null>(null);
-	// A course made: focus goes on to the composer's field, where he types
-	// his first question, never to the page (round 3, 14 Nov 2026).
-	const anchorRef = useRef<HTMLSpanElement>(null);
-	const focusComposer = (e: Event) => {
-		const field = anchorRef.current?.closest('[data-testid="composer"]')?.querySelector("textarea");
-		if (!field) return;
-		e.preventDefault();
-		field.focus();
-	};
 	const { state } = choice;
 	if (state.status === "loading") return null;
 	if (state.status === "unavailable") return null;
 	return (
 		<>
-			<span ref={anchorRef} hidden />
 			<CoursePicker
 				courses={state.courses}
 				workspace={choice.workspace}
 				onChange={choice.choose}
-				onNew={() => setCreating(true)}
+				{...(newLearning ? { onNew: () => choice.choose("") } : {})}
 				onManage={(action, course) => setManaging({ action, course })}
 				asked={choice.asked}
-			/>
-			<NewCourseDialog
-				roots={creating ? state.roots : null}
-				onClose={() => setCreating(false)}
-				onCreated={(course) => choice.add(course)}
-				onCloseAutoFocus={focusComposer}
 			/>
 			<RenameCourseDialog
 				course={managing?.action === "rename" ? managing.course : null}
@@ -206,14 +193,15 @@ export function CoursesUnavailable({ reason }: { reason: string }) {
 }
 
 /** The course chip: which course record the session studies from and saves
- *  into. The courses as one choice, then "New course…", then Rename and
- *  Delete for the picked course. No due counts: Today says what is waiting,
- *  in words. */
+ *  into. The courses as one choice, then New course or self-study (when
+ *  `onNew` is given), then Rename and Delete for the picked course. No due
+ *  counts: Today says what is waiting, in words. */
 export function CoursePicker({ courses, workspace, onChange, onNew, onManage, asked = 0 }: {
 	courses: readonly CourseSummary[];
 	workspace: string;
 	onChange: (workspace: string) => void;
-	onNew: () => void;
+	/** Takes the chip off every course: something new is set up. */
+	onNew?: () => void;
 	/** Rename or Delete the picked course. */
 	onManage?: (action: "rename" | "delete", course: CourseSummary) => void;
 	/** A change opens the menu (a send blocked for want of a course). */
@@ -252,7 +240,7 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 				)}
 			>
 				<GraduationCapIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-				<span className="max-w-[16rem] truncate">{picked ? courseLabel(picked) : "Pick a course"}</span>
+				<span className="max-w-[16rem] truncate">{picked ? courseLabel(picked) : onNew ? NEW_LEARNING : "Pick a course"}</span>
 				<ChevronDownIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
 			</DropdownMenuTrigger>
 			<DropdownMenuContent
@@ -278,10 +266,12 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 						<DropdownMenuSeparator />
 					</>
 				)}
-				<DropdownMenuItem onSelect={onNew} data-testid="course-new">
-					<PlusIcon aria-hidden="true" />
-					New course…
-				</DropdownMenuItem>
+				{onNew && (
+					<DropdownMenuItem onSelect={onNew} data-testid="course-new">
+						<PlusIcon aria-hidden="true" />
+						{NEW_LEARNING}
+					</DropdownMenuItem>
+				)}
 				{picked && onManage && (
 					<>
 						<DropdownMenuSeparator />
@@ -297,139 +287,5 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 				)}
 			</DropdownMenuContent>
 		</DropdownMenu>
-	);
-}
-
-/** A root as the dialog shows it: its last two folders. */
-function rootLabel(root: string): string {
-	return root.split("/").filter(Boolean).slice(-2).join("/");
-}
-
-/** Where the course goes, shown only when more than one folder is known: the shared select at the field's width; the
- *  hint carries the full path. */
-function RootSelect({ roots, value, onChange }: { roots: readonly string[]; value: string; onChange: (root: string) => void }) {
-	const trigger = (
-		<SelectTrigger data-testid="new-course-root" aria-label="Save in" className="w-full font-normal">
-			<SelectValue placeholder="Pick a folder" />
-		</SelectTrigger>
-	);
-	return (
-		<Select value={value || undefined} onValueChange={onChange}>
-			{value ? <Hint label={value}>{trigger}</Hint> : trigger}
-			<SelectContent data-testid="new-course-root-menu">
-				{roots.map((r) => (
-					<SelectItem key={r} value={r} data-testid="new-course-root-option">
-						{rootLabel(r)}
-					</SelectItem>
-				))}
-			</SelectContent>
-		</Select>
-	);
-}
-
-/** The New course form in the shared dialog anatomy (components/ui/dialog.md):
- *  a title, the exam day and the material, plus where it goes when more than
- *  one folder is known. The server makes `<root>/<slug>`, copies the
- *  material in, and has the engine make it a course with that exam day and
- *  material. */
-export function NewCourseBody({ roots, onClose, onCreated, onCloseAutoFocus, fetchLike = fetch }: {
-	roots: readonly string[];
-	onClose: () => void;
-	onCreated: (course: CourseSummary) => void;
-	/** Where focus goes once the dialog closes (the host's field). */
-	onCloseAutoFocus?: (e: Event) => void;
-	fetchLike?: typeof fetch;
-}) {
-	const [title, setTitle] = useState("");
-	const [root, setRoot] = useState(roots[0] ?? "");
-	const [exam, setExam] = useState<string | null>(null);
-	const [picks, setPicks] = useState<MaterialPick[]>([]);
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	/** Created with material: the dialog stays to show its map being built. */
-	const [created, setCreated] = useState<CourseSummary | null>(null);
-	const submit = async (e: FormEvent) => {
-		e.preventDefault();
-		if (!title.trim() || !root || busy) return;
-		setBusy(true);
-		setError(null);
-		try {
-			const res = await fetchLike("/api/courses", { method: "POST", body: newCourseForm({ title, exam, root, picks }) });
-			const body = (await res.json()) as CourseSummary | { error?: string };
-			if (!res.ok) throw new Error("error" in body && body.error ? body.error : "The course could not be made. Try again.");
-			onCreated(body as CourseSummary);
-			if (picks.length > 0) setCreated(body as CourseSummary);
-			else onClose();
-		} catch (err) {
-			setError(err instanceof TypeError ? "LearnHarness could not be reached. Check it is running, then try again." : (err as Error).message);
-			setBusy(false);
-		}
-	};
-	if (created) {
-		return (
-			<DialogContent aria-describedby={undefined} data-testid="new-course-dialog" className="max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
-				<CourseMapStatus course={created} onClose={onClose} fetchLike={fetchLike} />
-			</DialogContent>
-		);
-	}
-	const field = "flex flex-col gap-2 text-body text-foreground";
-	return (
-		<DialogContent aria-describedby={undefined} data-testid="new-course-dialog" className="max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
-			<form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
-				<DialogHeader>
-					<DialogTitle>New course</DialogTitle>
-				</DialogHeader>
-				<label className={field}>
-					Title
-					<Input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus required disabled={busy} placeholder="Group Theory" data-testid="new-course-title" className="font-normal" />
-				</label>
-				<div role="group" aria-labelledby="new-course-exam-label" className={field}>
-					<span id="new-course-exam-label">Exam day</span>
-					<ExamDayField value={exam} onChange={setExam} disabled={busy} />
-				</div>
-				<div role="group" aria-labelledby="new-course-material-label" className={field}>
-					<span id="new-course-material-label">Course material</span>
-					<span className="text-callout font-normal text-muted-foreground">Slides, notes or past papers. They are copied into the course, so the tutor can read them.</span>
-					<MaterialField picks={picks} onChange={setPicks} disabled={busy} />
-				</div>
-				{roots.length > 1 && (
-					<label className={field}>
-						Save in
-						<RootSelect roots={roots} value={root} onChange={setRoot} />
-					</label>
-				)}
-				{roots.length === 0 && (
-					<p className="text-body text-muted-foreground">
-						LearnHarness does not know your courses folder yet. Set up the first course from the Terminal with <code>study init</code>.
-					</p>
-				)}
-				{error && <p role="alert" className="text-body text-danger">{error}</p>}
-				<DialogFooter className="pt-2">
-					<Button type="button" variant="quiet" onClick={onClose}>
-						Cancel
-					</Button>
-					<Button type="submit" data-testid="new-course-create" disabled={!title.trim() || !root || busy}>
-						{busy ? "Creating…" : "Create"}
-					</Button>
-				</DialogFooter>
-			</form>
-		</DialogContent>
-	);
-}
-
-export function NewCourseDialog({ roots, ...props }: {
-	/** The folders a new course can go in; null = closed. */
-	roots: readonly string[] | null;
-	onClose: () => void;
-	onCreated: (course: CourseSummary) => void;
-	onCloseAutoFocus?: (e: Event) => void;
-}) {
-	const { open, shown, opening } = useDialogSubject(roots);
-	return (
-		shown && (
-			<Dialog open={open} onOpenChange={(next) => !next && props.onClose()}>
-				<NewCourseBody key={opening} roots={shown} {...props} />
-			</Dialog>
-		)
 	);
 }

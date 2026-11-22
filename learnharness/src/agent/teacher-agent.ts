@@ -19,6 +19,8 @@ import {
 import { practiceTools, type PracticeToolContext } from "./tools/practice.ts";
 import { healToolRecord, withArgumentHeal } from "./tools/heal.ts";
 import { sendToUserTool } from "./tools/send-to-user.ts";
+import { setupTools, type SetupToolContext } from "./tools/setup.ts";
+import { jobTools, type JobToolContext } from "./tools/jobs.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { MODE_HANDOFF_TOOLS, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, opensTurn, type LhMessage } from "../core/native-messages.ts";
@@ -55,7 +57,7 @@ import { ClosedTurn } from "./closed-turn.ts";
 
 /** Which agent's prompt directory to compose. Practice (2026-10-04)
  *  composes ONLY its own directory — see prompt-segments.ts. */
-export type AgentKind = "prober" | "teacher" | "practice";
+export type AgentKind = "prober" | "teacher" | "practice" | "setup";
 
 /** Exported for tests: assert what composes into the model's prompt.
  *  Composition order: shared base → the agent's own fragments → shared/
@@ -72,6 +74,7 @@ const composedInstructions: Record<AgentKind, string> = {
 	prober: composeInstructions("prober"),
 	teacher: composeInstructions("teacher"),
 	practice: composeInstructions("practice"),
+	setup: composeInstructions("setup"),
 };
 
 // Money channel (wave 4): the chat-handler passes a per-turn collector;
@@ -101,6 +104,9 @@ export interface AgentBuildOptions {
 	course?: CourseToolContext;
 	/** The process started for this turn while he thought (prestart.ts). */
 	claim?: SdkAgentConfig["claim"];
+	/** A setup session: the folders his study material is kept in, each
+	 *  with what it holds, for the setup agent to look in first. */
+	setup?: { places: readonly string[] };
 }
 
 /**
@@ -140,9 +146,14 @@ function closedBefore(kind: AgentKind, earlier: readonly ToolCall[]): boolean {
 const FILE_TOOLS = ["Read", "Grep", "Glob"] as const;
 
 /** Where his files are, for the file tools' paths: his home and, in a
- *  course, the course folder a search starts in. */
-function foldersPrompt(course: CourseToolContext | undefined): string {
-	return [`His home folder: ${homedir()}`, ...(course ? [`This course's folder: ${course.course.workspace}`] : [])].join("\n");
+ *  course, the course folder a search starts in; in a setup session, where
+ *  his study material is kept. */
+function foldersPrompt(course: CourseToolContext | undefined, setup?: AgentBuildOptions["setup"]): string {
+	return [
+		`His home folder: ${homedir()}`,
+		...(course ? [`This course's folder: ${course.course.workspace}`] : []),
+		...(setup ? ["Where his study material is kept, to look in first:", ...setup.places.map((p) => `- ${p}`)] : []),
+	].join("\n");
 }
 
 /** A lesson turn's effort: `CHAT_EFFORT`, save the turn the probe's end
@@ -156,11 +167,15 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	if (!opts.engine) throw new Error(`no engine injected for the ${kind}`);
 	const engine = opts.engine;
 	const composed = composedInstructions[kind]!;
-	const systemPrompt = [composed, ...(opts.course ? [courseRecordPrompt(kind, { arcs: opts.course.arcs })] : []), foldersPrompt(opts.course)].join("\n\n---\n\n");
+	const systemPrompt = [composed, ...(opts.course ? [courseRecordPrompt(kind, { arcs: opts.course.arcs })] : []), foldersPrompt(opts.course, opts.setup)].join("\n\n---\n\n");
 	// Every message and question of the turn is read against the voice
 	// before he sees it, and one that breaks it is rewritten.
 	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind), opts.course?.review === true, opts.course !== undefined);
-	const spoken = (tool: AgentTool<any, any>) => (voice.guards(tool.name) ? voice.wrap(tool) : tool);
+	// The guard's budgets and refusals are a lesson's (a teaching turn, an
+	// answer, a hint): setting something up teaches nothing, so its messages
+	// keep to the voice its prompt carries, unchecked by them.
+	const lesson = kind !== "setup";
+	const spoken = (tool: AgentTool<any, any>) => (lesson && voice.guards(tool.name) ? voice.wrap(tool) : tool);
 	// Nothing new starts once the session closed for today in this turn.
 	const closing = new ClosedTurn((opts.messages ?? []) as LhMessage[]);
 	return new SdkAgent({
@@ -176,7 +191,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 		].map(spoken).map((tool) => closing.wrap(tool)),
 		screen: (call) => {
 			closing.screen(call);
-			voice.screen(call);
+			if (lesson) voice.screen(call);
 		},
 		settle: (message) => voice.settle(message),
 		heard: () => voice.heard(),
@@ -263,8 +278,24 @@ export function createPracticeAgent(ctx: PracticeToolContext, opts: AgentBuildOp
 	return baseAgentOptions("practice", opts, Object.values(tools));
 }
 
+/**
+ * The SETUP agent (22 Nov 2026): sets up something new to learn by
+ * conversation, a course or a self-study. It finds his material itself
+ * (his files through Claude Code's file tools, the web through a research
+ * job), sorts it with the material survey, asks him only what it cannot
+ * find, creates it, and hands the session to its first lesson when he
+ * wants to start. Once created, the course tools join (opts.course) for
+ * corrections.
+ */
+export function createSetupAgent(ctx: SetupToolContext & { jobs: JobToolContext }, opts: AgentBuildOptions = {}) {
+	const jobs = jobTools(ctx.jobs);
+	const tools = opts.tools ?? healToolRecord({ ask_user_question: askUserQuestionTool, research: jobs.research!, ...setupTools(ctx) });
+	return baseAgentOptions("setup", opts, Object.values(tools));
+}
+
 export type ProberAgent = ReturnType<typeof createProberAgent>;
 export type TeacherAgent = ReturnType<typeof createTeacherAgent>;
 export type PracticeAgent = ReturnType<typeof createPracticeAgent>;
-export type TeachingAgent = ProberAgent | TeacherAgent | PracticeAgent;
+export type SetupAgent = ReturnType<typeof createSetupAgent>;
+export type TeachingAgent = ProberAgent | TeacherAgent | PracticeAgent | SetupAgent;
 

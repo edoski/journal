@@ -41,6 +41,20 @@ export interface CourseSummary {
 	 *  an observation or a topic taught); null when it shows none, even
 	 *  when the course was saved. */
 	lastActiveDaysAgo: number | null;
+	/** Present for a self-study (the engine's `kind`). */
+	selfStudy?: SelfStudy;
+}
+
+/** A self-study: learning he does on his own, with no exam and no spaced
+ *  reviews, done once every topic of it is learned (the engine's
+ *  `goal_reached`). */
+export interface SelfStudy {
+	goalReached: boolean;
+}
+
+/** The engine's `kind` and `goal_reached`, from a plan entry or a map. */
+export function selfStudyOf(json: { kind?: unknown; goal_reached?: unknown }): { selfStudy: SelfStudy } | Record<string, never> {
+	return json.kind === "self-study" ? { selfStudy: { goalReached: json.goal_reached === true } } : {};
 }
 
 /** One due review as `plan` lists it. */

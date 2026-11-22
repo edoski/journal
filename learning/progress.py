@@ -182,6 +182,32 @@ def asks(record: dict[str, Any]) -> bool:
     return choice != "none"
 
 
+def self_study(record: dict[str, Any]) -> bool:
+    """Whether the course is a self-study (``preferences.kind``): something he
+    learns on his own, with no exam and no spaced reviews, done when every
+    topic is taught (``goal_reached``)."""
+    kind: str | None = record["preferences"].get(preferences.KIND)
+    return kind == preferences.SELF_STUDY
+
+
+def spaced(record: dict[str, Any]) -> bool:
+    """Whether the course keeps spaced reviews: it takes questions and is not
+    a self-study. A course that keeps none schedules no review, lists none
+    due, and builds on what was taught rather than on what came out solid."""
+    return asks(record) and not self_study(record)
+
+
+def goal_reached(record: dict[str, Any], levels: dict[str, dict[str, Any]]) -> bool:
+    """A self-study whose path has topics, every one taught (``levels``, its
+    ``standings``): nothing is left to start."""
+    order = path_order(record)
+    return (
+        self_study(record)
+        and bool(order)
+        and all(levels[key]["level"] != "new" for key in order)
+    )
+
+
 def unplanned(record: dict[str, Any]) -> bool:
     """An exam whose final review the plan has yet to read: no course
     preference sets its length and it has not begun."""
@@ -821,7 +847,7 @@ def _resync(
     moved: str = "the exam",
 ) -> None:
     """Re-derive every engine date after ``moved``: the exam or its final
-    review, or the switch back to a course that takes questions.
+    review, or the switch back to a course that keeps reviews (``spaced``).
 
     Each engine date becomes the replayed one, so moving the exam and moving
     it back restores the dates. A tutor date on or after an exam still ahead is
@@ -845,15 +871,15 @@ def _resync(
 
 
 def _silenced(record: dict[str, Any], scheduled: Scheduled) -> None:
-    """In a course that takes no questions nothing falls due, so no topic keeps
-    a review date: the record, its due list and its map agree with the plan.
-    Asking again re-derives them (``_resync``)."""
+    """In a course that keeps no reviews (``spaced``) nothing falls due, so no
+    topic keeps a review date: the record, its due list and its map agree
+    with the plan. Keeping reviews again re-derives them (``_resync``)."""
     for key, topic in list(record["topics"].items()):
         if "due" in topic.get("review", {}):
             _clear_due(record, key)
             scheduled.reviews.pop(key, None)
             scheduled.notes.append(
-                f"{key}: review date cleared, the course takes no questions"
+                f"{key}: review date cleared, the course keeps no reviews"
             )
 
 
@@ -967,7 +993,7 @@ def _first_retrievals(
     histories: dict[str, _History],
     scheduled: Scheduled,
 ) -> None:
-    if not asks(record):
+    if not spaced(record):
         return
     exam_of = examining(record)
     for key in changes.introduced:
@@ -1024,24 +1050,24 @@ def schedule(
     verdicts this save created or changed is due on its next expected review day,
     unless the same patch dated its review; a practice day leaves the date alone
     unless the review was already due by then. Newly introduced topics without
-    attempts or a date get a first retrieval. A course that takes no questions
-    keeps no review date, and switching back re-derives them. Gap or note
-    judged on an earlier day than the new evidence gets a note. A self-report adds no verdict, but
+    attempts or a date get a first retrieval. A course that keeps no reviews
+    (no questions, or a self-study) keeps no review date, and switching back
+    re-derives them. Gap or note judged on an earlier day than the new
+    evidence gets a note. A self-report adds no verdict, but
     any observation that supersedes an attempt replays that attempt's topics.
     """
     result = {**record, "topics": dict(record["topics"])}
     _stamp_due(result, changes)
     scheduled = Scheduled()
     histories = _histories(result["observations"])
-    if changes.exam_moved:
-        _resync(result, histories, today, scheduled)
-    elif changes.questions_moved:
-        _resync(result, histories, today, scheduled, "the questions preference")
+    moved = "the exam" if changes.exam_moved else changes.spacing_moved
+    if moved is not None and spaced(result):
+        _resync(result, histories, today, scheduled, moved)
     _clamp_tutor_dates(result, changes, today, scheduled)
     _reschedule(result, changes, histories, scheduled)
     _first_retrievals(result, changes, histories, scheduled)
     _stale_notes(result, changes, histories, scheduled)
-    if not asks(result):
+    if not spaced(result):
         _silenced(result, scheduled)
     return result, scheduled
 

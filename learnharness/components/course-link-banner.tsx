@@ -23,7 +23,7 @@ export function CourseLinkBody({ choice, busy, error, onLink }: {
 				{choice.state.status === "unavailable" ? (
 					<CoursesUnavailable reason={choice.state.reason} />
 				) : (
-					<CourseControl choice={choice} />
+					<CourseControl choice={choice} newLearning={false} />
 				)}
 				{choice.state.status === "ready" && (
 					<Button

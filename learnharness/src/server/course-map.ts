@@ -23,7 +23,8 @@ import { createArcPass, type ArcPass } from "../agent/subagents/arc-former.ts";
 import { createCourseMapBuilder, type CourseMapBuilder, type CourseMapStatus } from "../agent/subagents/course-map-builder.ts";
 import { claudeEngine, type SdkEngine } from "../agent/models.ts";
 import { emit, subscribe, type ServerEvent } from "../core/events.ts";
-import { sourcesRegisteredInLastTurn } from "../core/native-messages.ts";
+import { sourcesRegisteredInLastTurn, topicsSavedInLastTurn } from "../core/native-messages.ts";
+import { growArcs } from "./arc-growth.ts";
 import { effectiveSettings, stores } from "./stores.ts";
 import { createCourseContexts, watchLinkedFolders, type CourseContexts } from "./course-context.ts";
 
@@ -58,7 +59,17 @@ export function courseMapBuilder(): CourseMapBuilder {
 		onBuilt: (workspace, title) => emit("work-finished", { kind: "course-map", workspace, title, at: new Date().toISOString() }),
 		onStatus: (workspace) => {
 			emit("courses-changed", {});
-			void arcPass().settle(workspace);
+			// Read before the pass claims the course, which reads as building.
+			const status = courseMapBuilder().status(workspace);
+			const ended = status.state === "built" || status.state === "failed";
+			// A setup conversation waits on its course's first map.
+			if (ended) void import("./setup.ts").then((m) => m.noteMapBuilt(workspace, status));
+			// The pass first (a course with no arcs yet), then what the build
+			// added may be a new unit of a course with arcs: they grow.
+			void arcPass()
+				.settle(workspace)
+				.then(() => (ended ? growArcs(workspace) : undefined))
+				.catch((err: unknown) => console.error(`[course-map ${workspace}]`, err));
 		},
 	}));
 }
@@ -91,6 +102,8 @@ export function courseMapStatus(workspace: string): CourseMapStatus {
 function onTurnSettled(event: ServerEvent<"turn-settled">): void {
 	const record = stores.chatStore.getChat(event.chatId);
 	if (!record?.course) return;
+	// A tutor's topics may be a new unit: the course's arcs grow.
+	if (topicsSavedInLastTurn(record.messages)) void growArcs(record.course.workspace);
 	const added = sourcesRegisteredInLastTurn(record.messages);
 	if (added.length === 0) return;
 	const { workspace } = record.course;
