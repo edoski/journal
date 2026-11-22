@@ -129,6 +129,20 @@ describe("the probe's end opens the lesson while the teacher plans (round 19, M7
 		assert.equal(endsTurnFor("prober")(SEND_TO_USER_TOOL, []), false, "feedback before the probe's end goes on");
 	});
 
+	it("a clean opening on a retried probe_done owes none, so he never sees it twice", async () => {
+		const guard = answering();
+		const long = Array.from({ length: 6 }, (_, i) => `Sentence ${i + 1} of the step.`).join(" ");
+		const tool = (ok: boolean) => guard.wrap({ name: "probe_done", label: "probe_done", description: "", parameters: {} as never, execute: async () => ({ content: [{ type: "text" as const, text: ok ? "" : "A question is still open." }], details: { ok }, isError: !ok }) } as AgentTool<any>);
+		const first = call("probe_done", { assessment: ASSESSMENT, opening: long });
+		guard.screen(first);
+		await tool(false).execute(first.id, first.arguments);
+		const retry = call("probe_done", { assessment: ASSESSMENT, opening: OPENING });
+		guard.screen(retry);
+		assert.equal((retry.arguments as { opening?: unknown }).opening, OPENING);
+		const ended = await tool(true).execute(retry.id, retry.arguments);
+		assert.notEqual(ended.terminate, false, "nothing is owed: the probe's end ends the turn as usual");
+	});
+
 	it("the wake reads an owed opening sent after the probe's end, and never as feedback", () => {
 		const record = probe(null);
 		const rewrite = call(SEND_TO_USER_TOOL, { message: OPENING });

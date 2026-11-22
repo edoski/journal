@@ -1445,6 +1445,8 @@ export class VoiceGuard {
 		const breaks = this.opensLesson && text.trim() ? this.messageBreaks(text, "teach") : [];
 		const asks = sentences(text).some((s) => s.trim().endsWith("?"));
 		if (this.opensLesson && text.trim() && breaks.length === 0 && !asks) {
+			// A clean opening on a retried probe_done is the one he sees: none is owed any more.
+			this.openingOwed = null;
 			this.said.push(text);
 			this.toldNow.push(text);
 			return;
