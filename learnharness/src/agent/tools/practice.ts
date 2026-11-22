@@ -26,7 +26,7 @@ import { boundaryParse } from "../../core/tool-parts.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
-import { saveCourse, type CourseToolContext } from "./course.ts";
+import { saveCourse, slipMarkedRight, type CourseToolContext } from "./course.ts";
 import { studyDay, withDayWords } from "../../core/day-words.ts";
 import type { LhMarkerMessage } from "../../core/native-messages.ts";
 import { CONCLUDE_ACK_TEXT } from "../../core/contracts/chat.ts";
@@ -325,6 +325,8 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 		conclusion,
 		final?.kind === "work" ? final.confidence : undefined,
 	);
+	const slip = slipMarkedRight(observations);
+	if (slip) return { refused: slip.replace(/^observations\[\d+\]: its line/, "record: the line"), text: "" };
 	// The same problem posed again after its solution was shown: his
 	// answer repeats what he saw (shown-help.ts).
 	const seen = seenBeforeAsked(record.messages, active.toolCallId);
