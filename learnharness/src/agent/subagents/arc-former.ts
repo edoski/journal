@@ -32,6 +32,7 @@ import {
 	lastEdgesEntry,
 	formationWords,
 	liveTopics,
+	sortedAway,
 	mergeMisses,
 	passDue,
 	purposeAnswerProblems,
@@ -92,10 +93,10 @@ const ARCS_TOOL = "submit_arcs";
 const SORT_TOOL = "submit_sort";
 const PURPOSE_TOOL = "submit_purpose";
 const NEVER_SUBMITTED = "The grouping pass never submitted.";
-/** Blind readers per cut: the rubric scores with two fresh scorers and
- *  takes the lower, so a name passes only when both place every topic. */
-const SORT_READERS = 2;
-/** Fresh readers per topic, for the same reason: a use one reader in two
+/** Blind readers per sort: a topic is a miss when two of the five put it
+ *  away from its arc (SORT_MISS_SHARE). */
+const SORT_READERS = 5;
+/** Fresh readers per topic: a use one reader in two
  *  finds is missed only when both miss it, and a drop needs them all. */
 const NEEDS_READERS = 2;
 /** Model rounds beyond reading, as the map builder counts them: one to look
@@ -168,7 +169,7 @@ const sortSchema = Type.Object({
 	sort: Type.Array(
 		Type.Object({
 			topic: Type.String({ description: "The topic's id: t1, t2, …" }),
-			arcs: Type.Array(Type.String(), { description: "The arc names it reads as part of, exactly as listed, best first; a second only when it fits exactly as well." }),
+			arc: Type.String({ description: "The one arc name it fits best, exactly as listed." }),
 		}),
 		{ description: "Every topic, once." },
 	),
@@ -292,12 +293,12 @@ How this differs from the text below:
 - An arc of one topic carries single, saying why it stands alone. Two arcs citing the same unit of the material each carry shares, saying why.
 - Every arc cites in refs the unit of the material it follows, when the course has registered material.
 - Before you submit, run the name sort that rule 8 describes, and check each focus question is one question, not two joined by "and".
-- examArcs and leavesOut only when the material states the next exam's scope. A topic the exam leaves out goes in an arc after the exam's arcs, never in one with topics it examines: list it in leavesOut.
+- A stated exam's scope draws a boundary whether its date is ahead or past (rule 4's second signal): no arc holds both topics it examines and topics outside its scope ("outside the scope of the exam" below), and those sit in arcs after every arc of topics it examines, each joining the later arc whose question it extends; they form an arc of their own only when no later arc's question fits. examArcs and leavesOut only for the next exam still ahead, when the material states its scope. A topic that exam leaves out goes in an arc after the exam's arcs, never in one with topics it examines: list it in leavesOut.
 - When the course should get no arcs, send none with the reason and an empty arcs list.
 
 `;
 
-export const SORT_INSTRUCTIONS = `You read a course's arc names the way a student does, coming back after days away. Below are the names of its arcs, in no particular order, and its topic titles, shuffled. For each topic, say which arc's name it reads as part of, from the names alone: nothing else about the course is given, and nothing else counts. List a second name only when it fits the topic exactly as well as the first. Answer with one ${SORT_TOOL} call.`;
+export const SORT_INSTRUCTIONS = `You read a course's arc names the way a student does, coming back after days away. Below are the course's title, the names of its arcs (chapter-like groups) in study order, and its topic titles, shuffled. Put each topic under the arc whose name it fits best, from the names alone: nothing else about the course is given, and nothing else counts. Every topic goes to exactly one arc; when two fit, pick the better one. Answer with one ${SORT_TOOL} call.`;
 
 export const PURPOSE_INSTRUCTIONS = `You read a course's arcs the way a student does. Each arc below has a purpose line, one sentence on what the arc lets the student do, and its topics. For each arc:
 - Read the purpose line against each of its topics in turn: is it true of that topic, so that studying the topic is part of what the line promises? Under false, list each topic a line is false of, with what the line claims that the topic does not give.
@@ -314,8 +315,8 @@ function purposePrompt(quiz: PurposeQuiz): string {
 	return quiz.arcs.flatMap((a) => [`## ${a.title}`, `Purpose: ${a.purpose}`, ...(a.units.length > 0 ? [`Cites: ${a.units.join("; ")}`] : []), ...a.topics.map((t) => `- ${t.id}: ${t.title}`), ""]).join("\n");
 }
 
-function sortPrompt(quiz: SortQuiz): string {
-	return ["## Arc names", ...[...quiz.arcs].sort().map((a) => `- ${a}`), "", "## Topics", ...quiz.topics.map((t) => `- ${t.id}: ${t.title}`)].join("\n");
+function sortPrompt(title: string, quiz: SortQuiz): string {
+	return [`# Course: ${title}`, "", "## Arc names, in study order", ...quiz.arcs.map((a) => `- ${a}`), "", "## Topics", ...quiz.topics.map((t) => `- ${t.id}: ${t.title}`)].join("\n");
 }
 
 /**
@@ -402,7 +403,7 @@ function courseHead(title: string, record: unknown, material: PassMaterial): str
 }
 
 /** The topics in path order, each with what the step reads of it. */
-function topicLines(view: MapCourseView & Pick<ArcPassView, "proposed" | "added" | "implied">, withNeeds: boolean): string[] {
+function topicLines(view: MapCourseView & Pick<ArcPassView, "proposed" | "added" | "implied"> & Partial<Pick<ArcPassView, "leftOut" | "examDate">>, withNeeds: boolean): string[] {
 	const listed = [...view.order.filter((k) => k in view.topics), ...Object.keys(view.topics).filter((k) => !view.order.includes(k))];
 	return listed.map((handle) => {
 		const t = view.topics[handle]!;
@@ -419,6 +420,7 @@ function topicLines(view: MapCourseView & Pick<ArcPassView, "proposed" | "added"
 			t.refs.length > 0 ? `refs ${refWords(t.refs)}` : "",
 			t.aliases.length > 0 ? `also called ${t.aliases.join(", ")}` : "",
 			t.excluded ? `left out of the exam: ${t.excluded}` : "",
+			view.leftOut?.includes(handle) ? `outside the scope of the exam${view.examDate ? ` on ${view.examDate}` : ""}` : "",
 		].filter(Boolean);
 		return `- ${handle}: ${t.title ?? "(no title)"}${facts.length > 0 ? ` (${facts.join("; ")})` : ""}`;
 	});
@@ -491,7 +493,7 @@ function cutPrompt(title: string, view: ArcPassView, record: unknown, material: 
 	const exam = obj(obj(record).exam);
 	const lines = courseHead(title, record, material);
 	const facts = [
-		view.examDate ? `Exam: ${view.examDate}` : "No exam date.",
+		view.examDate ? `Exam: ${view.examDate}${view.examPast ? ", already past" : ", still ahead"}` : "No exam date.",
 		typeof exam.coverage === "string" ? `Exam coverage: ${exam.coverage}` : "",
 		typeof exam.format === "string" ? `Exam format: ${exam.format}` : "",
 		view.basis ? `Path basis: ${view.basis}` : "",
@@ -820,7 +822,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 				fill: (input: Json) => ({ sort: (input.sort as SortAnswer["sort"] | undefined) ?? [] }),
 				validate: (answer) => sortAnswerProblems(answer, quiz),
 				systemPrompt: SORT_INSTRUCTIONS,
-				prompt: sortPrompt(quiz),
+				prompt: sortPrompt(title, quiz),
 				engine,
 				signal,
 				onMessage: (message) => log({ step: "sort", kind: "message", message }),
@@ -833,9 +835,9 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			});
 			const reads = (await Promise.all(Array.from({ length: SORT_READERS }, reader))).filter((r): r is SortAnswer => r !== null);
 			if (reads.length > 0) {
-				const now = mergeMisses(...reads.map((read) => sortMisses(quiz, read, a)));
+				const now = sortedAway(reads.map((read) => sortMisses(quiz, read, a)));
 				sorted = standingMisses(seen, now, a);
-				seen = mergeMisses(seen, now);
+				seen = mergeMisses(now, seen);
 				log({ step: "sort", kind: "sorted", misses: sorted });
 				const misses = sortProblems(sorted, a);
 				if (misses) return misses;
