@@ -246,6 +246,42 @@ export function leftQuestionRepose(messages: readonly LhMessage[]): LhMessage[] 
 	return calls.length > 0 ? [newQuestionRepose(calls)] : [];
 }
 
+/** The question his Done for today set aside with a half answer in its
+ *  box (`draftKept`), by its words, while that Done is his latest input;
+ *  null when none did (round 19, m4: the Invertible lesson's task step
+ *  said "You stopped before writing anything" over his kept half answer).
+ *  Pure. */
+export function halfAnswerLeft(messages: readonly LhMessage[]): string | null {
+	const done = doneTonightAt(messages);
+	if (done === null) return null;
+	for (let i = done - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)) continue;
+		if (m.role !== "toolResult") break;
+		const details = m.details as { dismissed?: unknown; reason?: unknown; draft?: { text?: unknown } } | undefined;
+		if (details?.dismissed !== true || details.reason !== "tonight" || typeof details.draft?.text !== "string" || !details.draft.text.trim()) continue;
+		const asked = messages.findLast((a) => a.role === "assistant" && a.content.some((b) => b.type === "toolCall" && b.id === m.toolCallId));
+		const call = asked?.role === "assistant" ? asked.content.find((b) => b.type === "toolCall" && b.id === m.toolCallId) : undefined;
+		const words = call?.type === "toolCall" ? (call.arguments as { question?: unknown }).question : undefined;
+		if (typeof words === "string" && words.trim()) return words;
+	}
+	return null;
+}
+
+/** The session since its last close: after its newest closing
+ *  `lesson_progress` call or Done for today, the Done he just pressed
+ *  aside (round 19, m15: a same-day resume's close named Mechanics,
+ *  answered before the first close). Pure. */
+export function sinceLastClose(messages: readonly LhMessage[]): readonly LhMessage[] {
+	const current = doneTonightAt(messages);
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		const closed = m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === LESSON_PROGRESS_TOOL && (b.arguments as { close?: unknown } | null)?.close === true);
+		if (closed || (i !== current && isDoneTonight(m))) return messages.slice(i + 1);
+	}
+	return messages;
+}
+
 function isDoneTonight(m: LhMessage): boolean {
 	return m.role === "custom" && m.customType === "done-tonight";
 }
