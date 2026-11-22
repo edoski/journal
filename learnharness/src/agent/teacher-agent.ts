@@ -6,7 +6,7 @@ import { SdkAgent, type SdkAgentConfig } from "./sdk/agent.ts";
 import type { SdkEngine } from "./sdk/engine.ts";
 import type { SessionStore } from "./sdk/session-files.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
-import { courseRecordPrompt, setupStyleText, sourcePromptTexts } from "./prompt-segments.ts";
+import { courseRecordPrompt, sourcePromptTexts } from "./prompt-segments.ts";
 import { courseTools, type CourseToolContext } from "./tools/course.ts";
 import {
 	askUserQuestionTool,
@@ -23,7 +23,7 @@ import { setupTools, type SetupToolContext } from "./tools/setup.ts";
 import { jobTools, type JobToolContext } from "./tools/jobs.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS } from "../core/pending.ts";
-import { MODE_HANDOFF_TOOLS, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, opensTurn, type LhMessage, type SetupStyle } from "../core/native-messages.ts";
+import { MODE_HANDOFF_TOOLS, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, opensTurn, type LhMessage } from "../core/native-messages.ts";
 import { LESSON_PROGRESS_TOOL, lessonProgressOf } from "../core/contracts/plan.ts";
 import { CHAT_EFFORT, CLAUDE_MODEL } from "../core/contracts/claude.ts";
 
@@ -106,7 +106,7 @@ export interface AgentBuildOptions {
 	claim?: SdkAgentConfig["claim"];
 	/** A setup session: the folders his study material is kept in, each
 	 *  with what it holds, for the setup agent to look in first. */
-	setup?: { places: readonly string[]; style?: SetupStyle };
+	setup?: { places: readonly string[] };
 }
 
 /**
@@ -166,7 +166,7 @@ export function turnEffort(messages: readonly LhMessage[]): "high" | "medium" {
 function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: AgentTool<any, any>[]) {
 	if (!opts.engine) throw new Error(`no engine injected for the ${kind}`);
 	const engine = opts.engine;
-	const composed = kind === "setup" ? `${composedInstructions.setup}\n\n${setupStyleText(opts.setup?.style)}` : composedInstructions[kind]!;
+	const composed = composedInstructions[kind]!;
 	const systemPrompt = [composed, ...(opts.course ? [courseRecordPrompt(kind, { arcs: opts.course.arcs })] : []), foldersPrompt(opts.course, opts.setup)].join("\n\n---\n\n");
 	// Every message and question of the turn is read against the voice
 	// before he sees it, and one that breaks it is rewritten.

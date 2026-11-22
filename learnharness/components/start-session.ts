@@ -19,14 +19,6 @@ export interface SessionCreation {
 	resume?: { from: string };
 }
 
-/** The setup conversation's direction under review (design-variant.ts,
- *  group "setup"), as the Logbook guide marks it on <html>; none in a
- *  production build. */
-function setupStyle(): { setupStyle?: string } {
-	const style = typeof document === "undefined" ? null : document.documentElement.getAttribute("data-polish-setup");
-	return style && style !== "current" ? { setupStyle: style } : {};
-}
-
 /** Per source-composer instance. Retain a successful creation if storage
  * fails, so an unchanged retry does not create another empty session.
  * Changed text or context is a different start, not a stale title.
@@ -54,7 +46,7 @@ export class SessionStarter {
 			const res = await fetchLike("/api/chats", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ ...body, ...setupStyle() }),
+				body: JSON.stringify(body),
 			});
 			if (!res.ok) throw new Error(OPENING_PROMPT_FAILURE);
 			const result = await res.json() as { id?: unknown };

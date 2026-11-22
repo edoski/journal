@@ -366,12 +366,15 @@ export const DONE_TONIGHT_TEXT = {
 	teacher:
 		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. Close the session now: call `lesson_progress` with `close: true` (and `done` for any step he finished). " +
 		`${DONE_GRADED} ${DONE_CLOSE}`,
-	setup:
-		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. Ask nothing more today. In one or two sentences, say what is set up so far and what is still missing, so he can pick it up later in this conversation.",
 	practice:
 		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and nothing keeps it, so name it only as set aside, never as something he picks up or still has; a question he left open was never answered: don't grade either, and pose nothing more today. " +
 		`${DONE_GRADED} ${DONE_CLOSE_PRACTICE}`,
 } as const;
+
+/** Done for today in a setup session, which teaches nothing: what is set
+ *  up and what is missing, so he picks it up later in the conversation. */
+export const SETUP_DONE_TEXT =
+	"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. Ask nothing more today. In one or two sentences, say what is set up so far and what is still missing, so he can pick it up later in this conversation.";
 
 /** The mark he thinks is right, in the record's words and his. */
 const PROPOSED_WORDS: Readonly<Record<MarkResult, string>> = {

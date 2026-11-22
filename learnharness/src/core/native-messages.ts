@@ -40,6 +40,7 @@ import { QUESTION_TOOLS, type PendingQuestion } from "./pending.ts";
 import {
 	CONCLUDE_ACK_TEXT,
 	DONE_TONIGHT_TEXT,
+	SETUP_DONE_TEXT,
 	HANDOFF_TEXT,
 	REVIEW_HANDOFF_TEXT,
 	TASK_HANDOFF_TEXT,
@@ -287,28 +288,16 @@ export const MODE_HANDOFF_TOOLS: Readonly<Record<string, SessionMode>> = { pract
 /** The mode a session starts in, chosen at creation (Current design's
  *  Teach/Practice switch). UI-only: the model never sees it, since the
  *  agent's system prompt already says what it runs. */
-export function newSessionModeMessage(mode: SessionMode, style?: SetupStyle): LhMarkerMessage {
+export function newSessionModeMessage(mode: SessionMode): LhMarkerMessage {
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "session-mode",
 		content: "",
 		display: false,
-		details: { mode, ...(style ? { style } : {}) },
+		details: { mode },
 		timestamp: Date.now(),
 	};
-}
-
-/** The setup conversation's directions under review (design-variant.ts,
- *  group "setup"); none is the default, look first. */
-export const SETUP_STYLES = ["ask", "build"] as const;
-export type SetupStyle = (typeof SETUP_STYLES)[number];
-
-/** The direction a setup session was started in, from its mode marker. */
-export function setupStyleOf(messages: readonly LhMessage[]): SetupStyle | undefined {
-	const marker = messages.find((m): m is LhMarkerMessage => m.role === "custom" && m.customType === "session-mode" && (m.details as { mode?: unknown } | null)?.mode === "setup");
-	const style = (marker?.details as { style?: unknown } | null | undefined)?.style;
-	return (SETUP_STYLES as readonly unknown[]).includes(style) ? (style as SetupStyle) : undefined;
 }
 
 /** What the setup agent's background work found, for the setup session to
@@ -707,12 +696,12 @@ export function finalSubmissionOf(messages: readonly LhMessage[], problemCallId:
 /** His Done for tonight: he stops now. The content tells the agent that
  *  answers it to close without grading what he left open; the
  *  transcript draws its own quiet line off the marker. */
-export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT): LhMarkerMessage {
+export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT | "setup"): LhMarkerMessage {
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "done-tonight",
-		content: DONE_TONIGHT_TEXT[agent],
+		content: agent === "setup" ? SETUP_DONE_TEXT : DONE_TONIGHT_TEXT[agent],
 		display: true,
 		details: {},
 		timestamp: Date.now(),

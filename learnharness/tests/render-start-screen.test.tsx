@@ -46,10 +46,10 @@ describe("the start screen", () => {
 		assert.doesNotMatch(main?.textContent ?? "", /Continue|Other courses|Exam in/);
 	});
 
-	it("asks one neutral question and prompt", () => {
+	it("asks one neutral question and, with no course picked, prompts for something new to learn", () => {
 		const draft = screen();
 		assert.equal(draft.querySelector("h1")?.textContent, "What do you want to work on?");
-		assert.equal(draft.querySelector("textarea")?.getAttribute("placeholder"), "Name a topic, ask a question or paste a problem");
+		assert.equal(draft.querySelector("textarea")?.getAttribute("placeholder"), "Name a course you're taking, or something you want to learn");
 	});
 });
 

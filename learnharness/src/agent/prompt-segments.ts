@@ -89,12 +89,6 @@ export function listSourceSegments(agent: PromptAgent): Array<{ path: string; sh
 	return segments;
 }
 
-/** The order a setup conversation follows, for the direction it was
- *  started in (prompts/setup/styles/), or look first when none. */
-export function setupStyleText(style: "ask" | "build" | undefined): string {
-	return fs.readFileSync(path.join(PROMPTS_DIR, "setup", "styles", `${style ?? "look"}.md`), "utf-8").trim();
-}
-
 /** Every source segment's text for one agent, in composition order. */
 export function sourcePromptTexts(agent: PromptAgent): string[] {
 	return listSourceSegments(agent).map((segment) => {
