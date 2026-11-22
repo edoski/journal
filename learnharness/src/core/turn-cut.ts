@@ -71,6 +71,28 @@ export function replyCutOf(messages: readonly LhMessage[]): "stopped" | "stopped
 	return nativeInputCause(last as never, messages.slice(0, i) as never) === "learner" ? "lost" : null;
 }
 
+/** His practice work whose reply never came (round 19, M3): the app
+ *  restarted while the tutor marked it, so the record ends at the work.
+ *  Like an answer to a question, it is owed its marking, so it resumes by
+ *  itself: as a reply "lost" with only Try again, his next words went to
+ *  the tutor as more work on the problem, and the problem was marked
+ *  twice. Any other input whose reply never came waits for Try again.
+ *  Pure. */
+export function practiceWorkCut(messages: readonly LhMessage[]): boolean {
+	if (replyCutOf(messages) !== "lost") return false;
+	let i = messages.length - 1;
+	while (i >= 0 && isNeutral(messages[i]!)) i--;
+	const last = messages[i];
+	return last?.role === "custom" && (last as { customType?: string }).customType === "practice-thinking";
+}
+
+/** Whether the record owes the tutor a turn that runs by itself, with no
+ *  press of his: its reaction to an answer (`needsContinuation`), or the
+ *  marking of practice work a restart cut (`practiceWorkCut`). Pure. */
+export function resumesByItself(messages: readonly LhMessage[]): boolean {
+	return needsContinuation(messages) || practiceWorkCut(messages);
+}
+
 /** Whether a `continue` has anything to do (round 4, 14 Nov 2026): the
  *  record owes the tutor's reaction to an answer, or its reply never came.
  *  Anything else means the reply already came, from another window's
