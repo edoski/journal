@@ -42,6 +42,10 @@ export function bgLlmSlots(): LlmSlots {
 export async function withBgLlmSlot<T>(
 	signal: AbortSignal | undefined,
 	critical: () => Promise<T>,
+	/** "first": waits ahead of every queued ticket. A course map build
+	 *  takes it, so a new course is usable while another course's arc pass
+	 *  (dozens of queued readers) still runs (22 Nov 2026). */
+	order: "first" | "last" = "last",
 ): Promise<T> {
 	const slots = bgLlmSlots();
 	let freshTake = true;
@@ -49,7 +53,8 @@ export async function withBgLlmSlot<T>(
 		freshTake = false;
 		await new Promise<void>((resolve, reject) => {
 			const ticket: { resolve: () => void; dead: boolean } = { resolve, dead: false };
-			slots.queue.push(ticket);
+			if (order === "first") slots.queue.unshift(ticket);
+			else slots.queue.push(ticket);
 			if (!signal) return;
 			const die = () => {
 				ticket.dead = true; // the permit handoff must skip us

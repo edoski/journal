@@ -368,6 +368,8 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 				if (shaped && !signal.aborted && err instanceof Error && err.message === NEVER_SUBMITTED) return shaped;
 				throw err;
 			}),
+			// A map makes a course usable: it waits ahead of other courses' arc readers.
+			"first",
 		);
 		if (signal.aborted) throw Object.assign(new Error("course map aborted"), { name: "AbortError" });
 		// A lesson may have saved while the agent read: merge into the record as it is now.
