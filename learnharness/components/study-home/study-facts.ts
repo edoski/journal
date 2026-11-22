@@ -440,7 +440,7 @@ export function withLessonHere(courses: readonly StudyCourse[], chats: readonly 
 		if (!newest || newest.kind !== "teach" || !IN_PROGRESS.has(sessionState(newest))) return course;
 		// Where its lesson's steps are, never a task's topics (round 19, M4: Problem sheet 4 moved it to Basis).
 		const at = lessonHereOf(newest);
-		const here = topics.find((t) => t.handle === at);
+		const here = topics.find((t) => at.includes(t.handle));
 		return here && here.handle !== course.map.current ? { ...course, map: { ...course.map, current: here.handle } } : course;
 	});
 }

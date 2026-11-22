@@ -145,8 +145,7 @@ export function openLessonsOf(chats: readonly ChatSummary[], workspace: string, 
  *  Pure. */
 export function lessonTopics(chats: readonly ChatSummary[], workspace: string): readonly string[] {
 	const newest = chats.filter((c) => c.course?.workspace === workspace && c.messageCount > 0).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-	const here = newest && newest.kind === "teach" && openSession(newest) && newest.ended !== "left" ? lessonHereOf(newest) : null;
-	return here ? [here] : [];
+	return newest && newest.kind === "teach" && openSession(newest) && newest.ended !== "left" ? lessonHereOf(newest) : [];
 }
 
 /** What the course record holds that a build's patch is merged into. */

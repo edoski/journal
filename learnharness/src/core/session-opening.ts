@@ -156,17 +156,16 @@ export function stepsOnOf(record: { title: string; topics?: readonly string[]; m
 }
 
 /** Where a session in progress puts You are here: the topic its steps are
- *  on (`stepsOn`), unless its work is a task that holds more than that
- *  topic, a problem sheet, which is his work and not a lesson, so it
- *  moves nothing (round 19, M4: Continue on Problem sheet 4, whose task
- *  holds Rank, Basis and Kernel, moved You are here from Eigen to Basis).
- *  Null when it places nothing. Pure. */
-export function lessonHereOf(chat: { stepsOn?: string; tasks?: readonly string[]; ownTopics?: readonly string[] }): string | null {
+ *  on (`stepsOn`), else, on a summary made elsewhere that leaves it out,
+ *  the topics it belongs to; none when its work is a task that holds more
+ *  than that topic, a problem sheet, which is his work and not a lesson
+ *  (round 19, M4: Continue on Problem sheet 4, whose task holds Rank,
+ *  Basis and Kernel, moved You are here from Eigen to Basis). Pure. */
+export function lessonHereOf(chat: { stepsOn?: string; tasks?: readonly string[]; ownTopics?: readonly string[] }): readonly string[] {
 	const own = chat.ownTopics ?? [];
-	// A summary made elsewhere may leave `stepsOn` out: a session of one topic is on that one.
-	const stepsOn = chat.stepsOn ?? (own.length === 1 ? own[0]! : null);
-	if (!stepsOn) return null;
-	return (chat.tasks ?? []).length === 0 || own.every((topic) => topic === stepsOn) ? stepsOn : null;
+	const { stepsOn } = chat;
+	if ((chat.tasks ?? []).length > 0 && !(stepsOn && own.every((topic) => topic === stepsOn))) return [];
+	return stepsOn ? [stepsOn] : own;
 }
 
 /** The topics a session teaches as its lesson: the topics a session not a
