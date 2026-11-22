@@ -398,6 +398,23 @@ function sessionsWords(exam: Record<string, unknown>): string {
 	return `, the session he aims at (sessions: ${listed}${past})`;
 }
 
+/** What the exam examines, from its record: its `coverage` in his
+ *  material's words, its `arcs` and the topics it `leaves_out`, or the
+ *  whole course. A topic it examines never moves past it (round 19, m18:
+ *  an Ask offered to move eight examined topics past the exam, then took
+ *  it back once it read the coverage). Pure. */
+function examScopeLine(exam: Record<string, unknown>): string {
+	const coverage = str(exam.coverage);
+	const arcs = list(exam.arc_titles).filter((t): t is string => typeof t === "string");
+	const leaves = list(exam.leaves_out).filter((t): t is string => typeof t === "string");
+	const what = [
+		...(coverage ? [`its scope, in his material's words: ${coverage}`] : []),
+		...(arcs.length > 0 ? [`it examines the arcs ${arcs.join(", ")}`] : []),
+		leaves.length > 0 ? `it leaves out ${leaves.join(", ")}` : arcs.length > 0 ? "every topic of those arcs is examined" : "every topic of the course is examined",
+	];
+	return `Exam scope: ${what.join("; ")}. Offer to move a topic to after the exam only when the exam leaves it out; an examined topic never moves past it.`;
+}
+
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
@@ -413,6 +430,7 @@ export function projectCourseBrief(
 	const lines: string[] = [];
 	const examLine = typeof exam.date === "string" ? ` · exam on ${longDay(exam.date)}${sessionsWords(exam)}` : "";
 	lines.push(`[Course record] ${str(course.title) ?? "Untitled course"} · today ${dayWithWeekday(str(r.today))}${examLine}`);
+	if (typeof exam.date === "string") lines.push(examScopeLine(exam));
 	if (str(course.goal)) lines.push(`About the course, in his words: ${course.goal}`);
 	if (studied) lines.push(studiedLine(studied));
 	// A review whose plan teaches another topic is that topic's lesson from then on (round 16, M4).

@@ -337,7 +337,10 @@ const DONE_GRADED = "An answer he sent before pressing it is still graded and sa
  *  names it (round 17, 2 m2: a four-topic review's close named only
  *  Conditional probability's, and Binomial, Random variables and
  *  Inclusion-exclusion got none). */
-const DONE_DAYS = "and the day each topic he answered in this session comes back, by its topic: topics on one day together, and with three days or more, the soonest and that the rest are on his calendar";
+/** Round 19, m15: "Mechanics of matrix multiplication comes back on a later
+ *  day on your calendar", for a topic answered before his last Done for
+ *  today; "you pick those up next", with no day. */
+const DONE_DAYS = "and the day each topic he answered since he last pressed Done for today comes back, by its topic, copied from the plan's words: topics on one day together, and with three different days or more, the soonest and that the rest are on his calendar; a topic he hears of gets its day, never \"a later day\" or \"next\", and a topic he did not answer since then is left out";
 /** A start planned for today that the session's saves moved is named,
  *  with its new day and its cause (round 18, M4: a hinted, then partly
  *  right, answer moved Expectation off today, every receipt carried it in
@@ -347,7 +350,7 @@ const DONE_MOVED = "a start planned for today that his answers moved (a save's `
  *  (round 18, m15: "…is waiting for you there. Because that lesson is
  *  unfinished, Any matrix represents a linear map moved …, and later
  *  starts moved too."). */
-const DONE_HALF = 'a question he left a half answer on (`draftKept`) is his half answer, waiting in this session by its name (your Invertible matrices lesson, your Probability review), never "there"; a start named inside a sentence has its title set off in quotes (Starting “Any matrix represents a linear map” moves to Tuesday 10 November), and every move he is told is named with its day, never as "later starts moved too"';
+const DONE_HALF = 'a question he left a half answer on (`draftKept`) is his half answer, waiting in this session by its name (your Invertible matrices lesson, your Probability review), never "there", with the day that lesson continues ("…, which continues tomorrow, Monday 9 November"), and a task step saved over it says to finish his half answer on that question, never that he wrote nothing; a start named inside a sentence has its title set off in quotes (Starting “Any matrix represents a linear map” moves to Tuesday 10 November), and every move he is told is named with its day, never as "later starts moved too"';
 const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one, ${DONE_DAYS}; ${DONE_MOVED}; a topic not started is one he starts, never a review; ${DONE_HALF}. ${DONE_LIMITS}`;
 /** Practice keeps nothing of a problem dropped at Done for today, so its
  *  close names only what the record keeps (round 9, 3 m7: "You still have

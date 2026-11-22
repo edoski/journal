@@ -12,7 +12,7 @@ import { DONE_TONIGHT_TEXT } from "../src/core/contracts/chat.ts";
 
 test("every agent's Done for today asks for the day of each topic he answered (round 17, 2 m2)", () => {
 	for (const [agent, text] of Object.entries(DONE_TONIGHT_TEXT)) {
-		assert.match(text, /the day each topic he answered in this session comes back/, agent);
+		assert.match(text, /the day each topic he answered since he last pressed Done for today comes back/, agent);
 		assert.match(text, /the soonest and that the rest are on his calendar/, agent);
 		assert.match(text, /at most two sentences/, `${agent}: the close stays short`);
 	}
