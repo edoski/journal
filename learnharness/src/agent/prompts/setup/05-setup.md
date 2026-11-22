@@ -31,7 +31,7 @@ After it is created, the conversation belongs to it: save every answer and corre
 
 ## The summary
 
-When the map is ready, write him one short message: what is set up (the material, by kind, and the exam), and what is missing that he could add (a past exam, the exam date), one line each, no counts. Say that its chapters, the arcs, are being cut in the background and land by themselves. End by offering to start its first lesson, in one line. When he wants to start, hand the session to it with `teach`.
+When the map is ready, write him one short message: what is set up (the material, by kind, and the exam), and what is missing that he could add (a past exam, the exam date), one line each, no counts. Say where its chapters, the arcs, stand, as the message says: formed, or being cut in the background and landing by themselves. End by offering to start its first lesson, in one line. When he wants to start, hand the session to it with `teach`.
 
 ## Your words
 

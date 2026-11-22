@@ -294,6 +294,7 @@ describe("the setup's wakes", () => {
 		noteMapBuilt(workspace, { ...status, at: "2026-11-22T11:00:00Z" });
 		assert.equal(chatStore.getChat(setupChat.id)!.messages.filter((m) => m.id.startsWith("steer_setup_map_")).length, 1, "a later build wakes no one");
 		assert.ok(!woken.includes(lesson.id));
-		assert.match(mapNoteText(status), /\[MAP READY\].*12 new topics/);
+		assert.match(mapNoteText(status), /\[MAP READY\].*12 new topics.*being cut/);
+		assert.match(mapNoteText(status, true), /arcs are formed already/);
 	});
 });

@@ -199,9 +199,10 @@ export async function createLearning(chatId: string, input: NewLearning): Promis
 }
 
 /** What the setup agent reads when its course's map build ended. Pure. */
-export function mapNoteText(status: Extract<CourseMapStatus, { state: "built" | "failed" }>): string {
+export function mapNoteText(status: Extract<CourseMapStatus, { state: "built" | "failed" }>, arcsFormed = false): string {
+	const arcs = arcsFormed ? "Its arcs are formed already." : "Its arcs are being cut in the background and land by themselves.";
 	return status.state === "built"
-		? `[MAP READY] The topic map is built from the material (${status.outcome}). Its arcs are being cut in the background and land by themselves. Read the map with course_show if you need it, then write him the short summary your system prompt asks for.`
+		? `[MAP READY] The topic map is built from the material (${status.outcome}). ${arcs} Read the map with course_show if you need it, then write him the short summary your system prompt asks for.`
 		: `[MAP FAILED] The topic map could not be built: ${status.reason}. Tell him in one plain line what went wrong and what he can do; the course itself is set up.`;
 }
 
@@ -217,6 +218,6 @@ export function noteMapBuilt(workspace: string, status: Extract<CourseMapStatus,
 		if (!record || sessionModeOf(record.messages, record.kind) !== "setup") continue;
 		if (record.messages.some((m) => m.id.startsWith(MAP_NOTE))) continue;
 		console.info(`[setup ${chat.id}] its course's map ${status.state}: waking it`);
-		void deliverJobResult(newSetupNoteMessage(chat.id, `map_${status.at.replace(/\W/g, "")}`, mapNoteText(status)));
+		void deliverJobResult(newSetupNoteMessage(chat.id, `map_${status.at.replace(/\W/g, "")}`, mapNoteText(status, stores.arcPassLedgers.get(workspace)?.state === "formed")));
 	}
 }
