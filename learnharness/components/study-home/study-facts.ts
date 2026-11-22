@@ -1,4 +1,4 @@
-import { courseReviewName, isReviewSession, taskTopics, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
+import { courseReviewName, isReviewSession, lessonHereOf, taskTopics, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
 import { continueMove, sessionState, type SessionState } from "@/components/nav/session-state";
 import { SOLID, taskSessions, topicSessions } from "@/components/unit-inbox/units";
@@ -434,7 +434,9 @@ export function withLessonHere(courses: readonly StudyCourse[], chats: readonly 
 		const { workspace, topics } = course.map;
 		const newest = chats.filter((c) => c.course?.workspace === workspace && c.messageCount > 0).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
 		if (!newest || newest.kind !== "teach" || !IN_PROGRESS.has(sessionState(newest))) return course;
-		const here = topics.find((t) => (newest.ownTopics ?? []).includes(t.handle));
+		// Where its lesson's steps are, never a task's topics (round 19, M4: Problem sheet 4 moved it to Basis).
+		const at = lessonHereOf(newest);
+		const here = topics.find((t) => t.handle === at);
 		return here && here.handle !== course.map.current ? { ...course, map: { ...course.map, current: here.handle } } : course;
 	});
 }

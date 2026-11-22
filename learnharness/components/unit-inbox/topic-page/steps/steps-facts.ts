@@ -117,7 +117,7 @@ export function ringedStep(plan: SessionPlan, waits: boolean): string | null {
  *  off here" for a lesson the page resumes, else "Stopped here on 6 Nov"),
  *  only while the plan has a step still ahead: on a lesson that went
  *  through every step it would say he stopped partway. */
-export function stepMarks(plan: SessionPlan, waits: boolean, leftOff = LEFT_OFF_HERE): Map<string, StepMark> {
+export function stepMarks(plan: SessionPlan, waits: boolean, leftOff: string | null = LEFT_OFF_HERE): Map<string, StepMark> {
 	const ring = ringedStep(plan, waits);
 	const visited = new Set(plan.current && plan.current !== ring ? [...plan.visited, plan.current] : plan.visited);
 	const ahead = plan.tree.nodes.some((node) => node.id !== ring && !visited.has(node.id));

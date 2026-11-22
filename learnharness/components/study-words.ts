@@ -212,15 +212,6 @@ export function leftOffWords(days: number | null, today: string): string {
 	return `Left off ${days <= 0 ? "today" : shortDay(dayBefore(today, days))}`;
 }
 
-/** Where an old lesson's map stopped, when nothing resumes it: "Stopped
- *  here today", "Stopped here on 6 Nov"; "Left off here" is only for a
- *  lesson the page resumes (round 16, m22: the 5 and 6 Nov lessons' maps
- *  said "Left off at A worked example" with no Resume anywhere). */
-export function stoppedHereWords(days: number, today: string): string {
-	const day = pastDay(days, today);
-	return days <= 1 ? `Stopped here ${day}` : `Stopped here on ${day}`;
-}
-
 /** A review the engine has dated ahead, by its day, never a count of
  *  days (round 8: "Back in 2d" where the tutor said Tuesday 10 November):
  *  "Back Tue 10 Nov". */

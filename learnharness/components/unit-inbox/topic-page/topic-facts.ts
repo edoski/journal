@@ -2,7 +2,7 @@ import { isReviewSession, markHow, namedArc, topicOpening, type ArcHandle, type 
 import { slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, lessonBegun, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyShort, startsWhyTells, startsWhyWords, studiedDaysWords, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
-import { daysBetween, shelfOf, taskSessions, topicSessions, worksOn } from "@/components/unit-inbox/units";
+import { daysBetween, mapsOn, shelfOf, taskSessions, topicSessions, worksOn } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { continueWords } from "@/components/study-home/study-facts";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
@@ -60,6 +60,9 @@ export interface SessionEntry {
 	/** Its work is on the topic (`worksOn`), rather than only touching it:
 	 *  only such a session is the page's Now, Next or first map. */
 	own: boolean;
+	/** Its step map is the topic's (`mapsOn`): the topic its plan's steps
+	 *  are on, so only that page draws it (round 19, M4). */
+	maps: boolean;
 	state: SessionState;
 	/** The day of its last message, YYYY-MM-DD. */
 	day: string;
@@ -318,7 +321,7 @@ export function sessionEntries(sessions: readonly ChatListItem[], plans: readonl
 	return sessions.map((chat) => {
 		const local = localDay(chat.updatedAt);
 		const day = local > today ? today : local;
-		return { chat, own: worksOn(chat, handle), state: sessionState(chat), day, when: agoWords(daysBetween(day, today), today), plan: plans.find((plan) => plan.id === chat.id) ?? null };
+		return { chat, own: worksOn(chat, handle), maps: mapsOn(chat, handle), state: sessionState(chat), day, when: agoWords(daysBetween(day, today), today), plan: plans.find((plan) => plan.id === chat.id) ?? null };
 	});
 }
 

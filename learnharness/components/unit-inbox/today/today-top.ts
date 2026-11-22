@@ -3,7 +3,7 @@ import { sessionState } from "@/components/nav/session-state";
 import { lessonTitle } from "@/components/study-home/agenda-rows/row-facts";
 import type { NeedsYou, NowLine } from "@/components/study-home/needs-you";
 import { courseKey, sessionKey, topicUnit } from "@/components/unit-inbox/now-inbox";
-import { unitKey, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
+import { unitKey, worksOn, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
 
 /**
  * One card on the sidebar's top (spec:
@@ -36,7 +36,7 @@ export function claimedKeys(item: NowItem): string[] {
 }
 
 /** The topics an item's line asks of him: a session's own topics (the
- *  lesson's, a review's), never one its lesson only touched on the way
+ *  lesson's, a review's, those its open question is on), never one its lesson only touched on the way
  *  (round 14, m28: the course page's Needs you listed Random variables
  *  beside the Poisson lesson that reviewed it, which no Today line asks);
  *  every topic a course's review or start names (round 16, m5: "Review
@@ -50,8 +50,8 @@ export function askedKeys(item: NowItem): string[] {
 	}
 	if (item.kind !== "session" || !row.course) return [itemKey(item)];
 	const { workspace } = row.course.map;
-	const own = new Set<string>(item.chat.ownTopics ?? []);
-	return [itemKey(item), ...topics.filter((t) => own.has(t.handle) || t === item.line.lead).map((t) => unitKey(workspace, t.handle))];
+	// The topics its open work is on (`worksOn`), never the rest of a task it holds (round 19, M4).
+	return [itemKey(item), ...topics.filter((t) => worksOn(item.chat, t.handle) || t === item.line.lead).map((t) => unitKey(workspace, t.handle))];
 }
 
 /**

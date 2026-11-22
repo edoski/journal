@@ -88,7 +88,7 @@ describe("a review's re-teach map and what it left are its re-taught topic's alo
 	const review = closedReview("inclusion-exclusion");
 
 	it("the session list names the topic its plan re-teaches", () => {
-		assert.equal(review.retaught, "inclusion-exclusion");
+		assert.equal(review.stepsOn, "inclusion-exclusion");
 		assert.deepEqual(review.ownTopics, TOPICS, "it is still the review of all three");
 		assert.equal(review.review, true);
 	});
@@ -113,6 +113,8 @@ describe("a review's re-teach map and what it left are its re-taught topic's alo
 	});
 
 	it("a review whose plan names a topic not its own is no re-teach of one of them", () => {
-		assert.equal(closedReview("expectation").retaught, undefined);
+		const other = closedReview("expectation");
+		assert.notEqual(other.stepsOn, "inclusion-exclusion");
+		assert.ok(!(other.ownTopics ?? []).includes("inclusion-exclusion") || other.stepsOn === undefined, "it is the lesson it took up, or no one topic's");
 	});
 });

@@ -293,6 +293,23 @@ export function sinceLastClose(messages: readonly LhMessage[]): readonly LhMessa
 	return messages;
 }
 
+/** The topics the work open on him is asked on, as the tutor tagged it: an
+ *  open practice problem's `topics`, else the `topic` of the question that
+ *  waits on him or that his Done for today left (round 19, M4: Problem
+ *  sheet 4's kernel question read "Your turn" on Basis and Rank too, the
+ *  9 Nov review's urn question "Left off" on Random variables). Empty when
+ *  nothing is open or the tutor tagged no topic. Pure. */
+export function openWorkTopicsOf(messages: readonly LhMessage[]): string[] {
+	const problem = activeProblemOf(messages);
+	const listed = (value: unknown) => (Array.isArray(value) ? value.filter((t): t is string => typeof t === "string" && t.trim() !== "") : []);
+	if (problem) return listed((problem.input as { topics?: unknown } | null)?.topics);
+	const left = leftQuestionRepose(messages)[0];
+	const call = left?.role === "assistant" ? left.content.find((block) => block.type === "toolCall") : undefined;
+	const input = danglingQuestionOf(messages)?.input ?? (call?.type === "toolCall" ? call.arguments : undefined);
+	const topic = (input as { topic?: unknown } | null | undefined)?.topic;
+	return typeof topic === "string" && topic.trim() ? [topic.trim()] : [];
+}
+
 function isDoneTonight(m: LhMessage): boolean {
 	return m.role === "custom" && m.customType === "done-tonight";
 }

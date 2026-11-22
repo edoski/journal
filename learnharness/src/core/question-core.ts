@@ -172,6 +172,13 @@ export const explainInputBase = Type.Object({
 			"text — never revise the commitment after seeing his words, and never mark a wrong answer right to be kind. " +
 			"It is shown to him on submit; your next reply grades the nuance of what he wrote.",
 	}),
+	topic: Type.Optional(
+		Type.String({
+			description:
+				"In a course session, the handle of the course topic this question is asked on, as course_save's observations name it " +
+				"(the topic his answer will be saved on). The app marks that topic alone as waiting on him: \"Your turn\", or \"Left off\" once he stops.",
+		}),
+	),
 });
 
 /** The guess's own rule where the teach question is written (round 12,

@@ -14,6 +14,7 @@ import type { SessionEntry } from "../components/unit-inbox/topic-page/topic-fac
 const entry = (id: string, updatedAt: string, state: SessionEntry["state"] = "finished"): SessionEntry => ({
 	chat: { id, title: id, kind: "teach", createdAt: updatedAt, updatedAt, messageCount: 4, phase: "teach", pendingQuestion: false, pendingProblem: false, busy: false } as ChatListItem,
 	own: true,
+	maps: true,
 	state,
 	day: updatedAt.slice(0, 10),
 	when: updatedAt.slice(0, 10),

@@ -76,9 +76,10 @@ export function slotWords(why: Why | null, lead: CourseMapTopic | null, title?: 
 
 /**
  * The topic a line's reason is about, so a card titled by it and its
- * reason name the same topic: a session's own topic, the one it belongs
- * to, fixed for its life (none when it has none on the map), never the
- * topic its lesson is on now; a lapse's lapsed topic; an open task's
+ * reason name the same topic: for a session, of the topics it belongs
+ * to, the one its open question or problem is on, else the one its plan's
+ * steps are on (`stepsOn`), else its first (none when it has none on the
+ * map), never a step's name; a lapse's lapsed topic; an open task's
  * current topic when the task holds it, else none, since the record does
  * not say which of its topics the task is at (round 5: "Continue Problem
  * sheet 4" opened the Basis page, its first topic); else the line's
@@ -86,8 +87,10 @@ export function slotWords(why: Why | null, lead: CourseMapTopic | null, title?: 
  */
 export function leadOf(row: TodayRow, topics: readonly CourseMapTopic[], why: Why | null): CourseMapTopic | null {
 	if (row.kind === "session") {
-		const [own] = row.chat.ownTopics ?? [];
-		return topics.find((t) => t.handle === own) ?? null;
+		// The topic its open work is on, else its steps', before the first it belongs to (round 19, M4: sheet 4's
+		// kernel question led with Rank, the task's first topic).
+		const [first] = [...(row.chat.openOn ?? []), ...(row.chat.stepsOn ? [row.chat.stepsOn] : []), ...(row.chat.ownTopics ?? [])];
+		return topics.find((t) => t.handle === first) ?? null;
 	}
 	if (why?.kind === "missed") {
 		const held = new Set(topics.map((t) => t.handle));

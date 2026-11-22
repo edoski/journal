@@ -147,7 +147,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 				return { ...base, icon: action.task ? "task" : "standing", words: action.task?.title ?? sessionName(action.chat, facts), note: action.task?.step ?? (entry ? leftDayWords(entry.day, facts.today) : null), chat: action.chat.id, href: continueHref(action.chat) };
 			}
 			if (action.task) return { ...base, icon: "task", words: action.task.title, note: action.task.step };
-			const last = facts.sessions.find((entry) => entry.own && isPlanned(entry));
+			const last = facts.sessions.find((entry) => entry.maps && isPlanned(entry));
 			return last
 				? { ...base, icon: "standing", words: sessionName(last.chat, facts), note: leftDayWords(last.day, facts.today) }
 				: { ...base, icon: "standing", words: "Next lesson" };

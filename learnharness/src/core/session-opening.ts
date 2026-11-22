@@ -122,18 +122,36 @@ export function reviewRecord(record: { title: string; topics?: readonly string[]
 	return lessonTakenUp(record) === null && (openedAsReview(record) || isReviewSession(record));
 }
 
-/** The one of a review's topics its plan re-teaches: the topic its newest
- *  plan names, when that is one of the review's own, so its map and its
- *  open question are that topic's alone (round 18, M2: the Probability
- *  review re-taught Inclusion-exclusion, and Random variables' and
- *  Binomial's pages drew its map and read "Left off 8 Nov"). Null for a
- *  session not a review, a review of one topic, or one whose plan names
- *  none. Pure. */
-export function retaughtTopicOf(record: { title: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): string | null {
+/** The topic a session's plan steps are on: its step map is that topic's
+ *  alone, and a question of its lesson with no topic of its own is open
+ *  on it. The topic its newest plan names (`goal.topic`) when the session
+ *  belongs to it (`own`); else a review of one topic, that topic, and a
+ *  review of several, none; else the first topic it was opened on that it
+ *  belongs to, or its one topic. Null for a session that belongs to no
+ *  topic yet (round 18, M2: the Probability review re-taught
+ *  Inclusion-exclusion, and Random variables' and Binomial's pages drew
+ *  its map; round 19, M4: the 5 Nov lesson opened on Random variables and
+ *  Binomial drew its map, all on Random variables, on both pages). Pure. */
+export function stepsOnOf(record: { title: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }, own: readonly string[]): string | null {
+	const planned = plannedTopicsOf(record.messages as readonly LhMessage[]).at(-1);
+	if (planned && own.includes(planned)) return planned;
 	const opened = record.topics ?? [];
-	if (opened.length < 2 || !reviewRecord(record)) return null;
-	const topic = plannedTopicsOf(record.messages as readonly LhMessage[]).at(-1);
-	return topic && opened.includes(topic) ? topic : null;
+	if (reviewRecord(record)) return opened.length === 1 && own.includes(opened[0]!) ? opened[0]! : null;
+	return opened.find((topic) => own.includes(topic)) ?? (own.length === 1 ? own[0]! : null);
+}
+
+/** Where a session in progress puts You are here: the topic its steps are
+ *  on (`stepsOn`), unless its work is a task that holds more than that
+ *  topic, a problem sheet, which is his work and not a lesson, so it
+ *  moves nothing (round 19, M4: Continue on Problem sheet 4, whose task
+ *  holds Rank, Basis and Kernel, moved You are here from Eigen to Basis).
+ *  Null when it places nothing. Pure. */
+export function lessonHereOf(chat: { stepsOn?: string; tasks?: readonly string[]; ownTopics?: readonly string[] }): string | null {
+	const own = chat.ownTopics ?? [];
+	// A summary made elsewhere may leave `stepsOn` out: a session of one topic is on that one.
+	const stepsOn = chat.stepsOn ?? (own.length === 1 ? own[0]! : null);
+	if (!stepsOn) return null;
+	return (chat.tasks ?? []).length === 0 || own.every((topic) => topic === stepsOn) ? stepsOn : null;
 }
 
 /** The topics a session teaches as its lesson: the topics a session not a

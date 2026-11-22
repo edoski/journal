@@ -1,7 +1,5 @@
 import type { SessionPlan } from "@/src/core";
 import { LEFT_OFF_HERE, stepMarks, type StepMark } from "@/components/unit-inbox/topic-page/steps/steps-facts";
-import { stoppedHereWords } from "@/components/study-words";
-import { daysBetween } from "@/components/unit-inbox/units";
 import { roadmapSteps } from "@/components/lesson/roadmap-facts";
 import type { SessionEntry, TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 
@@ -27,19 +25,20 @@ export const isPlanned = (entry: SessionEntry): entry is PlannedEntry => new Set
  *  its map only when he picks it (round 7: Kernel's page drew the Eigen
  *  lesson's map). */
 export function mapLessonAtFirst(sessions: readonly SessionEntry[], action: TopicAction): string | null {
-	const planned = sessions.filter((entry) => entry.own && isPlanned(entry));
+	const planned = sessions.filter((entry) => entry.maps && isPlanned(entry));
 	const opens = "chat" in action ? planned.find((entry) => entry.chat.id === action.chat.id) : undefined;
 	return (opens ?? planned[0])?.chat.id ?? null;
 }
 
 /** The words over the step a lesson stopped on: "Left off here" when the
- *  page's action resumes that lesson where it stopped, else the day it
- *  stopped, "Stopped here on 6 Nov" (round 16, m22: the 5 and 6 Nov
- *  lessons' maps said "Left off at A worked example" while Now resumed
- *  nothing of them, or continued a task at part (c), elsewhere). */
-export function mapLeftOff(entry: SessionEntry, action: TopicAction, today: string): string {
+ *  page's action resumes that lesson where it stopped, else none, so the
+ *  map shows the steps it taught and names no place to stop or go next
+ *  beside a page with nothing to resume (round 16, m22: "Left off at A
+ *  worked example" while Now resumed nothing; round 19, M4: "Stopped here
+ *  on 5 Nov … Next: One on your own" beside "Nothing due today"). */
+export function mapLeftOff(entry: SessionEntry, action: TopicAction): string | null {
 	const resumes = (action.kind === "resume" || action.kind === "open") && action.chat.id === entry.chat.id;
-	return resumes ? LEFT_OFF_HERE : stoppedHereWords(daysBetween(entry.day, today), today);
+	return resumes ? LEFT_OFF_HERE : null;
 }
 
 /** The step after the one the lesson stopped on, as the lesson's ⌘K
@@ -60,8 +59,10 @@ export function nextSteps(plan: SessionPlan): Set<string> {
 /** Each step's mark: the steps tab's marks (the step it stopped on, the
  *  steps earlier questions were about), with "Next" over the step after
  *  the one it stopped on (`nextSteps`). */
-export function hybridMarks(plan: SessionPlan, waits: boolean, leftOff?: string): Map<string, StepMark> {
+export function hybridMarks(plan: SessionPlan, waits: boolean, leftOff: string | null = LEFT_OFF_HERE): Map<string, StepMark> {
 	const marks = stepMarks(plan, waits, leftOff);
+	// Nothing resumes it and nothing waits: no step is his to go on to.
+	if (leftOff === null && !waits) return marks;
 	for (const id of nextSteps(plan)) {
 		const mark = marks.get(id);
 		if (mark) marks.set(id, { ...mark, tag: "Next" });

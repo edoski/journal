@@ -114,7 +114,7 @@ const surface = {
 	topicScheduled: (day: string) => render(<ScheduledEntry kind="start" day={day} waits={null} />).querySelector('[data-slot="pickup-scheduled"]'),
 	topicSession(id: string) {
 		const c = CHATS.find((x) => x.id === id)!;
-		const entry: SessionEntry = { chat: c, own: true, state: sessionState(c), day: TODAY, when: "Today", plan: null };
+		const entry: SessionEntry = { chat: c, own: true, maps: true, state: sessionState(c), day: TODAY, when: "Today", plan: null };
 		return render(<SessionItem entry={entry} shown={false} onShow={() => {}} ends={{ above: false, below: false }} />).querySelector('[data-slot="topic-why"]');
 	},
 	calendar(kind: "session" | "task" | "new") {
