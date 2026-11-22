@@ -873,14 +873,13 @@ export const READY_FACT_WORDS = {
 /** An arc not started whose topics the plan gives no day yet, on the road's line. */
 export const ARC_NOT_PLANNED = "Not planned yet";
 
-/** An arc under way, when the plan starts its next topic, on the road's line: "Planned 10 Dec". */
-export function arcPlannedWords(day: string): string {
-	return `Planned ${shortDay(day)}`;
-}
-
-/** When an arc's first new topic starts, on the road's line: "Starts 15 Nov". */
-export function arcStartsWords(day: string): string {
-	return `Starts ${shortDay(day)}`;
+/** When the plan starts an arc's next new topic, on the road's line, in
+ *  the word a topic's row, Home and the calendar use for a planned start:
+ *  "Planned today", "Planned 10 Dec". One word whether the arc is under way
+ *  or not started (round 19, m8: arc 6 read "Starts 18 Nov" beside arc 7's
+ *  "Planned 18 Nov" for the same fact). */
+export function arcPlannedWords(day: string, today: string): string {
+	return day <= today ? "Planned today" : `Planned ${shortDay(day)}`;
 }
 
 /** A course without arcs, not ready: the topics not yet solid, else those
