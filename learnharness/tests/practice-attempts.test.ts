@@ -3,12 +3,12 @@ import { describe, it } from "node:test";
 import { conclusionProblem, practiceObservations, type PracticeConclusion } from "../src/core/practice-attempts.ts";
 
 const POSE = { statement: "Is $x \\mapsto 2x$ linear?", topics: ["linearity"] };
-const base: PracticeConclusion = { outcome: "solved", rung: null, result: "correct", response: "Yes, additive and homogeneous" };
+const base: PracticeConclusion = { outcome: "solved", rung: null, result: "correct", response: "Yes, additive and homogeneous", record: "Showed the map is additive and homogeneous" };
 
 describe("a concluded practice problem as engine observations", () => {
 	it("solved without hints is one unaided attempt", () => {
 		assert.deepEqual(practiceObservations(POSE, base, undefined), [
-			{ topics: ["linearity"], text: POSE.statement, response: "Yes, additive and homogeneous", help: "none", result: "correct" },
+			{ topics: ["linearity"], text: "Showed the map is additive and homogeneous", response: "Yes, additive and homogeneous", help: "none", result: "correct" },
 		]);
 	});
 
@@ -151,7 +151,7 @@ describe("conclude records the attempt, and never locks the session", async () =
 		{ id: "r1", role: "toolResult", toolCallId: "p1", toolName: "problem", content: [{ type: "text", text: "posed" }], isError: false, timestamp: 2 },
 	];
 	const chatStore = { getChat: () => ({ messages }) } as never;
-	const conclusion = { outcome: "solved", verdict: "ok", rung: null, missClass: null, retest: false, result: "correct", response: "1" };
+	const conclusion = { outcome: "solved", verdict: "ok", rung: null, missClass: null, retest: false, result: "correct", response: "1", record: "Found the rank as 1" };
 
 	it("a refused save still concludes, and hands the observations back for course_save", async () => {
 		const records = { list: async () => ({ available: true, courses: [], roots: [] }), run: async () => ({ ok: false, kind: "validation", message: 'unknown topic "fresh-topic"' }) };

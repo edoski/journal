@@ -13,10 +13,10 @@ import { practiceObservations, recordLineProblem, type PracticeConclusion } from
 
 const statement = "In $\\mathbb{R}^3$, let $u = (1,0,2)$, $v = (0,1,1)$ and $w_k = (2,3,k)$. For which value of $k$ is the set $\\{u, v, w_k\\}$ linearly dependent, and why?";
 const pose = { statement, topics: ["independence"] };
-const lens = { outcome: "solvedWithHints", rung: "R1", result: "correct", response: "k = 7", firstTry: { result: "incorrect", response: "k = 5", sure: "confident" } } as PracticeConclusion;
+const lens = { outcome: "solvedWithHints", rung: "R1", result: "correct", response: "k = 7", record: "Found $k = 7$ from the third entries after the nudge", firstTry: { result: "incorrect", response: "k = 5", sure: "confident" } } as PracticeConclusion;
 
 test("a not-right answer with no line of its own is refused, and a line that is the problem too", () => {
-	assert.match(recordLineProblem(lens, statement) ?? "", /^firstTry\.record: a not-right answer's record says what he did/);
+	assert.match(recordLineProblem(lens, statement) ?? "", /^firstTry\.record: an answer's record says what he did/);
 	assert.match(recordLineProblem({ ...lens, firstTry: { ...lens.firstTry!, record: ` ${statement}` } }, statement) ?? "", /^firstTry\.record/);
 	assert.match(recordLineProblem({ outcome: "movedOn", rung: null, result: "partial", response: "k = 5" }, statement) ?? "", /^record:/);
 });
@@ -24,8 +24,10 @@ test("a not-right answer with no line of its own is refused, and a line that is 
 test("the conclusion it asks for saves what he did, and no observation's text is the problem", () => {
 	const fixed = { ...lens, firstTry: { ...lens.firstTry!, record: "Took the third entry of $v$ as $0$ and got $k = 5$" } } as PracticeConclusion;
 	assert.equal(recordLineProblem(fixed, statement), null);
-	assert.equal(recordLineProblem({ ...lens, firstTry: undefined }, statement), null, "a right answer may read as the problem");
+	assert.equal(recordLineProblem({ ...lens, firstTry: undefined }, statement), null);
+	// Round 19, m3: a right answer's line says what he did too.
+	assert.match(recordLineProblem({ ...lens, record: statement, firstTry: undefined }, statement) ?? "", /^record:/);
 	const observations = practiceObservations(pose, fixed, "neutral");
-	assert.ok(observations.filter((o) => o.result !== "correct").every((o) => o.text !== statement), JSON.stringify(observations));
+	assert.ok(observations.every((o) => o.text !== statement), JSON.stringify(observations));
 	assert.equal(observations[0]!.text, "Took the third entry of $v$ as $0$ and got $k = 5$");
 });

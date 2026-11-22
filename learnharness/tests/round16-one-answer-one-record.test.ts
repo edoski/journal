@@ -47,7 +47,7 @@ async function concluded(messages: LhMessage[], input: Record<string, unknown>):
 	};
 	const store = { chatId: "c", chatStore: { getChat: () => ({ messages }) } };
 	const tool = concludeTool(createPracticeGate(store), { ctx: store, course });
-	const result = await tool.execute("c_rank", input as never);
+	const result = await tool.execute("c_rank", { record: "Found the rank from the pivots", ...input } as never);
 	assert.ok(!(result.details as { invalid?: unknown } | null)?.invalid, JSON.stringify(result.content));
 	assert.equal(written.length, 1, "one save");
 	return written[0]!.observations;

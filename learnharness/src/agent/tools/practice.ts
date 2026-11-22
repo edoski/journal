@@ -31,13 +31,13 @@ import { studyDay, withDayWords } from "../../core/day-words.ts";
 import type { LhMarkerMessage } from "../../core/native-messages.ts";
 import { CONCLUDE_ACK_TEXT } from "../../core/contracts/chat.ts";
 import { CONFIDENCE_STATES } from "../../core/contracts/course.ts";
-import { conclusionProblem, practiceObservations, recordLineProblem, type PracticeConclusion } from "../../core/practice-attempts.ts";
+import { concludedSavesOf, conclusionProblem, practiceObservations, recordLineProblem, type PracticeConclusion } from "../../core/practice-attempts.ts";
 
 
 /** The record-reading context the gates need (the plan-tools idiom). */
 export interface PracticeToolContext {
 	chatId: string;
-	chatStore: { getChat(id: string): { messages: LhMessage[]; kind?: string } | null } & Partial<Pick<ChatStore, "nameSession">>;
+	chatStore: { getChat(id: string): { messages: LhMessage[]; kind?: string; answerSaves?: Readonly<Record<string, readonly string[]>> } | null } & Partial<Pick<ChatStore, "nameSession">>;
 	/** THE RARELY-NEEDED SET (owner round 10, 2026-10-05): the research +
 	 *  pdf jobs (both keyless). Absent (tests) = absent from the registry. */
 	jobs?: JobToolContext;
@@ -154,7 +154,7 @@ function partsField() {
  *  line his topic's history reads for the answer (round 11, 2 n5: the
  *  history showed the whole problem, and a first try as "First try"). */
 const RECORD_DESCRIPTION =
-	"What he did on this answer, as one short line for his course record in the words a lesson save uses, with math in `$…$` LaTeX: what he got right or where it broke (\"Subtracted the rank from the rows instead of the columns\"), never the problem's statement. His topic's history reads it. Required when the answer is not right.";
+	"What he did on this answer, as one short line for his course record in the words a lesson save uses, with math in `$…$` LaTeX: what he got right or where it broke (\"Subtracted the rank from the rows instead of the columns\", \"Found both eigenvalues from the trace and determinant\"), never the problem's statement. His topic's history reads it. Required for every answer, a right one included.";
 
 export const concludeInputObject = Type.Object({
 	outcome: Type.Union(
@@ -255,6 +255,20 @@ function answersOn(messages: readonly LhMessage[], problemCallId: string): numbe
 	}).length;
 }
 
+/** What the tutor reads when the problem's answer was saved before the app
+ *  restarted: the receipt that follows is that save's. */
+const ALREADY_SAVED =
+	"This problem's answer was already marked and saved before the app restarted, so nothing new is saved and the problem is closed. Tell him in plain words how his answer was marked, from this receipt, and answer what his newest message asks; never grade it again.";
+
+/** Keep a problem's saved attempts under the call that posed it, the moment
+ *  the engine takes them (concludedSavesOf). */
+function keepUnderPose(rec: ConcludeRecording, poseCallId: string, json: unknown): void {
+	const saved = (json as { saved?: unknown } | null)?.saved;
+	if (!Array.isArray(saved)) return;
+	const links = saved.filter((id): id is string => typeof id === "string").map((observation) => ({ question: poseCallId, observation }));
+	if (links.length > 0) rec.course.onSaved?.(links);
+}
+
 /** Save a concluded problem's attempts; a refusal names what to fix. An
  *  attempt the record would not take is kept as `unsaved`, the conclude's
  *  own observations, which a later save writes as they are. */
@@ -268,6 +282,10 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 	if (!record || !active || !pose) {
 		return { text: "The attempt could not be recorded: the posed problem was not found in the session record." };
 	}
+	// Saved already, by a turn a restart cut short before its transcript was
+	// written: nothing is saved twice (round 19, M3).
+	const kept = concludedSavesOf(record, active.toolCallId);
+	if (kept.length > 0) return { text: `${ALREADY_SAVED} Course record: ${JSON.stringify({ saved: kept })}` };
 	const topics = pose.topics;
 	if (explainedBeforeAnyWork(record.messages, active.toolCallId)) {
 		return { text: "No attempt recorded: he asked to be taught before submitting any work on this problem." };
@@ -311,7 +329,10 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 	// answer repeats what he saw (shown-help.ts).
 	const seen = seenBeforeAsked(record.messages, active.toolCallId);
 	const saved = await saveCourse(rec.course, { observations }, { id: concludeCallId, seen });
-	if (saved.ok) return { text: `Course record: ${JSON.stringify(withDayWords(saved.json, studyDay()))}` };
+	if (saved.ok) {
+		keepUnderPose(rec, active.toolCallId, saved.json);
+		return { text: `Course record: ${JSON.stringify(withDayWords(saved.json, studyDay()))}` };
+	}
 	// The problem still concludes: a pose's topics cannot change after the
 	// fact, so holding the problem open would lock the session.
 	const repair =
