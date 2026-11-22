@@ -60,6 +60,13 @@ export async function startShell({ entry = "tests/helpers/app-shell-page.tsx", r
 	const server: Server = createServer((req, res) => {
 		const path = new URL(req.url ?? "/", "http://x").pathname;
 		const [type, body] = path === "/" ? ["text/html", html] : path === "/shell.js" ? ["text/javascript", js] : path === "/shell.css" ? ["text/css", css] : [null, null];
+		// KaTeX's sheet asks for its fonts beside it (`fonts/…`), as the app's bundled sheet serves them, so a formula is
+		// measured in its own glyphs, not a fallback's.
+		const font = /^\/fonts\/(KaTeX_[\w-]+\.woff2)$/.exec(path)?.[1];
+		if (type === null && font && sheets.some((sheet) => sheet.includes("katex"))) {
+			res.writeHead(200, { "content-type": "font/woff2" }).end(readFileSync(`${root}node_modules/katex/dist/fonts/${font}`));
+			return;
+		}
 		if (type === null) {
 			// The sidebar's reads: no server, so each fails as an offline app's would.
 			res.writeHead(404).end();
