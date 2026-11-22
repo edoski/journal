@@ -159,7 +159,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// a turn end he never saw.
 	// Round 18, m13: "marking them as solved 'with the hint' was my error",
 	// a slip of its own he never saw, told instead of the next problem.
-	{ rule: "own-words", re: /\bmy (?:error|mistake|slip|fault|oversight)s?\b|\bI (?:made|have made) (?:an error|a mistake|a slip|two mistakes)\b|\b(?:mistakes|errors|slips) of mine\b|\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b|\b(?:a )?correction to what I (?:said|wrote|told you)\b|\b(?:correcting|to correct) what I (?:said|wrote)\b|\bwhat I (?:said|wrote|told you) (?:earlier|before|above)\b/i },
+	// Round 19, m19 (4 minor 4): "I was wrong earlier to say your review
+	// days don't fit the date", about nothing he was ever shown.
+	{ rule: "own-words", re: /\bI was (?:wrong|mistaken|incorrect)\b|\bmy (?:error|mistake|slip|fault|oversight)s?\b|\bI (?:made|have made) (?:an error|a mistake|a slip|two mistakes)\b|\b(?:mistakes|errors|slips) of mine\b|\bmy (?:earlier|last|previous|first|own) (?:line|message|words?|wording|reply|sentence|note|remark)\b|\bI (?:was wrong to (?:say|write|call)|wrongly (?:said|wrote|called)|misspoke|should(?: not|n't) have (?:said|written|called))\b|\b(?:a )?correction to what I (?:said|wrote|told you)\b|\b(?:correcting|to correct) what I (?:said|wrote)\b|\bwhat I (?:said|wrote|told you) (?:earlier|before|above)\b/i },
 	// A slip caught mid-sentence and left in for him to read: one clean
 	// statement says it (round 19, m17: "…write each one as a(1,1)+b(−1,1)...
 	// rather, as a(1,1)+b(1,−1).", in a posed question, and again word for
