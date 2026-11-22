@@ -59,6 +59,9 @@ export interface TopicMapState {
 	/** Shows another arc of the course on this map, for a card's "From <arc>" line; unset where a page has no arc to
 	 *  show. */
 	openArc?: (arc: ArcHandle) => void;
+	/** How far the frame's fade reaches in, in screen pixels (`MAP_FADE`): a card wholly under it is out of view, and
+	 *  its lines go with it (canvas.md, Lines); unset, the frame has none. */
+	fade?: { x: number; y: number };
 }
 
 export const TopicMapContext = createContext<TopicMapState | null>(null);
