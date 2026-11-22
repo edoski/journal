@@ -40,7 +40,8 @@ const { PRODUCT_NAME, nameApp } = require("./product.cjs");
 // "LearnHarness" (DATA_FOLDER) in dev AND packaged, so the rename moved no
 // data. Must run before the LH_DEV_URL suffix below — dev becomes
 // "LearnHarness-dev".
-nameApp(app, process.env);
+// The packaged app ignores LH_USER_DATA_DIR, the launcher's test override.
+nameApp(app, app.isPackaged ? {} : process.env);
 const DATA_DIR = () => path.join(app.getPath("userData"), "data");
 
 /** The packaged standalone server (extraResources → Resources/server).

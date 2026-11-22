@@ -66,7 +66,7 @@ npm test           # deterministic, no LLM, no network
 
 ### Open it from Spotlight
 
-`scripts/launcher/install.sh` builds `~/Applications/Chiron.app` (run it once; the name comes from `electron/product.cjs`). When main renames the app, the next launch rebuilds the .app under the new name and removes the old one. The folders below keep the app's first name, LearnHarness, so a rename moves no data. Opening it runs the app in dev mode from the repository's main checkout:
+`scripts/launcher/install.sh` builds `~/Applications/Chiron.app` (run it once; the name comes from `electron/product.cjs`). When main renames the app, the launch after the one that pulled the rename rebuilds the .app under the new name, opens it and removes the old copy. The folders below keep the app's first name, LearnHarness, so a rename moves no data. Opening it runs the app in dev mode from the repository's main checkout:
 
 - **Always on the latest main.** A checkout on `main` with no tracked changes runs `git fetch origin main` and `git merge --ff-only origin/main`, then `npm ci` if `package-lock.json` changed. Any other checkout opens as it is, with one notification saying why it wasn't updated.
 - **Live.** `next dev` runs on 127.0.0.1:4747 and the window reloads on every change to pages, server routes and the engine. A change to `electron/` needs a relaunch.

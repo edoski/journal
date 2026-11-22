@@ -4,7 +4,7 @@ This fork has no update feed and no in-app updater. `electron-builder.yml` sets 
 
 ## Platform
 
-LearnHarness is Mac only: a signed, notarized Apple Silicon DMG. The custom app bar keeps the macOS traffic lights on its left, and the app keeps the system menu.
+The app is Mac only: a signed, notarized Apple Silicon DMG. Its visible name is Chiron (`productName`); the bundle id and the data folder keep LearnHarness. A build from before the rename installed `/Applications/LearnHarness.app`: dragging in `Chiron.app` leaves it beside the new one, so delete the old one by hand. The custom app bar keeps the macOS traffic lights on its left, and the app keeps the system menu.
 
 The icon (2026-10-13) is the Icon Composer document `build/icon.icon`, which actool compiles into `Assets.car` (macOS 26 Liquid Glass) plus a fallback icns that `scripts/after-pack.cjs` replaces with the hand-packed full-res `build/icon.icns` (actool's caps at 256px). Building it needs **macOS 26+ and Xcode 26+** (`actool`): Xcode 26's asset compiler crashes on macOS 15 because its host frameworks lack required symbols. `desktop:dist` injects `DEVELOPER_DIR` locally. The older-OS fallback icon remains included.
 

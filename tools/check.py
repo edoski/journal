@@ -16,6 +16,7 @@ ENGINE_CONTRACT_TESTS = (
     "tests/course-brief.test.ts",
     "tests/course-records.test.ts",
     "tests/engine-doctrine.test.ts",
+    "tests/visible-name.test.ts",
 )
 
 

@@ -14,6 +14,7 @@ const { createHash, randomBytes } = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { removeRenamedBundles } = require("./bundles.cjs");
 const { updateCheckout } = require("./update.cjs");
 const product = require.resolve("../../electron/product.cjs");
 const serverReady = require.resolve("../../electron/server-ready.cjs");
@@ -50,8 +51,11 @@ function launch({ checkout, bundle }) {
 		if (!fs.existsSync(path.join(appDir, "node_modules", "electron", "path.txt"))) {
 			run("node", ["node_modules/electron/install.js"], appDir, env, log);
 		}
-		if (bundle && reinstallStaleBundle({ appDir, checkout, bundle, env, log })) return;
-		if (bundle) removeRenamedBundles(bundle, log);
+		// The update may have renamed the app: the .app follows the name it brought.
+		delete require.cache[product];
+		const { PRODUCT_NAME: name } = require(product);
+		if (bundle && reinstallStaleBundle({ appDir, checkout, bundle, name, env, log })) return;
+		if (bundle) removeRenamedBundles(bundle, name, log);
 
 		const url = `http://127.0.0.1:${PORT}`;
 		const pidFile = path.join(LOG_DIR, `next-dev-${PORT}.pid`);
@@ -131,32 +135,15 @@ function installPackagesIfStale(appDir, env, log) {
 /** The .app carries its own copy of Electron and the app's name. When main
  *  moved to another Electron version or renamed the app, rebuild the .app
  *  from the checkout and open the new one. */
-function reinstallStaleBundle({ appDir, checkout, bundle, env, log }) {
+function reinstallStaleBundle({ appDir, checkout, bundle, name, env, log }) {
 	const wanted = JSON.parse(fs.readFileSync(path.join(appDir, "node_modules", "electron", "package.json"), "utf8")).version;
-	const named = `${PRODUCT_NAME}.app`;
+	const named = `${name}.app`;
 	if ((wanted === process.versions.electron && path.basename(bundle) === named) || process.argv.includes("--lh-reinstalled")) return false;
 	log(`${path.basename(bundle)} on Electron ${process.versions.electron} -> ${named} on ${wanted}: reinstalling`);
 	run("/bin/bash", [path.join(appDir, "scripts", "launcher", "install.sh"), "--checkout", checkout, "--dest", path.dirname(bundle)], appDir, env, log);
 	app.relaunch({ execPath: path.join(path.dirname(bundle), named, "Contents", "MacOS", "Electron"), args: [...process.argv.slice(1), "--lh-reinstalled"] });
 	app.exit(0);
 	return true;
-}
-
-/** A rename leaves the .app under its old name beside this one, both found by
- *  Spotlight: remove every other copy of this launcher (same bundle id) from
- *  its folder. Runs from the new .app, once the old one has quit. */
-function removeRenamedBundles(bundle, log) {
-	const id = (copy) => spawnSync("/usr/libexec/PlistBuddy", ["-c", "Print :CFBundleIdentifier", path.join(copy, "Contents", "Info.plist")], { encoding: "utf8" }).stdout?.trim();
-	const own = id(bundle);
-	if (!own) return;
-	const folder = path.dirname(bundle);
-	for (const entry of fs.readdirSync(folder)) {
-		const other = path.join(folder, entry);
-		// Only a launcher carries checkout.json: other apps are never read.
-		if (other === bundle || !fs.existsSync(path.join(other, "Contents", "Resources", "app", "checkout.json")) || id(other) !== own) continue;
-		log(`removing the launcher's old copy: ${other}`);
-		fs.rmSync(other, { recursive: true, force: true });
-	}
 }
 
 function startServer({ appDir, env, pidFile, log }) {

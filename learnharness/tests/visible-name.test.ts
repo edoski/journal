@@ -49,13 +49,13 @@ describe("the app's visible name", () => {
 	it("is Chiron on the Mac: app menu, Dock, Spotlight, DMG", () => {
 		assert.equal(PRODUCT_NAME, "Chiron");
 		const builder = fs.readFileSync(path.join(root, "electron-builder.yml"), "utf8");
-		assert.match(builder, /^productName: Chiron$/m);
+		assert.equal(/^productName: (.+)$/m.exec(builder)?.[1], PRODUCT_NAME);
 		assert.match(builder, /^ {2}title: "\$\{productName\} \$\{version\}"$/m);
 		// The Spotlight launcher's .app takes its name from this line of install.sh.
 		const line = fs.readFileSync(path.join(root, "scripts/launcher/install.sh"), "utf8").split("\n").find((l) => l.startsWith('name="$('));
 		assert.ok(line);
 		const name = execFileSync("bash", ["-c", `${line}\nprintf %s "$name"`], { env: { ...process.env, app_src: root }, encoding: "utf8" });
-		assert.equal(name, "Chiron");
+		assert.equal(name, PRODUCT_NAME);
 	});
 
 	it("names the app Chiron and keeps its data in the old folder", () => {
@@ -66,7 +66,7 @@ describe("the app's visible name", () => {
 			setPath: (which: string, where: string) => void (calls[which] = where),
 		};
 		nameApp(app, {});
-		assert.deepEqual(calls, { name: "Chiron", userData: "/Users/x/Library/Application Support/LearnHarness" });
+		assert.deepEqual(calls, { name: PRODUCT_NAME, userData: "/Users/x/Library/Application Support/LearnHarness" });
 		assert.equal(DATA_FOLDER, "LearnHarness");
 		nameApp(app, { LH_USER_DATA_DIR: "/tmp/fixture-user-data" });
 		assert.equal(calls.userData, "/tmp/fixture-user-data");

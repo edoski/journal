@@ -8,7 +8,8 @@
 #
 # --checkout defaults to the repository's main checkout (not a worktree);
 # --dest to ~/Applications. Rerun it only when this script or app/ changes:
-# the launcher reinstalls the .app itself when main moves to a new Electron.
+# the launcher reinstalls the .app itself when main moves to a new Electron
+# or renames the app.
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"

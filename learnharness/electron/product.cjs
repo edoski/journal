@@ -1,5 +1,7 @@
-// The app's name, the one constant a rename changes: the shell names its menu
-// with it, and scripts/launcher/install.sh its .app.
+// The app's name: the shell names its menu and notifications with it, and
+// scripts/launcher/install.sh its .app. A rename also changes productName in
+// electron-builder.yml and the pages' own words; tests/visible-name.test.ts
+// fails on any place still showing the old name.
 // DATA_FOLDER is the app's first name and stays: it names the folders that
 // hold his data, preferences and logs (Application Support, Logs), so a
 // rename moves nothing on disk.
