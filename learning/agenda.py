@@ -1018,9 +1018,7 @@ def _kept_reviews(
                 moved += 1
                 taken += 1
             continue
-        ahead = (
-            len(kept) if told.yields else sum(other < key for other in kept)
-        ) + moved
+        ahead = sum(other < key for other in kept) + moved
         final = owner.final(topic, day)
         if week.studies(day) and ahead < room and (not final or quota[name] > 0):
             chosen[name].append(topic)
@@ -1558,9 +1556,6 @@ class _Told:
     touched: Mapping[str, set[str]]
     on: date
     morning: Plan | None
-    yields: bool = False
-    """A night's step: what it moves takes only the room the days he was
-    told leave, so what he left never stacks a day past his limit."""
 
     def kept(self, name: str, day: date, kind: str) -> list[str]:
         """The ``kind`` items the plan before put on ``day``, of topics the
@@ -1728,10 +1723,16 @@ def replay(
 
     A day begins from the plan as the last day he studied ended: the night
     moves nothing but what that plan left on its day, an item he neither
-    answered nor started, and that takes the room the days he was told
-    leave, so a finished day's days all hold (round 10: one moved 19 dates
-    overnight); and what it put on a day his week no longer studies, since
-    nothing lands on one. A day counts as unfinished only when it left such an item:
+    answered nor started, so a finished day's days all hold (round 10: one
+    moved 19 dates overnight), and what it moves takes its place among the
+    days he was told as a save's step does: a review he left goes ahead of
+    the told reviews it ranks before, and a start that waits on what he left
+    goes ahead of the told starts it passes, so a day holds more than his
+    limit by what he left instead of the exam's topics falling behind it
+    (round 19, M1: the reviews left on 9 Nov waited for free room in full
+    days, the starts that needed them moved, and five exam topics fell past
+    the exam overnight); and what it put on a day his week no longer
+    studies, since nothing lands on one. A day counts as unfinished only when it left such an item:
     what his limit owed beyond the plan is his limit's evidence, never work
     left, and an open question at Done for today leaves its topic answered
     (round 11: a day whose plan was all done moved 36 dates overnight, and
@@ -1742,7 +1743,7 @@ def replay(
     his own study moving the days, so the next begins with a plan made
     afresh from the record as it began, which spreads what he left within
     his limit. An unfinished day that moved neither moves only what it left,
-    into the room the days he was told leave, as a finished day's night does
+    among the days he was told, as a save's step moves what it touched
     (round 17, 1 M2: a day that left one start and a review was planned
     afresh, and two exam topics that had fitted fell after the exam with no
     new answer). So the replay reaches back through the days he finished,
@@ -1856,7 +1857,7 @@ def _day(
     moving = {
         name: left[name] | unstudied[name] | changed.get(name, set()) for name in live
     }
-    night = _Told(ended_plan, moving, studied, None, yields=True)
+    night = _Told(ended_plan, moving, studied, None)
     began = _planned(morning, day, days, weekly, night)
     now = _saved(records, day, days, weekly, began, until, finals)
     return Replay(
@@ -1885,8 +1886,8 @@ def _moved_week(
     studies on fewer weekdays, than the week that day began with: only then
     can the days he was told hold more starts than his week gives, so the
     next day is planned afresh (``replay``). A lower review limit moves only
-    the reviews he left, which take the room the days he was told leave; a
-    higher limit leaves room past them.
+    the reviews he left, which take their place among the days he was told;
+    a higher limit leaves room past them.
 
     Both weeks are read from the record as ``day`` began (``morning``), the
     week that day began with from the days before it: each morning reads
@@ -2199,7 +2200,7 @@ def _planned(
                         course.why[topic] = told.plan.why[course.name][topic]
                         starts[course.name].append(topic)
                         new_room -= 1
-                        passed += not told.yields
+                        passed += 1
                     else:
                         course.moving.add(topic)
         new = (

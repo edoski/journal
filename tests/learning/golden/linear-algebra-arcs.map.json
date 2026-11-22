@@ -95,7 +95,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-28",
-      "review": "2026-11-13",
+      "review": "2026-11-23",
       "held": true,
       "due": "2026-10-12",
       "weak": false,
@@ -127,7 +127,7 @@
       "contrasts": [],
       "level": "independent",
       "introduced": "2026-10-05",
-      "review": "2026-11-25",
+      "review": "2026-11-20",
       "held": true,
       "due": "2026-10-28",
       "weak": true,
@@ -167,7 +167,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-12",
-      "review": "2026-11-11",
+      "review": "2026-11-09",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -185,7 +185,7 @@
       ],
       "level": "retained",
       "introduced": "2026-10-15",
-      "review": "2026-11-27",
+      "review": "2026-11-16",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -209,7 +209,7 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-03",
-      "review": "2026-11-16",
+      "review": "2026-11-11",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -254,7 +254,9 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-04",
-      "review": "2026-11-09",
+      "review": "2026-11-20",
+      "held": true,
+      "due": "2026-11-09",
       "weak": false,
       "right": "helped",
       "tasks": []
@@ -271,7 +273,7 @@
       ],
       "level": "introduced",
       "introduced": "2026-11-05",
-      "review": "2026-11-23",
+      "review": "2026-11-19",
       "held": true,
       "due": "2026-11-06",
       "weak": false,
@@ -287,12 +289,12 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-16",
+      "starts": "2026-11-20",
       "starts_why": {
         "arc": "determinants",
         "kind": "after",
         "needs": [
-          "rank"
+          "determinant"
         ]
       },
       "weak": false,
@@ -309,7 +311,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-18",
+      "starts": "2026-11-21",
       "starts_why": {
         "arc": "eigenvalues",
         "kind": "after",
@@ -350,12 +352,13 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-20",
+      "starts": "2026-11-23",
       "starts_why": {
         "arc": "eigenvalues",
         "kind": "after",
         "needs": [
-          "eigen"
+          "eigen",
+          "change-basis"
         ]
       },
       "weak": false,
@@ -370,14 +373,15 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-11",
+      "starts": "2026-11-09",
       "starts_why": {
         "arc": "orthogonality",
         "kind": "early",
-        "behind": "eigenvalues",
+        "behind": "determinants",
         "waiting_on": [
-          "invertibility"
-        ]
+          "determinant"
+        ],
+        "exam": true
       },
       "weak": false,
       "tasks": []
@@ -392,13 +396,12 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-12",
+      "starts": "2026-11-16",
       "starts_why": {
         "arc": "orthogonality",
-        "kind": "early",
-        "behind": "eigenvalues",
-        "waiting_on": [
-          "invertibility"
+        "kind": "after",
+        "needs": [
+          "inner-product"
         ]
       },
       "weak": false,

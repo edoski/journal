@@ -194,6 +194,15 @@ def test_the_plan_never_exceeds_his_capacity_or_touches_a_day_off(
     since = replayed.since
     assert since is not None
     added = {"one": agenda.touched(one, since), "two": agenda.touched(two, since)}
+    # What a day he studied left takes its place among the days he was told,
+    # past his limit, as what a save moved does (round 19, M1): every night
+    # of the run, each replayed as that day began.
+    for offset in range((today - since).days + 1):
+        night = agenda.replay(
+            {"one": one, "two": two}, since + timedelta(days=offset), 45, week
+        )
+        for name, left in night.left.items():
+            added[name] = added[name] | set(left)
     for offset in range(45):
         day = today + timedelta(days=offset)
         planned = [days[offset] for days in together.days.values()]
