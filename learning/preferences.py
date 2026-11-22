@@ -23,11 +23,20 @@ COUNTS = {FINAL_REVIEW_DAYS: (1, 14)}
 # being asked (a project course), so it has no arc check. How to ask is the
 # free-text ``question_style``; this is the one fact the engine reads.
 QUESTIONS = "questions"
-CHOICES = {QUESTIONS: ("asked", "none")}
+# Whether a course is a university course or a self-study: something he
+# learns on his own, with no exam and no spaced reviews, done when every
+# topic is taught. Unset is a course.
+KIND = "kind"
+SELF_STUDY = "self-study"
+CHOICES = {QUESTIONS: ("asked", "none"), KIND: ("course", SELF_STUDY)}
 # Course-only dimensions: why each belongs to one course, and an example value.
 COURSE_ONLY = {
     FINAL_REVIEW_DAYS: ("it moves that course's review dates", "4"),
     QUESTIONS: ("it says whether that course takes questions", "none"),
+    KIND: (
+        "it says whether the course is a university course or self-study",
+        SELF_STUDY,
+    ),
 }
 # How much a day holds, and which days, come from what the learner completes.
 LEARNED = frozenset({"daily_topics", "new_topics_on_weekends"})

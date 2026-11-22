@@ -21,6 +21,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import {
 	ARC_PASS_MIN_TOPICS,
+	type ArcPassLedger,
 	arcPassChanges,
 	arcPassProblems,
 	arcPassView,
@@ -597,6 +598,10 @@ export interface ArcPass {
 
 const aborted = () => Object.assign(new Error("grouping pass aborted"), { name: "AbortError" });
 
+/** What a live run's ledger write keeps of the one before: his setup words
+ *  (`asked`) and the growth step's place (`grown`). */
+const kept = (ledger: ArcPassLedger | undefined) => ({ ...(ledger?.asked ? { asked: ledger.asked } : {}), ...(ledger?.grown !== undefined ? { grown: ledger.grown } : {}) });
+
 export function createArcPass(deps: ArcPassDeps): ArcPass {
 	const { courseRecords, ledgers } = deps;
 	const wanted = new Set<string>();
@@ -914,15 +919,19 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			const record = await readRecord(workspace);
 			if (!passDue(ledger, record)) return;
 			topics = liveTopics(record).length;
-			const write = (state: "formed" | "none" | "failed", extra: { reason?: string; revision?: number }) => ledgers.save(workspace, { state, at: new Date().toISOString(), topics, ...extra });
+			// His setup words and the growth step's place outlive every outcome.
+			const write = (state: "formed" | "none" | "failed", extra: { reason?: string; revision?: number }) => ledgers.save(workspace, { ...kept(ledger), state, at: new Date().toISOString(), topics, ...extra });
+			// A course set up by conversation carries his words asking for it,
+			// so its arcs still form once he has begun studying it (G5).
+			const asked = ledger?.asked;
 			const studied = await studiedOf(workspace, record);
-			if (studied.length > 0) {
+			if (studied.length > 0 && !asked) {
 				write("failed", { reason: `he has studied ${studied.length === 1 ? "a topic" : "topics"} of it already, so only his words can ask for arcs` });
 				return;
 			}
 			const title = typeof obj(record).title === "string" ? (obj(record).title as string) : workspace;
 			signal = setRunPhase(jobKey, "grouping", "arc-pass", title).controller.signal;
-			const result = await run(workspace, { edges: "apply", signal });
+			const result = await run(workspace, { edges: "apply", signal, ...(asked ? { asked } : {}) });
 			if (result.status === "failed" && /^no model is set|does not allow background work$/.test(result.reason)) {
 				console.info(`[arc-pass ${workspace}] skipped: ${result.reason}`);
 				return;
@@ -932,7 +941,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			console.info(`[arc-pass ${workspace}] ${result.status}: ${result.status === "formed" ? result.summary : result.reason}`);
 		} catch (err) {
 			const reason = failureWords(err, signal?.aborted === true || (err instanceof Error && err.name === "AbortError"));
-			ledgers.save(workspace, { state: "failed", at: new Date().toISOString(), topics, reason });
+			ledgers.save(workspace, { ...kept(ledger), state: "failed", at: new Date().toISOString(), topics, reason });
 			console.error(`[arc-pass ${workspace}] failed (${reason}):`, err);
 		} finally {
 			if (signal) finishRun(jobKey);

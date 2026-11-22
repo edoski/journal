@@ -689,6 +689,89 @@ def test_a_page_names_no_section(workspace: Workspace) -> None:
     ) == {"power": "limits"}
 
 
+def units(workspace: Workspace, topics: dict[str, Any]) -> list[dict[str, Any]]:
+    """The unit events a save placing ``topics`` logs."""
+    placed(workspace, topics)
+    log = records.load(workspace).get("arc_log", [])
+    return [event for event in log if event["kind"] == "unit"]
+
+
+def test_two_topics_of_a_unit_no_arc_holds_log_one_unit_event(
+    workspace: Workspace,
+) -> None:
+    in_sections(workspace, "limit", derivative="Section 3.1", riemann="Chapter 4")
+    assert units(
+        workspace,
+        {
+            "series": cites("Series", "book", "Chapter 7", needs=["limit"]),
+            "ratio": cites("Ratio test", "book", "Ch. 7.2", needs=["series"]),
+            "power": cites("Power rule", "book", "Section 3.3", needs=["limit"]),
+        },
+    ) == [
+        {
+            "day": TODAY,
+            "kind": "unit",
+            "topics": ["ratio", "series"],
+            "reason": "chapter 7 of book: new topics no arc holds",
+        }
+    ]
+    records.save(workspace, {"topics": {"series": {"note": "Saved again"}}})
+    record = records.load(workspace)
+    assert schema.validate_record(record)["arc_log"] == record["arc_log"]
+
+
+def test_topics_of_a_unit_an_arc_holds_log_no_unit_event(
+    workspace: Workspace,
+) -> None:
+    in_sections(workspace, "limit", derivative="Section 3.1")
+    assert not units(
+        workspace,
+        {
+            "power": cites("Power rule", "book", "§3.3", needs=["limit"]),
+            "quotient": cites("Quotient rule", "book", "Sec. 3.5", needs=["limit"]),
+            "area": cites("Area", "book", "p. 210", needs=["limit"]),
+            "volume": cites("Volume", "book", "p. 230", needs=["limit"]),
+        },
+    )
+
+
+def test_one_topic_of_a_new_unit_logs_no_unit_event(workspace: Workspace) -> None:
+    in_sections(workspace, "limit", derivative="Section 3.1")
+    assert not units(
+        workspace, {"series": cites("Series", "book", "Chapter 7", needs=["limit"])}
+    )
+
+
+def test_a_new_source_citing_no_section_is_its_own_unit(
+    workspace: Workspace,
+) -> None:
+    in_sections(workspace, "limit", derivative="Section 3.1")
+    assert [
+        (event["topics"], event["reason"])
+        for event in units(
+            workspace,
+            {
+                "series": cites("Series", "notes", "slide 4", needs=["limit"]),
+                "ratio": cites("Ratio test", "notes", "p. 9", needs=["series"]),
+            },
+        )
+    ] == [(["ratio", "series"], "the source notes: new topics no arc holds")]
+
+
+def test_an_excluded_topic_holds_its_unit(workspace: Workspace) -> None:
+    topics = deepcopy(TOPICS)
+    topics["chain-rule"]["refs"] = [{"source": "book", "locator": "Chapter 7"}]
+    topics["chain-rule"]["excluded"] = "Not on his exam"
+    formed(workspace, sources={"book": BOOK}, topics=topics)
+    assert not units(
+        workspace,
+        {
+            "series": cites("Series", "book", "Chapter 7", needs=["limit"]),
+            "ratio": cites("Ratio test", "book", "Chapter 7.2", needs=["series"]),
+        },
+    )
+
+
 # --- cleanup (P2) and forget --------------------------------------------------
 
 

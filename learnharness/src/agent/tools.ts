@@ -167,6 +167,9 @@ export interface ProberToolContext extends ProbeDoneContext {
 	/** The session saves to a course record, whose goal every lesson in it
 	 *  serves: the probe asks no goal question. */
 	course?: boolean;
+	/** Take the session out of its course as it hands off to setting up
+	 *  something new: present = the `setup` handoff is registered. */
+	leaveCourse?: () => void;
 }
 
 /** In a course, a lesson's goal is the topic it is on, for the course's own
@@ -209,7 +212,7 @@ export function createProberTools(ctx: ProberToolContext): Record<string, AgentT
 		...done,
 		// The opening names the session in its first reply (name-session.ts).
 		...nameSessionTool(ctx),
-	}), ctx); // the prober routes the opening: a request to practise hands off
+	}), { ...ctx, ...(ctx.leaveCourse ? { leave: ctx.leaveCourse } : {}) }); // the prober routes the opening: a request to practise, or to set up something new, hands off
 }
 
 // ─── the teacher's question tool (explain carries the position field) ────────

@@ -40,6 +40,7 @@ import { QUESTION_TOOLS, type PendingQuestion } from "./pending.ts";
 import {
 	CONCLUDE_ACK_TEXT,
 	DONE_TONIGHT_TEXT,
+	SETUP_DONE_TEXT,
 	HANDOFF_TEXT,
 	REVIEW_HANDOFF_TEXT,
 	TASK_HANDOFF_TEXT,
@@ -95,7 +96,10 @@ export interface LhMarkerMessage {
 		| "compaction"
 		| "session-resume"
 		| "ungraded-answer"
-		| "asked";
+		| "asked"
+		// What the setup agent's background work found (the material survey,
+		// the course's map built): model-facing, it wakes the setup session.
+		| "setup-note";
 	/** The model-facing text ("" for plan blocks — UI-only). */
 	content: string;
 	display: boolean;
@@ -276,10 +280,10 @@ export function probeFeedbackOf(messages: readonly LhMessage[]): string[] | null
 	);
 }
 
-// ─── the session's mode: teaching or practice ───────────────────────────────
+// ─── the session's mode: teaching, practice or setup ────────────────────────
 
 /** The handoff tools, by the mode each one switches the session to. */
-export const MODE_HANDOFF_TOOLS: Readonly<Record<string, SessionMode>> = { practice: "practice", teach: "teach" };
+export const MODE_HANDOFF_TOOLS: Readonly<Record<string, SessionMode>> = { practice: "practice", teach: "teach", setup: "setup" };
 
 /** The mode a session starts in, chosen at creation (Current design's
  *  Teach/Practice switch). UI-only: the model never sees it, since the
@@ -292,6 +296,22 @@ export function newSessionModeMessage(mode: SessionMode): LhMarkerMessage {
 		content: "",
 		display: false,
 		details: { mode },
+		timestamp: Date.now(),
+	};
+}
+
+/** What the setup agent's background work found, for the setup session to
+ *  carry on from: the material survey's sorting, or the new course's map
+ *  built. Model-facing only; it wakes the session when nothing runs, and
+ *  rides a live run otherwise. `key` makes it one per event. */
+export function newSetupNoteMessage(chatId: string, key: string, text: string): LhMarkerMessage {
+	return {
+		id: `steer_setup_${key}`,
+		role: "custom",
+		customType: "setup-note",
+		content: text,
+		display: false,
+		details: { chatId },
 		timestamp: Date.now(),
 	};
 }
@@ -323,7 +343,8 @@ function foldModes(messages: readonly LhMessage[], initial: SessionMode): { writ
 	const written = messages.map((m) => {
 		const at = mode;
 		if (m.role === "custom" && m.customType === "session-mode") {
-			mode = (m.details as { mode?: unknown } | null)?.mode === "practice" ? "practice" : "teach";
+			const marked = (m.details as { mode?: unknown } | null)?.mode;
+			mode = marked === "practice" || marked === "setup" ? marked : "teach";
 			return mode;
 		}
 		if (m.role === "assistant" && m.stopReason !== "error" && m.stopReason !== "aborted") {
@@ -675,12 +696,12 @@ export function finalSubmissionOf(messages: readonly LhMessage[], problemCallId:
 /** His Done for tonight: he stops now. The content tells the agent that
  *  answers it to close without grading what he left open; the
  *  transcript draws its own quiet line off the marker. */
-export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT): LhMarkerMessage {
+export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT | "setup"): LhMarkerMessage {
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "done-tonight",
-		content: DONE_TONIGHT_TEXT[agent],
+		content: agent === "setup" ? SETUP_DONE_TEXT : DONE_TONIGHT_TEXT[agent],
 		display: true,
 		details: {},
 		timestamp: Date.now(),
@@ -858,6 +879,15 @@ export function saveChanges(args: Record<string, unknown>): Record<string, unkno
 		}
 	}
 	return typeof changes === "object" && changes !== null && !Array.isArray(changes) ? (changes as Record<string, unknown>) : null;
+}
+
+/** Whether the last turn saved topics to the course (a clean `course_save`
+ *  with `topics`): what may have added a unit to its arcs. */
+export function topicsSavedInLastTurn(messages: readonly LhMessage[]): boolean {
+	const start = messages.findLastIndex((m) => m.role === "user") + 1;
+	const turn = messages.slice(start);
+	const clean = cleanToolCallIds(turn);
+	return turn.some((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === "course_save" && clean.has(b.id) && saveChanges(b.arguments as Record<string, unknown>)?.topics !== undefined));
 }
 
 /** The sources the last turn's clean course_saves registered: material
@@ -1635,10 +1665,12 @@ export function hasProbeDone(messages: readonly LhMessage[]): boolean {
 }
 
 /** Which agent answers the record's next input: practice in a practice
- *  session, else the prober until the probe concluded or the session picks
- *  up a lesson, then the teacher. */
-export function respondingAgentOf(messages: readonly LhMessage[], startedIn?: SessionMode): "prober" | "teacher" | "practice" {
-	if (sessionModeOf(messages, startedIn) === "practice") return "practice";
+ *  session, the setup agent while the session sets something new up, else
+ *  the prober until the probe concluded or the session picks up a lesson,
+ *  then the teacher. */
+export function respondingAgentOf(messages: readonly LhMessage[], startedIn?: SessionMode): "prober" | "teacher" | "practice" | "setup" {
+	const mode = sessionModeOf(messages, startedIn);
+	if (mode === "practice" || mode === "setup") return mode;
 	return hasProbeDone(messages) || resumesLesson(messages) ? "teacher" : "prober";
 }
 
@@ -1710,7 +1742,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "user") return "learner";
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
-		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
+		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort", "setup-note"].includes(message.customType)) return "automatic";
 		if (["practice-thinking", "practice-next", "practice-request", "done-tonight", UNGRADED_ANSWER, "dispute", "task-continue"].includes(message.customType)) return "learner";
 		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}

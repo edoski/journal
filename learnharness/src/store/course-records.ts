@@ -18,6 +18,7 @@ import { studyDay } from "../core/day-words.ts";
 import { emit, subscribe } from "../core/events.ts";
 import {
 	courseLabel,
+	selfStudyOf,
 	type CourseResult,
 	type CourseSummary,
 	type CourseVerb,
@@ -173,6 +174,7 @@ function summaryOf(workspace: string, e: Record<string, unknown>): CourseSummary
 		step: str(task.step),
 		exam: examOf(e.exam),
 		lastActiveDaysAgo: daysAgoOf(e.last_studied),
+		...selfStudyOf(e),
 	};
 }
 
@@ -377,6 +379,7 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 		edges,
 		...(block.arcs ? { arcs: block.arcs } : {}),
 		...(block.currentArc ? { currentArc: block.currentArc } : {}),
+		...selfStudyOf(m),
 	};
 }
 

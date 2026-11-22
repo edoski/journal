@@ -206,6 +206,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "to": _TEXT,
         "edges": _EDGES,
         "edges_entry": _ENTRY,
+        "topics": _HANDLES,
         "reason": _TEXT,
         "asked": _TEXT,
     },
@@ -302,6 +303,7 @@ ArcEvent = TypedDict(
         "to": str,
         "edges": list[ArcEdge],
         "edges_entry": int,
+        "topics": list[str],
         "reason": str,
         "asked": str,
     },
@@ -424,7 +426,9 @@ class PatchResult:
     judged: list[str] = field(default_factory=list)
     global_preferences: dict[str, str | None] | None = None
     exam_moved: bool = False
-    questions_moved: bool = False
+    # A changed preference that decides whether the course keeps spaced
+    # reviews (``progress.spaced``), named for the receipt's notes.
+    spacing_moved: str | None = None
     pruned: dict[str, str] = field(default_factory=dict)
 
 
@@ -1277,8 +1281,9 @@ def empty() -> dict[str, Any]:
 
 
 def _arc_log(value: Any) -> list[dict[str, Any]]:
-    """The log's events; an ``edges`` event lists its edges, and an
-    ``edges_entry`` names an earlier ``edges`` event."""
+    """The log's events; an ``edges`` event lists its edges, a ``unit``
+    event its topics, and an ``edges_entry`` names an earlier ``edges``
+    event."""
     log: list[dict[str, Any]] = []
     for index, item in enumerate(_list(value, "arc_log", "arc events")):
         path = f"arc_log[{index}]"
@@ -1286,6 +1291,10 @@ def _arc_log(value: Any) -> list[dict[str, Any]]:
         if (event["kind"] == "edges") != ("edges" in event):
             raise ValueError(
                 f"{path}: an edges event lists its edges, and only an edges event does"
+            )
+        if (event["kind"] == "unit") != ("topics" in event):
+            raise ValueError(
+                f"{path}: a unit event lists its topics, and only a unit event does"
             )
         if "edges_entry" in event:
             arc_rules.check_edges_entry(
@@ -1934,6 +1943,24 @@ def _exam_plan(record: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
+def _check_self_study(before: dict[str, Any], after: dict[str, Any]) -> None:
+    """A self-study has no exam: refuse a save that leaves it with an exam
+    date, naming the fix."""
+    if after["preferences"].get(preferences.KIND) != preferences.SELF_STUDY:
+        return
+    if "date" not in after.get("exam", {}):
+        return
+    if before["preferences"].get(preferences.KIND) == preferences.SELF_STUDY:
+        raise ValueError(
+            "exam.date: a self-study has no exam; to study for an exam, make it a "
+            'course: {"preferences": {"kind": "course"}}'
+        )
+    raise ValueError(
+        "preferences.kind: this course has an exam, and a self-study has none; "
+        'remove the exam first with "exam": null, in the same save or before'
+    )
+
+
 def apply_patch(
     record: dict[str, Any], patch: dict[str, Any], *, today: date, now: str
 ) -> tuple[dict[str, Any], PatchResult]:
@@ -1999,13 +2026,14 @@ def apply_patch(
     arc_rules.drop(result, removals["arcs"])
     if removed:
         outcome.pruned = arc_rules.prune(result)
-    arc_rules.check_exam_patch(record, result, changes.get("exam"))
-    if "focus" not in changes and result.get("focus") not in result["tasks"]:
-        result.pop("focus", None)
     if "preferences" in changes:
         result["preferences"] = preferences.merge(
             result["preferences"], changes["preferences"]
         )
+    _check_self_study(record, result)
+    arc_rules.check_exam_patch(record, result, changes.get("exam"))
+    if "focus" not in changes and result.get("focus") not in result["tasks"]:
+        result.pop("focus", None)
     tasks = set(record["tasks"]) | set(result["tasks"])
     _append_observations(
         result, changes.get("observations", []), tasks, today, now, outcome
@@ -2020,7 +2048,7 @@ def apply_patch(
         )
     _check_predictions(record, result, changes, outcome, today)
     outcome.exam_moved = _exam_plan(record) != _exam_plan(result)
-    outcome.questions_moved = record["preferences"].get(
-        preferences.QUESTIONS
-    ) != result["preferences"].get(preferences.QUESTIONS)
+    for dimension in (preferences.QUESTIONS, preferences.KIND):
+        if record["preferences"].get(dimension) != result["preferences"].get(dimension):
+            outcome.spacing_moved = f"the {dimension} preference"
     return validate_record(result, placing=True), outcome

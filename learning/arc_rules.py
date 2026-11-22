@@ -27,6 +27,7 @@ ARC_EVENTS = (
     "reordered",
     "moved",
     "edges",
+    "unit",
     "note",
 )
 EDGE_CHANGES = ("add", "drop")

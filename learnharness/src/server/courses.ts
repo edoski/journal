@@ -12,8 +12,8 @@ import type { CourseLink, CourseListing, CourseSummary } from "../core/contracts
 import { courseLabel } from "../core/contracts/course.ts";
 import { emit } from "../core/events.ts";
 import { stores } from "./stores.ts";
-import { startCourseMap } from "./course-map.ts";
 import { courseRecordForgotten } from "../store/course-records.ts";
+import { sessionModeOf } from "../core/native-messages.ts";
 
 /** The registered courses plus the study roots a new course can go in.
  *  Until the engine exposes its study roots, a root is the parent folder
@@ -68,13 +68,13 @@ export interface MaterialFile {
 	bytes: Uint8Array;
 }
 
+/** A new course in a folder of its own (the setup agent's, when its
+ *  material has no folder): its study root and its title. Its exam and
+ *  material come after, as for any course. */
 export interface NewCourse {
 	/** The folder the course goes in; may be empty when only one is known. */
 	root: string;
 	title: string;
-	/** The exam day, YYYY-MM-DD, or null when none is set yet. */
-	exam: string | null;
-	material: readonly MaterialFile[];
 }
 
 /** Where a new course's material is copied, inside its folder. */
@@ -105,8 +105,6 @@ function sameTitle(courses: readonly CourseSummary[], title: string, except?: st
 	return courses.find((c) => c.workspace !== except && c.title?.toLocaleLowerCase() === wanted) ?? null;
 }
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-
 /** A material path made safe to write under the material folder: its
  *  folders kept, nothing hidden, nothing that climbs out. Null when nothing
  *  of it is left. */
@@ -116,9 +114,8 @@ export function materialPath(given: string): string | null {
 	return parts.join("/");
 }
 
-/** Create `<root>/<slug>`, copy the material into it, make it a course with
- *  its title and exam day, and register the material with the engine. The
- *  folder must be new: the engine's `init` reopens an existing course
+/** Create `<root>/<slug>` and make it a course with its title. The folder
+ *  must be new: the engine's `init` reopens an existing course
  *  silently, and the title save would then rename it. A folder whose
  *  engine steps failed is left in place, because what `init` already wrote
  *  cannot be told apart from the learner's own files; creating again
@@ -127,7 +124,6 @@ export async function createCourse(input: NewCourse): Promise<CourseCreation> {
 	const title = input.title.trim();
 	const problem = titleProblem(title);
 	if (problem) return { ok: false, status: 400, code: "title_required", error: problem };
-	if (input.exam !== null && !DAY.test(input.exam)) return { ok: false, status: 400, code: "bad_exam", error: "Pick the exam day from the calendar." };
 	const listing = await listCourses();
 	if (!listing.available) return engineFailure("list", listing.reason);
 	const root = input.root || (listing.roots.length === 1 ? listing.roots[0]! : "");
@@ -161,36 +157,11 @@ export async function createCourse(input: NewCourse): Promise<CourseCreation> {
 			return { ok: false, status: 500, code: "create_failed", error: "The course folder could not be made. Check that your courses folder can be written to." };
 		}
 	}
-	const copied: string[] = [];
-	try {
-		for (const file of input.material) {
-			const relative = materialPath(file.path);
-			if (!relative) continue;
-			const target = path.join(directory, MATERIAL_FOLDER, relative);
-			fs.mkdirSync(path.dirname(target), { recursive: true });
-			fs.writeFileSync(target, file.bytes);
-			copied.push(`${MATERIAL_FOLDER}/${relative}`);
-		}
-	} catch (error) {
-		console.error(`[courses] copy material into ${directory}: ${(error as Error).message}`);
-		return { ok: false, status: 500, code: "material_failed", error: "The material could not be copied into the course folder. Check there is room on the disk, then try again." };
-	}
-	const created = await stores.courseRecords.create(directory, { title, exam: input.exam });
+	const created = await stores.courseRecords.create(directory, { title, exam: null });
 	if (!created.ok) return engineFailure("create", created.message);
-	if (copied.length > 0) {
-		const added = await stores.courseRecords.run(created.workspace, { verb: "sources", add: copied });
-		if (!added.ok) {
-			// No half-made course: without its record the folder is unfinished,
-			// so creating it again picks up where this stopped.
-			await stores.courseRecords.run(created.workspace, { verb: "forget-course" });
-			console.error(`[courses] sources --add in ${created.workspace}: ${added.message}`);
-			return { ok: false, status: 502, code: "material_failed", error: "The material could not be added to the course. Try again with the files that matter most." };
-		}
-	}
 	// A course the app makes may get its arcs from the grouping pass.
 	stores.arcPassLedgers.save(created.workspace, { state: "new", at: new Date().toISOString(), topics: 0 });
 	emit("courses-changed", {});
-	if (copied.length > 0) startCourseMap(created.workspace);
 	// The engine's own entry, so the exam countdown is the engine's count.
 	const fresh = await listCourses();
 	const listed = fresh.available ? fresh.courses.find((c) => c.workspace === created.workspace) : undefined;
@@ -300,9 +271,10 @@ export function courseGone(course: { workspace: string } | undefined): boolean {
 }
 
 /** True when the session exists and has no course: its learner turns are
- *  refused until the learner links one. */
+ *  refused until the learner links one. A setup session has none until it
+ *  makes one, and takes his turns meanwhile. */
 export function courseRequired(chatId: unknown): boolean {
 	if (typeof chatId !== "string") return false;
 	const chat = stores.chatStore.getChat(chatId);
-	return chat !== null && !chat.course;
+	return chat !== null && !chat.course && sessionModeOf(chat.messages, chat.kind) !== "setup";
 }

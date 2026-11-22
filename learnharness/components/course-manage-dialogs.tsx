@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useDialogSubject } from "@/components/ui/overlay";
 import { CourseMapStatus } from "@/components/course-map-status";
-import { MaterialField } from "@/components/new-course-fields";
+import { MaterialField } from "@/components/material-field";
 import { addMaterialForm, type MaterialPick } from "@/components/new-course-facts";
 import { courseLabel, type CourseSummary } from "@/src/core";
 

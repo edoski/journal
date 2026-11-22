@@ -22,6 +22,7 @@ from learning import (
     capacity,
     clock,
     packing,
+    preferences,
     progress,
     records,
     schema,
@@ -394,6 +395,17 @@ def tonight(
         key=lambda item: item["planned"],
     )
     return today, later
+
+
+def kind(record: dict[str, Any], levels: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """A self-study's ``kind`` and whether its goal is reached (every topic
+    taught); nothing for a course."""
+    if not progress.self_study(record):
+        return {}
+    return {
+        "kind": preferences.SELF_STUDY,
+        "goal_reached": progress.goal_reached(record, levels),
+    }
 
 
 def _arc_of(record: dict[str, Any], topic: str) -> list[str]:
@@ -838,6 +850,7 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
             "today": today.isoformat(),
             "revision": record.get("revision", 0),
             "title": record.get("title"),
+            **kind(record, levels),
             "exam": _runup(record, countdown, planned)
             if countdown and "date" in countdown
             else None,

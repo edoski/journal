@@ -6,7 +6,7 @@
  * master. Pure types + protocol docs + tiny pure helpers; type-only imports
  * of "ai" (safe everywhere: server, client, tests). See docs/vision.md.
  */
-import type { CallUsage } from "./chat.ts";
+import type { CallUsage, SessionMode } from "./chat.ts";
 import type { LhMessage, LhMarkerMessage } from "../native-messages.ts";
 import { newHandoffMessage, newModeHandoffMessage } from "../native-messages.ts";
 
@@ -440,7 +440,7 @@ export function buildProbeHandoffSteer(chatId: string, review = false, task = fa
 
 /** A mode handoff's wake (tools/handoff.ts): like the probe handoff, it
  *  starts the next agent's run and never rides a live one. One per call. */
-export function buildModeHandoffSteer(chatId: string, toolCallId: string, mode: "teach" | "practice"): SteerMessage {
+export function buildModeHandoffSteer(chatId: string, toolCallId: string, mode: SessionMode): SteerMessage {
 	return newModeHandoffMessage(chatId, toolCallId, mode);
 }
 

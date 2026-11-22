@@ -3,8 +3,9 @@
 ``studied``, ``untaught``, ``held``, ``current`` and ``standing`` are the one
 definition of each, for every host, derived on every read and never stored.
 ``settle`` runs in each save after the patch is applied: it places new topics
-(P1), logs what changed, and refuses a change that would re-cut what the
-learner is in without his words (the guards G0 to G5).
+(P1), logs what changed and the new units it placed, and refuses a change
+that would re-cut what the learner is in without his words (the guards G0 to
+G5).
 
 Only the app sees its open lessons, so the readers take them: ``here``, the
 topic of the lesson in progress, and ``lessons``, every open lesson's topics.
@@ -459,6 +460,54 @@ def _place(before: dict[str, Any], record: dict[str, Any]) -> dict[str, str]:
     return placed
 
 
+# The doctrine's bar for a new arc (arcs.md, "Placing a new topic"): new
+# material whose own unit heading covers at least two new topics.
+NEW_UNIT_TOPICS = 2
+
+
+def _unit(topic: dict[str, Any]) -> Section | None:
+    """The unit a topic's material comes from: its section, else the source of
+    its first ref, a file whose locators name no section (one lecture's
+    slides) being a unit of its own; none without a ref."""
+    if section := _section(topic):
+        return section
+    refs = topic.get("refs", ())
+    return (refs[0]["source"], "", "") if refs else None
+
+
+def _new_units(
+    record: dict[str, Any], placed: Collection[str], day: str
+) -> list[dict[str, Any]]:
+    """A ``unit`` event for each unit no arc holds that at least
+    ``NEW_UNIT_TOPICS`` of the topics the save placed come from, so the app
+    re-cuts the arcs he has not begun around them. A topic with an arc the
+    engine did not place, excluded ones included, holds its unit, and its
+    sources as whole-source units."""
+    topics = record["topics"]
+    holders = [t for key, t in topics.items() if "arc" in t and key not in placed]
+    held = {_unit(topic) for topic in holders}
+    cited = {ref["source"] for topic in holders for ref in topic.get("refs", ())}
+    found: dict[Section, list[str]] = defaultdict(list)
+    for key in placed:
+        unit = _unit(topics[key])
+        if unit is not None and unit not in held and (unit[1] or unit[0] not in cited):
+            found[unit].append(key)
+    events: list[dict[str, Any]] = []
+    for (source, word, number), keys in found.items():
+        if len(keys) < NEW_UNIT_TOPICS:
+            continue
+        name = f"{word} {number} of {source}" if word else f"the source {source}"
+        events.append(
+            {
+                "day": day,
+                "kind": "unit",
+                "topics": sorted(keys),
+                "reason": f"{name}: new topics no arc holds",
+            }
+        )
+    return events
+
+
 def _guard(
     before: dict[str, Any],
     after: dict[str, Any],
@@ -559,9 +608,10 @@ def settle(
     outcome: schema.PatchResult,
     today: date,
 ) -> dict[str, str]:
-    """Place new topics, guard, check and log the save's arc changes, and mark the
-    exam as moved when topics move into or out of its scope. Changes
-    ``record`` in place; returns the arc each new topic was placed in."""
+    """Place new topics, guard, check and log the save's arc changes and the
+    new units it placed, and mark the exam as moved when topics move into or
+    out of its scope. Changes ``record`` in place; returns the arc each new
+    topic was placed in."""
     placed = _place(before, record)
     found = [
         event
@@ -576,6 +626,8 @@ def settle(
     log = [*record.get("arc_log", ()), *arc_rules.removals(outcome.pruned, day)]
     if change is not None:
         log += _logged(before, record, found, change, log, day)
+    if before["arcs"]:
+        log += _new_units(record, placed, day)
     if log:
         record["arc_log"] = log
     old = set(before["topics"])

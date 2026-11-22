@@ -11,13 +11,15 @@ import { emit, subscribe } from "../../core/events.ts";
  * starts the runs. Every change announces activity-changed.
  */
 
-/** What a run is doing: a lesson's digest, a course's map build, or the
- *  grouping of a course's topics into arcs. */
-export type RunPhase = "digesting" | "mapping" | "grouping";
+/** What a run is doing: a lesson's digest, a course's map build, the
+ *  grouping of a course's topics into arcs, or reading the material a new
+ *  course or self-study is being set up from. */
+export type RunPhase = "digesting" | "mapping" | "grouping" | "reading";
 
 /** Which work a run is: a finished lesson's digest into the course record,
- *  a course's topic map built from its material, or its arcs formed. */
-export type RunKind = "digest" | "course-map" | "arc-pass";
+ *  a course's topic map built from its material, its arcs formed, or the
+ *  material survey of a setup conversation. */
+export type RunKind = "digest" | "course-map" | "arc-pass" | "survey";
 
 export interface BackgroundRun {
 	/** The registry key, unique per row: "chatId#digest" or "workspace#course-map". */

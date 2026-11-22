@@ -10,4 +10,6 @@ export const FRAGMENT_RE = /^\d+-[\w.-]+\.md$/;
 /** Practice (2026-10-04): composes ONLY its own directory — no shared
  *  teaching base, no shared fragments (the doctrine contradicts the
  *  teaching philosophy; its 00-base.md plays the base role). */
-export type PromptAgent = "prober" | "teacher" | "practice";
+/** Setup (22 Nov 2026): the shared base, its own directory, and a curated
+ *  shared appendix (voice, accuracy, his files, formatting). */
+export type PromptAgent = "prober" | "teacher" | "practice" | "setup";

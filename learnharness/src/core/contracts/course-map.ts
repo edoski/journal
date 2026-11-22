@@ -6,6 +6,7 @@
  */
 
 import type { ArcHandle, CourseMapArc } from "./course-arcs.ts";
+import type { SelfStudy } from "./course.ts";
 
 /** An engine topic key, verbatim. */
 export type TopicHandle = string & { readonly __topic: unique symbol };
@@ -220,6 +221,8 @@ export interface CourseMap {
 	 *  lesson in progress). Read `currentArc(map)`, which also follows a
 	 *  `current` Home moved to the lesson since. */
 	currentArc?: ArcHandle;
+	/** Present for a self-study: no exam, no spaced reviews. */
+	selfStudy?: SelfStudy;
 }
 
 /** Of a session's candidate topics, the ones the course map lists as never

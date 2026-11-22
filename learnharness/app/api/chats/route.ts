@@ -28,7 +28,14 @@ export async function POST(req: Request) {
 	// without it the prober routes the opening, and the agents hand the
 	// session between teaching and practice from there.
 	const practice = body.kind === "practice";
-	// Every session belongs to one registered course. A workspace the
+	// Setting up something new to learn starts with no course: the setup
+	// agent makes one and links the session to it.
+	if (body.kind === "setup") {
+		const chat = createChat(name ?? (title.trim() ? titleFromPrompt(title) : "New learning"), undefined, [], undefined, name !== null);
+		stores.chatStore.saveMessages(chat.id, [newSessionModeMessage("setup") as LhMessage]);
+		return Response.json({ id: chat.id, title: chat.title });
+	}
+	// Every other session belongs to one registered course. A workspace the
 	// engine does not list is refused, never guessed.
 	const workspace = (body.course as { workspace?: unknown } | undefined)?.workspace;
 	if (typeof workspace !== "string" || workspace.length === 0) {

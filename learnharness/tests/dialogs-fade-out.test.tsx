@@ -14,7 +14,6 @@ import { DeleteSessionDialog } from "../components/delete-session-dialog.tsx";
 import { AbortTurnDialog, ShowMeConfirm } from "../components/abort-turn-dialog.tsx";
 import { DisputeDialog } from "../components/answer-mark.tsx";
 import { DeleteCourseDialog, RenameCourseDialog } from "../components/course-manage-dialogs.tsx";
-import { NewCourseDialog } from "../components/course-picker.tsx";
 import { SetupDialog } from "../components/setup-dialog.tsx";
 import { SettingsDialogProvider, useSettingsDialog } from "../components/settings/settings-dialog.tsx";
 import type { AnswerMark } from "../src/core/index.ts";
@@ -87,7 +86,6 @@ const DIALOGS: { name: string; testid: string; shows: string; render: (open: boo
 	{ name: "dispute", testid: "dispute-dialog", shows: "Dispute this mark", render: (open, close) => <DisputeDialog rows={open ? MARK.rows : null} onClose={close} onSend={() => {}} /> },
 	{ name: "rename course", testid: "rename-course-dialog", shows: "Rename course", render: (open, close) => <RenameCourseDialog course={open ? COURSE : null} onClose={close} onRenamed={() => {}} /> },
 	{ name: "delete course", testid: "delete-course-dialog", shows: "Delete SMM?", render: (open, close) => <DeleteCourseDialog course={open ? COURSE : null} onClose={close} onDeleted={() => {}} /> },
-	{ name: "new course", testid: "new-course-dialog", shows: "New course", render: (open, close) => <NewCourseDialog roots={open ? ["/study/courses"] : null} onClose={close} onCreated={() => {}} /> },
 	{ name: "sign in", testid: "setup-dialog", shows: "Sign in to Claude", render: (open, close) => <SetupDialog open={open} onClose={close} /> },
 ];
 

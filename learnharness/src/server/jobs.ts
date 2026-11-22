@@ -463,7 +463,7 @@ export function abortJob(jobId: string): AbortOutcome {
 function chatIdOf(steer: SteerMessage): string {
 	// A handoff carries its chat directly in the marker details (the job
 	// record would say it too, but the details are the cheap path).
-	if (isHandoff(steer)) {
+	if (isHandoff(steer) || steer.customType === "setup-note") {
 		return (steer.details as { chatId: string }).chatId;
 	}
 	// The chat is resolvable from the job record; the steer's details

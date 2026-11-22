@@ -1974,7 +1974,8 @@ export function Chat({
 				    anchored to the dock block's top edge, so it rides every
 				    height morph (typing, a question growing the band, the
 				    fold) and NEVER overlaps the composer. */}
-				{gone || courseGone ? null : !course ? <CourseLinkBanner chatId={chatId} /> : <DockOverlay
+				{/* A setup session has no course until it makes one, and talks meanwhile. */}
+				{gone || courseGone ? null : !course && mode !== "setup" ? <CourseLinkBanner chatId={chatId} /> : <DockOverlay
 					onReserve={setDockReserve}
 					busy={busy}
 					replyingToDock={busy && sentFromDockRef.current !== null}

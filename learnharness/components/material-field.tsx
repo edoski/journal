@@ -1,56 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { CalendarIcon, FileTextIcon, FolderIcon, XIcon } from "lucide-react";
+import { useRef } from "react";
+import { FileTextIcon, FolderIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { dayDate, isoDay, longDay, pickWords, type MaterialPick } from "@/components/new-course-facts";
-import { cn } from "@/lib/utils";
-
-/** The exam day: shadcn's date picker, a button that opens a calendar.
- *  Days before today cannot be picked; Clear takes the day back. */
-export function ExamDayField({ value, onChange, disabled }: { value: string | null; onChange: (day: string | null) => void; disabled?: boolean }) {
-	const [open, setOpen] = useState(false);
-	const today = new Date();
-	today.setHours(0, 0, 0, 0);
-	return (
-		<div className="flex items-center gap-2">
-			<Popover open={open} onOpenChange={setOpen}>
-				<PopoverTrigger asChild>
-					<Button
-						type="button"
-						variant="outline"
-						disabled={disabled}
-						data-testid="new-course-exam"
-						className={cn("flex-1 justify-start font-normal", !value && "text-muted-foreground")}
-					>
-						<CalendarIcon aria-hidden />
-						{value ? longDay(value) : "Not set yet"}
-					</Button>
-				</PopoverTrigger>
-				<PopoverContent align="start" className="w-auto p-0" data-testid="new-course-exam-calendar">
-					<Calendar
-						mode="single"
-						selected={value ? dayDate(value) : undefined}
-						defaultMonth={value ? dayDate(value) : today}
-						disabled={{ before: today }}
-						weekStartsOn={1}
-						onSelect={(date) => {
-							onChange(date ? isoDay(date) : null);
-							setOpen(false);
-						}}
-					/>
-				</PopoverContent>
-			</Popover>
-			{value && (
-				<Button type="button" variant="quiet" size="icon-row" aria-label="Clear the exam day" disabled={disabled} onClick={() => onChange(null)}>
-					<XIcon aria-hidden />
-				</Button>
-			)}
-		</div>
-	);
-}
+import { pickWords, type MaterialPick } from "@/components/new-course-facts";
 
 /** The course's material: Add files or Add a folder, each press one line
  *  that a cross takes back. */

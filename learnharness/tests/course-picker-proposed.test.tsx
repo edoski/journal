@@ -5,7 +5,7 @@ import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "./helpers/app-render.tsx";
-import { CoursePicker, NewCourseBody } from "../components/course-picker.tsx";
+import { CoursePicker } from "../components/course-picker.tsx";
 import { AddMaterialDialog, DeleteCourseDialog, RenameCourseDialog } from "../components/course-manage-dialogs.tsx";
 import { pickWords } from "../components/new-course-facts.ts";
 import { CourseMapStatus } from "../components/course-map-status.tsx";
@@ -60,7 +60,7 @@ async function escapeReachesWindow(): Promise<boolean> {
 }
 
 describe("course chip", () => {
-	it("opens a menu of the courses by name, with no counts, then New course", async () => {
+	it("opens a menu of the courses by name, with no counts, then New course or self-study", async () => {
 		await mount(<CoursePicker courses={COURSES} workspace="/study/smm" onChange={() => {}} onNew={() => {}} />);
 		const chip = element('[data-testid="course-picker"]');
 		assert.equal(chip.textContent, "SMM");
@@ -69,7 +69,7 @@ describe("course chip", () => {
 		const rows = [...document.querySelectorAll('[data-testid="course-option"]')];
 		assert.deepEqual(rows.map((r) => r.textContent), ["SMM", "untitled-dir"]);
 		assert.equal(rows[0]!.getAttribute("aria-checked"), "true", "the picked course is the checked one");
-		assert.equal(element('[data-testid="course-new"]').textContent, "New course…");
+		assert.equal(element('[data-testid="course-new"]').textContent, "New course or self-study");
 	});
 
 	it("picking a course or New course reaches the host, and Esc closes the menu only", async () => {
@@ -89,25 +89,6 @@ describe("course chip", () => {
 	});
 });
 
-describe("New course study root", () => {
-	it("shows the root's last two folders and picks another from the shared select", async () => {
-		await mount(
-			<Dialog open>
-				<NewCourseBody roots={["/vault/learn", "/vault/university/msc"]} onClose={() => {}} onCreated={() => {}} />
-			</Dialog>,
-		);
-		const trigger = element('[data-testid="new-course-root"]');
-		assert.equal(trigger.textContent, "vault/learn");
-		await press(trigger, "pointerdown");
-		const options = [...document.querySelectorAll('[data-testid="new-course-root-option"]')];
-		assert.deepEqual(options.map((o) => o.textContent), ["vault/learn", "university/msc"]);
-		await press(options[1]!, "pointerdown");
-		await press(options[1]!, "pointerup");
-		assert.equal(element('[data-testid="new-course-root"]').textContent, "university/msc");
-	});
-});
-
-/** A fetch that records each request and answers with `reply`. */
 function recorder(reply: (init: RequestInit) => Response) {
 	const sent: RequestInit[] = [];
 	const fetchLike = (async (_url: unknown, init?: RequestInit) => {
@@ -116,7 +97,6 @@ function recorder(reply: (init: RequestInit) => Response) {
 	}) as typeof fetch;
 	return { sent, fetchLike };
 }
-
 async function typeInto(input: HTMLInputElement, value: string) {
 	await act(async () => {
 		// linkedom reports no type for an untyped input, which React needs to
@@ -129,7 +109,6 @@ async function typeInto(input: HTMLInputElement, value: string) {
 		input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
 	});
 }
-
 async function pickFiles(input: HTMLInputElement, files: File[]) {
 	await act(async () => {
 		Object.defineProperty(input, "files", { value: files, configurable: true });
@@ -137,96 +116,7 @@ async function pickFiles(input: HTMLInputElement, files: File[]) {
 	});
 }
 
-describe("New course", () => {
-	it("asks for the title, the exam day and the material in plain words, with no folder choice when one is known", async () => {
-		await mount(
-			<Dialog open>
-				<NewCourseBody roots={["/vault/courses"]} onClose={() => {}} onCreated={() => {}} />
-			</Dialog>,
-		);
-		const text = element('[data-testid="new-course-dialog"]').textContent ?? "";
-		for (const words of ["Title", "Exam day", "Not set yet", "Course material", "Add files", "Add a folder"]) assert.match(text, new RegExp(words));
-		assert.doesNotMatch(text, /Study root/);
-		assert.ok(document.querySelector('[data-testid="new-course-root"]') === null);
-	});
-
-	it("sends the title, the picked exam day and every picked file under its folder path", async () => {
-		const created: unknown[] = [];
-		const { sent, fetchLike } = recorder((init) =>
-			init.method === "POST" ? Response.json({ workspace: "/vault/courses/group-theory", title: "Group Theory" }) : Response.json({ state: "building" }),
-		);
-		await mount(
-			<Dialog open>
-				<NewCourseBody roots={["/vault/courses"]} fetchLike={fetchLike} onClose={() => {}} onCreated={(c) => created.push(c)} />
-			</Dialog>,
-		);
-		await typeInto(element('[data-testid="new-course-title"]') as HTMLInputElement, "  Group Theory ");
-		await press(element('[data-testid="new-course-exam"]'), "click");
-		const days = [...document.querySelectorAll<HTMLButtonElement>('[data-testid="new-course-exam-calendar"] button[data-day]')].filter((b) => !b.disabled);
-		assert.ok(days.length > 0, "the calendar offers days from today on");
-		const picked = days.at(-1)!;
-		await press(picked, "click");
-		assert.doesNotMatch(element('[data-testid="new-course-exam"]').textContent ?? "", /Not set yet/, "the picked day shows on the button");
-
-		const syllabus = new File(["s"], "Syllabus.pdf");
-		const week = new File(["w"], "Week 1.md");
-		Object.defineProperty(week, "webkitRelativePath", { value: "Lectures/Week 1.md" });
-		await pickFiles(element('[data-testid="new-course-files-input"]') as HTMLInputElement, [syllabus, new File(["x"], ".DS_Store")]);
-		await pickFiles(element('[data-testid="new-course-folder-input"]') as HTMLInputElement, [week]);
-		assert.deepEqual([...document.querySelectorAll('[data-testid="new-course-material-pick"]')].map((r) => r.textContent), ["Syllabus.pdf", "Lectures"]);
-
-		await press(element('[data-testid="new-course-create"]'), "click");
-		await act(async () => { element('[data-testid="new-course-dialog"] form').dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); });
-		const posts = sent.filter((init) => init.method === "POST");
-		assert.equal(posts.length, 1);
-		const form = posts[0]!.body as FormData;
-		assert.equal(form.get("title"), "Group Theory");
-		assert.match(String(form.get("exam")), /^\d{4}-\d{2}-\d{2}$/);
-		assert.equal(form.get("root"), "/vault/courses");
-		assert.deepEqual(form.getAll("material").map((f) => (f as File).name), ["Syllabus.pdf", "Lectures/Week 1.md"]);
-		assert.equal(created.length, 1);
-		await act(async () => {});
-		assert.match(element('[data-testid="course-map-status"]').textContent ?? "", /Group Theory is ready.*topic map is being built from your material/, "with material, the dialog stays to show the map being built");
-	});
-
-	it("says in plain words when the map could not be built, that nothing changed, and offers Try again", async () => {
-		const { fetchLike } = recorder(() => Response.json({ state: "failed", reason: "it was stopped before it finished" }));
-		await mount(
-			<Dialog open>
-				<CourseMapStatus course={{ workspace: "/vault/courses/group-theory", title: "Group Theory" }} fetchLike={fetchLike} onClose={() => {}} />
-			</Dialog>,
-		);
-		await act(async () => {});
-		assert.equal(element('[data-testid="course-map-status"] [role="status"]').textContent, "Its topic map could not be built, because it was stopped before it finished. Nothing in the course changed.");
-		assert.ok(document.querySelector('[data-testid="course-map-retry"]'));
-	});
-
-	it("closes at once after Create when no material came with the course", async () => {
-		let closed = 0;
-		const { fetchLike } = recorder(() => Response.json({ workspace: "/vault/courses/group-theory", title: "Group Theory" }));
-		await mount(
-			<Dialog open>
-				<NewCourseBody roots={["/vault/courses"]} fetchLike={fetchLike} onClose={() => closed++} onCreated={() => {}} />
-			</Dialog>,
-		);
-		await typeInto(element('[data-testid="new-course-title"]') as HTMLInputElement, "Group Theory");
-		await act(async () => { element('[data-testid="new-course-dialog"] form').dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); });
-		assert.equal(closed, 1);
-	});
-
-	it("shows the server's plain sentence when a course cannot be made, and keeps the form", async () => {
-		const { fetchLike } = recorder(() => Response.json({ error: "You already have a course called Group Theory.", code: "course_exists" }, { status: 409 }));
-		await mount(
-			<Dialog open>
-				<NewCourseBody roots={["/vault/courses"]} fetchLike={fetchLike} onClose={() => {}} onCreated={() => assert.fail("not created")} />
-			</Dialog>,
-		);
-		await typeInto(element('[data-testid="new-course-title"]') as HTMLInputElement, "group theory");
-		await act(async () => { element('[data-testid="new-course-dialog"] form').dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); });
-		assert.equal(element('[data-testid="new-course-dialog"] [role="alert"]').textContent, "You already have a course called Group Theory.");
-		assert.equal((element('[data-testid="new-course-title"]') as HTMLInputElement).value, "group theory");
-	});
-
+describe("material picks", () => {
 	it("names a pick of files by up to two names and a folder by its name, never a count", () => {
 		const f = (name: string, at = "") => Object.defineProperty(new File([""], name), "webkitRelativePath", { value: at });
 		assert.equal(pickWords({ kind: "files", files: [f("A.pdf")] }), "A.pdf");

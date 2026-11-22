@@ -521,7 +521,8 @@ function callPart(out: readonly LhViewMessage[], toolCallId: string | undefined)
 function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 	switch (marker.customType) {
 		case "course-context":
-			return; // model-facing course brief: nothing to render
+		case "setup-note":
+			return; // model-facing (the course brief, the setup's findings): nothing to render
 		case "ungraded-answer":
 			return; // model-facing: grade the answer a stop cut off
 		case "session-mode":

@@ -17,11 +17,11 @@
 
 /** Total background LLM concurrency, process-wide, across ALL subsystems
  *  (owner ruling 2026-09-29: one shared pool). */
-const PERMIT_COUNT = 3;
+export const BG_LLM_PERMITS = 3;
 
 export interface LlmSlots {
 	active: number;
-	queue: { resolve: () => void; dead: boolean }[];
+	queue: { resolve: () => void; dead: boolean; first?: true }[];
 }
 
 interface LhLlmSemaphoreGlobal {
@@ -42,14 +42,21 @@ export function bgLlmSlots(): LlmSlots {
 export async function withBgLlmSlot<T>(
 	signal: AbortSignal | undefined,
 	critical: () => Promise<T>,
+	/** "first": waits ahead of every queued ticket. A course map build
+	 *  takes it, so a new course is usable while another course's arc pass
+	 *  (dozens of queued readers) still runs (22 Nov 2026). */
+	order: "first" | "last" = "last",
 ): Promise<T> {
 	const slots = bgLlmSlots();
 	let freshTake = true;
-	if (slots.active >= PERMIT_COUNT) {
+	if (slots.active >= BG_LLM_PERMITS) {
 		freshTake = false;
 		await new Promise<void>((resolve, reject) => {
-			const ticket: { resolve: () => void; dead: boolean } = { resolve, dead: false };
-			slots.queue.push(ticket);
+			const ticket: { resolve: () => void; dead: boolean; first?: true } = { resolve, dead: false, ...(order === "first" ? { first: true as const } : {}) };
+			// Taken first: after the other first tickets, in their order, ahead of the rest.
+			const at = order === "first" ? slots.queue.findIndex((t) => !t.first) : -1;
+			if (at >= 0) slots.queue.splice(at, 0, ticket);
+			else slots.queue.push(ticket);
 			if (!signal) return;
 			const die = () => {
 				ticket.dead = true; // the permit handoff must skip us
