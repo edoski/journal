@@ -789,9 +789,9 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
     levels = progress.standings(record)
     wrong = progress.open_mistakes(record)
     order = progress.path_order(record, everything=True)
-    planned, moves = _planned_and_moves(workspace, record, today)
+    planned, moves, told = _planned_moves_told(workspace, record, today)
     overdue = {
-        item["topic"]: item["overdue"]
+        item["topic"]: late_since_told(item, told.get(item["topic"]), today)
         for item in progress.due(record, today, levels=levels)
         if planned.tonight(item["topic"])
     }
@@ -1307,10 +1307,40 @@ def _planned_and_moves(
     workspace: Workspace, record: dict[str, Any], today: date
 ) -> tuple[agenda.When, dict[str, dict[str, Any]]]:
     """``when``, and each of this course's days that moved (``moved``)."""
+    now, moves, _ = _planned_moves_told(workspace, record, today)
+    return now, moves
+
+
+def _planned_moves_told(
+    workspace: Workspace, record: dict[str, Any], today: date
+) -> tuple[agenda.When, dict[str, dict[str, Any]], dict[str, date]]:
+    """``when``, the days that moved (``moved``), and the day he was last
+    told each review comes (``told_reviews``)."""
     replayed, readable, studies = _replayed(workspace, record, today)
     name = str(workspace.directory)
     now = replayed.now.when(name, today, studies)
-    return now, moved(name, record, replayed, readable, today)
+    moves = moved(name, record, replayed, readable, today)
+    return now, moves, told_reviews(name, replayed)
+
+
+def told_reviews(name: str, replayed: agenda.Replay) -> dict[str, date]:
+    """The day course ``name``'s plan gave each review as the last day he
+    studied ended: the days he was last told (``moved``)."""
+    told, studied = replayed.told, replayed.studied
+    if told is None or studied is None or name not in told.days:
+        return {}
+    return dict(told.when(name, studied, True).reviews)
+
+
+def late_since_told(item: dict[str, Any], told: date | None, today: date) -> int:
+    """Days a due review is late: from memory's day, or from the day he was
+    told when that came later and has passed, never from a day earlier than
+    the one he was told (round 19, m2: Uniform, told "Back Sun 15 Nov",
+    read "Due 6 Nov" on 17 Nov)."""
+    overdue = int(item["overdue"])
+    if told is None or told > today:
+        return overdue
+    return min(overdue, (today - told).days)
 
 
 def moved(
