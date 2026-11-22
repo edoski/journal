@@ -31,6 +31,7 @@ import {
 	lastEdgesEntry,
 	formationWords,
 	liveTopics,
+	majorityMisses,
 	mergeMisses,
 	passDue,
 	purposeAnswerProblems,
@@ -91,9 +92,9 @@ const ARCS_TOOL = "submit_arcs";
 const SORT_TOOL = "submit_sort";
 const PURPOSE_TOOL = "submit_purpose";
 const NEVER_SUBMITTED = "The grouping pass never submitted.";
-/** Blind readers per cut: the rubric scores with two fresh scorers and
- *  takes the lower, so a name passes only when both place every topic. */
-const SORT_READERS = 2;
+/** Blind readers per cut, as the arcs rubric's B1 counts them: a topic is a
+ *  miss when two of the three put it away from its arc. */
+const SORT_READERS = 3;
 /** Fresh readers per topic, for the same reason: a use one reader in two
  *  finds is missed only when both miss it, and a drop needs them all. */
 const NEEDS_READERS = 2;
@@ -167,7 +168,7 @@ const sortSchema = Type.Object({
 	sort: Type.Array(
 		Type.Object({
 			topic: Type.String({ description: "The topic's id: t1, t2, …" }),
-			arcs: Type.Array(Type.String(), { description: "The arc names it reads as part of, exactly as listed, best first; a second only when it fits exactly as well." }),
+			arc: Type.String({ description: "The one arc name it fits best, exactly as listed." }),
 		}),
 		{ description: "Every topic, once." },
 	),
@@ -296,7 +297,7 @@ How this differs from the text below:
 
 `;
 
-export const SORT_INSTRUCTIONS = `You read a course's arc names the way a student does, coming back after days away. Below are the names of its arcs, in no particular order, and its topic titles, shuffled. For each topic, say which arc's name it reads as part of, from the names alone: nothing else about the course is given, and nothing else counts. List a second name only when it fits the topic exactly as well as the first. Answer with one ${SORT_TOOL} call.`;
+export const SORT_INSTRUCTIONS = `You read a course's arc names the way a student does, coming back after days away. Below are the course's title, the names of its arcs (chapter-like groups) in study order, and its topic titles, shuffled. Put each topic under the arc whose name it fits best, from the names alone: nothing else about the course is given, and nothing else counts. Every topic goes to exactly one arc; when two fit, pick the better one. Answer with one ${SORT_TOOL} call.`;
 
 export const PURPOSE_INSTRUCTIONS = `You read a course's arcs the way a student does. Each arc below has a purpose line, one sentence on what the arc lets the student do, and its topics. For each arc:
 - Read the purpose line against each of its topics in turn: is it true of that topic, so that studying the topic is part of what the line promises? Under false, list each topic a line is false of, with what the line claims that the topic does not give.
@@ -313,8 +314,8 @@ function purposePrompt(quiz: PurposeQuiz): string {
 	return quiz.arcs.flatMap((a) => [`## ${a.title}`, `Purpose: ${a.purpose}`, ...(a.units.length > 0 ? [`Cites: ${a.units.join("; ")}`] : []), ...a.topics.map((t) => `- ${t.id}: ${t.title}`), ""]).join("\n");
 }
 
-function sortPrompt(quiz: SortQuiz): string {
-	return ["## Arc names", ...[...quiz.arcs].sort().map((a) => `- ${a}`), "", "## Topics", ...quiz.topics.map((t) => `- ${t.id}: ${t.title}`)].join("\n");
+function sortPrompt(title: string, quiz: SortQuiz): string {
+	return [`# Course: ${title}`, "", "## Arc names, in study order", ...quiz.arcs.map((a) => `- ${a}`), "", "## Topics", ...quiz.topics.map((t) => `- ${t.id}: ${t.title}`)].join("\n");
 }
 
 /**
@@ -815,7 +816,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 				fill: (input: Json) => ({ sort: (input.sort as SortAnswer["sort"] | undefined) ?? [] }),
 				validate: (answer) => sortAnswerProblems(answer, quiz),
 				systemPrompt: SORT_INSTRUCTIONS,
-				prompt: sortPrompt(quiz),
+				prompt: sortPrompt(title, quiz),
 				engine,
 				signal,
 				onMessage: (message) => log({ step: "sort", kind: "message", message }),
@@ -828,7 +829,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			});
 			const reads = (await Promise.all(Array.from({ length: SORT_READERS }, reader))).filter((r): r is SortAnswer => r !== null);
 			if (reads.length > 0) {
-				const now = mergeMisses(...reads.map((read) => sortMisses(quiz, read, a)));
+				const now = majorityMisses(reads.map((read) => sortMisses(quiz, read, a)));
 				sorted = standingMisses(seen, now, a);
 				seen = mergeMisses(seen, now);
 				log({ step: "sort", kind: "sorted", misses: sorted });

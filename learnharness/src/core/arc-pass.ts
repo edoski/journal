@@ -939,7 +939,14 @@ export function arcPassChanges(submit: ArcSubmit, given: ArcPassView, extra: { e
 		const left = (submit.leavesOut ?? []).filter(exists);
 		if (left.length > 0) exam.leaves_out = left;
 	}
-	const reason = [extra.reason, submit.basis.trim()].filter(Boolean).join("; ");
+	// A one-topic arc's reason and a shared unit's reason are what the edge-case rules ask for; they live in the
+	// formation's reason, which the record keeps, beside the basis (arc calibration 3: a one-topic "Metric spaces" read
+	// as unexplained, since the answer's single was checked and then dropped).
+	const why = arcs.flatMap((a) => [
+		...(a.single?.trim() ? [`"${a.title.trim()}" holds one topic: ${a.single.trim()}`] : []),
+		...(a.shares?.trim() ? [`"${a.title.trim()}" shares its unit: ${a.shares.trim()}`] : []),
+	]);
+	const reason = [extra.reason, submit.basis.trim(), ...why].filter(Boolean).join("; ");
 	const edgeLog = [
 		...dropped.map((w) => ({ topic: w.topic, need: w.need, change: "drop", reason: `withdrawn by the cut: ${w.reason.trim()}` })),
 		...restored.map((r) => ({ topic: r.topic, need: r.need, change: "add", reason: `implied until the cut withdrew the need it was reached through: ${r.reason.trim()}` })),
@@ -971,25 +978,37 @@ export function arcPassChanges(submit: ArcSubmit, given: ArcPassView, extra: { e
 // ─── the blind sort ──────────────────────────────────────────────────────────
 
 /**
- * Rule 8's name test, read by a fresh reader instead of the agent that chose
- * the names: the arc names alone and every topic title as the learner will
- * see it, shuffled, under a neutral id, so neither a handle nor the order
- * gives the answer away.
+ * Rule 8's name test, read by fresh readers instead of the agent that chose
+ * the names, as the arcs rubric's B1 reads it: the course's title, the arc
+ * names in study order, and every topic title as the learner will see it,
+ * shuffled, under a neutral id, so neither a handle nor the order gives the
+ * answer away. Each reader puts each topic in exactly one arc.
  */
 export interface SortQuiz {
 	arcs: string[];
 	topics: { id: string; handle: string; title: string }[];
 }
 
-/** The reader's answer: for each topic id, the arc names it reads as part of,
- *  best first, several only when they fit equally well. */
+/** One reader's answer: for each topic id, the one arc name it fits best. */
 export interface SortAnswer {
-	sort: { topic: string; arcs: string[] }[];
+	sort: { topic: string; arc: string }[];
 }
 
-/** Each topic either reader sorted away from its arc, once, with every arc
- *  name it read as: the rubric takes the lower of two blind scorers, so a
- *  name passes only when both readers place the topic home. Pure. */
+/** The misses of one sort by several readers: a topic is a miss when more
+ *  than half of them put it away from its arc (two of three, as B1 counts),
+ *  with every arc name they read it as and how many did. Pure. */
+export function majorityMisses(readings: readonly SortMiss[][]): SortMiss[] {
+	const of = readings.length;
+	const away = new Map<string, SortMiss>();
+	for (const m of readings.flat()) {
+		const seen = away.get(m.topic);
+		away.set(m.topic, seen ? { ...seen, readsAs: [...new Set([...seen.readsAs, ...m.readsAs])], away: seen.away + 1 } : { ...m, away: 1, of });
+	}
+	return [...away.values()].filter((m) => m.away * 2 > of);
+}
+
+/** Misses from several sorts, once each: the later sort's count, with every
+ *  arc name either read it as. Pure. */
 export function mergeMisses(...readings: readonly SortMiss[][]): SortMiss[] {
 	const merged = new Map<string, SortMiss>();
 	for (const m of readings.flat()) {
@@ -1023,6 +1042,9 @@ export interface SortMiss {
 	title: string;
 	arc: string;
 	readsAs: string[];
+	/** How many of the sort's readers put it away, of how many. */
+	away: number;
+	of: number;
 }
 
 /** The quiz for a formation: titles after the label strip and any new
@@ -1046,42 +1068,45 @@ export function sortAnswerProblems(answer: SortAnswer, quiz: SortQuiz): string |
 		if (!ids.has(s.topic)) problems.push(`"${s.topic}" is no topic id.`);
 		else if (seen.has(s.topic)) problems.push(`"${s.topic}" is sorted twice.`);
 		seen.add(s.topic);
-		if (s.arcs.length === 0) problems.push(`"${s.topic}" names no arc.`);
-		for (const a of s.arcs) if (!names.has(a)) problems.push(`"${a}" is no arc name; use the names exactly as listed.`);
+		if (!names.has(s.arc)) problems.push(`"${s.arc}" is no arc name; use the names exactly as listed.`);
 	}
 	const missing = quiz.topics.filter((t) => !seen.has(t.id)).map((t) => t.id);
 	if (missing.length > 0) problems.push(`sort every topic: ${missing.join(", ")} missing.`);
 	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
 }
 
-/** The topics the reader put in another arc than their own: a miss only
- *  when no name it fits as well is the topic's own arc. Pure. */
+/** The topics one reader put in another arc than their own. Pure. */
 export function sortMisses(quiz: SortQuiz, answer: SortAnswer, submit: ArcSubmit): SortMiss[] {
 	const home = new Map(submit.arcs.flatMap((a) => a.topics.map((t) => [t, a.title.trim()] as const)));
-	const read = new Map(answer.sort.map((s) => [s.topic, s.arcs]));
+	const read = new Map(answer.sort.map((s) => [s.topic, s.arc]));
 	return quiz.topics.flatMap((t) => {
 		const arc = home.get(t.handle)!;
-		const readsAs = read.get(t.id) ?? [];
-		return readsAs.length > 0 && !readsAs.includes(arc) ? [{ topic: t.handle, title: t.title, arc, readsAs }] : [];
+		const readAs = read.get(t.id);
+		return readAs && readAs !== arc ? [{ topic: t.handle, title: t.title, arc, readsAs: [readAs], away: 1, of: 1 }] : [];
 	});
 }
 
 /**
  * The refusal the misses give the cut, or null. Rule 8 allows one
- * borderline miss when the basis explains it (it names the topic); any more,
- * or one the basis leaves unexplained, goes back to the agent with each
- * topic and the arc it read as. Pure.
+ * borderline miss when the basis explains it (it names the topic): one some
+ * reader placed home. One every reader put away is no borderline miss, and
+ * any more, or one the basis leaves unexplained, goes back to the agent with
+ * each topic and the arc it read as. Pure.
  */
 export function sortProblems(misses: readonly SortMiss[], submit: ArcSubmit): string | null {
 	if (misses.length === 0) return null;
 	const basis = submit.basis.toLowerCase();
-	if (misses.length === 1 && (basis.includes(misses[0]!.topic.toLowerCase()) || basis.includes(misses[0]!.title.toLowerCase()))) return null;
-	const lines = misses.map((m) => `- "${m.title}" (${m.topic}), in "${m.arc}", reads as part of ${m.readsAs.map((a) => `"${a}"`).join(" or ")}.`);
+	const [only] = misses;
+	const borderline = misses.length === 1 && only!.away < only!.of;
+	if (borderline && (basis.includes(only!.topic.toLowerCase()) || basis.includes(only!.title.toLowerCase()))) return null;
+	const lines = misses.map((m) => `- "${m.title}" (${m.topic}), in "${m.arc}", reads as part of ${m.readsAs.map((a) => `"${a}"`).join(" or ")}${m.away === m.of && m.of > 1 ? ` (every reader)` : ""}.`);
 	return [
-		"A fresh reader sorted the topic titles into the arc names alone, as the learner will read them after days away (rule 8's name test), and put these topics in another arc than yours:",
+		"Fresh readers sorted the topic titles into the arc names alone, as the learner will read them after days away (rule 8's name test), and most of them put these topics in another arc than yours:",
 		...lines,
 		misses.length === 1
-			? "One borderline miss may stay only with its reason in the basis, naming the topic. Otherwise move it to the arc it reads as when rule 2 allows, or rename the arcs so it reads as part of its own."
+			? borderline
+				? "One borderline miss may stay only with its reason in the basis, naming the topic. Otherwise move it to the arc it reads as when rule 2 allows, or rename the arcs so it reads as part of its own."
+				: "Every reader put it away, so it is no borderline miss: move it to the arc it reads as when rule 2 allows, or rename the arcs so it reads as part of its own."
 			: "At most one may stay, explained in the basis. For each, move the topic to the arc it reads as when rule 2 allows; rename only where rule 2 holds it, choosing a name for the arc's one idea that its topics read into. When the material's unit is whole, prefer a name that holds it to moving a topic out of it: keep the words of the unit's own heading and add what the topics that read elsewhere need (\"Graph search and shortest paths\", never \"Shortest paths\" alone for a unit headed \"Graph search\").",
 	].join("\n");
 }
