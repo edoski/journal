@@ -24,7 +24,8 @@ function fakeEngine() {
 	const dir = fs.mkdtempSync(path.join(TMP, "engine-"));
 	const python = path.join(dir, "python");
 	fs.writeFileSync(python, `#!/bin/sh\nexec "${process.execPath}" "${path.join(HERE, "fixtures", "fake-learning-engine.mjs")}" "$@"\n`, { mode: 0o755 });
-	return { python, root: dir, env: { ...process.env } };
+	// The test's own HOME: an engine run on the real one is refused (carry-in 3, round 19).
+	return { python, root: dir, env: { ...process.env, HOME: path.join(dir, "home") } };
 }
 
 function announced(): { workspaces: string[]; stop: () => void } {

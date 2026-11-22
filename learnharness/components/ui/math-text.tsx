@@ -38,7 +38,10 @@ export function mathPieces(text: string): MathPiece[] {
 export function mathPlain(text: string): string {
 	return mathPieces(text)
 		.map((piece) => (piece.kind === "text" ? piece.text : texPlain(piece.tex)))
-		.join("");
+		.join("")
+		.replace(/\s+([,.;:!?)])/g, "$1")
+		.replace(/\s{2,}/g, " ")
+		.trim();
 }
 
 const SYMBOL: Record<string, string> = {
@@ -48,12 +51,19 @@ const SYMBOL: Record<string, string> = {
 	R: "ℝ", N: "ℕ", Z: "ℤ", Q: "ℚ", C: "ℂ",
 };
 
+/** A formula as plain words, or nothing when it holds a command with
+ *  arguments this cannot read: "Combinations and binomial coefficients
+ *  binomnj" stood in a placeholder (round 19, m25), where a dropped formula
+ *  leaves the title's words whole. */
 function texPlain(tex: string): string {
-	return tex
+	const plain = tex
 		.replace(/\\[,;:! ]/g, " ")
 		.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, "$1/$2")
+		.replace(/\\binom\{([^{}]*)\}\{([^{}]*)\}/g, "C($1, $2)")
 		.replace(/\\(?:mathbb|mathbf|mathrm|mathcal|text|operatorname)\{([^{}]*)\}/g, (_, inner: string) => SYMBOL[inner] ?? inner)
-		.replace(/\\([a-zA-Z]+)/g, (_, name: string) => SYMBOL[name] ?? name)
+		.replace(/\\([a-zA-Z]+)(?![a-zA-Z]|\s*[{[])/g, (_, name: string) => SYMBOL[name] ?? name);
+	if (/\\[a-zA-Z]+\s*[{[]/.test(plain)) return "";
+	return plain
 		.replace(/[{}]/g, "")
 		.replace(/\s+/g, " ")
 		.trim();

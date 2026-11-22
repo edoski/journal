@@ -17,6 +17,7 @@ import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import {
 	needsContinuation,
+	resumesByItself,
 	pendingQuestionOf,
 	failedResponseAtEnd,
 	isQuestionTool,
@@ -1118,7 +1119,7 @@ export class SessionModel {
 	/** Automatic mount/sync continuation is never permission to retry a
 	 * failed turn. Read current model truth, not a stale React closure. */
 	async continueIfOwed(record: readonly LhMessage[]): Promise<void> {
-		if (this.statusValue === "ready" && !this.automaticContinuationBlocked && this.getState().error === null && needsContinuation(record)) {
+		if (this.statusValue === "ready" && !this.automaticContinuationBlocked && this.getState().error === null && resumesByItself(record)) {
 			await this.send({ type: "continue" });
 		}
 	}

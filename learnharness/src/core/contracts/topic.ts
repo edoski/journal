@@ -12,7 +12,8 @@ export interface TopicAttempt {
 	id: string;
 	/** The engine's study day. */
 	date: string;
-	/** When it was recorded (ISO), for order within a day; null when absent. */
+	/** When he gave it (ISO), for order within a day: for a re-mark, when
+	 *  he gave the answer it corrects; null when absent. */
 	recorded: string | null;
 	result: "correct" | "partial" | "incorrect";
 	/** The engine's rule: an exam, or help "none". */

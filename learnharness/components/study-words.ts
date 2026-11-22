@@ -705,6 +705,8 @@ export const LESSON_WORDS = {
 	skippedQuestion: "Skipped",
 	stoppedBeforeReply: "The tutor stopped before replying.",
 	couldntReply: "The tutor couldn't reply.",
+	/** A turn refused for a signed-out Claude, once Claude reads signed in (round 19, m27). */
+	signedInAgain: "Signed in again. Press Enter to send.",
 	youStoppedReply: "You stopped the tutor before it replied.",
 	youStoppedMidReply: "You stopped the tutor mid-reply.",
 	tryAgain: "Try again",

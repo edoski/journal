@@ -119,13 +119,14 @@ test("a signed-out line asks again at once, and goes when he comes back signed i
 	await settle();
 	const line = pane.querySelector('[data-testid="turn-error"]');
 	assert.ok(line === null, `the line goes once he is back (${line?.textContent})`);
-	assert.equal(pane.querySelector('[data-testid="reply-cut"]')?.textContent, "The tutor couldn't reply.Try again");
+	// Round 19, m27: what to do now, not the vaguer "The tutor couldn't reply".
+	assert.equal(pane.querySelector('[data-testid="reply-cut"]')?.textContent, "Signed in again. Press Enter to send.Try again");
 });
 
-test("reopened once Claude is connected, the failed turn says the tutor couldn't reply, never that it stopped (round 16, m2)", async () => {
+test("reopened once Claude is connected, the failed turn says he is signed in again, never that it stopped (round 16, m2; round 19, m27)", async () => {
 	connected = true;
 	const pane = await mount();
-	assert.equal(pane.querySelector('[data-testid="reply-cut"]')?.textContent, "The tutor couldn't reply.Try again");
+	assert.equal(pane.querySelector('[data-testid="reply-cut"]')?.textContent, "Signed in again. Press Enter to send.Try again");
 });
 
 test("every turn line names its one act Try again, and a failed session's status says it (round 16, m3)", async () => {
