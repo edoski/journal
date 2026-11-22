@@ -96,7 +96,7 @@ const NEVER_SUBMITTED = "The grouping pass never submitted.";
 /** Blind readers per sort: a topic is a miss when two of the five put it
  *  away from its arc (SORT_MISS_SHARE). */
 const SORT_READERS = 5;
-/** Fresh readers per topic, for the same reason: a use one reader in two
+/** Fresh readers per topic: a use one reader in two
  *  finds is missed only when both miss it, and a drop needs them all. */
 const NEEDS_READERS = 2;
 /** Model rounds beyond reading, as the map builder counts them: one to look
@@ -293,7 +293,7 @@ How this differs from the text below:
 - An arc of one topic carries single, saying why it stands alone. Two arcs citing the same unit of the material each carry shares, saying why.
 - Every arc cites in refs the unit of the material it follows, when the course has registered material.
 - Before you submit, run the name sort that rule 8 describes, and check each focus question is one question, not two joined by "and".
-- A stated exam's scope draws a boundary whether its date is ahead or past (rule 4's second signal): no arc holds both topics it examines and topics it leaves out, and the topics it leaves out sit in arcs after every arc of topics it examines, each joining the later arc whose question it extends rather than standing alone. examArcs and leavesOut only for the next exam still ahead, when the material states its scope. A topic that exam leaves out goes in an arc after the exam's arcs, never in one with topics it examines: list it in leavesOut.
+- A stated exam's scope draws a boundary whether its date is ahead or past (rule 4's second signal): no arc holds both topics it examines and topics outside its scope ("outside the scope of the exam" below), and those sit in arcs after every arc of topics it examines, each joining the later arc whose question it extends; they form an arc of their own only when no later arc's question fits. examArcs and leavesOut only for the next exam still ahead, when the material states its scope. A topic that exam leaves out goes in an arc after the exam's arcs, never in one with topics it examines: list it in leavesOut.
 - When the course should get no arcs, send none with the reason and an empty arcs list.
 
 `;
@@ -493,7 +493,7 @@ function cutPrompt(title: string, view: ArcPassView, record: unknown, material: 
 	const exam = obj(obj(record).exam);
 	const lines = courseHead(title, record, material);
 	const facts = [
-		view.examDate ? `Exam: ${view.examDate}` : "No exam date.",
+		view.examDate ? `Exam: ${view.examDate}${view.examPast ? ", already past" : ", still ahead"}` : "No exam date.",
 		typeof exam.coverage === "string" ? `Exam coverage: ${exam.coverage}` : "",
 		typeof exam.format === "string" ? `Exam format: ${exam.format}` : "",
 		view.basis ? `Path basis: ${view.basis}` : "",
@@ -837,7 +837,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			if (reads.length > 0) {
 				const now = sortedAway(reads.map((read) => sortMisses(quiz, read, a)));
 				sorted = standingMisses(seen, now, a);
-				seen = mergeMisses(seen, now);
+				seen = mergeMisses(now, seen);
 				log({ step: "sort", kind: "sorted", misses: sorted });
 				const misses = sortProblems(sorted, a);
 				if (misses) return misses;

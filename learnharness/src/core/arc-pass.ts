@@ -25,6 +25,7 @@
 
 import { createHash } from "node:crypto";
 import { sameName, validHandle, type MapCourseView, type MapRef } from "./course-map-build.ts";
+import { studyDay } from "./day-words.ts";
 
 type Json = Record<string, unknown>;
 const obj = (v: unknown): Json => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Json) : {});
@@ -659,6 +660,9 @@ export interface ArcSubmit {
 export interface ArcPassView extends MapCourseView {
 	/** The exam's day, when it has one. */
 	examDate: string | null;
+	/** The exam's day is before the study day: its scope still splits the
+	 *  course, but it is no next exam for `exam.arcs`. */
+	examPast?: boolean;
 	/** The topics the record already says the exam leaves out (`exam.leaves_out`). */
 	leftOut?: readonly string[];
 	/** Needs the edge step proposes and the record does not hold yet, by
@@ -721,10 +725,18 @@ export function withoutWithdrawn<V extends ArcPassView>(view: V, submit: Pick<Ar
 }
 
 /** The view, from the record and the topics he has studied. */
-export function arcPassView(view: MapCourseView, record: unknown): ArcPassView {
+export function arcPassView(view: MapCourseView, record: unknown, today: string = studyDay()): ArcPassView {
 	const exam = obj(obj(record).exam);
 	const left = Array.isArray(exam.leaves_out) ? exam.leaves_out.filter((t): t is string => typeof t === "string") : [];
-	return { ...view, examDate: text(exam.date) ?? null, ...(left.length > 0 ? { leftOut: left } : {}) };
+	const date = text(exam.date) ?? null;
+	return { ...view, examDate: date, ...(date && date < today ? { examPast: true } : {}), ...(left.length > 0 ? { leftOut: left } : {}) };
+}
+
+/** The arcs each cited unit of the material is cited by. Pure. */
+function unitArcs(submit: ArcSubmit): Map<string, string[]> {
+	const units = new Map<string, string[]>();
+	for (const a of submit.arcs) for (const unit of new Set((a.refs ?? []).flatMap((r) => unitOf(r) ?? []))) units.set(unit, [...(units.get(unit) ?? []), a.handle]);
+	return units;
 }
 
 /** A ref's unit of the material: its source and locator. */
@@ -773,15 +785,14 @@ export function arcPassProblems(submit: ArcSubmit, given: ArcPassView): string |
 	}
 	const unplaced = topics.filter((t) => !home.has(t));
 	if (unplaced.length > 0) problems.push(`these topics are in no arc: ${unplaced.join(", ")}. Every topic, left-out ones too, sits in exactly one arc.`);
-	const units = new Map<string, string[]>();
-	for (const a of submit.arcs) for (const unit of new Set((a.refs ?? []).flatMap((r) => unitOf(r) ?? []))) units.set(unit, [...(units.get(unit) ?? []), a.handle]);
-	for (const [unit, arcs] of units) {
+	for (const [unit, arcs] of unitArcs(submit)) {
 		if (arcs.length < 2) continue;
 		const silent = arcs.filter((h) => !submit.arcs.find((a) => a.handle === h)?.shares?.trim());
 		if (silent.length > 0) problems.push(`arcs ${arcs.join(", ")} each cite "${unit}": two arcs share a unit of the material only with a reason, in shares, on each.`);
 	}
 	if (submit.examArcs?.length) {
 		if (!view.examDate) problems.push("examArcs names the exam's arcs, but the course has no exam date: leave it out.");
+		else if (view.examPast) problems.push(`examArcs names the next exam's arcs, but the exam on ${view.examDate} is past: leave examArcs and leavesOut out. Its scope still splits the arcs.`);
 		for (const a of submit.examArcs) if (!handles.has(a)) problems.push(`examArcs names "${a}", which is no arc of the answer.`);
 	}
 	if (submit.leavesOut?.length && !submit.examArcs?.length) problems.push("leavesOut needs examArcs: it lists the topics the exam leaves out, only when the material states such an exam.");
@@ -795,6 +806,17 @@ export function arcPassProblems(submit: ArcSubmit, given: ArcPassView): string |
 			if (at === undefined) continue;
 			if (submit.examArcs.includes(at)) problems.push(`"${t}", which the exam leaves out, is in "${at}", one of examArcs: an arc holds topics the exam examines or topics it leaves out, never both. Put "${t}" in an arc after the exam's arcs, and list it in leavesOut.`);
 			else if (submit.arcs.findIndex((x) => x.handle === at) < last) problems.push(`leavesOut lists "${t}", in "${at}", an arc before the exam's: put it in an arc after them.`);
+		}
+	}
+	// A stated exam's scope splits the course whether its date is ahead or past (arcs.md rule 4's second signal;
+	// arc calibration 4: Probability's past midterm): no arc holds a topic the record's exam leaves out beside one it
+	// examines. A topic no exam examines (`excluded`) may sit with either.
+	if (view.leftOut?.length) {
+		const left = new Set(view.leftOut);
+		for (const a of submit.arcs) {
+			const out = a.topics.filter((t) => left.has(t));
+			const examined = a.topics.filter((t) => !left.has(t) && t in view.topics && !view.topics[t]!.excluded);
+			if (out.length > 0 && examined.length > 0) problems.push(`arc "${a.handle}" holds ${out.map((t) => `"${t}"`).join(", ")}, which the exam on ${view.examDate ?? "record"} leaves out, beside ${examined.map((t) => `"${t}"`).join(", ")}, which it examines: an arc holds one side of the exam's scope, whether the exam is ahead or past.`);
 		}
 	}
 	for (const t of submit.titles ?? []) {
@@ -952,9 +974,10 @@ export function arcPassChanges(submit: ArcSubmit, given: ArcPassView, extra: { e
 	// A one-topic arc's reason and a shared unit's reason are what the edge-case rules ask for; they live in the
 	// formation's reason, which the record keeps, beside the basis (arc calibration 3: a one-topic "Metric spaces" read
 	// as unexplained, since the answer's single was checked and then dropped).
+	const sharing = new Set([...unitArcs(submit).values()].filter((h) => h.length > 1).flat());
 	const why = arcs.flatMap((a) => [
-		...(a.single?.trim() ? [`"${a.title.trim()}" holds one topic: ${a.single.trim()}`] : []),
-		...(a.shares?.trim() ? [`"${a.title.trim()}" shares its unit: ${a.shares.trim()}`] : []),
+		...(a.topics.length === 1 && a.single?.trim() ? [`"${a.title.trim()}" holds one topic: ${a.single.trim()}`] : []),
+		...(sharing.has(a.handle) && a.shares?.trim() ? [`"${a.title.trim()}" shares its unit: ${a.shares.trim()}`] : []),
 	]);
 	const reason = [extra.reason, submit.basis.trim(), ...why].filter(Boolean).join("; ");
 	const edgeLog = [
@@ -1005,10 +1028,10 @@ export interface SortAnswer {
 }
 
 /** The share of a sort's readers that makes a topic a miss. The arcs
- *  jury's B1 counts two of three readers; a topic one reader in three puts
- *  away fails such a trio about half the time (arc calibration 4: four of
- *  the jury's five misses in rounds 2 and 3 had one of the pass's three
- *  readers away), so the pass reads five and counts two. */
+ *  jury's B1 counts two of three readers. In arc calibration 4's rounds 2
+ *  and 3, four of the jury's five misses were topics only one of the pass's
+ *  three readers had put away, and about as many such topics passed the
+ *  jury, so the pass reads five and counts two: stricter than the jury. */
 export const SORT_MISS_SHARE = 0.4;
 
 /** The misses of one sort by several readers: a topic is a miss when at
@@ -1116,9 +1139,9 @@ export function sortProblems(misses: readonly SortMiss[], submit: ArcSubmit): st
 	const [only] = misses;
 	const borderline = misses.length === 1 && only!.away < only!.of;
 	if (borderline && (basis.includes(only!.topic.toLowerCase()) || basis.includes(only!.title.toLowerCase()))) return null;
-	const lines = misses.map((m) => `- "${m.title}" (${m.topic}), in "${m.arc}", reads as part of ${m.readsAs.map((a) => `"${a}"`).join(" or ")}${m.away === m.of && m.of > 1 ? ` (every reader)` : ""}.`);
+	const lines = misses.map((m) => `- "${m.title}" (${m.topic}), in "${m.arc}", reads as part of ${m.readsAs.map((a) => `"${a}"`).join(" or ")} (${m.away} of ${m.of} readers).`);
 	return [
-		"Fresh readers sorted the topic titles into the arc names alone, as the learner will read them after days away (rule 8's name test), and two or more of them put these topics in another arc than yours:",
+		"Fresh readers sorted the topic titles into the arc names alone, as the learner will read them after days away (rule 8's name test), and put these topics in another arc than yours:",
 		...lines,
 		misses.length === 1
 			? borderline

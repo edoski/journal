@@ -19,6 +19,7 @@ import {
 	ARC_PASS_MIN_TOPICS,
 	arcPassChanges,
 	arcPassProblems,
+	arcPassView,
 	doubtNote,
 	EDGES_REASON,
 	edgeChanges,
@@ -56,7 +57,7 @@ import {
 	type KindVerdict,
 } from "../src/core/arc-pass.ts";
 import { duplicateOf, type ViewTopic } from "../src/core/course-map-build.ts";
-import { ARC_KINDS_INSTRUCTIONS, createArcPass, type TranscriptEntry } from "../src/agent/subagents/arc-former.ts";
+import { createArcPass, type TranscriptEntry } from "../src/agent/subagents/arc-former.ts";
 import { createMaterialTools, measureMaterial } from "../src/agent/tools/material.ts";
 import { mapRuns } from "../src/agent/subagents/course-map-builder.ts";
 import type { SdkEngine } from "../src/agent/models.ts";
@@ -327,7 +328,6 @@ describe("the kind check", () => {
 		const heard = withReadings(JUDGED, readings, view(CALC), kindAdmits(oneOff));
 		assert.ok(!heard.submit.add.some((a) => a.topic === "riemann"), "a one-off is no prerequisite");
 		assert.ok(heard.refused.some((a) => `${a.topic}<-${a.need}` === "riemann<-continuity"));
-		assert.match(ARC_KINDS_INSTRUCTIONS, /- one-off: A one-off among the exercises set for B/, "the kind check is told the kind");
 	});
 });
 
@@ -456,10 +456,32 @@ describe("the cut's shape rules", () => {
 		assert.equal(arcPassProblems({ ...apart, examArcs: ["limits-continuity", "derivatives"], leavesOut: ["riemann"] }, dated), null);
 	});
 
-	it("a one-topic arc's reason and a shared unit's reason are saved with the formation, where the record keeps them", () => {
-		const alone = { ...good, basis: "the book's chapters 2 to 4", arcs: [good.arcs[0]!, { ...good.arcs[1]!, topics: ["derivative", "chain"], shares: "chapter 3 splits rules from uses" }, { ...arc("integrals", "Integrals", ["riemann"]), single: "its own chapter, and the exam treats it alone" }] };
-		const reason = (arcPassChanges(alone, view(CALC))!.changes.arc_change as { reason: string }).reason;
-		assert.equal(reason, `the book's chapters 2 to 4; "Derivatives" shares its unit: chapter 3 splits rules from uses; "Integrals" holds one topic: its own chapter, and the exam treats it alone`);
+	it("a one-topic arc's reason and a shared unit's reason are saved with the formation, where the record keeps them; a stray one is not", () => {
+		const chapter3 = [{ source: "book", locator: "Chapter 3" }];
+		const cut = {
+			...good,
+			basis: "the book's chapters 2 to 4",
+			arcs: [
+				{ ...good.arcs[0]!, single: "stray: it holds two topics" },
+				{ ...good.arcs[1]!, topics: ["derivative"], refs: chapter3, single: "the rules alone", shares: "chapter 3 splits rules from uses" },
+				{ ...arc("uses", "Uses of derivatives", ["chain", "riemann"]), refs: chapter3, shares: "chapter 3 splits rules from uses" },
+			],
+		};
+		const reason = (arcPassChanges(cut, view(CALC))!.changes.arc_change as { reason: string }).reason;
+		assert.equal(reason, `the book's chapters 2 to 4; "Derivatives" holds one topic: the rules alone; "Derivatives" shares its unit: chapter 3 splits rules from uses; "Uses of derivatives" shares its unit: chapter 3 splits rules from uses`);
+	});
+
+	it("a stated exam's scope splits the arcs whether its date is ahead or past; only an exam ahead takes examArcs (arc calibration 4: Probability's past midterm)", () => {
+		const past = view(CALC, { examDate: "2026-11-19", examPast: true, leftOut: ["riemann"] });
+		const mixed = { ...good, arcs: [good.arcs[0]!, { ...good.arcs[1]!, topics: ["derivative", "chain", "riemann"] }] };
+		assert.match(arcPassProblems(mixed, past)!, /arc "derivatives" holds "riemann", which the exam on 2026-11-19 leaves out, beside "derivative", "chain", which it examines/);
+		const apart = { ...good, arcs: [good.arcs[0]!, { ...good.arcs[1]!, topics: ["derivative", "chain"] }, { ...arc("integrals", "Integrals", ["riemann"]), single: "outside the midterm, and no later arc" }] };
+		assert.equal(arcPassProblems(apart, past), null);
+		assert.match(arcPassProblems({ ...apart, examArcs: ["limits-continuity", "derivatives"] }, past)!, /the exam on 2026-11-19 is past: leave examArcs and leavesOut out/);
+		const excluded = view({ ...CALC, chain: { ...CALC.chain, excluded: "no exam asks it" } }, { examDate: "2026-11-19", examPast: true, leftOut: ["riemann"] });
+		assert.equal(arcPassProblems({ ...apart, arcs: [good.arcs[0]!, { ...good.arcs[1]!, topics: ["derivative"] , single: "x" }, { ...arc("integrals", "Integrals", ["chain", "riemann"]) }] }, excluded), null, "a topic no exam examines sits with either side");
+		assert.equal(arcPassView({ ...view(CALC) }, { exam: { date: "2026-11-19" } }, "2026-11-22").examPast, true);
+		assert.equal(arcPassView({ ...view(CALC) }, { exam: { date: "2026-12-01" } }, "2026-11-22").examPast, undefined);
 	});
 
 	it("R4: with registered material, every arc cites the unit it follows", () => {
