@@ -48,7 +48,9 @@ const { createProberAgent, createSetupAgent } = await import("../src/agent/teach
 const { setupTools } = await import("../src/agent/tools/setup.ts");
 const { newUserMessage, sessionModeOf } = await import("../src/core/native-messages.ts");
 
-after(() => fs.rmSync(TMP, { recursive: true, force: true }));
+// A setup wake still running reads the course through the engine, which keeps a last-read copy in this home (round
+// 19, m5): removal retries while that write lands, as it failed once on CI with ENOTEMPTY.
+after(() => fs.rmSync(TMP, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
 afterEach(() => setTurnRunner(async () => 200));
 
 const engine = (args: string[], input?: unknown) =>
