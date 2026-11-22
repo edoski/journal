@@ -97,6 +97,18 @@ export const COMPOSER_SURFACE =
  *  the field on top (14px, two lines growing to 208px), the toolbar under
  *  it with attach on the left, quiet chips on the right and one 32px round
  *  send. Its host draws no shell around it. */
+/** The paths of dropped files that are not photos, in the desktop app,
+ *  whose preload reads a dropped file's path (Electron's webUtils); none
+ *  in a browser, which never gives one. */
+export function droppedPaths(files: FileList | null): string[] {
+	const pathOf = typeof window === "undefined" ? undefined : (window as unknown as { lh?: { pathForFile?: (file: File) => string } }).lh?.pathForFile;
+	if (!pathOf || !files) return [];
+	return Array.from(files)
+		.filter((f) => !f.type.startsWith("image/"))
+		.map((f) => pathOf(f))
+		.filter((p) => p.length > 0);
+}
+
 export function LessonComposer({
 	busy,
 	value,
@@ -230,6 +242,17 @@ export function LessonComposer({
 				act();
 			}}
 			{...photos?.surface}
+			onDrop={(e) => {
+				// A dropped file or folder that is no photo: its path joins his words
+				// (the desktop app), so the tutor reads it where it is.
+				const paths = droppedPaths(e.dataTransfer.files);
+				if (paths.length > 0) {
+					e.preventDefault();
+					onChange([value.trimEnd(), ...paths].filter(Boolean).join("\n"));
+					fieldRef.current?.focus();
+				}
+				photos?.surface.onDrop(e);
+			}}
 		>
 			{!collapsed && head}
 			{photos && <PendingPhotos draft={photos} />}

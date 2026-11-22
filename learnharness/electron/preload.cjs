@@ -29,7 +29,7 @@
  *
  * Channel names are mirrored in electron/main.cjs — keep them in sync.
  */
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("lh", {
 	expandWindow: () => ipcRenderer.send("lh:expand-window"),
@@ -41,6 +41,8 @@ contextBridge.exposeInMainWorld("lh", {
 	getZoom: () => ipcRenderer.invoke("lh:zoom:get"),
 	lightsCentre: Number(process.argv.find((arg) => arg.startsWith("--lh-lights-centre="))?.split("=")[1]),
 	pickFolder: () => ipcRenderer.invoke("lh:pick-folder"),
+	/** A dropped file's or folder's path on his Mac (the composer puts it in his words). */
+	pathForFile: (file) => webUtils.getPathForFile(file),
 	notify: (notice) => ipcRenderer.send("lh:notify", notice),
 	onInUse: (cb) => {
 		const listener = () => cb();
