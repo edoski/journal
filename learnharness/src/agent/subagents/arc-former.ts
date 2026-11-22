@@ -292,7 +292,7 @@ How this differs from the text below:
 - An arc of one topic carries single, saying why it stands alone. Two arcs citing the same unit of the material each carry shares, saying why.
 - Every arc cites in refs the unit of the material it follows, when the course has registered material.
 - Before you submit, run the name sort that rule 8 describes, and check each focus question is one question, not two joined by "and".
-- examArcs and leavesOut only when the material states the next exam's scope. A topic the exam leaves out goes in an arc after the exam's arcs, never in one with topics it examines: list it in leavesOut.
+- A stated exam's scope draws a boundary whether its date is ahead or past (rule 4's second signal): no arc holds both topics it examines and topics it leaves out. examArcs and leavesOut only for the next exam still ahead, when the material states its scope. A topic that exam leaves out goes in an arc after the exam's arcs, never in one with topics it examines: list it in leavesOut.
 - When the course should get no arcs, send none with the reason and an empty arcs list.
 
 `;
@@ -402,7 +402,7 @@ function courseHead(title: string, record: unknown, material: PassMaterial): str
 }
 
 /** The topics in path order, each with what the step reads of it. */
-function topicLines(view: MapCourseView & Pick<ArcPassView, "proposed" | "added" | "implied">, withNeeds: boolean): string[] {
+function topicLines(view: MapCourseView & Pick<ArcPassView, "proposed" | "added" | "implied"> & Partial<Pick<ArcPassView, "leftOut" | "examDate">>, withNeeds: boolean): string[] {
 	const listed = [...view.order.filter((k) => k in view.topics), ...Object.keys(view.topics).filter((k) => !view.order.includes(k))];
 	return listed.map((handle) => {
 		const t = view.topics[handle]!;
@@ -419,6 +419,7 @@ function topicLines(view: MapCourseView & Pick<ArcPassView, "proposed" | "added"
 			t.refs.length > 0 ? `refs ${refWords(t.refs)}` : "",
 			t.aliases.length > 0 ? `also called ${t.aliases.join(", ")}` : "",
 			t.excluded ? `left out of the exam: ${t.excluded}` : "",
+			view.leftOut?.includes(handle) ? `outside the scope of the exam${view.examDate ? ` on ${view.examDate}` : ""}` : "",
 		].filter(Boolean);
 		return `- ${handle}: ${t.title ?? "(no title)"}${facts.length > 0 ? ` (${facts.join("; ")})` : ""}`;
 	});

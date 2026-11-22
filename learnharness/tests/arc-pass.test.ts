@@ -1030,6 +1030,16 @@ describe("the grouping pass (real engine, scripted model)", { skip: realEngineMi
 		assert.equal(model.sorts, 3, "three blind readers");
 	});
 
+	it("the cut reads which topics the record's exam leaves out, so it can keep the exam's boundary (AIKR: 50 topics left out of Module 1)", async () => {
+		const dir = course("left-out");
+		engine(["--workspace", dir, "save"], { exam: { date: "2026-12-01", leaves_out: ["riemann"] } });
+		const model = scriptedModel(EDGES, [CUT]);
+		await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "apply" });
+		const cut = [...model.prompts].find((p) => p.includes("## Topics, in path order"))!;
+		assert.match(cut, /^- riemann: Riemann sums \(.*outside the scope of the exam on 2026-12-01\)$/m);
+		assert.doesNotMatch(cut, /^- limits: .*outside the scope/m);
+	});
+
 	it("a course he has studied takes arcs only with words in asked", async () => {
 		const dir = course("studied");
 		engine(["--workspace", dir, "save"], { topics: { limits: { introduced: "2026-11-01" } } });
