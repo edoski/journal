@@ -743,6 +743,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `A topic named with no day he can act on: ${quoted(b.excerpt)}. Name its day from the close's days, copied as written, or leave the topic out.`;
 		case "half-answer-day":
 			return `His half answer is named with no day for its lesson: ${quoted(b.excerpt)}. Say when that lesson continues, copied from the close's days ("…waits in your Poisson distribution lesson, which continues tomorrow, Monday 9 November.").`;
+		case "lesson-unnamed":
+			return `His review is done, and this question opens the ${b.excerpt} lesson with no word that it has begun. Open it with one clause naming it ("Now ${b.excerpt}: …"); if it is another review's question, name that review ("Now your … review: …").`;
 		case "split-display":
 			return `Two displays joined by a lone "${b.excerpt}" leave it alone on a line between them. Write short equations inline in the sentence ("$h(1,1) = (1,0,2)$ ${b.excerpt} $h(1,-1) = (3,2,0)$"), or set both in one display.`;
 		case "nothing-above":
@@ -1025,6 +1027,32 @@ function reviewTopicsOf(messages: readonly LhMessage[]): string[] {
 	return [];
 }
 
+/** A session opened on a topic's page for its lesson, before its probe
+ *  ended or its plan was written: its topics, from the brief's "Opened
+ *  on: …." line, and its title, his first message, which the app posted.
+ *  Null for a review, a free session, or once the lesson is under way. */
+function lessonOpenedOn(messages: readonly LhMessage[]): { topics: string[]; title: string } | null {
+	const begun = messages.some((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && (b.name === "plan_init" || b.name === PROBE_DONE_TOOL)));
+	const first = messages.find((m) => m.role === "user");
+	if (begun || !first) return null;
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "custom" || m.customType !== "course-context" || typeof m.content !== "string") continue;
+		const opened = /^Opened on: (.+?)\. He pressed the action on its page/m.exec(m.content);
+		const title = textOf(first.content).trim();
+		return opened && title ? { topics: opened[1]!.split(/,\s*/), title } : null;
+	}
+	return null;
+}
+
+/** A saved answer that ends a review of a topic other than the lesson's:
+ *  right, on his own, not a guess (reviews.md: one right answer, unaided,
+ *  ends the topic's review). */
+function endsReview(o: Record<string, unknown>, lessonTopics: readonly string[]): boolean {
+	const topics = Array.isArray(o.topics) ? o.topics.map(String) : [];
+	return typeof o.question === "string" && o.result === "correct" && (o.help === undefined || o.help === "none") && o.sure !== "guess" && o.predicted !== true && topics.length > 0 && !topics.some((t) => lessonTopics.includes(t));
+}
+
 const OFF_TOPIC_NOTE = "off-topic";
 const UNSAVED_NOTE = "His answer to your last question is not saved. Save it with course_save now, as it was, a wrong prediction included, since every attempt is kept; if it only asked you something, it holds no attempt.";
 
@@ -1292,6 +1320,14 @@ export class VoiceGuard {
 	 *  many messages had been sent at its save, and whether a turn-ending
 	 *  call was held for the sentence it owes (once a turn). */
 	private readonly reviewTopics: string[];
+	/** The lesson a session opened on a topic is for, before its probe has
+	 *  ended (its topics and his first message, the topic's title), and
+	 *  whether this turn's save ended a review of another topic with a right
+	 *  answer on his own: the next question opens the lesson, and says so
+	 *  (round 19, m20). Held once a turn. */
+	private readonly lesson: { topics: string[]; title: string } | null;
+	private reviewEnded = false;
+	private heldLessonUnnamed = false;
 	private offTopic: { topics: string[]; at: number; held: boolean } | null = null;
 	/** The topic titles this turn's results named. */
 	private readonly titles: string[] = [];
@@ -1327,6 +1363,7 @@ export class VoiceGuard {
 		this.posedLast = posedLast(messages);
 		this.posedSinceInput = posedSinceInput(messages);
 		this.reviewTopics = review ? reviewTopicsOf(messages) : [];
+		this.lesson = review ? null : lessonOpenedOn(messages);
 		this.problemBefore = messages.some((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === PRACTICE_PROBLEM_TOOL));
 		this.openAbove = openAbove(messages);
 		this.stepsAhead = stepsNotDone(messages);
@@ -1477,6 +1514,7 @@ export class VoiceGuard {
 		if (call.name === SAVE_TOOL && this.firstTry && savedNotRight(call.arguments, this.firstTry.id)) this.retryOwed = true;
 		if (call.name === SAVE_TOOL && this.secondTry && savedNotRight(call.arguments, this.secondTry.id)) this.repairOwed = true;
 		if (call.name === SAVE_TOOL && this.setAside && savedQuestionsOf(call.arguments).includes(HIS_MESSAGE)) this.setAside = null;
+		if (call.name === SAVE_TOOL && this.lesson && savedObservations(isRecord(call.arguments) ? call.arguments : {}).some((o) => endsReview(o, this.lesson!.topics))) this.reviewEnded = true;
 		if (call.name === SAVE_TOOL && this.reviewTopics.length > 0 && !this.offTopic) {
 			const off = savedObservations(isRecord(call.arguments) ? call.arguments : {}).find((o) => typeof o.question === "string" && Array.isArray(o.topics) && o.topics.length > 0 && !o.topics.some((t) => this.reviewTopics.includes(String(t))));
 			if (off) this.offTopic = { topics: (off.topics as unknown[]).map(String), at: this.sent, held: false };
@@ -1588,7 +1626,7 @@ export class VoiceGuard {
 			this.heldRetry = true;
 			return RETRY(this.firstTry!.question);
 		}
-		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text)]);
+		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text), ...this.lessonUnnamed(text)]);
 		if (breaks.length > 0) {
 			this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 			return refusal("question", call.name, text, breaks, undefined);
@@ -1789,6 +1827,18 @@ export class VoiceGuard {
 	 *  message of this turn names with its new day. */
 	private unnamedMoves(text: string): MovedStart[] {
 		return this.moved.filter((m) => ![text, ...this.toldNow].some((t) => namesMove(t, m)));
+	}
+
+	/** The first question after a review a lesson ran first, with no word
+	 *  of the lesson: the move from review to probe went unannounced (round
+	 *  19, m20: after the Mechanics review's last right answer, Invertible
+	 *  matrices' probe began with no word that the lesson had). */
+	private lessonUnnamed(text: string): VoiceBreak[] {
+		if (!this.lesson || !this.reviewEnded || this.heldLessonUnnamed) return [];
+		const opening = sentences(text)[0] ?? text;
+		if (namesTitle(text, this.lesson.title) || /\breview\b/i.test(opening)) return [];
+		this.heldLessonUnnamed = true;
+		return [{ rule: "lesson-unnamed", excerpt: this.lesson.title }];
 	}
 
 	/** Words that point at a demo this turn called for: it is built after

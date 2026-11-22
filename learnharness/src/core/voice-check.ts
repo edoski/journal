@@ -86,7 +86,8 @@ export type VoiceRule =
 	| "split-display"
 	| "self-correction"
 	| "vague-day"
-	| "half-answer-day";
+	| "half-answer-day"
+	| "lesson-unnamed";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
