@@ -4,7 +4,7 @@ import { continueMove, sessionState, type SessionState } from "@/components/nav/
 import { SOLID, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { CONTINUE_OPENING } from "@/components/start/course-facts";
 import { localDay } from "@/components/day-change";
-import { lessonBegun } from "@/components/study-words";
+import { lapsedNow, lessonBegun } from "@/components/study-words";
 
 /** "Span", "Span, Rank", "Span, Rank, Basis and dimension": every title,
  *  in order, joined by commas only, since a title may hold its own "and"
@@ -71,7 +71,10 @@ export function todaySteps(course: StudyCourse): NextStep[] {
 	const tasks = focused ? [focused, ...map.tasks.filter((t) => t !== focused)] : map.tasks;
 	const current = map.topics.find((t) => t.handle === map.current);
 	const steps: NextStep[] = [];
-	const reviews = todaysReview(course);
+	// The topic he got wrong last time leads, so the review opens on the slip its line names (round 19, m11:
+	// "Calculus I review · Not right last time: The chain rule" opened on cylindrical shells).
+	const due = todaysReview(course);
+	const reviews = [...due.filter((t) => lapsedNow(t.signals)), ...due.filter((t) => !lapsedNow(t.signals))];
 	if (reviews.length > 0) {
 		steps.push({ kind: "review", titles: reviews.map((t) => t.title), topics: reviews.map((t) => t.handle), then: tasks[0]?.title ?? current?.title ?? null });
 	}
