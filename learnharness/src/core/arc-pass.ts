@@ -244,7 +244,7 @@ export const ADD_KINDS = {
 	definition: { adds: true, words: "B's definition, statement or central formula is written with A, and working it computes A (∇f(g(x)) = J_gᵀ∇f computes a transpose)." },
 	method: {
 		adds: true,
-		words: "A step towards B's own question, in the method B's material teaches or in an exercise or worked example it sets for B, runs A (a null space's basis is found by row reduction; whether a series converges is settled by the limit of its terms).",
+		words: "A step towards B's own question runs A: in the method B's material teaches, or in the exercises it typically sets for B, its standard cases, and not only in a one-off (a null space's basis is found by row reduction; whether a series converges is settled by the limit of its terms; most chain-rule exercises differentiate trigonometric outer functions).",
 	},
 	tool: { adds: true, words: "B's work runs on what A teaches: a service, a library, a program or a model it uses (a deploy runbook that ships through a hosting platform)." },
 	property: {
@@ -252,6 +252,10 @@ export const ADD_KINDS = {
 		words: "The step answers A's question about B's object, not B's own question: a side result about B stated through A that no exercise set for B uses to answer B's question, or A's computation carried out on B (the mean of a Binomial answers expectation's question, so it practises expectation, not the Binomial; that a tree has one edge fewer than vertices is counting about trees, which are worked without it).",
 	},
 	application: { adds: false, words: "The step uses B to do A's work: B applied to A's problem (Dijkstra's algorithm run on a road map does not make the algorithm need the maps topic), so A is where B is used, not what B needs." },
+	"one-off": {
+		adds: false,
+		words: "A one-off among the exercises set for B takes the step: a single worked example, a checkpoint, or an odd exercise or pair that brings A in, while B's method and its standard exercises are worked without A (one example finds a velocity through lim sin t/t).",
+	},
 	"other exercise": { adds: false, words: "The step belongs to an exercise the material sets for another topic, not for B." },
 	route: { adds: false, words: "A way of working B that B's material does not teach, such as a lesson's or the reader's own route, or a second method beside the one B's material uses." },
 	wording: { adds: false, words: "B only writes in A's notation or vocabulary, or uses what a learner knows before the course starts." },

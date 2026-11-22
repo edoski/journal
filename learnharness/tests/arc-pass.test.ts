@@ -56,7 +56,7 @@ import {
 	type KindVerdict,
 } from "../src/core/arc-pass.ts";
 import { duplicateOf, type ViewTopic } from "../src/core/course-map-build.ts";
-import { createArcPass, type TranscriptEntry } from "../src/agent/subagents/arc-former.ts";
+import { ARC_KINDS_INSTRUCTIONS, createArcPass, type TranscriptEntry } from "../src/agent/subagents/arc-former.ts";
 import { createMaterialTools, measureMaterial } from "../src/agent/tools/material.ts";
 import { mapRuns } from "../src/agent/subagents/course-map-builder.ts";
 import type { SdkEngine } from "../src/agent/models.ts";
@@ -319,6 +319,15 @@ describe("the kind check", () => {
 		assert.deepEqual(heard.refused.map((a) => `${a.topic}<-${a.need}`), ["chain<-continuity"], "the judge's add and the reader's same use go once");
 		assert.equal(heard.submit.verdicts[0]!.keep, true, "the stored edge stays: its reader found a step that uses it");
 		assert.deepEqual(withReadings(JUDGED, readings, view(CALC), kindAdmits(null)).submit.add.map((a) => `${a.topic}<-${a.need}`), ["chain<-continuity", "riemann<-continuity"]);
+	});
+
+	it("refuses a use only a one-off brings in: one example or an odd exercise or two, while the topic's method and standard exercises are worked without it", () => {
+		const readings = new Map([["riemann", { uses: [{ need: "continuity", step: "one example samples a continuous integrand" }] }]]);
+		const oneOff: KindVerdict[] = [{ topic: "riemann", need: "continuity", kind: "one-off", reason: "only Example 5.4 uses it" }];
+		const heard = withReadings(JUDGED, readings, view(CALC), kindAdmits(oneOff));
+		assert.ok(!heard.submit.add.some((a) => a.topic === "riemann"), "a one-off is no prerequisite");
+		assert.ok(heard.refused.some((a) => `${a.topic}<-${a.need}` === "riemann<-continuity"));
+		assert.match(ARC_KINDS_INSTRUCTIONS, /- one-off: A one-off among the exercises set for B/, "the kind check is told the kind");
 	});
 });
 
