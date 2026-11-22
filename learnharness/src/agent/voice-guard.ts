@@ -1056,7 +1056,7 @@ const RETRY_NOTE = "His first try at your check was not right, and he has not tr
  *  check on the same step, the screen drew it as "Your turn, on the
  *  question above" over the SR question, and his SR answer was filed
  *  under the hidden one). */
-function setAsideOf(messages: readonly LhMessage[]): { tool: string; question: string; key: string } | null {
+function setAsideOf(messages: readonly LhMessage[]): SetAside | null {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const m = messages[i]!;
 		if (m.role === "user" || m.role === "custom") continue;
@@ -1066,12 +1066,39 @@ function setAsideOf(messages: readonly LhMessage[]): { tool: string; question: s
 			if (a.role !== "assistant") continue;
 			const call = a.content.find((b): b is ToolCall => b.type === "toolCall" && b.id === m.toolCallId);
 			const question = call ? questionText(call) : undefined;
-			if (call && question) return { tool: call.name, question, key: sameQuestionKey(question) };
+			if (call && question) return { tool: call.name, question, key: sameQuestionKey(question), step: stepOf(call) };
 		}
 		return null;
 	}
 	return null;
 }
+
+type SetAside = { tool: string; question: string; key: string; step?: string };
+
+/** The plan step a question call names (`nodeId`), if any. */
+function stepOf(call: Pick<ToolCall, "arguments">): string | undefined {
+	return isRecord(call.arguments) && typeof call.arguments.nodeId === "string" ? call.arguments.nodeId : undefined;
+}
+
+/** Whether a call is on the step `step` names: either names none, or both the same. */
+function sameStepAs(call: Pick<ToolCall, "arguments">, step: string | undefined): boolean {
+	const own = stepOf(call);
+	return own === undefined || step === undefined || own === step;
+}
+
+/** His words asking practice for a problem: "next", "another one", "give
+ *  me a harder problem", "yes". */
+const ASKS_FOR_PROBLEM = /\b(?:next|another|new|more|different|harder|easier|similar)\b(?:\s+[\w-]+){0,2}\s+(?:problems?|ones?|questions?|exercises?)\b|^\s*(?:next|go on|continue|keep going|more|another|again|ok(?:ay)?|yes|yep|sure|go(?: ahead)?)\b/i;
+
+/** A problem posed in reply to his message from Ask, which asked for none
+ *  (round 19, m16, 3 n3: after a finished Rank problem, a side question got
+ *  its answer and an unasked problem on bases of ℝ³, and Next problem was
+ *  gone). The next problem waits for his Next problem. */
+const ASKED_ONLY: AgentToolResult<unknown> = {
+	content: [{ type: "text", text: "Not posed: he asked you something and asked for no problem. Answer his message with send_to_user and end your turn; the next problem waits for his Next problem, or his words asking for one." }],
+	isError: true,
+	details: { withheld: "asked-only" },
+};
 
 /** His message asks to be taught or told instead of asked: the question
  *  he set aside is set aside for good (ASKED_INSTEAD_TEXT). */
@@ -1204,8 +1231,12 @@ export class VoiceGuard {
 	 *  the turn asks it again before any other, unless his message was
 	 *  his answer (a save names it), asked to guess first (a prediction
 	 *  goes through) or asked to be taught instead. Held once a turn. */
-	private setAside: { tool: string; question: string; key: string } | null;
+	private setAside: SetAside | null;
 	private heldSetAside = false;
+	/** A problem posed in reply to his Ask was held back once (`ASKED_ONLY`). */
+	private heldAskedOnly = false;
+	/** The session posed a practice problem before this turn. */
+	private readonly problemBefore: boolean;
 	/** A save of his answer failed this turn, and no message has said its
 	 *  verdict: his card shows no mark while the record can't be read. */
 	private verdictOwed = false;
@@ -1294,6 +1325,7 @@ export class VoiceGuard {
 		this.posedLast = posedLast(messages);
 		this.posedSinceInput = posedSinceInput(messages);
 		this.reviewTopics = review ? reviewTopicsOf(messages) : [];
+		this.problemBefore = messages.some((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === PRACTICE_PROBLEM_TOOL));
 		this.openAbove = openAbove(messages);
 		this.stepsAhead = stepsNotDone(messages);
 		this.unsaved = saves ? unsavedAnswerOf(messages) : null;
@@ -1529,6 +1561,10 @@ export class VoiceGuard {
 			return PLAIN_OWED(call.name);
 		}
 		const waits = this.owed && !question && this.endsTurn(call.name);
+		if (call.name === PRACTICE_PROBLEM_TOOL && this.problemBefore && this.input.kind === "direct" && !this.input.ruling && !ASKS_FOR_PROBLEM.test(this.input.words ?? "") && !this.heldAskedOnly) {
+			this.heldAskedOnly = true;
+			return ASKED_ONLY;
+		}
 		if (call.name === PRACTICE_PROBLEM_TOOL) {
 			const refused = this.judgeProblem(call);
 			if (!refused && waits) this.waiting.add(call.id);
@@ -1556,7 +1592,9 @@ export class VoiceGuard {
 			return refusal("question", call.name, text, breaks, undefined);
 		}
 		// A prediction he is invited to make is the guess rule's: it never counts.
-		const asksAside = !!this.setAside && GRADED_QUESTION_TOOLS.includes(call.name) && sameQuestionKey(text) === this.setAside.key;
+		// Asked again with its own tool and step, so the screen draws it as his
+		// turn on the question above, never its words again (round 19, m16).
+		const asksAside = !!this.setAside && call.name === this.setAside.tool && sameStepAs(call, this.setAside.step) && sameQuestionKey(text) === this.setAside.key;
 		const predicts = normalizeQuestionType(isRecord(call.arguments) ? call.arguments.type : undefined) === "predict";
 		if (this.setAside && GRADED_QUESTION_TOOLS.includes(call.name) && !asksAside && !predicts && !this.heldSetAside) {
 			this.heldSetAside = true;
