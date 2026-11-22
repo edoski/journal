@@ -206,6 +206,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "to": _TEXT,
         "edges": _EDGES,
         "edges_entry": _ENTRY,
+        "topics": _HANDLES,
         "reason": _TEXT,
         "asked": _TEXT,
     },
@@ -302,6 +303,7 @@ ArcEvent = TypedDict(
         "to": str,
         "edges": list[ArcEdge],
         "edges_entry": int,
+        "topics": list[str],
         "reason": str,
         "asked": str,
     },
@@ -1279,8 +1281,9 @@ def empty() -> dict[str, Any]:
 
 
 def _arc_log(value: Any) -> list[dict[str, Any]]:
-    """The log's events; an ``edges`` event lists its edges, and an
-    ``edges_entry`` names an earlier ``edges`` event."""
+    """The log's events; an ``edges`` event lists its edges, a ``unit``
+    event its topics, and an ``edges_entry`` names an earlier ``edges``
+    event."""
     log: list[dict[str, Any]] = []
     for index, item in enumerate(_list(value, "arc_log", "arc events")):
         path = f"arc_log[{index}]"
@@ -1288,6 +1291,10 @@ def _arc_log(value: Any) -> list[dict[str, Any]]:
         if (event["kind"] == "edges") != ("edges" in event):
             raise ValueError(
                 f"{path}: an edges event lists its edges, and only an edges event does"
+            )
+        if (event["kind"] == "unit") != ("topics" in event):
+            raise ValueError(
+                f"{path}: a unit event lists its topics, and only a unit event does"
             )
         if "edges_entry" in event:
             arc_rules.check_edges_entry(
