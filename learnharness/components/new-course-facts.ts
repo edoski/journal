@@ -1,7 +1,7 @@
 /**
- * What the New course and Add material forms hold and how they read, kept
- * pure for tests: the exam day as the engine writes it, and the material
- * picked so far, one pick per press of Add files or Add a folder.
+ * What the Add material form holds and how it reads, kept pure for tests:
+ * the material picked so far, one pick per press of Add files or Add a
+ * folder. (A new course is set up by conversation since 22 Nov 2026.)
  */
 
 /** One press of Add files or Add a folder. A folder's files carry their
@@ -9,25 +9,6 @@
 export interface MaterialPick {
 	kind: "files" | "folder";
 	files: readonly File[];
-}
-
-/** A local calendar day as the engine writes it, YYYY-MM-DD. */
-export function isoDay(date: Date): string {
-	const pad = (n: number) => String(n).padStart(2, "0");
-	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-/** The local Date at midnight of a YYYY-MM-DD day. */
-export function dayDate(day: string): Date {
-	const [year, month, date] = day.split("-").map(Number);
-	return new Date(year!, month! - 1, date);
-}
-
-const LONG = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-
-/** "Monday 14 December 2026". */
-export function longDay(day: string): string {
-	return LONG.format(dayDate(day)).replace(",", "");
 }
 
 /** The name a file is sent under: its path inside a picked folder, else its name. */
@@ -48,15 +29,6 @@ export function pickWords(pick: MaterialPick): string {
 function appendMaterial(form: FormData, picks: readonly MaterialPick[]): FormData {
 	for (const pick of picks) for (const file of pick.files) form.append("material", file, sentName(file));
 	return form;
-}
-
-/** The form as the server reads it (app/api/courses, POST). */
-export function newCourseForm({ title, exam, root, picks }: { title: string; exam: string | null; root: string; picks: readonly MaterialPick[] }): FormData {
-	const form = new FormData();
-	form.set("title", title.trim());
-	if (exam) form.set("exam", exam);
-	if (root) form.set("root", root);
-	return appendMaterial(form, picks);
 }
 
 /** Add material's form as the server reads it (app/api/courses/material, POST). */

@@ -14,6 +14,7 @@ import { emit } from "../core/events.ts";
 import { stores } from "./stores.ts";
 import { startCourseMap } from "./course-map.ts";
 import { courseRecordForgotten } from "../store/course-records.ts";
+import { sessionModeOf } from "../core/native-messages.ts";
 
 /** The registered courses plus the study roots a new course can go in.
  *  Until the engine exposes its study roots, a root is the parent folder
@@ -300,9 +301,10 @@ export function courseGone(course: { workspace: string } | undefined): boolean {
 }
 
 /** True when the session exists and has no course: its learner turns are
- *  refused until the learner links one. */
+ *  refused until the learner links one. A setup session has none until it
+ *  makes one, and takes his turns meanwhile. */
 export function courseRequired(chatId: unknown): boolean {
 	if (typeof chatId !== "string") return false;
 	const chat = stores.chatStore.getChat(chatId);
-	return chat !== null && !chat.course;
+	return chat !== null && !chat.course && sessionModeOf(chat.messages, chat.kind) !== "setup";
 }

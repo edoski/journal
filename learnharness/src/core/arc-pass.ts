@@ -59,6 +59,13 @@ export interface ArcPassLedger {
 	reason?: string;
 	/** His words, for `approved`. */
 	approval?: string;
+	/** His words that asked for the course to be set up (a setup
+	 *  conversation): a live run quotes them as `arc_change.asked`, so the
+	 *  arcs still form once he has begun studying it. */
+	asked?: string;
+	/** How many arc log entries the growth step has read (server/arc-growth.ts):
+	 *  a `unit` event after them starts a re-cut of the arcs not begun. */
+	grown?: number;
 }
 
 /** The engine's `MIN_ARCS` (arc_rules.py): one live arc is the course again. */

@@ -43,7 +43,8 @@ process.env.LH_DATA_DIR = path.join(TMP, "data");
 await signInTestClaude();
 
 const { POST: createChatRoute } = await import("../app/api/chats/route.ts");
-const { GET: coursesRoute, POST: createCourseRoute, PATCH: renameCourseRoute, DELETE: deleteCourseRoute } = await import("../app/api/courses/route.ts");
+const { GET: coursesRoute, PATCH: renameCourseRoute, DELETE: deleteCourseRoute } = await import("../app/api/courses/route.ts");
+const { createCourse: createCourseServer } = await import("../src/server/courses.ts");
 const { PUT: linkCourseRoute } = await import("../app/api/chats/[id]/course/route.ts");
 const { POST: chatTurnRoute } = await import("../app/api/chat/route.ts");
 const { handleChatRequest } = await import("../src/server/chat-handler.ts");
@@ -73,14 +74,11 @@ async function createChat(body: Record<string, unknown>): Promise<Response> {
 	return createChatRoute(post("/api/chats", body));
 }
 
-/** The New course form as the dialog sends it. */
+/** A new course as the setup conversation makes one (server/setup.ts), its
+ *  answer as a response. */
 async function createCourse(body: { root?: string; title: string; exam?: string; material?: Array<[string, string]> }): Promise<Response> {
-	const form = new FormData();
-	form.set("title", body.title);
-	if (body.root !== undefined) form.set("root", body.root);
-	if (body.exam !== undefined) form.set("exam", body.exam);
-	for (const [name, content] of body.material ?? []) form.append("material", new File([content], name));
-	return createCourseRoute(new Request("http://test/api/courses", { method: "POST", body: form }));
+	const made = await createCourseServer({ root: body.root ?? "", title: body.title, exam: body.exam ?? null, material: (body.material ?? []).map(([path, content]) => ({ path, bytes: new TextEncoder().encode(content) })) });
+	return made.ok ? Response.json(made.course) : Response.json({ error: made.error, code: made.code }, { status: made.status });
 }
 
 function send(method: "PATCH" | "DELETE", body: unknown): Request {

@@ -62,7 +62,8 @@ describe("course link banner", () => {
 				Object.assign(event, { pointerId: 1, pointerType: "mouse", isPrimary: true, button: 0, ctrlKey: false });
 				chip.dispatchEvent(event);
 			});
-			assert.ok(dom.document.querySelector('[data-testid="course-new"]'), "New course is offered");
+			assert.ok(dom.document.querySelector('[data-testid="course-option"]'), "his courses are offered");
+			assert.ok(dom.document.querySelector('[data-testid="course-new"]') === null, "an old session is linked to a course he has: nothing new is set up here");
 		} finally {
 			await act(async () => root.unmount());
 			host.remove();

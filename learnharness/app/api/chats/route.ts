@@ -1,4 +1,4 @@
-import { derivePlanStatusesLh, newSessionModeMessage, openingTitle, newSessionResumeMessage, sessionResumeText, sessionTasksOf, type LhMessage } from "@/src/core";
+import { derivePlanStatusesLh, newSessionModeMessage, SETUP_STYLES, openingTitle, newSessionResumeMessage, sessionResumeText, sessionTasksOf, type LhMessage } from "@/src/core";
 import { courseGone, courseLinkFor, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
 import type { ChatListItem } from "@/src/core";
 
@@ -20,7 +20,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-	const body = (await req.json().catch(() => ({}))) as { title?: unknown; name?: unknown; kind?: unknown; course?: unknown; resume?: unknown; topics?: unknown; arcCheck?: unknown };
+	const body = (await req.json().catch(() => ({}))) as { title?: unknown; name?: unknown; kind?: unknown; course?: unknown; resume?: unknown; topics?: unknown; arcCheck?: unknown; setupStyle?: unknown };
 	const title = typeof body.title === "string" ? body.title : "";
 	// A start the app words for him names itself apart from its opening question (round 11, 1 N14).
 	const name = typeof body.name === "string" && body.name.trim().length > 0 ? body.name.trim() : null;
@@ -28,7 +28,15 @@ export async function POST(req: Request) {
 	// without it the prober routes the opening, and the agents hand the
 	// session between teaching and practice from there.
 	const practice = body.kind === "practice";
-	// Every session belongs to one registered course. A workspace the
+	// Setting up something new to learn starts with no course: the setup
+	// agent makes one and links the session to it.
+	if (body.kind === "setup") {
+		const chat = createChat(name ?? (title.trim() ? titleFromPrompt(title) : "New learning"), undefined, [], undefined, name !== null);
+		const style = SETUP_STYLES.find((s) => s === body.setupStyle);
+		stores.chatStore.saveMessages(chat.id, [newSessionModeMessage("setup", style) as LhMessage]);
+		return Response.json({ id: chat.id, title: chat.title });
+	}
+	// Every other session belongs to one registered course. A workspace the
 	// engine does not list is refused, never guessed.
 	const workspace = (body.course as { workspace?: unknown } | undefined)?.workspace;
 	if (typeof workspace !== "string" || workspace.length === 0) {

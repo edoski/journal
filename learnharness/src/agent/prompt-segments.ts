@@ -26,6 +26,12 @@ const PROMPTS_DIR = path.join(PATHS.root, "src", "agent", "prompts");
  *  the same law for every agent that marks him (14 Nov 2026). */
 const PRACTICE_SHARED_FRAGMENTS = ["10-voice.md", "15-accuracy.md", "16-mental-model.md", "40-formatting.md", "45-photos.md"];
 
+/** Shared fragments the SETUP agent composes: the voice, the truth
+ *  contract, where his files are and the formatting guide. It teaches
+ *  nothing and asks no graded question, so the question and confidence
+ *  mechanics stay out. */
+const SETUP_SHARED_FRAGMENTS = ["10-voice.md", "15-accuracy.md", "30-learner-files.md", "40-formatting.md"];
+
 /** The voice's sections that govern every text he reads, a chat turn or a
  *  record he reads days later: the digest, which writes only the latter,
  *  composes these and leaves out the turn budgets. */
@@ -71,7 +77,7 @@ export function listSourceSegments(agent: PromptAgent): Array<{ path: string; sh
 	const sharedDir = path.join(PROMPTS_DIR, "shared");
 	if (fs.existsSync(sharedDir)) {
 		// The practice allowlist (owner, 2026-10-04 late): formatting only.
-		const allow = agent === "practice" ? PRACTICE_SHARED_FRAGMENTS : null;
+		const allow = agent === "practice" ? PRACTICE_SHARED_FRAGMENTS : agent === "setup" ? SETUP_SHARED_FRAGMENTS : null;
 		const sharedFragments = fs
 			.readdirSync(sharedDir)
 			.filter((f) => FRAGMENT_RE.test(f) && (allow === null || allow.includes(f)))
@@ -81,6 +87,12 @@ export function listSourceSegments(agent: PromptAgent): Array<{ path: string; sh
 		}
 	}
 	return segments;
+}
+
+/** The order a setup conversation follows, for the direction it was
+ *  started in (prompts/setup/styles/), or look first when none. */
+export function setupStyleText(style: "ask" | "build" | undefined): string {
+	return fs.readFileSync(path.join(PROMPTS_DIR, "setup", "styles", `${style ?? "look"}.md`), "utf-8").trim();
 }
 
 /** Every source segment's text for one agent, in composition order. */
@@ -148,6 +160,8 @@ export const ENGINE_DOCTRINE: Readonly<Record<PromptAgent, readonly DoctrinePart
 		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close", "Exam run-up"] },
 		...ACROSS_SESSIONS,
 	],
+	// Setup corrects what it set up with course_save: what a self-study is, the exam's facts.
+	setup: [{ file: "course.md", sections: ["Self-study", "Exam facts"], intro: false }],
 };
 
 /** What each agent adds of arcs.md in a course with arcs. */
@@ -155,6 +169,7 @@ export const ARCS_DOCTRINE: Readonly<Record<PromptAgent, DoctrinePart>> = {
 	prober: ARCS_PROBING,
 	teacher: ARCS_TEACHING,
 	practice: ARCS_TEACHING,
+	setup: { file: "arcs.md", sections: ["What an arc is"], intro: false },
 };
 
 /** What a prompt's composition knows of the course. */

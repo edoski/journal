@@ -3,6 +3,7 @@ import { COURSE_DELETED, courseDeleted } from "./courses.ts";
 import {
 	createPracticeAgent,
 	createProberAgent,
+	createSetupAgent,
 	createTeacherAgent,
 	type AgentBuildOptions,
 	type AgentKind,
@@ -37,7 +38,8 @@ import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn
 import { askPrestart, claimPrestart, prestart } from "./prestart.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
 import { continuedTask } from "./task-passage.ts";
-import { activeProblemOf, answeredQuestionsOf, danglingQuestionOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
+import { activeProblemOf, answeredQuestionsOf, danglingQuestionOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, sessionModeOf, setupStyleOf, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
+import { createLearning, startSurvey, studyPlaces } from "./setup.ts";
 import { remarkableOf } from "../core/answer-marks.ts";
 import { lessonTopicsOf, reviewRecord } from "../core/session-opening.ts";
 import { compactionInstructions, planTreeToText } from "../core/compaction.ts";
@@ -229,7 +231,7 @@ function turnAgent(
 	merged: LhMessage[],
 	engine: SdkEngine,
 	courseArcs: Awaited<ReturnType<typeof fetchCourseArcs>>,
-	{ onUsage, claim, buildAgent }: { onUsage?: (usage: Usage) => void; claim?: AgentBuildOptions["claim"]; buildAgent?: TurnAgentFactory } = {},
+	{ onUsage, claim, buildAgent, places }: { onUsage?: (usage: Usage) => void; claim?: AgentBuildOptions["claim"]; buildAgent?: TurnAgentFactory; places?: readonly string[] } = {},
 ): TeachingAgent {
 	// AGENT CONSTRUCTION BRANCH (docs/probe-teach-split.md §2): the transcript
 	// is the seam. Its mode picks practice or teaching; in teaching a
@@ -286,6 +288,7 @@ function turnAgent(
 		// save's links are kept the moment the engine takes it, so a restart
 		// before the transcript's write loses neither the mark nor the
 		// "already saved" (round 8).
+		...(agentKind === "setup" ? { setup: { places: places ?? [], style: setupStyleOf(agentMessages) } } : {}),
 		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, onMoved: keepMoved, review: reviewRecord(record), reviewTopics: record.topics ?? [], lessonTopics: () => lessonTopicsOf(stores.chatStore.getChat(chatId) ?? record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [], courses: keptCourseMaps } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
@@ -294,6 +297,18 @@ function turnAgent(
 	// uniform across agents).
 	return buildAgent
 		? buildAgent({ ...agentOpts, teaching, agent: agentKind })
+		: agentKind === "setup"
+			? createSetupAgent(
+					{
+						chatId,
+						chatStore: stores.chatStore,
+						deliver: (steer) => void deliverJobResult(steer),
+						survey: (paths) => startSurvey(chatId, paths),
+						create: (input) => createLearning(chatId, input),
+						jobs: { chatId, jobStore: stores.jobStore, spawn: (job, input) => void jobRunner.runJob(job.id, input) },
+					},
+					agentOpts,
+				)
 		: agentKind === "practice"
 			? createPracticeAgent(
 					{
@@ -332,6 +347,11 @@ function turnAgent(
 						// needs the same job wiring as the teacher's.
 						jobStore: stores.jobStore,
 						spawn: (job, input) => void jobRunner.runJob(job.id, input),
+						// His opening asks to set up something new: the session leaves this course.
+						leaveCourse: () => {
+							stores.chatStore.leaveCourse(chatId);
+							emit("record-changed", { chatId });
+						},
 					},
 					agentOpts,
 				);
@@ -367,7 +387,8 @@ export async function prestartAnswerTurn(chatId: string, buildAgent?: TurnAgentF
 	// His answer opens the turn: an input of his after the record, as the
 	// turn reads its effort.
 	const messages = [...record.messages, { id: "prestart", role: "user", content: "", timestamp: Date.now() } as LhMessage];
-	prestart(chatId, turnAgent(chatId, record, messages, messages, engine, courseArcs, { buildAgent }).prepare());
+	const places = sessionModeOf(record.messages, record.kind) === "setup" ? await studyPlaces().catch(() => []) : undefined;
+	prestart(chatId, turnAgent(chatId, record, messages, messages, engine, courseArcs, { buildAgent, places }).prepare());
 }
 
 /**
@@ -448,10 +469,12 @@ export async function handleChatInput(
 	// material, as the engine's map names them, drawn the moment he presses
 	// (round 17, M8; round 18, M6).
 	const opened = record;
-	const [courseBrief, courseArcs, task] = await Promise.all([
+	const [courseBrief, courseArcs, task, places] = await Promise.all([
 		learnerInput || handoffWake ? fetchCourseBrief(record) : null,
 		fetchCourseArcs(record),
 		input.type === "task" ? keptCourseMaps().then((maps) => continuedTask(maps.find((m) => m.workspace === opened.course?.workspace), opened.messages)) : null,
+		// A setup session looks first where his study material is kept.
+		sessionModeOf(record.messages, record.kind) === "setup" ? studyPlaces().catch(() => []) : undefined,
 	]);
 	const freshRecord = stores.chatStore.getChat(chatId);
 	if (!freshRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
@@ -588,7 +611,7 @@ export async function handleChatInput(
 	const modelId = `${engine.model.provider}:${engine.model.id}`;
 	// The turn takes the process started for it while he thought, when
 	// that process has every option this turn starts one with.
-	const constructed = turnAgent(chatId, record, agentMessages, merged, engine, courseArcs, { onUsage: collectUsage, claim: (key) => claimPrestart(chatId, key), buildAgent });
+	const constructed = turnAgent(chatId, record, agentMessages, merged, engine, courseArcs, { onUsage: collectUsage, claim: (key) => claimPrestart(chatId, key), buildAgent, places });
 
 	// A test-injected agent gets no usage collector (tests assert the
 	// transcript, not the money channel); when it's ours, usage flows through

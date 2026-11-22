@@ -78,19 +78,20 @@ const OWING_TOOLS: readonly string[] = [...QUESTION_TOOLS, "probe_done"];
 /** The prober's or teacher's registry plus `practice`, with the turn guard:
  *  a handoff after a question or a concluded probe in the same turn is
  *  refused, and so are those calls after a handoff. */
-export function withPracticeHandoff(tools: Record<string, AgentTool<any>>, ctx: HandoffContext): Record<string, AgentTool<any>> {
+export function withPracticeHandoff(tools: Record<string, AgentTool<any>>, ctx: HandoffContext & { leave?: () => void }): Record<string, AgentTool<any>> {
 	const turn: TurnState = { owed: false, handedOff: false };
 	const guarded = Object.fromEntries(
 		Object.entries(tools).map(([name, tool]) => [name, OWING_TOOLS.includes(name) ? guardedByHandoff(name, tool, turn) : tool]),
 	);
-	return { ...guarded, ...practiceHandoffTool(ctx, turn) };
+	const leave = ctx.leave;
+	return { ...guarded, ...practiceHandoffTool(ctx, turn), ...(leave ? setupHandoffTool({ ...ctx, leave }, turn) : {}) };
 }
 
 function guardedByHandoff(name: string, tool: AgentTool<any>, turn: TurnState): AgentTool<any> {
 	return {
 		...tool,
 		execute: async (...args: Parameters<AgentTool<any>["execute"]>) => {
-			if (turn.handedOff) return invalidInputResult(name, ["the session was just handed to practice: end your turn"]);
+			if (turn.handedOff) return invalidInputResult(name, ["the session was just handed on: end your turn"]);
 			const result = await tool.execute(...args);
 			if (!result.isError && (result.details as { ok?: unknown } | null)?.ok !== false) turn.owed = true;
 			return result;
@@ -118,6 +119,36 @@ export function practiceHandoffTool(ctx: HandoffContext, turn: TurnState = { owe
 		},
 	};
 	return { practice: tool };
+}
+
+export const setupHandoffInput = Type.Object({
+	what: Type.String({ description: "REQUIRED — what he wants to learn or set up, in his own words." }),
+});
+
+/** `setup`, for the prober: his opening asks to set up something new to
+ *  learn (a new course, or a subject, topic or task of his own) rather than
+ *  to study this course. The session leaves this course (`leave`) and the
+ *  setup agent takes it from his words. Refused once he owes an answer. */
+export function setupHandoffTool(ctx: HandoffContext & { leave: () => void }, turn: TurnState = { owed: false, handedOff: false }): Record<string, AgentTool<any>> {
+	const tool: AgentTool<typeof setupHandoffInput> = {
+		name: "setup",
+		label: "setup",
+		description:
+			"Hand the session to setting up something new to learn: call it when his message asks to set up a new course, or to learn a subject, topic or task this course does not cover. " +
+			"The setup agent takes over from his words. Refused once a question is open. After it succeeds, end your turn.",
+		parameters: setupHandoffInput,
+		executionMode: "sequential",
+		execute: async (toolCallId) => {
+			const record = ctx.chatStore.getChat(ctx.chatId);
+			if (turn.owed || (record && danglingQuestionOf(record.messages) !== null)) {
+				return invalidInputResult("setup", ["a question is open — hand off on a later turn"]);
+			}
+			turn.handedOff = true;
+			ctx.leave();
+			return handedOff(ctx, toolCallId, "setup");
+		},
+	};
+	return { setup: tool };
 }
 
 /** `teach`, for the practice agent. `problemActive` is the turn's own gate

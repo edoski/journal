@@ -913,14 +913,17 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			if (!passDue(ledger, record)) return;
 			topics = liveTopics(record).length;
 			const write = (state: "formed" | "none" | "failed", extra: { reason?: string; revision?: number }) => ledgers.save(workspace, { state, at: new Date().toISOString(), topics, ...extra });
+			// A course set up by conversation carries his words asking for it,
+			// so its arcs still form once he has begun studying it (G5).
+			const asked = ledger?.asked;
 			const studied = await studiedOf(workspace, record);
-			if (studied.length > 0) {
+			if (studied.length > 0 && !asked) {
 				write("failed", { reason: `he has studied ${studied.length === 1 ? "a topic" : "topics"} of it already, so only his words can ask for arcs` });
 				return;
 			}
 			const title = typeof obj(record).title === "string" ? (obj(record).title as string) : workspace;
 			signal = setRunPhase(jobKey, "grouping", "arc-pass", title).controller.signal;
-			const result = await run(workspace, { edges: "apply", signal });
+			const result = await run(workspace, { edges: "apply", signal, ...(asked ? { asked } : {}) });
 			if (result.status === "failed" && /^no model is set|does not allow background work$/.test(result.reason)) {
 				console.info(`[arc-pass ${workspace}] skipped: ${result.reason}`);
 				return;

@@ -2,14 +2,14 @@
 
 import { useCallback } from "react";
 import { LessonComposer } from "@/components/lesson/lesson-composer";
-import { CourseControl, CoursesUnavailable, useCourseChoice } from "@/components/course-picker";
+import { CourseControl, CoursesUnavailable, NEW_LEARNING_PLACEHOLDER, useCourseChoice } from "@/components/course-picker";
 import { useFieldCycle } from "@/components/field-cycle";
 import { SetupDialog } from "@/components/setup-dialog";
 import { useModelSetup } from "@/components/setup-cta";
 import { Button } from "@/components/ui/button";
 import { WindowPage } from "@/components/page-frame/window-page";
 import { NEW_LESSON_BOX } from "@/components/lesson/kept-drafts";
-import { lessonCreation, useLessonStart, useStartDraft } from "@/components/start/use-lesson-start";
+import { startCreation, useLessonStart, useStartDraft } from "@/components/start/use-lesson-start";
 
 /** The heading over the composer. It names no mode: the tutor routes the
  *  request to teaching or practice itself. */
@@ -39,12 +39,15 @@ export function StartScreen() {
 	useFieldCycle(cycleComposer);
 
 	// The session is created with no mode: the prober reads the opening and
-	// hands it to practice when it asks for problems.
+	// hands it to practice when it asks for problems. With no course picked
+	// (New course or self-study), his words set something new up.
 	const send = () => {
 		if (!draft.canSend) return;
-		const course = courseChoice.requireCourse();
-		if (!course) return;
-		lesson.start(lessonCreation(draft.text.trim(), course), { draft });
+		if (courseChoice.state.status === "unavailable") {
+			courseChoice.requireCourse();
+			return;
+		}
+		lesson.start(startCreation(draft.text.trim(), courseChoice.workspace), { draft });
 	};
 
 	const { state } = courseChoice;
@@ -64,7 +67,7 @@ export function StartScreen() {
 						onStop={() => {}}
 						canSend={draft.canSend}
 						autoFocus
-						placeholder={START_PLACEHOLDER}
+						placeholder={courseChoice.workspace ? START_PLACEHOLDER : NEW_LEARNING_PLACEHOLDER}
 						leading={<CourseControl choice={courseChoice} />}
 						photos={draft.photos}
 					/>

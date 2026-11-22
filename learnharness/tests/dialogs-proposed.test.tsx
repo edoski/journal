@@ -7,7 +7,6 @@ import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { Dialog } from "../components/ui/dialog.tsx";
 import { AlertDialog } from "../components/ui/alert-dialog.tsx";
-import { NewCourseBody } from "../components/course-picker.tsx";
 import { AbortTurnBody } from "../components/abort-turn-dialog.tsx";
 import { DeleteSessionBody } from "../components/delete-session-dialog.tsx";
 
@@ -46,25 +45,6 @@ async function escapeReachesWindow(): Promise<boolean> {
 }
 
 describe("dialogs keep their actions", () => {
-	it("New course: a dialog with a title field, the exam day and material, Cancel, and Create disabled until there is a title", async () => {
-		const closes: boolean[] = [];
-		await mount(
-			<Dialog open onOpenChange={(open) => closes.push(open)}>
-				<NewCourseBody roots={["/study/courses"]} onClose={() => {}} onCreated={() => {}} />
-			</Dialog>,
-		);
-		const dialog = $('[data-testid="new-course-dialog"]');
-		assert.equal(dialog?.getAttribute("role"), "dialog");
-		assert.equal(dialog?.querySelector('[data-slot="dialog-title"]')?.textContent, "New course");
-		assert.ok($('[data-testid="new-course-title"]'));
-		assert.ok($('[data-testid="new-course-exam"]'));
-		assert.ok($('[data-testid="new-course-material"]'));
-		assert.equal($('[data-testid="new-course-create"]')?.hasAttribute("disabled"), true);
-		assert.ok([...document.querySelectorAll("button")].some((b) => b.textContent === "Cancel"));
-		assert.equal(await escapeReachesWindow(), false, "Esc closes the dialog and stops there");
-		assert.deepEqual(closes, [false]);
-	});
-
 	it("abort: an alert dialog with the question's own words and action, Cancel first", async () => {
 		await mount(
 			<AlertDialog open>

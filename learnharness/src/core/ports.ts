@@ -71,6 +71,8 @@ export interface ChatStore {
 	/** Link the session to a registered course (the banner on a session
 	 *  that has none, or whose course is gone). Silent, like saveTree. */
 	linkCourse(id: string, course: CourseLink): void;
+	/** Take the session out of its course (a handoff to setup). */
+	leaveCourse(id: string): void;
 	/** Rename a session (the header's click-to-edit title, 2026-09-17).
 	 * Like saveTree: a rename is NOT conversation activity — updatedAt
 	 * stays put, so sidebar order never churns on a rename. */
