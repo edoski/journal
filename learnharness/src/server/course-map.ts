@@ -23,7 +23,8 @@ import { createArcPass, type ArcPass } from "../agent/subagents/arc-former.ts";
 import { createCourseMapBuilder, type CourseMapBuilder, type CourseMapStatus } from "../agent/subagents/course-map-builder.ts";
 import { claudeEngine, type SdkEngine } from "../agent/models.ts";
 import { emit, subscribe, type ServerEvent } from "../core/events.ts";
-import { sourcesRegisteredInLastTurn } from "../core/native-messages.ts";
+import { sourcesRegisteredInLastTurn, topicsSavedInLastTurn } from "../core/native-messages.ts";
+import { growArcs } from "./arc-growth.ts";
 import { effectiveSettings, stores } from "./stores.ts";
 import { createCourseContexts, watchLinkedFolders, type CourseContexts } from "./course-context.ts";
 
@@ -63,6 +64,8 @@ export function courseMapBuilder(): CourseMapBuilder {
 			if (status.state === "built" || status.state === "failed") {
 				// A setup conversation waits on its course's first map.
 				void import("./setup.ts").then((m) => m.noteMapBuilt(workspace, status));
+				// What the build added may be a new unit: its arcs grow.
+				void growArcs(workspace);
 			}
 		},
 	}));
@@ -96,6 +99,8 @@ export function courseMapStatus(workspace: string): CourseMapStatus {
 function onTurnSettled(event: ServerEvent<"turn-settled">): void {
 	const record = stores.chatStore.getChat(event.chatId);
 	if (!record?.course) return;
+	// A tutor's topics may be a new unit: the course's arcs grow.
+	if (topicsSavedInLastTurn(record.messages)) void growArcs(record.course.workspace);
 	const added = sourcesRegisteredInLastTurn(record.messages);
 	if (added.length === 0) return;
 	const { workspace } = record.course;
