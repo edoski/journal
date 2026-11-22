@@ -7,7 +7,7 @@ import { HomeMap } from "@/components/study-home/home-map";
 import { neighbourCourse, useHomeKeys } from "@/components/study-home/home-keys";
 import { followedRow, lineKey } from "@/components/study-home/agenda-rows/row-facts";
 import { lessonOf } from "@/components/study-home/lesson-facts";
-import type { TodayRow } from "@/components/study-home/study-facts";
+import { byUrgency, type TodayRow } from "@/components/study-home/study-facts";
 import { Today } from "@/components/study-home/today";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
@@ -79,7 +79,8 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 	const tie = useMapTie({ onHold: (at) => setChosen({ by: "line", key: at.key }) });
 
 	const followed = chosen?.by !== "tab" ? followedRow(rows, chosen?.by === "line" ? chosen.key : null, chats) : null;
-	const workspace = chosen?.by === "tab" ? chosen.workspace : (followed?.course?.map.workspace ?? courses[0]!.map.workspace);
+	// The tabs keep the read's order (round 19, m9); with no line to follow, the most urgent course shows.
+	const workspace = chosen?.by === "tab" ? chosen.workspace : (followed?.course?.map.workspace ?? byUrgency(courses)[0]!.map.workspace);
 	const lesson = useMemo(() => (followed ? lessonOf(followed) : null), [followed]);
 	const followedTopics = useMemo<ReadonlySet<TopicHandle> | null>(() => (lesson?.topics.length ? new Set(lesson.topics) : null), [lesson]);
 	// Only the line the map follows wears its fill while he points at it, so no row has a card behind it at rest.

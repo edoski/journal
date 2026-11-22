@@ -20,7 +20,6 @@ import { HomeBody } from "../components/study-home/study-home.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
 import { lessonOf } from "../components/study-home/lesson-facts.ts";
 import { needsYouNow } from "../components/study-home/needs-you.ts";
-import { todayCourses } from "../components/study-home/study-facts.ts";
 import { CHATS, LINALG_ARCS, PROB, TODAY } from "./fixtures/now-demo.ts";
 
 const router = { push: () => {}, replace: () => {}, prefetch: () => {}, back: () => {}, forward: () => {}, refresh: () => {} };
@@ -35,7 +34,7 @@ afterEach(async () => {
 
 async function mount(courses: readonly StudyCourse[], chats: readonly ChatListItem[]) {
 	const { rows } = needsYouNow(courses, chats, TODAY);
-	const ready = { rows, lessons: rows.map(lessonOf), courses: todayCourses(rows, courses), chats, done: [], exam: null, busy: false, onContinue: () => {} };
+	const ready = { rows, lessons: rows.map(lessonOf), courses, chats, done: [], exam: null, busy: false, onContinue: () => {} };
 	host = document.createElement("div");
 	document.body.appendChild(host);
 	root = createRoot(host);

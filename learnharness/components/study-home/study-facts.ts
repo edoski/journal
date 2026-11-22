@@ -369,16 +369,6 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 	return [...plan, ...unplaced(waiting), ...tasks, ...unplaced(leftovers), ...later];
 }
 
-/** The courses of Today's lines, each once, in the lines' order: a course
- *  with a waiting lesson and its review on two lines is one course. Then
- *  every other course of `all` with nothing today, most urgent first, so
- *  Home's tabs still reach every map. Pure. */
-export function todayCourses(rows: readonly TodayRow[], all: readonly StudyCourse[] = []): StudyCourse[] {
-	const listed = [...new Set(rows.flatMap((r) => (r.course ? [r.course] : [])))];
-	const workspaces = new Set(listed.map((c) => c.map.workspace));
-	return [...listed, ...byUrgency(all).filter((c) => !workspaces.has(c.map.workspace))];
-}
-
 /** The exam in words while the course is in its run-up, else null. Pure. */
 export function runupExam(course: StudyCourse): string | null {
 	return course.unready === null ? null : examWords(course);
