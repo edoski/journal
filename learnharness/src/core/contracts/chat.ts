@@ -245,6 +245,16 @@ export function probeFeedbackText(said: readonly string[] | null): string {
 	return `I have already read the probe's feedback on my last answer: ${said.map((t) => `"${t.trim()}"`).join(" ")} That is said: the first step builds on it with something new, and never says its point again, in any words.`;
 }
 
+/** His task's step is his to try before anything is taught (carry-in 1,
+ *  round 18 P5's runs: on Continue Problem sheet 4, 5 of 8 turns read the
+ *  task's record, which names his two misses at part (c), then worked part
+ *  (c) on his own matrix in a message and asked a check on a new one, so
+ *  his hand-in part was done for him). A gap the record names is taught
+ *  after his try shows it, on an example of the tutor's own. */
+export const TASK_STEP_FIRST =
+	"Pose the step to me first, as my own work, and let me try it before you teach anything: never work it, or any part of it, yourself. " +
+	"If my try shows a gap, teach it then, on an example of your own, never on my task's own matrix or numbers.";
+
 /** The wake in a session that continues an open task (round 11, 2 N2: the
  *  lesson's wake turned Problem sheet 4, answered right at part (c), into a
  *  nine-step rank–nullity lesson from its basics put in front of part (d),
@@ -252,8 +262,9 @@ export function probeFeedbackText(said: readonly string[] | null): string {
  *  a gap the assessment names may come before it; a step that needs his
  *  material waits for it. */
 export const TASK_HANDOFF_TEXT =
-	"Next: carry on with my open task at the step the assessment says comes next. It is my task, not a lesson: plan only that step with plan_init, one node named for the part it is, with a node before it only for a gap the assessment names, never a lesson on the topic from its basics. " +
-	"If the step needs something from me first, such as a part's text, ask me for it in one plain line, unless that is already asked above, and end your turn; work the step once I send it. Otherwise pose the step straight away.";
+	"Next: carry on with my open task at the step the assessment says comes next. It is my task, not a lesson: plan only that step with plan_init, one node named for the part it is, never a lesson on the topic from its basics. " +
+	"If the step needs something from me first, such as a part's text, ask me for it in one plain line, unless that is already asked above, and end your turn; pose the step once I send it. Otherwise pose the step straight away. " +
+	TASK_STEP_FIRST;
 
 /** The model-facing words of Continue pressed on an open task this session
  *  holds, when nothing in it waits on him (round 13, 2 M1): Continue
@@ -268,8 +279,9 @@ export function taskContinueText(tasks: readonly string[], passage?: string | nu
 	return (
 		`[CONTINUE MY TASK] I pressed Continue on my open task ${named}. Carry on at its saved step, as the course record above gives it. ` +
 		(passage ? `My screen already shows its text from my material, so read no file for it:\n\n${passage}\n\n` : "") +
-		"It is my task, not a lesson: never a lesson on the topic from its basics, and a step before it only for a gap the record names. If you plan, plan only that step with plan_init, one node named for the part it is. " +
-		"If the step needs something from me first, such as a part's text, ask me for it in one plain line and end your turn; otherwise pose the step straight away. Never say this message."
+		"It is my task, not a lesson: never a lesson on the topic from its basics. If you plan, plan only that step with plan_init, one node named for the part it is. " +
+		"If the step needs something from me first, such as a part's text, ask me for it in one plain line and end your turn; otherwise pose the step straight away. " +
+		`${TASK_STEP_FIRST} Never say this message.`
 	);
 }
 
