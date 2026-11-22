@@ -1136,15 +1136,16 @@ function sameStepAs(call: Pick<ToolCall, "arguments">, step: string | undefined)
 }
 
 /** His words asking practice for a problem: "next", "another one", "give
- *  me a harder problem", "yes". */
-const ASKS_FOR_PROBLEM = /\b(?:next|another|new|more|different|harder|easier|similar)\b(?:\s+[\w-]+){0,2}\s+(?:problems?|ones?|questions?|exercises?)\b|^\s*(?:next|go on|continue|keep going|more|another|again|ok(?:ay)?|yes|yep|sure|go(?: ahead)?)\b/i;
+ *  me a harder problem", "give me a problem on bases", "can I try one on
+ *  eigenvalues?", "yes". */
+const ASKS_FOR_PROBLEM = /\b(?:next|another|new|more|different|harder|easier|similar)\b(?:\s+[\w-]+){0,2}\s+(?:problems?|ones?|questions?|exercises?)\b|\b(?:give|set|pose|try|do|practi[sc]e)\b(?:\s+[\w-]+){0,3}\s+(?:problems?|ones?|questions?|exercises?)\b|^\s*(?:next|go on|continue|keep going|more|another|again|ok(?:ay)?|yes|yep|sure|go(?: ahead)?)\b/i;
 
 /** A problem posed in reply to his message from Ask, which asked for none
  *  (round 19, m16, 3 n3: after a finished Rank problem, a side question got
  *  its answer and an unasked problem on bases of ℝ³, and Next problem was
  *  gone). The next problem waits for his Next problem. */
 const ASKED_ONLY: AgentToolResult<unknown> = {
-	content: [{ type: "text", text: "Not posed: he asked you something and asked for no problem. Answer his message with send_to_user and end your turn; the next problem waits for his Next problem, or his words asking for one." }],
+	content: [{ type: "text", text: "Not posed: his message reads as a question, not a request for a problem. If it asked for none, answer it with send_to_user and end your turn; the next problem waits for his Next problem. If his words did ask for one, pose it again." }],
 	isError: true,
 	details: { withheld: "asked-only" },
 };

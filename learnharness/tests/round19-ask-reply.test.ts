@@ -57,8 +57,15 @@ describe("m16: one rule for an Ask reply (3 n2, n3)", () => {
 		assert.equal(verdict(guard, nextProblem())?.withheld, "asked-only");
 	});
 
-	it("his words asking for one pose it", () => {
-		const guard = practiceAsk("another one please");
+	for (const words of ["another one please", "give me a problem on bases", "can I try one on eigenvalues?"]) {
+		it(`his words asking for one pose it: "${words}"`, () => {
+			assert.equal(verdict(practiceAsk(words), nextProblem()), null);
+		});
+	}
+
+	it("a request the words miss is posed on the second try, as the refusal says", () => {
+		const guard = practiceAsk("let's do kernels now");
+		assert.equal(verdict(guard, nextProblem())?.withheld, "asked-only");
 		assert.equal(verdict(guard, nextProblem()), null);
 	});
 });
