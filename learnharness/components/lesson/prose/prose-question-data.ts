@@ -9,6 +9,7 @@ import {
 	buildAnswer,
 	normalizeOptions,
 	normalizeQuestionType,
+	offersStopIn,
 	parseQuestionInput,
 	QUESTION_TOOLS,
 	sameQuestionKey,
@@ -34,6 +35,10 @@ export interface ProseQuestionSpec {
 	/** He can give it up with Show me: a check, never a prediction, which
 	 *  asks before anything is taught. */
 	showsAnswer: boolean;
+	/** The tutor's offer to go on: a choice one of whose options stops for
+	 *  today (`offersStopIn`). It asks nothing of him, so it has no "Your
+	 *  turn" (round 19, m21). */
+	offer: boolean;
 }
 
 /** The question a tool call asks, or null when its input doesn't parse. */
@@ -55,7 +60,7 @@ export function proseQuestionSpec(tool: string, toolCallId: string, input: unkno
 		...(explain ? { committedAnswer: explain.correctAnswer } : {}),
 	};
 	const predicts = normalizeQuestionType((input as { type?: unknown } | null)?.type) === "predict";
-	return { tool, kind, mode, data, takesOwnAnswer: kind === "ask" && mode !== "text", showsAnswer: kind === "explain" && !predicts };
+	return { tool, kind, mode, data, takesOwnAnswer: kind === "ask" && mode !== "text", showsAnswer: kind === "explain" && !predicts, offer: kind === "ask" && offersStopIn(input) };
 }
 
 /** What the field says it wants while the question is open: literal words,
@@ -308,8 +313,8 @@ function wordsKey(text: string): string {
 }
 
 /** The re-asks (`askedAgain`) that follow a hint: the hint may itself end
- *  in a question, so their mark names the question he pressed Hint on,
- *  never "the question above" (round 12, 3 D11). */
+ *  in a question, so their words are drawn again under "Your turn", never
+ *  pointed at as "the question above" (round 12, 3 D11; round 19, m21). */
 export function askedAfterHint(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
 	return new Set(reasks(messages).filter((r) => r.after === "hint").map((r) => r.id));
 }
