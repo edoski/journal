@@ -38,6 +38,46 @@ export function keepForNewLesson(...words: readonly (string | null | undefined)[
 	return true;
 }
 
+/** A deleted course's lesson (round 19, M6): what this window's boxes in
+ *  it hold, its message box, an open question's and an open practice
+ *  problem's, as texts for `keepForNewLesson`, each box forgotten. Their
+ *  photos join the New lesson box's. Round 18 carried the message box
+ *  alone, so words typed in a question's answer box were lost. */
+export function takeLessonBoxes(chatId: string): string[] {
+	const store = storage();
+	if (!store) return [];
+	const win = thisWindow().id;
+	const scopes: string[] = [];
+	try {
+		for (let i = 0; i < store.length; i++) {
+			const parsed = parseKey(store.key(i) ?? "");
+			if (parsed?.window === win && lessonBox(chatId, parsed.scope)) scopes.push(parsed.scope);
+		}
+	} catch {
+		return [];
+	}
+	const texts = scopes.map((scope) => leftDraftOf(keptWords(scope))?.text ?? "");
+	for (const scope of scopes) keepWords(scope, null);
+	void movePhotosToNewLesson(chatId);
+	return texts;
+}
+
+function lessonBox(chatId: string, scope: string): boolean {
+	return scope === `${chatId}:composer` || scope.startsWith(`${chatId}:q:`) || scope.startsWith(`${chatId}:p:`);
+}
+
+async function movePhotosToNewLesson(chatId: string): Promise<void> {
+	const win = thisWindow().id;
+	const keys = await run<IDBValidKey[]>("readonly", (store) => store.getAllKeys());
+	const moved: Photo[] = [];
+	for (const key of keys ?? []) {
+		const parsed = typeof key === "string" ? parseKey(PREFIX + key) : null;
+		if (parsed?.window !== win || !lessonBox(chatId, parsed.scope)) continue;
+		moved.push(...(await takeKeptPhotos(parsed.scope)));
+	}
+	if (moved.length) await keepPhotos(NEW_LESSON_BOX, [...(await keptPhotos(NEW_LESSON_BOX)), ...moved]);
+}
+
 /** A question form's words as stored: its selection as plain indexes. */
 export interface KeptForm {
 	selected: number[];
