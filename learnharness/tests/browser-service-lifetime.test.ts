@@ -25,7 +25,7 @@ function helperFixture(connected = true, channel = true) {
 		connected, channel: channel ? {} : undefined,
 	});
 	const app = {
-		setName() {}, whenReady: () => appReady,
+		setName() {}, setPath() {}, getPath: () => "/fixture/user-data", whenReady: () => appReady,
 		commandLine: { appendSwitch(...args: string[]) { state.switches.push(args); } },
 		quit() { state.quits++; }, exit(code: number) { state.exits.push(code); },
 	};
