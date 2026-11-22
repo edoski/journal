@@ -154,12 +154,15 @@ def _down(stored: dict[str, Any]) -> dict[str, Any]:
                 continue
         elif name in _V6_MAPS:
             value = {k: _v6(item, _V6_MAPS[name]) for k, item in value.items()}
-        elif (
-            name == "preferences"
-            and value.get(preferences.QUESTIONS)
-            in (preferences.CHOICES[preferences.QUESTIONS])
-        ):
-            value = _strip(value, (preferences.QUESTIONS,))
+        elif name == "preferences":
+            value = _strip(
+                value,
+                tuple(
+                    dimension
+                    for dimension, choices in preferences.CHOICES.items()
+                    if value.get(dimension) in choices
+                ),
+            )
         result[name] = value
     content = {
         k: v for k, v in result.items() if k not in ("schema", *storage.METADATA)

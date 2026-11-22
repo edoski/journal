@@ -380,7 +380,7 @@ def _new_short(
     }
     order = progress.path_order(record)
     partners = progress.contrasts(record)
-    asks = progress.asks(record)
+    spaced = progress.spaced(record)
     free = progress.free_arcs(record)
     short: set[date] = set()
     moved: set[date] = set()
@@ -410,13 +410,13 @@ def _new_short(
             ]
 
         def before(key: str, day: date = day) -> bool:
-            if not asks:
+            if not spaced:
                 return starts.get(key, day) < day
             return _solid_on(replayed[key], day)
 
         owed = pace(len(untaught), left, day, lambda other: other.weekday() in studies)
         final = exam.final <= day
-        if asks:
+        if spaced:
             # The plan proposes a start on the day of its need's review, as
             # if it came out solid: one his answers left not solid withdrew it.
 
@@ -504,7 +504,7 @@ def _activity(records: list[dict[str, Any]], today: date) -> dict[date, Done]:
     short: set[date] = set()
     moved: set[date] = set()
     for record, replays in zip(records, replayed, strict=True):
-        if progress.asks(record):
+        if progress.spaced(record):
             exam_of = progress.examining(record)
             for key, replay in progress.replays({**record, "exam": {}}).items():
                 left |= {

@@ -2,6 +2,10 @@
 
 When a course is new, or exam preparation needs missing information, read the syllabus, assessment instructions or past papers already in the course directory (`list_sources` finds them; `add_sources` registers them). Read what the task needs; do not run an intake survey.
 
+## Self-study
+
+A self-study is something the learner wants to learn on his own, with no university course behind it: the course preference `kind` is `"self-study"` (absent, or `"course"`, is a course). It uses topics, arcs, lessons and practice like any course, but never give it an exam or a review: the engine refuses an `exam.date` on it and schedules no review, and a prerequisite counts as met once taught. Its `goal` says what he wants to be able to do. It is done when every topic on its path is taught, which the plan shows as `goal_reached`. When he wants to study it for an exam, make it a course with `{"preferences": {"kind": "course"}}`, then set the exam.
+
 ## Exam facts
 
 The exam lives in one object, merged by field:
