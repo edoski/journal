@@ -93,8 +93,8 @@ export function leadOf(row: TodayRow, topics: readonly CourseMapTopic[], why: Wh
 		return topics.find((t) => t.handle === first) ?? null;
 	}
 	if (why?.kind === "missed") {
-		const held = new Set(topics.map((t) => t.handle));
-		const lapsed = row.course?.map.topics.find((t) => held.has(t.handle) && lapsedNow(t.signals));
+		// The first lapse in the line's own order, the order its review asks in (round 19, m11).
+		const lapsed = topics.find((t) => lapsedNow(t.signals));
 		if (lapsed) return lapsed;
 	}
 	if (row.kind === "course" && row.step.kind === "task") return topics.find((t) => t.handle === row.course.map.current) ?? null;

@@ -19,25 +19,27 @@ const CALCULUS = {
 		title: "Calculus I",
 		today: "2026-11-08",
 		topics: [
-			topic("shells", "Volumes of revolution: cylindrical shells", { level: "retained", review: due as never }),
-			topic("chain-rule", "The chain rule", { level: "retained", review: due as never, signals: { ...QUIET, lapsed: true, mistake: true } as never }),
 			topic("epsilon-delta", "The precise ε–δ definition of a limit", { level: "retained", review: due as never }),
+			topic("chain-rule", "The chain rule", { level: "retained", review: due as never, signals: { ...QUIET, lapsed: true, mistake: true } as never }),
+			topic("shells", "Volumes of revolution: cylindrical shells", { level: "retained", review: due as never, signals: { ...QUIET, lapsed: true, mistake: true } as never }),
 		],
 	}),
 	unready: null,
-	due: ["shells", "chain-rule", "epsilon-delta"],
+	due: ["epsilon-delta", "shells", "chain-rule"],
 	newToday: [],
 	lastActiveDaysAgo: 3,
 } as unknown as StudyCourse;
 
 describe("a review opens on the slip its line names (round 19, m11)", () => {
-	it("the line names The chain rule, and the review it starts leads with it", () => {
+	// As the seed holds it: the map lists the chain rule first, the plan's review shells first, and both lapsed.
+	it("the line names the slip the review it starts leads with", () => {
 		const step = nextStepOf(CALCULUS);
 		assert.equal(step.kind, "review");
-		assert.match(whyOf({ kind: "course", course: CALCULUS, step } as never)?.short ?? "", /The chain rule$/);
 		const move = courseMove(CALCULUS, [], step);
 		assert.equal(move.kind, "start");
-		assert.ok(move.kind === "start" && move.topics[0] === "chain-rule", `it opens on ${move.kind === "start" ? move.topics[0] : "a session"}`);
-		assert.ok(move.kind === "start" && /^Review The chain rule\b/.test(move.opening), move.kind === "start" ? move.opening : "");
+		const first = move.kind === "start" ? move.topics[0] : null;
+		assert.equal(first, "shells", "a lapse leads the review, in the plan's order");
+		assert.match(whyOf({ kind: "course", course: CALCULUS, step } as never)?.short ?? "", /cylindrical shells$/);
+		assert.ok(move.kind === "start" && /^Review Volumes of revolution/.test(move.opening), move.kind === "start" ? move.opening : "");
 	});
 });

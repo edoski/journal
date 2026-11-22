@@ -170,8 +170,8 @@ export function whyOf(row: TodayRow): Why | null {
 	switch (step.kind) {
 		case "review": {
 			if (step.on) return { kind: "review", short: `Planned ${planDay(step.on)}` };
-			const handles = new Set<string>(step.topics);
-			return reviewReason(course.map.topics.filter((t) => handles.has(t.handle)), course.map.today);
+			// In the review's own order, so a lapse it names is the one its review opens on (round 19, m11).
+			return reviewReason(step.topics.flatMap((h) => course.map.topics.find((t) => t.handle === h) ?? []), course.map.today);
 		}
 		case "task":
 			return { kind: "task", short: taskWords(step, course.map.today) };
