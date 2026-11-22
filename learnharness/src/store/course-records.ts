@@ -13,6 +13,7 @@
 
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { studyDay } from "../core/day-words.ts";
 import { emit, subscribe } from "../core/events.ts";
@@ -51,13 +52,30 @@ interface Exit {
 	spawnError?: string;
 }
 
+/** Under test, an engine run on the account's real home: it would read and
+ *  write his own registry, kept plan and preferences (a test once registered
+ *  8 temporary courses in his real `workspaces.json`). The run never starts,
+ *  and the test process fails whatever its caller makes of the refusal. */
+function realHomeUnderTest(env: NodeJS.ProcessEnv): boolean {
+	if (process.env.NODE_ENV !== "test") return false;
+	const home = env.HOME ? path.resolve(env.HOME) : "";
+	return home === "" || home === path.resolve(os.userInfo().homedir);
+}
+
 function exec(engine: EngineCommand, args: string[], stdin: string): Promise<Exit> {
+	const env = engine.env ?? process.env;
+	if (realHomeUnderTest(env)) {
+		const message = `A test ran the learning engine on the real home (${env.HOME ?? "no HOME"}): give it its own HOME`;
+		console.error(message);
+		process.exitCode = 1;
+		return Promise.resolve({ code: null, stdout: "", stderr: "", timedOut: false, spawnError: message });
+	}
 	return new Promise((resolve) => {
 		let stdout = "";
 		let stderr = "";
 		const child = spawn(engine.python, ["-m", "learning", ...args], {
 			cwd: engine.root,
-			env: { ...(engine.env ?? process.env), PYTHONPATH: engine.root, PYTHONIOENCODING: "utf-8" },
+			env: { ...env, PYTHONPATH: engine.root, PYTHONIOENCODING: "utf-8" },
 			stdio: ["pipe", "pipe", "pipe"],
 			timeout: engine.timeoutMs ?? DEFAULT_TIMEOUT_MS,
 			killSignal: "SIGKILL",
@@ -196,6 +214,7 @@ function mapExamOf(value: unknown, listed: ReadonlySet<string>, block: ArcBlock)
 	const handles = (v: unknown) => strings(v).filter((h) => listed.has(h)) as TopicHandle[];
 	const finalReview = str(e.final_review);
 	const doesNotFit = handles(e.does_not_fit);
+	const fellPast = handles(e.fell_past).filter((h) => doesNotFit.includes(h));
 	const unreviewed = handles(e.unreviewed);
 	const arcs = block.arcs && Array.isArray(e.arcs) ? strings(e.arcs).flatMap((a) => block.arcOf(a) ?? []) : null;
 	const leavesOut = handles(e.leaves_out);
@@ -210,6 +229,7 @@ function mapExamOf(value: unknown, listed: ReadonlySet<string>, block: ArcBlock)
 		...(past ? { past } : {}),
 		...(finalReview ? { finalReview } : {}),
 		...(doesNotFit.length > 0 ? { doesNotFit } : {}),
+		...(fellPast.length > 0 ? { fellPast } : {}),
 		...(unreviewed.length > 0 ? { unreviewed } : {}),
 		...(Object.keys(reasons).length > 0 ? { reasons } : {}),
 		...(arcs ? { arcs } : {}),

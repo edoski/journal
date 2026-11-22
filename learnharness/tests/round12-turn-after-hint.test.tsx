@@ -5,7 +5,8 @@
  * above it was the hint's. After a hint the mark is "Your turn" alone (Edo,
  * 18 Nov 2026: "Your turn, on the question you pressed Hint on" cut, since
  * his Hint bubble under the question already shows it); after his side
- * question it still says "above".
+ * question it still says "above". Round 19, m21: "Your turn" alone then
+ * stood over nothing, so the question asked again is drawn under it.
  */
 import React from "react";
 import assert from "node:assert/strict";
@@ -32,7 +33,7 @@ describe("the mark after a hint is Your turn alone", () => {
 	});
 
 	it("the mark's words", () => {
-		assert.match(renderToStaticMarkup(<YourTurn above afterHint />), />Your turn<\/p>/);
+		assert.match(renderToStaticMarkup(<YourTurn />), />Your turn<\/p>/);
 		assert.match(renderToStaticMarkup(<YourTurn above />), /Your turn, on the question above/);
 	});
 });

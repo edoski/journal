@@ -185,7 +185,7 @@ describe("the road", () => {
 
 	it("says when a not-started arc's first topic starts, and for one under way when its next starts (round 17, m9)", () => {
 		const view = viewOf(course());
-		assert.equal(arcStarts(view.arcs!.find((s) => s.arc.handle === "eigen")!, view.course.map.today), "Starts 20 Nov");
+		assert.equal(arcStarts(view.arcs!.find((s) => s.arc.handle === "eigen")!, view.course.map.today), "Planned 20 Nov", "an arc not started says Planned, as one under way does (round 19, m8)");
 		assert.equal(arcStarts(view.arcs!.find((s) => s.arc.handle === "maps")!, view.course.map.today), "Planned 12 Nov");
 	});
 

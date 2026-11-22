@@ -310,11 +310,24 @@ export function ownsTopic(chat: ChatListItem, handle: string): boolean {
 }
 
 /** Whether a session's work is on a topic: it belongs to it (`ownsTopic`),
- *  and a review whose plan re-teaches one of its topics (`retaught`) works
- *  on that one alone, so only that topic resumes it, reads "Left off" for
- *  it and draws its map (round 18, M2). Pure. */
+ *  and what it holds open, else what its steps teach, is on that topic: a
+ *  question or problem waiting on him (`openOn`), else the topic its plan's
+ *  steps are on (`stepsOn`). Only such a topic resumes it, reads "Your
+ *  turn" or "Left off" for it, and draws its map (round 18, M2; round 19,
+ *  M4: Problem sheet 4's kernel question read "Your turn" on Basis and
+ *  Rank too). A session with neither works on every topic it belongs to.
+ *  Pure. */
 export function worksOn(chat: ChatListItem, handle: string): boolean {
-	return ownsTopic(chat, handle) && (chat.retaught === undefined || chat.retaught === handle);
+	if (!ownsTopic(chat, handle)) return false;
+	const on = chat.openOn ?? (chat.stepsOn ? [chat.stepsOn] : null);
+	return on === null || on.includes(handle);
+}
+
+/** Whether a session's step map is a topic's: the topic its plan's steps
+ *  are on (`stepsOn`), whatever its open question is on; else as it works
+ *  on it (`worksOn`). Pure. */
+export function mapsOn(chat: ChatListItem, handle: string): boolean {
+	return chat.stepsOn ? ownsTopic(chat, handle) && chat.stepsOn === handle : worksOn(chat, handle);
 }
 
 /** The sessions in a course that hold an open task, newest first. Pure. */

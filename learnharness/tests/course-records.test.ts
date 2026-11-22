@@ -40,7 +40,8 @@ function fakeEngine(plan?: unknown) {
 	const python = path.join(dir, "python");
 	fs.writeFileSync(python, `#!/bin/sh\nexec "${process.execPath}" "${path.join(HERE, "fixtures", "fake-learning-engine.mjs")}" "$@"\n`, { mode: 0o755 });
 	const log = path.join(dir, "calls.jsonl");
-	const env = { ...process.env, FAKE_ENGINE_LOG: log, ...(plan ? { FAKE_ENGINE_PLAN: JSON.stringify(plan) } : {}) };
+	// The test's own HOME: an engine run on the real one is refused (carry-in 3, round 19).
+	const env = { ...process.env, HOME: path.join(dir, "home"), FAKE_ENGINE_LOG: log, ...(plan ? { FAKE_ENGINE_PLAN: JSON.stringify(plan) } : {}) };
 	const calls = () =>
 		fs.existsSync(log)
 			? fs.readFileSync(log, "utf-8").trim().split("\n").map((l) => JSON.parse(l) as { args: string[]; stdin: string })
@@ -196,7 +197,7 @@ describe("course records adapter (fake engine)", () => {
 		assert.match(!slow.ok ? slow.message : "", /did not finish in time/);
 		const moved = await records.run("/study/missing-course", { verb: "resume" });
 		assert.equal(!moved.ok && moved.kind, "unavailable", "a moved workspace is not a repairable validation error");
-		const missing = createCourseRecords({ python: path.join(TMP, "no-such-python"), root: TMP });
+		const missing = createCourseRecords({ python: path.join(TMP, "no-such-python"), root: TMP, env: { ...process.env, HOME: path.join(TMP, "home") } });
 		assert.equal((await missing.run("/w", { verb: "resume" })).ok, false);
 		const listing = await missing.list();
 		assert.equal(listing.available, false);
@@ -312,7 +313,7 @@ describe("course map arcs (E2's goldens)", () => {
 		assert.equal(map.topics.some((t) => "arc" in t), false, "no topic names an arc");
 		assert.equal(currentArc(map), null);
 		assert.deepEqual(topicOf(map, "invertibility").startsWhy, { kind: "after", needs: ["determinant"], partners: [] });
-		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", waitingOn: ["matmul", "determinant"], exam: false });
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", waitingOn: ["determinant"], exam: false });
 		assert.deepEqual(
 			map.topics.filter((t) => t.startsWhy).map((t) => t.handle),
 			map.topics.filter((t) => t.starts).map((t) => t.handle),
@@ -339,7 +340,7 @@ describe("course map arcs (E2's goldens)", () => {
 			"every topic in one arc",
 		);
 		assert.equal(map.currentArc, "eigenvalues");
-		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", arc: "orthogonality", waitingOn: ["invertibility"], exam: false });
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", arc: "orthogonality", waitingOn: ["determinant"], exam: true });
 		assert.deepEqual(topicOf(map, "change-basis").startsWhy, { kind: "after", arc: "eigenvalues", needs: ["invertibility"], partners: [] });
 	});
 

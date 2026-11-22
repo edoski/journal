@@ -7,6 +7,7 @@ import { createTree, planDropsSteps, planMapTooBig, planStepIsTheTopic, planTitl
 import { parseMermaidPlan } from "./mermaid-plan.ts";
 import type { CourseToolContext } from "./course.ts";
 import { sessionTopicsOf } from "../../core/native-messages.ts";
+import { halfAnswerLeft, sinceLastClose } from "../../core/session-end.ts";
 import { topicsToIntroduce, type CourseMap } from "../../core/contracts/course-map.ts";
 import { plannedDayWords } from "../../core/day-words.ts";
 import { planTakesUp, reviewRecord } from "../../core/session-opening.ts";
@@ -223,10 +224,13 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 					};
 				}
 				if (!close || !ctx.course) return { ok: true };
-				const topics = [...new Set([...(record.topics ?? []), ...sessionTopicsOf(record.messages)])];
+				// Only what this sitting touched: a topic answered before the
+				// session's last close was named by that close (round 19, m15).
+				const topics = [...new Set([...(record.topics ?? []), ...sessionTopicsOf(sinceLastClose(record.messages))])];
 				const introduced = await introduceLessonTopics(ctx.course, topics);
 				const read = await lessonDays(ctx.course, topics);
-				return { ok: true, ...(introduced ? { record: introduced } : {}), ...(read ? { days: read.days } : {}), ...(read?.dayItems ? { day_items: read.dayItems } : {}) };
+				const half = halfAnswerLeft(record.messages);
+				return { ok: true, ...(introduced ? { record: introduced } : {}), ...(read ? { days: read.days } : {}), ...(read?.dayItems ? { day_items: read.dayItems } : {}), ...(half ? { half_answer_on: half } : {}) };
 			}),
 		},
 		plan_init: {

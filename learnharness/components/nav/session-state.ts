@@ -14,13 +14,18 @@ import type { ChatListItem } from "@/src/core";
  *     problem it set aside, plan steps still to teach, a review not yet
  *     done), so it waits for next time, even with the question the app
  *     posed again for him there (round 12, 3 n10): he said he is done;
- *   - finished: the tutor ended the lesson (a sign-off such as "Good place
- *     to stop" included), the practice round or the answer.
+ *   - finished: the tutor ended the lesson (its close, or every step
+ *     taught), the practice round or the answer, or its course was
+ *     deleted, which makes it history. A lesson whose turn ended asking
+ *     nothing with steps still ahead is left, not finished (round 19, M2).
  */
 export type SessionState = "working" | "your-turn" | "paused" | "left" | "finished";
 
 export function sessionState(chat: ChatListItem): SessionState {
 	if (chat.busy) return "working";
+	// A deleted course's session is history: nothing in it waits on him, whatever it was left on (round 19, m12:
+	// it read "Your turn" in the sidebar and in search, on a question he can no longer answer).
+	if (chat.courseDeleted) return "finished";
 	if (chat.ended === "left") return "left";
 	if (chat.pendingQuestion || chat.pendingProblem || chat.ended === "mid-lesson") return "your-turn";
 	return chat.ended === "cut" ? "paused" : "finished";

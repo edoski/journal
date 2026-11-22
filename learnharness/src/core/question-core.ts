@@ -172,6 +172,13 @@ export const explainInputBase = Type.Object({
 			"text — never revise the commitment after seeing his words, and never mark a wrong answer right to be kind. " +
 			"It is shown to him on submit; your next reply grades the nuance of what he wrote.",
 	}),
+	topic: Type.Optional(
+		Type.String({
+			description:
+				"In a course session, the handle of the course topic this question is asked on, as course_save's observations name it " +
+				"(the topic his answer will be saved on). The app marks that topic alone as waiting on him: \"Your turn\", or \"Left off\" once he stops.",
+		}),
+	),
 });
 
 /** The guess's own rule where the teach question is written (round 12,
@@ -253,6 +260,13 @@ export const askInputSchema = Type.Object({
 // call boundary in execute (askOptionProblems, above).
 
 export type AskToolInput = Static<typeof askInputSchema>;
+
+/** Whether an ask's options include one that stops for today (`stops`):
+ *  the tutor's offer to go on, which asks nothing of him. Pure. */
+export function offersStopIn(input: unknown): boolean {
+	const options = parseOptionsIfString((input as { options?: unknown } | null)?.options as string | undefined);
+	return Array.isArray(options) && options.some((o) => (o as { stops?: unknown } | null)?.stops === true);
+}
 
 /** Whether his answer to a choices question picked an option the tutor
  *  marked as ending the session for today (`stops`). Pure. */
@@ -535,7 +549,7 @@ export const LEFT_DRAFT_TEXT =
  *  rule to conclude). It names no action: the prober hands over to the
  *  teacher, the teacher teaches. */
 export const ASKED_INSTEAD_TEXT =
-	"He asked you something before answering: his message follows. Not an answer: no grade, no attempt recorded, its answer never shown. The question is still open: answer his message without working the open question for him (no step, value or factor of its answer, since a reply that gives any of them away costs him his answer on his own), then ask this question again, word for word, with a fresh call. When his message asks to be taught or told instead of asked (\"stop quizzing me\", \"just explain it\"), the question is set aside: do what your instructions say for that request, and never ask it again. When his message asks to guess first, his guess is a prediction: pose it as one, so it is kept and never counts, and ask this question again once his guess is answered. When his message asks nothing and only answers the question (a guess, a value, a choice), it is his answer to it: save it as his attempt naming \"his-message\", a prediction when the question asked for one, and reply to it as to an answer.";
+	"He asked you something before answering: his message follows. Not an answer: no grade, no attempt recorded, its answer never shown. The question is still open: answer his message without working the open question for him (no step, value or factor of its answer, since a reply that gives any of them away costs him his answer on his own), then ask this question again, word for word, with a fresh call of the same tool on the same step, so his screen shows it as his turn on the question above. When his message asks to be taught or told instead of asked (\"stop quizzing me\", \"just explain it\"), the question is set aside: do what your instructions say for that request, and never ask it again. When his message asks to guess first, his guess is a prediction: pose it as one, so it is kept and never counts, and ask this question again once his guess is answered. When his message asks nothing and only answers the question (a guess, a value, a choice), it is his answer to it: save it as his attempt naming \"his-message\", a prediction when the question asked for one, and reply to it as to an answer.";
 
 /**
  * The MODEL-VISIBLE answer record (owner, tool-result diet 2026-10-02):

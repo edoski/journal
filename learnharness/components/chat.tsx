@@ -95,7 +95,7 @@ import { showsWorking } from "@/components/lesson/working-sign";
 import { boxAfterClose, boxLine, forgetRescue, keepRescue, overtakenDraft, rescuedBox, typedAfterSend, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendKeepingWords } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
-import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, leftDraftAt, leftDraftOf, takeCarry, takeKeptPhotos } from "@/components/lesson/kept-drafts";
+import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, leftDraftAt, leftDraftOf, takeCarry, takeKeptPhotos, takeLessonBoxes } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine, doneTonightGone, focusAfterDone } from "@/components/lesson/done-tonight";
@@ -927,19 +927,21 @@ export function Chat({
 		// clearError and outlivedFailure are stable per session.
 	}, [error, modelStatus?.connected, statusRead]);
 	// A DELETED COURSE (course-gone.tsx): the lesson is history and has no
-	// box, so what he wrote there, sent and refused or still in the box,
-	// goes to the New lesson box, and the line says so. A send refused
+	// box, so what he wrote there, sent and refused or still in any of its
+	// boxes (round 19, M6: an open question's answer box was lost), goes to
+	// the New lesson box, and the line says so. A layout effect, so the
+	// boxes are read before a closed box is forgotten. A send refused
 	// because the course went (410 course_deleted) leaves the record as it
 	// was: the refused message's bubble goes.
 	const [courseGoneKept, setCourseGoneKept] = useState(false);
-	useEffect(() => {
+	useLayoutEffect(() => {
 		if (!courseGone) return;
-		const kept = keepForNewLesson(draftRef.current, textRef.current);
+		const kept = keepForNewLesson(draftRef.current, textRef.current, ...takeLessonBoxes(chatId));
 		draftRef.current = null;
 		if (!kept) return;
 		applyText("");
 		setCourseGoneKept(true);
-	}, [courseGone, applyText]);
+	}, [courseGone, applyText, chatId]);
 	useEffect(() => {
 		if (!error || !isCourseDeletedRefusal(error.message)) return;
 		setCourseGone(true);
@@ -1949,7 +1951,7 @@ export function Chat({
 							{thinking && <ActivityLine testId="thinking-placeholder" label={compacting ? COMPACTING_LINE : (streamingToolActivity(messages) ?? idleLine)} />}
 							{replyCut && !courseGone && !gone && <ReplyCut cut={replyCut} onRetry={() => void send({ type: "continue" })} />}
 							{/* A failed turn whose cause is gone (signed in again): Retry alone. */}
-							{!error && retryable && !claudeLimit && !courseGone && !gone && <ReplyCut cut="failed" onRetry={retryFailedTurn} />}
+							{!error && retryable && !claudeLimit && !courseGone && !gone && <ReplyCut cut={isSignedOutLine(failure?.errorMessage) ? "signed-in" : "failed"} onRetry={retryFailedTurn} />}
 							{openingError && <p role="alert" className="text-body text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}

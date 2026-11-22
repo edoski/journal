@@ -19,14 +19,11 @@ const SMALL = `text-muted-foreground ${SMALL_SIZE}`;
  *  over the question's words or choices; never over nothing. A question
  *  asked again after his side question has its words above, so its mark
  *  says where they are (round 8: after a direct answer the open question
- *  had no mark at all). After a hint it is "Your turn" alone: his Hint
- *  bubble under the question already shows which one he is on (Edo, 18 Nov
- *  2026), and "above" would name a hint that ends in a question of its own
- *  (round 12, 3 D11). */
-export function YourTurn({ above = false, afterHint = false }: { above?: boolean; afterHint?: boolean }) {
+ *  had no mark at all). */
+export function YourTurn({ above = false }: { above?: boolean }) {
 	return (
 		<p data-slot="your-turn" className="mb-1 text-body text-muted-foreground">
-			{above && !afterHint ? "Your turn, on the question above" : "Your turn"}
+			{above ? "Your turn, on the question above" : "Your turn"}
 		</p>
 	);
 }
@@ -81,13 +78,18 @@ export function QuestionWords({ spec, compact = false }: { spec: ProseQuestionSp
 	);
 }
 
+/** An open question ends the message. After a hint the question asked
+ *  again is drawn again under "Your turn": "above" would name the hint,
+ *  which may end in a question of its own (round 12, 3 D11), and "Your
+ *  turn" alone stood over nothing (round 19, m21). The tutor's offer to go
+ *  on asks nothing of him, so it has no "Your turn" (round 19, m21). */
 function OpenQuestion({ spec, stepAnchor, repeat, afterHint, spoken }: { spec: ProseQuestionSpec; stepAnchor?: string; repeat: boolean; afterHint: boolean; spoken: boolean }) {
 	const answer = useProseAnswerContext();
 	const selected = answer?.selection.selected ?? new Set<number>();
 	return (
 		<div data-testid="prose-question" data-slot="prose-question" data-open="" data-repeat={repeat ? "" : undefined} data-step-anchor={stepAnchor} className="mt-2">
-			<YourTurn above={repeat && !spoken && spec.mode === "text"} afterHint={afterHint} />
-			{!repeat && !spoken && <QuestionWords spec={spec} />}
+			{!spec.offer && <YourTurn above={repeat && !afterHint && !spoken && spec.mode === "text"} />}
+			{(!repeat || afterHint) && !spoken && <QuestionWords spec={spec} />}
 			{spec.mode !== "text" && (
 				<ChoiceRows
 					options={spec.data.options}

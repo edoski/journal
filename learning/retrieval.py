@@ -718,11 +718,15 @@ def show(
 
 
 def _runup(
-    record: dict[str, Any], countdown: dict[str, Any], planned: agenda.When
+    record: dict[str, Any],
+    countdown: dict[str, Any],
+    planned: agenda.When,
+    fell: list[str] | None = None,
 ) -> dict[str, Any]:
     """The exam and its run-up: its listed ``sessions`` and the ``past`` one
     the plan moved on from (``progress.aimed``), when the final review starts, the path topics
-    the plan cannot start before it (``does_not_fit``), the taught ones its
+    the plan cannot start before it (``does_not_fit``), those of them that
+    fell past it since he was last told (``fell_past``), the taught ones its
     final review has no room for (``unreviewed``), and why the plan leaves
     each of those out (``reasons``, ``agenda.Reason``); with a scope, its
     ``arcs``, the topics it ``leaves_out``, and the untaught
@@ -745,6 +749,7 @@ def _runup(
             "needed": needed or None,
             "final_review": (planned.final or plan.final).isoformat() if plan else None,
             "does_not_fit": planned.does_not_fit,
+            "fell_past": fell or None,
             "unreviewed": planned.unreviewed,
             "reasons": dict(planned.reasons),
         },
@@ -801,9 +806,9 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
     levels = progress.standings(record)
     wrong = progress.open_mistakes(record)
     order = progress.path_order(record, everything=True)
-    planned, moves = _planned_and_moves(workspace, record, today)
+    planned, moves, told, fell = _planned_moves_told(workspace, record, today)
     overdue = {
-        item["topic"]: item["overdue"]
+        item["topic"]: late_since_told(item, told.get(item["topic"]), today)
         for item in progress.due(record, today, levels=levels)
         if planned.tonight(item["topic"])
     }
@@ -851,7 +856,7 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
             "revision": record.get("revision", 0),
             "title": record.get("title"),
             **kind(record, levels),
-            "exam": _runup(record, countdown, planned)
+            "exam": _runup(record, countdown, planned, fell)
             if countdown and "date" in countdown
             else None,
             "current": record.get("path", {}).get("current"),
@@ -1263,14 +1268,12 @@ def _hits(
 
 def _readable(workspace: Workspace) -> dict[str, dict[str, Any]]:
     """Every course's stored record, by directory; a course whose record
-    cannot be read is left out of the others' plan, as ``plan`` leaves it
-    out."""
+    cannot be read is planned as it was last read (``records.for_plan``), as
+    ``plan`` plans it, and left out when it never was."""
     readable: dict[str, dict[str, Any]] = {}
     for target in records.courses(workspace):
-        try:
-            readable[str(target.directory)] = records.read(target)
-        except (ValueError, OSError):
-            continue
+        if (found := records.for_plan(target)) is not None:
+            readable[str(target.directory)] = found
     return readable
 
 
@@ -1322,10 +1325,54 @@ def _planned_and_moves(
     workspace: Workspace, record: dict[str, Any], today: date
 ) -> tuple[agenda.When, dict[str, dict[str, Any]]]:
     """``when``, and each of this course's days that moved (``moved``)."""
+    now, moves, _, _ = _planned_moves_told(workspace, record, today)
+    return now, moves
+
+
+def _planned_moves_told(
+    workspace: Workspace, record: dict[str, Any], today: date
+) -> tuple[agenda.When, dict[str, dict[str, Any]], dict[str, date], list[str]]:
+    """``when``, the days that moved (``moved``), the day he was last
+    told each review comes (``told_reviews``), and the exam topics that fell
+    past the exam since he was last told (``fell_past``)."""
     replayed, readable, studies = _replayed(workspace, record, today)
     name = str(workspace.directory)
     now = replayed.now.when(name, today, studies)
-    return now, moved(name, record, replayed, readable, today)
+    moves = moved(name, record, replayed, readable, today)
+    return now, moves, told_reviews(name, replayed), fell_past(name, replayed, now)
+
+
+def fell_past(name: str, replayed: agenda.Replay, now: agenda.When) -> list[str]:
+    """The topics the plan has no room to start before the exam that it
+    still started before it as the last day he studied ended
+    (``agenda.Replay.told``): those that fell past the exam since he was
+    last told, whatever moved them (round 19, M1: on 10 Nov five exam
+    topics fell past the exam overnight, and Home said nothing, since
+    ``moved`` names only a move his study caused)."""
+    if replayed.told is None:
+        return []
+    told = replayed.told.does_not_fit.get(name, [])
+    return [key for key in now.does_not_fit if key not in told]
+
+
+def told_reviews(name: str, replayed: agenda.Replay) -> dict[str, date]:
+    """The day course ``name``'s plan gave each review as the last day he
+    studied ended: the days he was last told (``moved``)."""
+    told, studied = replayed.told, replayed.studied
+    if told is None or studied is None or name not in told.days:
+        return {}
+    return dict(told.when(name, studied, True).reviews)
+
+
+def late_since_told(item: dict[str, Any], told: date | None, today: date) -> int:
+    """Days a due review is late: from memory's day, or from the day he was
+    told when that came later and has passed, never from a day earlier than
+    the one he was told (round 19, m2: Uniform, told "Back Sun 15 Nov",
+    read "Due 6 Nov" on 17 Nov)."""
+    overdue = int(item["overdue"])
+    if told is None or told > today:
+        return overdue
+    return min(overdue, (today - told).days)
 
 
 def moved(

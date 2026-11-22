@@ -2,7 +2,7 @@ import type { PlanTree } from "./contracts/plan.ts";
 import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, lessonProgressOf } from "./contracts/plan.ts";
 import type { SessionEnd, SessionMode } from "./contracts/chat.ts";
 import { activeProblemOf, danglingQuestionOf, endsInDismissal, nativeInputCause, isQuestionRepose, needsContinuation, NEUTRAL_MARKERS, newQuestionRepose, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, problemInputForConclude, sessionModeOf, sessionTaskStatesOf, type LhMessage } from "./native-messages.ts";
-import { parseOptionsIfString, picksStop } from "./question-core.ts";
+import { offersStopIn, picksStop } from "./question-core.ts";
 import { phaseAt3Lh } from "./phases.ts";
 import { topicResults, type PracticeConclusion } from "./practice-attempts.ts";
 
@@ -51,7 +51,20 @@ export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | unde
 	// not his turn (round 17, m13: the card read "Your turn" with nothing to answer).
 	if (tree.nodes.length > 0 && tree.nodes.every((node) => taught.has(node.id))) return asks(last) ? "mid-lesson" : "closed";
 	if (current === null) return "mid-lesson";
-	return asks(last) && tree.edges.some((edge) => edge.from === current) ? "mid-lesson" : "closed";
+	if (asks(last) && tree.edges.some((edge) => edge.from === current)) return "mid-lesson";
+	// A turn that ended with no words of its own, no question and no close (`lesson_progress` with `close`), steps
+	// still ahead, ended nowhere: the lesson is left where it stopped, never finished, so every surface keeps
+	// "Continue … lesson · Left off today" (round 19, M2: after marking a prediction the tutor's turn stopped empty,
+	// and the lesson left Home, the sidebar and its page's Now). A live tutor's reply always ends wordless, since the
+	// voice guard takes plain text out (`screenText`), so a sign-off sent with send_to_user leaves it too; only a
+	// reply that kept words of its own, from a run with no voice guard (the demo seed's records), reads as before.
+	return silent(last) && stepsLeft(tree, messages) ? "left" : "closed";
+}
+
+/** Whether a reply has no words of its own: what it said, if anything, went
+ *  through `send_to_user` earlier in its turn. Pure. */
+function silent(reply: Extract<LhMessage, { role: "assistant" }>): boolean {
+	return !reply.content.some((block) => block.type === "text" && block.text.trim() !== "");
 }
 
 /** Whether the turn after his Done for today has settled, whatever it did
@@ -110,9 +123,7 @@ function leftOpen(messages: readonly LhMessage[], at: number, tree: PlanTree | u
  *  in the sidebar). Pure. */
 export function offersStop(messages: readonly LhMessage[]): boolean {
 	const open = danglingQuestionOf(messages);
-	if (open?.tool !== "ask_user_question") return false;
-	const options = parseOptionsIfString((open.input as { options?: unknown } | null)?.options as string | undefined);
-	return Array.isArray(options) && options.some((o) => (o as { stops?: unknown } | null)?.stops === true);
+	return open?.tool === "ask_user_question" && offersStopIn(open.input);
 }
 
 /** Whether the message before index `at` is his pick of an option the
@@ -244,6 +255,59 @@ export function leftQuestionRepose(messages: readonly LhMessage[]): LhMessage[] 
 		return call?.type === "toolCall" ? [{ tool: call.name, input: call.arguments }] : [];
 	});
 	return calls.length > 0 ? [newQuestionRepose(calls)] : [];
+}
+
+/** The question his Done for today set aside with a half answer in its
+ *  box (`draftKept`), by its words, while that Done is his latest input;
+ *  null when none did (round 19, m4: the Invertible lesson's task step
+ *  said "You stopped before writing anything" over his kept half answer).
+ *  Pure. */
+export function halfAnswerLeft(messages: readonly LhMessage[]): string | null {
+	const done = doneTonightAt(messages);
+	if (done === null) return null;
+	for (let i = done - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)) continue;
+		if (m.role !== "toolResult") break;
+		const details = m.details as { dismissed?: unknown; reason?: unknown; draft?: { text?: unknown } } | undefined;
+		if (details?.dismissed !== true || details.reason !== "tonight" || typeof details.draft?.text !== "string" || !details.draft.text.trim()) continue;
+		const asked = messages.findLast((a) => a.role === "assistant" && a.content.some((b) => b.type === "toolCall" && b.id === m.toolCallId));
+		const call = asked?.role === "assistant" ? asked.content.find((b) => b.type === "toolCall" && b.id === m.toolCallId) : undefined;
+		const words = call?.type === "toolCall" ? (call.arguments as { question?: unknown }).question : undefined;
+		if (typeof words === "string" && words.trim()) return words;
+	}
+	return null;
+}
+
+/** The session since its last close: after its newest closing
+ *  `lesson_progress` call or Done for today, the Done he just pressed
+ *  aside (round 19, m15: a same-day resume's close named Mechanics,
+ *  answered before the first close). Pure. */
+export function sinceLastClose(messages: readonly LhMessage[]): readonly LhMessage[] {
+	const current = doneTonightAt(messages);
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		const closed = m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === LESSON_PROGRESS_TOOL && (b.arguments as { close?: unknown } | null)?.close === true);
+		if (closed || (i !== current && isDoneTonight(m))) return messages.slice(i + 1);
+	}
+	return messages;
+}
+
+/** The topics the work open on him is asked on, as the tutor tagged it: an
+ *  open practice problem's `topics`, else the `topic` of the question that
+ *  waits on him or that his Done for today left (round 19, M4: Problem
+ *  sheet 4's kernel question read "Your turn" on Basis and Rank too, the
+ *  9 Nov review's urn question "Left off" on Random variables). Empty when
+ *  nothing is open or the tutor tagged no topic. Pure. */
+export function openWorkTopicsOf(messages: readonly LhMessage[]): string[] {
+	const problem = activeProblemOf(messages);
+	const listed = (value: unknown) => (Array.isArray(value) ? value.filter((t): t is string => typeof t === "string" && t.trim() !== "") : []);
+	if (problem) return listed((problem.input as { topics?: unknown } | null)?.topics);
+	const left = leftQuestionRepose(messages)[0];
+	const call = left?.role === "assistant" ? left.content.find((block) => block.type === "toolCall") : undefined;
+	const input = danglingQuestionOf(messages)?.input ?? (call?.type === "toolCall" ? call.arguments : undefined);
+	const topic = (input as { topic?: unknown } | null | undefined)?.topic;
+	return typeof topic === "string" && topic.trim() ? [topic.trim()] : [];
 }
 
 function isDoneTonight(m: LhMessage): boolean {

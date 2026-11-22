@@ -93,7 +93,7 @@ export function HybridTopic({ facts, busy, onAct, onTask }: TopicPageProps) {
 							key={shown.chat.id}
 							entry={shown}
 							label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")}
-							leftOff={mapLeftOff(shown, facts.action, facts.today)}
+							leftOff={mapLeftOff(shown, facts.action)}
 						/>
 					) : starting ? (
 						<BuildsOnMap map={starting} said={facts.said} topic={facts.topic.handle} lights={tie.lights} />

@@ -89,7 +89,7 @@ describe("the begun lesson's page (m36)", () => {
 
 describe("Earlier's session row (m36)", () => {
 	it("wraps a long title whole instead of cutting it beside the pane's free half", () => {
-		const entry = { chat: { ...LESSON, title: "Eigenvalues and eigenvectors lesson: eigenspaces and diagonalising" }, state: "left", day: "2026-11-08", own: true, plan: null } as never;
+		const entry = { chat: { ...LESSON, title: "Eigenvalues and eigenvectors lesson: eigenspaces and diagonalising" }, state: "left", day: "2026-11-08", own: true, maps: true, plan: null } as never;
 		const doc = render(<ol><SessionItem entry={entry} shown={false} onShow={() => {}} ends={{ above: false, below: false }} date="Sun 8 Nov" /></ol>);
 		const title = doc.querySelector('[data-slot="topic-history-session-title"]');
 		assert.ok(title !== null, "the session's title");

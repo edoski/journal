@@ -1,6 +1,6 @@
 import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
-import { daysBetween } from "@/components/unit-inbox/units";
+import { daysBetween, leftWords } from "@/components/unit-inbox/units";
 import { dayAndNearWords, distanceWords, heldExamWords, longDayWords, nextSessionWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { courseMove, nextStepOf, titleList, todaySteps, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
@@ -364,6 +364,9 @@ export function calendarEntries({
 	const ofToday = (workspace: string) => chats.filter((chat) => chat.course?.workspace === workspace && sessionDay(chat, today) === today);
 	/** Each open task a session of today holds, by session id. */
 	const heldBy = new Map<string, CourseMapTask>();
+	/** Each lesson left today whose rest goes on a later day: that day's
+	 *  entry is the left work, so today's says only what he did. */
+	const carried = new Set<string>();
 	for (const studied of shown) {
 		const { map, due, planned, doesNotFit, finalReview } = studied;
 		const course = { workspace: map.workspace, title: map.title };
@@ -384,11 +387,11 @@ export function calendarEntries({
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) => {
 			const held = topic.review?.kind === "scheduled" && topic.review.date === day && topic.review.held ? topic.review : null;
 			const told = topic.review?.date === day ? topic.moved : undefined;
-			const since = held || told ? movedWords(held, today, told) : null;
+			const since = told ? movedWords(told, today) : null;
 			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held && !told ? heldExamWords(held) : null, ...facts(topic) });
 		};
 		const fresh = (topic: CourseMapTopic, day: string) =>
-			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? (leftOutWords(topic, map.exam) ?? (topic.moved ? movedWords(null, today, topic.moved) : startsAfterWords(topic.startsAfter))) : null, ...facts(topic) });
+			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? (leftOutWords(topic, map.exam) ?? (topic.moved ? movedWords(topic.moved, today) : startsAfterWords(topic.startsAfter))) : null, ...facts(topic) });
 		const topicOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle);
 		// Today's review is every review the daily plan makes today: `plan`'s `due` names only its first five, so a
 		// sixth went unshown today and its first entry was the day after the exam the plan puts its next review on,
@@ -436,14 +439,18 @@ export function calendarEntries({
 		// The rest of a lesson he left for next time today goes on the course's next study day the plan holds, as the
 		// close says it carries on (round 17, m14: only the next day's reviews showed). One entry that continues it, in
 		// the words of Home's row for it, its title and its status (round 18, m12: "Invertible matrices lesson ·
-		// Unfinished" here, "Continue Invertible matrices lesson · Left off today" on Home).
+		// Unfinished" here, "Continue Invertible matrices lesson · Left off today" on Home). It is the one entry of the left
+		// work, and it says the day it was left as that day reads from its own, "Left off 10 Nov", never "Left off today"
+		// on a later day; today's entry is what he did (round 19, m6: "Stirling's formula lesson · Left off today" on Tue 10
+		// and "Continue Stirling's formula lesson · Left off today" on Wed 11).
 		const next = planned.find((day) => day.date > today)?.date;
 		for (const task of next ? map.tasks : []) {
 			const holders = taskTopics(task, map).map((t) => t.handle);
 			const lesson = ofToday(map.workspace).find((chat) => sessionType(chat) === "lesson" && sessionState(chat) === "left" && holdsTask(chat, task, holders));
 			if (!lesson || planned.some((day) => day.date > today && day.new.some((h) => holders.includes(h)))) continue;
+			carried.add(lesson.id);
 			const title = lessonTitle({ kind: "session", chat: lesson, course: studied });
-			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}@${next}`, day: next!, title, course, task, topic: taskTopics(task, map)[0] ?? null, move: { kind: "open", chat: lesson }, status: openWorkStatus(studied, lesson, task) });
+			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}@${next}`, day: next!, title, course, task, topic: taskTopics(task, map)[0] ?? null, move: { kind: "open", chat: lesson }, status: leftWords(lesson, next!) });
 		}
 	}
 	for (const chat of chats) {
@@ -453,7 +460,8 @@ export function calendarEntries({
 		if (day === today && workspace && inReview(sessionTopics(chat, courses), reviewedToday.get(workspace))) continue;
 		const listed = courses.find((c) => c.map.workspace === workspace);
 		const course = workspace ? { workspace, title: listed?.map.title ?? chat.course!.title } : null;
-		const held = heldBy.get(chat.id) ?? null;
+		const goesOn = carried.has(chat.id);
+		const held = goesOn ? null : (heldBy.get(chat.id) ?? null);
 		entries.push({
 			kind: "session",
 			id: `session:${chat.id}`,
@@ -465,7 +473,7 @@ export function calendarEntries({
 			waits: sessionState(chat) === "your-turn",
 			topic: sessionTopic(chat, courses),
 			task: held,
-			status: held || sessionState(chat) === "left" ? openWorkStatus(listed, chat, held) : null,
+			status: !goesOn && (held || sessionState(chat) === "left") ? openWorkStatus(listed, chat, held) : null,
 		});
 		// Every earlier day he worked in it shows it too, as what he did that day (round 16, m8: the Linear maps lesson
 		// begun on 9 Nov showed only on 10 Nov, the day he left it).

@@ -160,3 +160,16 @@ test("the sign-in dialog opened while Claude is connected closes once, with an i
 	assert.deepEqual(depthErrors(), []);
 	assert.equal(closes, 1, "the close fires once per open");
 });
+
+test("once Claude reads signed in, the refused turn's line says so and what to do now, never the vaguer couldn't reply (round 19, m27)", async () => {
+	watchErrors();
+	stubFetch();
+	host = document.createElement("div");
+	document.body.append(host);
+	root = createRoot(host);
+	await act(async () => root!.render(lesson()));
+	await settle();
+	const cut = host.querySelector('[data-testid="reply-cut"]')?.textContent ?? "";
+	assert.match(cut, /^Signed in again\. Press Enter to send\./, cut);
+	assert.doesNotMatch(host.textContent ?? "", /couldn't reply/);
+});

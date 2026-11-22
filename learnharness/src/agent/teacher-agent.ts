@@ -138,6 +138,8 @@ export function endsTurnFor(kind: AgentKind): (toolName: string, earlier?: reado
  *  with nothing on his screen after a practice problem (round 13, 4 #2). */
 function closedBefore(kind: AgentKind, earlier: readonly ToolCall[]): boolean {
 	if (kind === "practice") return earlier.some((c) => c.name === PRACTICE_CONCLUDE_TOOL);
+	// The lesson's opening, owed after a probe_done whose own was left off (round 19, M7).
+	if (kind === "prober") return earlier.some((c) => c.name === PROBE_DONE_TOOL);
 	if (kind === "teacher") return earlier.some((c) => c.name === LESSON_PROGRESS_TOOL && lessonProgressOf(c.arguments)?.close === true);
 	return false;
 }

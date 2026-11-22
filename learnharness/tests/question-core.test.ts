@@ -279,8 +279,9 @@ describe("dock selection (toggleOption / toggleOther)", () => {
 
 describe("explainInputBase / explainInputProblems (the commitment contract)", () => {
 	it("has ONE authoring field — no explanation remnant (owner ruling 2026-09-27), and no details line under the question (Edo, 14 Nov 2026)", () => {
+		// Beside them only the optional course topic the question is asked on, a tag, not authoring (round 19, M4).
 		const keys = Object.keys(explainInputBase.properties);
-		assert.deepEqual(keys, ["question", "correctAnswer"]);
+		assert.deepEqual(keys, ["question", "correctAnswer", "topic"]);
 	});
 
 	it("the teach object LEADS with the required pair (type, nodeId) — base fields follow", () => {
@@ -360,9 +361,10 @@ describe("a request to be taught during the opening check", () => {
 		const rule = prober.split("\n").find((l) => l.startsWith("**He asks to be taught instead of asked**"));
 		assert.ok(rule, "the prober's rule for a request to be taught");
 		assert.match(rule, /"teach me", "stop quizzing me"/);
-		assert.match(rule, /explain nothing yourself and ask nothing more/);
+		assert.match(rule, /explain nothing before the probe's end and ask nothing more/);
 		assert.match(rule, /Conclude at once with `probe_done`/);
-		assert.match(rule, /the teacher opens the lesson/);
+		// Round 19, M7: in a lesson, probe_done's opening is the first step, which he reads while the teacher plans.
+		assert.match(rule, /In a lesson, its `opening` opens the lesson, as the probe's \*Conclude\* says\. Then end your turn with no words\./);
 		assert.doesNotMatch(prober, /Explain what he asked about directly in this reply, as above, then conclude with `probe_done`/);
 		const tool = probeDoneTool({ chatId: "c", chatStore: {} as never, deliver: () => {} }).probe_done!;
 		assert.match(tool.description, /"teach me\", \"stop quizzing me\"\), from what you measured so far, explaining nothing yourself: the teacher teaches/);

@@ -19,8 +19,10 @@ import { cn } from "@/lib/utils";
 
 
 /** A fact of the standing line that goes somewhere: its 16px mark and
- *  words, muted at rest and in full ink under the pointer. */
-export const PRESS = "inline-flex h-5 min-w-0 items-center gap-1.5 whitespace-nowrap rounded-sm outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:text-foreground motion-reduce:transition-none";
+ *  words, muted at rest and in full ink under the pointer. Its focus ring
+ *  stands off the words (`ring-offset-2`), so it never runs over their
+ *  last letter (round 19, m13: the ring cut the readiness fact's last word). */
+export const PRESS = "inline-flex h-5 min-w-0 items-center gap-1.5 whitespace-nowrap rounded-sm outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=open]:text-foreground motion-reduce:transition-none";
 export const MARK = "size-4 shrink-0";
 /** A fact of the standing line with nothing more to open: its mark and words, muted. */
 export const FACT = "inline-flex h-5 min-w-0 items-center gap-1.5 whitespace-nowrap";

@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -19,6 +20,25 @@ def private_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[No
     assert Path.home() != REAL_HOME, (
         "the test reached the real home: restore only your own patches "
         "(monkeypatch.context()), never monkeypatch.undo()"
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def real_registry_untouched(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
+    """No test registers a course in his real registry, by any path: a
+    subprocess given the real HOME, a patch undone, a home read before the
+    fixture ran (round 19, carry-in 3: 8 pytest folders were registered in
+    his real ``workspaces.json``)."""
+    yield
+    registry = REAL_HOME / "Library/Application Support/Learning/workspaces.json"
+    base = tmp_path_factory.getbasetemp().parent
+    try:
+        listed = json.loads(registry.read_text(encoding="utf-8")).get("workspaces", {})
+    except (OSError, ValueError, AttributeError):
+        return
+    strays = [w for w in listed if Path(w).is_relative_to(base)]
+    assert not strays, (
+        f"tests registered courses in the real registry {registry}: {strays}"
     )
 
 

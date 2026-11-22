@@ -9,7 +9,7 @@ import { takeLine, useLessonStart, type TakeLine } from "@/components/start/use-
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import { doneToday, homeExams, misfitExam, nearExam, sessionAsks, type NearExam, type SessionAsk } from "@/components/study-home/day-record";
 import { needsYouNow } from "@/components/study-home/needs-you";
-import { todayCourses, type TodayRow } from "@/components/study-home/study-facts";
+import type { TodayRow } from "@/components/study-home/study-facts";
 import { UnreadableLines } from "@/components/study-home/unreadable-course";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
 import type { ChatListItem, StudyCourse } from "@/src/core";
@@ -20,8 +20,9 @@ export interface HomeReady {
 	rows: readonly TodayRow[];
 	/** The same lines as lessons in plain words. */
 	lessons: readonly Lesson[];
-	/** The courses, in Today's order, each once (two sessions waiting in
-	 *  one course are two lines of one course). */
+	/** Every course, in the study read's order, Home's tabs' fixed order:
+	 *  never Today's, which moves with what he studied last (round 19, m9:
+	 *  P, LA, CI, RA, then P, CI, LA, RA, then P, LA, RA, CI). */
 	courses: readonly StudyCourse[];
 	/** Every session, newest first. */
 	chats: readonly ChatListItem[];
@@ -86,12 +87,12 @@ export function HomeFrame({
 }
 
 /** Home's lines and what goes with them, from the courses read. */
-function homeOf(courses: readonly StudyCourse[], chats: readonly ChatListItem[], readAt: string | undefined) {
+export function homeOf(courses: readonly StudyCourse[], chats: readonly ChatListItem[], readAt: string | undefined) {
 	const { rows } = needsYouNow(courses, chats, courses[0]!.map.today, readAt);
 	return {
 		rows,
 		lessons: rows.map(lessonOf),
-		courses: todayCourses(rows, courses),
+		courses,
 		chats,
 		done: doneToday(chats, new Date(), courses),
 		exam: nearExam(homeExams(courses)),

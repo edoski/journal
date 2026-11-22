@@ -337,9 +337,11 @@ def test_a_day_yesterdays_end_moves_says_why(
         run(monkeypatch, capsys, root, "save", stdin=practice)
     found = moves(monkeypatch, capsys, root)
     if studied:
-        # He studied yesterday and left Late: it takes the first day the
-        # days he was told leave, and Told keeps today.
-        assert found["late"] == (day(1), {"from": day(-1), "by": "left", "on": day(-1)})
+        # He studied yesterday and left Late: it comes today, his next study
+        # day, beside Told, past his one review a day, and Told keeps today
+        # (round 19, M1: what a day left takes its place among the days he
+        # was told). Today is a day gone by's next, so Late is due, not moved.
+        assert found["late"] == (day(0), None)
         assert found["told"] == (day(0), None)
     else:
         assert found["late"] == (day(0), None)
@@ -347,3 +349,50 @@ def test_a_day_yesterdays_end_moves_says_why(
             day(1),
             {"from": day(0), "by": "missed", "on": day(-7)},
         )
+
+
+@pytest.mark.usefixtures("no_new_topics")
+def test_a_due_review_is_late_from_the_day_he_was_told(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 19, m2 (1 n9): Uniform read "Back Sun 15 Nov" on 8 Nov, memory
+    having asked for it on 6 Nov, then "Due 6 Nov" on 17 Nov: an earlier day
+    than the one he was told. Once the told day passes, a review is late from
+    that day, never from memory's earlier one."""
+    root = course(tmp_path / "algebra")
+    late = {"introduced": day(-20), "review": {"due": day(-10)}}
+    topics = {"eigen": {"introduced": day(-20)}, **{f"f{n}": late for n in range(3)}}
+    answers = [checked(key, -17) for key in topics] + [checked("eigen", 0)]
+    run(
+        monkeypatch,
+        capsys,
+        root,
+        "save",
+        stdin={"topics": topics, "observations": answers},
+    )
+    pins = {f"f{n}": {"review": late["review"]} for n in range(3)}
+    run(monkeypatch, capsys, root, "save", stdin={"topics": pins})
+    told = {
+        key: review
+        for key, (review, _) in moves(monkeypatch, capsys, root).items()
+        if key.startswith("f")
+    }
+    held = {key: when for key, when in told.items() if when > day(0)}
+    assert held, "a review memory asked for is held past today"
+
+    later = max(held.values())
+    monkeypatch.setenv("LEARNING_TODAY", later)
+    topics_now = run(monkeypatch, capsys, root, "map")["topics"]
+    due = {
+        item["topic"]: item["overdue"]
+        for item in topics_now
+        if item.get("overdue") is not None
+    }
+    assert due, "a review is due on the day it was told"
+    for key, overdue in due.items():
+        since = told[key] if told[key] <= later else day(-10)
+        assert (
+            overdue == (date.fromisoformat(later) - date.fromisoformat(since)).days
+        ), key

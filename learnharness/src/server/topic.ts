@@ -116,8 +116,19 @@ export function topicRecordOf(show: unknown, handle: string, taskKeys: readonly 
 	const scored = strings(topic.observations).flatMap((id) => attemptOf(id, evidence[id]) ?? []);
 	const corrected = new Set(scored.flatMap((s) => s.corrects));
 	const sessionOf = (id: string, corrects: readonly string[]) => saved.get(id) ?? corrects.map((c) => saved.get(c)).find((s) => s !== undefined) ?? null;
+	// A re-mark keeps the time he answered: the earliest of what it
+	// corrects, followed back (round 19, m24: two disputes moved his first
+	// answers above the last in Earlier).
+	const byId = new Map(scored.map((s) => [s.attempt.id, s]));
+	const answered = (id: string, seen = new Set<string>()): string | null => {
+		const found = byId.get(id);
+		if (!found || seen.has(id)) return null;
+		seen.add(id);
+		const earlier = found.corrects.map((c) => answered(c, seen)).filter((t): t is string => t !== null).sort();
+		return earlier[0] ?? found.attempt.recorded;
+	};
 	return {
-		attempts: scored.filter((s) => !corrected.has(s.attempt.id)).map((s) => ({ ...s.attempt, session: sessionOf(s.attempt.id, s.corrects) })),
+		attempts: scored.filter((s) => !corrected.has(s.attempt.id)).map((s) => ({ ...s.attempt, recorded: answered(s.attempt.id), session: sessionOf(s.attempt.id, s.corrects) })),
 		refs: refsOf(topic, record(record(show)?.sources) ?? {}, titles),
 		tasks: taskKeys.flatMap((key) => {
 			const task = record(items[key]);

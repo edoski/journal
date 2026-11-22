@@ -159,7 +159,7 @@ describe("saving an answer to a question whose solution he had seen", () => {
 		const lastId = (messages: LhMessage[]) => ((messages.findLast((m) => m.role === "assistant") as AssistantMessage).content[0] as { id: string }).id;
 		const concludeOn = (messages: LhMessage[], args: Record<string, unknown>) => {
 			const practice = { chatId: "c1", chatStore: { getChat: () => ({ messages, kind: "practice" }) } };
-			return concludeTool(createPracticeGate(practice), { ctx: practice, course: ctx }).execute("k", { verdict: "v", rung: null, missClass: null, retest: false, response: "r", ...args } as never);
+			return concludeTool(createPracticeGate(practice), { ctx: practice, course: ctx }).execute("k", { verdict: "v", rung: null, missClass: null, retest: false, response: "r", record: "Found the rank from the rows", ...args } as never);
 		};
 		const explained = [...pose(["rank"])];
 		explained.push(newPracticeRequestMessage(lastId(explained), "explain"));

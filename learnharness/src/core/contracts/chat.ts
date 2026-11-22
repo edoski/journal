@@ -212,6 +212,26 @@ export const HANDOFF_TEXT =
 	`each of ${SENTENCE_WORDS} words or fewer, since a longer one counts as two, ` +
 	"then its question, never waiting for plan_init's result; I'll interrupt if I want something else.";
 
+/** The lesson's wake once the probe opened it (round 19, M7): the prober
+ *  showed the first step's teaching, written from its assessment, with the
+ *  probe's end, so he reads it while the plan's own thinking runs (22 to 33
+ *  s, the whole wait). The plan is still made from the whole assessment,
+ *  after it, never before it (round 16's plan-early started the plan before
+ *  the assessment was written, and blind judges preferred the plans it
+ *  replaced); its first step is the one on his screen, and the plan's reply
+ *  carries it on to its question. */
+export function openedHandoffText(opening: string): string {
+	return (
+		"Next: plan the full teaching arc from my current understanding to the goal understanding. " +
+		"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
+		"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
+		"Take your time here and really think this through. " +
+		`The lesson's first step is already on my screen, written from the probe's assessment so I read it while you plan: "${opening.trim()}" ` +
+		"It is the plan's first step, taught. When it's genuinely reasoned out, call plan_init and, in that same reply, pose that step's question, " +
+		`with at most one sentence of ${SENTENCE_WORDS} words or fewer before it, never saying the step's point again and never waiting for plan_init's result; I'll interrupt if I want something else.`
+	);
+}
+
 /** What the wake says of the probe's last answer, read from the record
  *  once the probe's turn has landed (round 15, m13: the first step opened
  *  "Your answer took the limit of the base alone…" under the feedback
@@ -225,6 +245,16 @@ export function probeFeedbackText(said: readonly string[] | null): string {
 	return `I have already read the probe's feedback on my last answer: ${said.map((t) => `"${t.trim()}"`).join(" ")} That is said: the first step builds on it with something new, and never says its point again, in any words.`;
 }
 
+/** His task's step is his to try before anything is taught (carry-in 1,
+ *  round 18 P5's runs: on Continue Problem sheet 4, 5 of 8 turns read the
+ *  task's record, which names his two misses at part (c), then worked part
+ *  (c) on his own matrix in a message and asked a check on a new one, so
+ *  his hand-in part was done for him). A gap the record names is taught
+ *  after his try shows it, on an example of the tutor's own. */
+export const TASK_STEP_FIRST =
+	"Pose the step to me first, as my own work, and let me try it before you teach anything: never work it, or any part of it, yourself. " +
+	"If my try shows a gap, teach it then, on an example of your own, never on my task's own matrix or numbers.";
+
 /** The wake in a session that continues an open task (round 11, 2 N2: the
  *  lesson's wake turned Problem sheet 4, answered right at part (c), into a
  *  nine-step rank–nullity lesson from its basics put in front of part (d),
@@ -232,8 +262,9 @@ export function probeFeedbackText(said: readonly string[] | null): string {
  *  a gap the assessment names may come before it; a step that needs his
  *  material waits for it. */
 export const TASK_HANDOFF_TEXT =
-	"Next: carry on with my open task at the step the assessment says comes next. It is my task, not a lesson: plan only that step with plan_init, one node named for the part it is, with a node before it only for a gap the assessment names, never a lesson on the topic from its basics. " +
-	"If the step needs something from me first, such as a part's text, ask me for it in one plain line, unless that is already asked above, and end your turn; work the step once I send it. Otherwise pose the step straight away.";
+	"Next: carry on with my open task at the step the assessment says comes next. It is my task, not a lesson: plan only that step with plan_init, one node named for the part it is, never a lesson on the topic from its basics. " +
+	"If the step needs something from me first, such as a part's text, ask me for it in one plain line, unless that is already asked above, and end your turn; pose the step once I send it. Otherwise pose the step straight away. " +
+	TASK_STEP_FIRST;
 
 /** The model-facing words of Continue pressed on an open task this session
  *  holds, when nothing in it waits on him (round 13, 2 M1): Continue
@@ -248,8 +279,9 @@ export function taskContinueText(tasks: readonly string[], passage?: string | nu
 	return (
 		`[CONTINUE MY TASK] I pressed Continue on my open task ${named}. Carry on at its saved step, as the course record above gives it. ` +
 		(passage ? `My screen already shows its text from my material, so read no file for it:\n\n${passage}\n\n` : "") +
-		"It is my task, not a lesson: never a lesson on the topic from its basics, and a step before it only for a gap the record names. If you plan, plan only that step with plan_init, one node named for the part it is. " +
-		"If the step needs something from me first, such as a part's text, ask me for it in one plain line and end your turn; otherwise pose the step straight away. Never say this message."
+		"It is my task, not a lesson: never a lesson on the topic from its basics. If you plan, plan only that step with plan_init, one node named for the part it is. " +
+		"If the step needs something from me first, such as a part's text, ask me for it in one plain line and end your turn; otherwise pose the step straight away. " +
+		`${TASK_STEP_FIRST} Never say this message.`
 	);
 }
 
@@ -337,7 +369,10 @@ const DONE_GRADED = "An answer he sent before pressing it is still graded and sa
  *  names it (round 17, 2 m2: a four-topic review's close named only
  *  Conditional probability's, and Binomial, Random variables and
  *  Inclusion-exclusion got none). */
-const DONE_DAYS = "and the day each topic he answered in this session comes back, by its topic: topics on one day together, and with three days or more, the soonest and that the rest are on his calendar";
+/** Round 19, m15: "Mechanics of matrix multiplication comes back on a later
+ *  day on your calendar", for a topic answered before his last Done for
+ *  today; "you pick those up next", with no day. */
+const DONE_DAYS = "and the day each topic the close's `days` lists comes back (the session's topics and those he answered since its last close), by its topic, copied from its words: topics on one day together, and with three different days or more, the soonest and that the rest are on his calendar; a topic he hears of gets its day, never \"a later day\" or \"next\", and a topic `days` does not list is left out";
 /** A start planned for today that the session's saves moved is named,
  *  with its new day and its cause (round 18, M4: a hinted, then partly
  *  right, answer moved Expectation off today, every receipt carried it in
@@ -347,7 +382,7 @@ const DONE_MOVED = "a start planned for today that his answers moved (a save's `
  *  (round 18, m15: "…is waiting for you there. Because that lesson is
  *  unfinished, Any matrix represents a linear map moved …, and later
  *  starts moved too."). */
-const DONE_HALF = 'a question he left a half answer on (`draftKept`) is his half answer, waiting in this session by its name (your Invertible matrices lesson, your Probability review), never "there"; a start named inside a sentence has its title set off in quotes (Starting “Any matrix represents a linear map” moves to Tuesday 10 November), and every move he is told is named with its day, never as "later starts moved too"';
+const DONE_HALF = 'a question he left a half answer on (`draftKept`, `half_answer_on` in the close) is his half answer, waiting in this session by its name (your Invertible matrices lesson, your Probability review), never "there", with the day that lesson continues ("…, which continues tomorrow, Monday 9 November"), and a task step saved over it says to finish his half answer on that question, never that he wrote nothing; a start named inside a sentence has its title set off in quotes (Starting “Any matrix represents a linear map” moves to Tuesday 10 November), and every move he is told is named with its day, never as "later starts moved too"';
 const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one, ${DONE_DAYS}; ${DONE_MOVED}; a topic not started is one he starts, never a review; ${DONE_HALF}. ${DONE_LIMITS}`;
 /** Practice keeps nothing of a problem dropped at Done for today, so its
  *  close names only what the record keeps (round 9, 3 m7: "You still have
@@ -561,10 +596,15 @@ export interface ChatSummary {
 	 *  words (`openedAsReview`), whatever it is named now. The list always
 	 *  sets it; a summary made elsewhere may leave it out. */
 	review?: boolean;
-	/** The one of a review's topics its plan re-teaches (`retaughtTopicOf`):
-	 *  its map and what it left are that topic's alone, never its other
-	 *  topics' (round 18, M2). Absent otherwise. */
-	retaught?: string;
+	/** The topic its plan's steps are on (`stepsOnOf`): its step map is
+	 *  that topic's alone, never its other topics' (round 18, M2; round 19,
+	 *  M4). Absent when it belongs to no one topic. */
+	stepsOn?: string;
+	/** The topics the work open on him is asked on (`openWorkTopicsOf`), or
+	 *  for a lesson's question the topic its steps are on: "Your turn" and
+	 *  "Left off" mark these alone (round 19, M4). Absent when nothing is
+	 *  open, or a review's open question names no topic. */
+	openOn?: readonly string[];
 	/** The topics whose start its saves moved (`startsMovedOf`): while it
 	 *  is open, Home keeps a start it moved off today (round 18, M4).
 	 *  Absent when none. */

@@ -212,15 +212,6 @@ export function leftOffWords(days: number | null, today: string): string {
 	return `Left off ${days <= 0 ? "today" : shortDay(dayBefore(today, days))}`;
 }
 
-/** Where an old lesson's map stopped, when nothing resumes it: "Stopped
- *  here today", "Stopped here on 6 Nov"; "Left off here" is only for a
- *  lesson the page resumes (round 16, m22: the 5 and 6 Nov lessons' maps
- *  said "Left off at A worked example" with no Resume anywhere). */
-export function stoppedHereWords(days: number, today: string): string {
-	const day = pastDay(days, today);
-	return days <= 1 ? `Stopped here ${day}` : `Stopped here on ${day}`;
-}
-
 /** A review the engine has dated ahead, by its day, never a count of
  *  days (round 8: "Back in 2d" where the tutor said Tuesday 10 November):
  *  "Back Tue 10 Nov". */
@@ -280,16 +271,15 @@ export function heldExamWords(review: CourseMapTopic["review"]): string | null {
 	return review?.kind === "scheduled" && review.held?.exam ? HELD_WORDS.exam(review.held.exam) : null;
 }
 
-/** A day that moved, from when: one he was told ("Moved from 10 Nov after
- *  your Probability study today", round 7: a told day moved in silence),
- *  else a review the plan holds past a day memory asked for that has
- *  passed, "Due 1 Oct"; null otherwise. Memory's day still ahead was
- *  never a day he was told, so nothing moved "from" it (round 8: "Moved
- *  from 11 Nov" named a day he never heard). */
-export function movedWords(review: CourseMapTopic["review"], today: string, told?: TopicMoved): string | null {
-	if (told) return `Moved from ${shortDay(told.from)}${movedWhy(told, today, shortDay)}`;
-	if (review?.kind !== "scheduled" || !review.held) return null;
-	return review.held.since < today ? dueWords(review.held.since) : null;
+/** A day he was told that moved, from when ("Moved from 10 Nov after
+ *  your Probability study today", round 7: a told day moved in silence);
+ *  null otherwise. Memory's day was never a day he was told, passed or
+ *  ahead, so nothing moved "from" it and no row names it beside the day
+ *  the plan gives (round 8: "Moved from 11 Nov" named a day he never
+ *  heard; round 19, m2: RV's Scheduled row read "Review · Mon 9 Nov" over
+ *  "Due 7 Nov" while its course row said "Back Mon 9 Nov"). */
+export function movedWords(told: TopicMoved, today: string): string {
+	return `Moved from ${shortDay(told.from)}${movedWhy(told, today, shortDay)}`;
 }
 
 /** A review that is due: "Due today", "Due 5 Nov"; any review the plan
@@ -715,6 +705,8 @@ export const LESSON_WORDS = {
 	skippedQuestion: "Skipped",
 	stoppedBeforeReply: "The tutor stopped before replying.",
 	couldntReply: "The tutor couldn't reply.",
+	/** A turn refused for a signed-out Claude, once Claude reads signed in (round 19, m27). */
+	signedInAgain: "Signed in again. Press Enter to send.",
 	youStoppedReply: "You stopped the tutor before it replied.",
 	youStoppedMidReply: "You stopped the tutor mid-reply.",
 	tryAgain: "Try again",
@@ -899,14 +891,13 @@ export const READY_FACT_WORDS = {
 /** An arc not started whose topics the plan gives no day yet, on the road's line. */
 export const ARC_NOT_PLANNED = "Not planned yet";
 
-/** An arc under way, when the plan starts its next topic, on the road's line: "Planned 10 Dec". */
-export function arcPlannedWords(day: string): string {
-	return `Planned ${shortDay(day)}`;
-}
-
-/** When an arc's first new topic starts, on the road's line: "Starts 15 Nov". */
-export function arcStartsWords(day: string): string {
-	return `Starts ${shortDay(day)}`;
+/** When the plan starts an arc's next new topic, on the road's line, in
+ *  the word a topic's row, Home and the calendar use for a planned start:
+ *  "Planned today", "Planned 10 Dec". One word whether the arc is under way
+ *  or not started (round 19, m8: arc 6 read "Starts 18 Nov" beside arc 7's
+ *  "Planned 18 Nov" for the same fact). */
+export function arcPlannedWords(day: string, today: string): string {
+	return day <= today ? "Planned today" : `Planned ${shortDay(day)}`;
 }
 
 /** A course without arcs, not ready: the topics not yet solid, else those

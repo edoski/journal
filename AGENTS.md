@@ -379,6 +379,8 @@ commits touching `sync/`, `finance/` or `macos/`. Run the quality gate before su
 - media cache: `~/Library/Caches/Journal/media/dates.json`
 - learning workspace registry and links: `~/Library/Application Support/Learning/workspaces.json`
 - learning global preferences: `~/Library/Application Support/Learning/preferences.json`
+- learning last-read courses: `~/Library/Application Support/Learning/last-read/<sha256 of the course folder, 16>.<revision>.json`
+  (the newest revision each course was read at, so the other courses' plan keeps its room while its record can't be read)
 - flow reminder state: `~/Library/Application Support/Journal/state/flow_reminder_state.json`
 - shortcut pending state: `~/Library/Application Support/Journal/state/daily/status/pending/`
 - shortcut invalid diagnostics: `~/Library/Application Support/Journal/state/daily/status/invalid/` (30-day retention)

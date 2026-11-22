@@ -94,7 +94,7 @@ export function plannedWords(facts: TopicFacts): string | null {
 	// The exam is why it comes when it does, whatever else it waits behind (round 13, 1 N1: Geometric read only
 	// "Planned Sat 28 Nov" while the head said no room before the exam to start it).
 	if (facts.exam) return `${day} · ${facts.exam}`;
-	if (moved) return `${day} · ${movedWords(null, facts.today, moved)}`;
+	if (moved) return `${day} · ${movedWords(moved, facts.today)}`;
 	if (facts.startsWhy?.kind === "after") return `${day} · ${facts.startsWhy.short}`;
 	const after = startsAfterWords(startsAfter);
 	return after ? `${day}, ${after.charAt(0).toLowerCase()}${after.slice(1)}` : day;
@@ -147,7 +147,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 				return { ...base, icon: action.task ? "task" : "standing", words: action.task?.title ?? sessionName(action.chat, facts), note: action.task?.step ?? (entry ? leftDayWords(entry.day, facts.today) : null), chat: action.chat.id, href: continueHref(action.chat) };
 			}
 			if (action.task) return { ...base, icon: "task", words: action.task.title, note: action.task.step };
-			const last = facts.sessions.find((entry) => entry.own && isPlanned(entry));
+			const last = facts.sessions.find((entry) => entry.maps && isPlanned(entry));
 			return last
 				? { ...base, icon: "standing", words: sessionName(last.chat, facts), note: leftDayWords(last.day, facts.today) }
 				: { ...base, icon: "standing", words: "Next lesson" };
@@ -172,7 +172,8 @@ export function nextItems(facts: TopicFacts, now: NowItem): NextItem[] {
 	const waiting = (["your-turn", "working", "left"] as const).flatMap((state) => sessions.filter((entry) => entry.state === state));
 	const review =
 		facts.action.kind !== "review" && facts.topic.review?.kind === "due"
-			? [{ kind: "review" as const, words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today), press: { opening: `Review ${facts.topic.title}` } }]
+			? // A due review says it is one beside its day, never a bare past date (round 19, m2: "Next · Due 9 Nov").
+				[{ kind: "review" as const, words: `Review · ${facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today)}`, press: { opening: `Review ${facts.topic.title}` } }]
 			: [];
 	const listed = [...waiting.map((entry) => entry.chat), ...facts.sessions.filter((entry) => entry.chat.id === now.chat).map((entry) => entry.chat)];
 	const taken = new Set([...(facts.action.kind === "continue" && facts.action.task ? [facts.action.task.key] : []), ...listed.flatMap((chat) => chat.tasks ?? [])]);

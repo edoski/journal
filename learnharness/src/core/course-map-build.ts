@@ -14,6 +14,7 @@
 
 import { createHash } from "node:crypto";
 import type { ChatSummary } from "./contracts/chat.ts";
+import { lessonHereOf } from "./session-opening.ts";
 
 // ─── the ledger ──────────────────────────────────────────────────────────────
 
@@ -137,12 +138,14 @@ export function openLessonsOf(chats: readonly ChatSummary[], workspace: string, 
 	};
 }
 
-/** The topics of the course's lesson in progress, as `withLessonHere`
- *  reads it: its newest session, when that is a lesson still open and not
- *  left for next time; empty otherwise. Pure. */
+/** The topic of the course's lesson in progress, as `withLessonHere`
+ *  reads it: where its newest session puts You are here (`lessonHereOf`),
+ *  when that is a lesson still open and not left for next time; empty
+ *  otherwise, and for work on a task that is not a lesson (round 19, M4).
+ *  Pure. */
 export function lessonTopics(chats: readonly ChatSummary[], workspace: string): readonly string[] {
 	const newest = chats.filter((c) => c.course?.workspace === workspace && c.messageCount > 0).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-	return newest && newest.kind === "teach" && openSession(newest) && newest.ended !== "left" ? (newest.ownTopics ?? []) : [];
+	return newest && newest.kind === "teach" && openSession(newest) && newest.ended !== "left" ? lessonHereOf(newest) : [];
 }
 
 /** What the course record holds that a build's patch is merged into. */

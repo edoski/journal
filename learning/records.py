@@ -18,7 +18,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timezone
+import hashlib
 import os
+from pathlib import Path
 from typing import Any
 
 from learning import arcs, capacity, clock, packing, preferences, progress
@@ -66,8 +68,73 @@ def _readable(workspace: Workspace, stored: dict[str, Any] | None) -> dict[str, 
 
 
 def read(workspace: Workspace) -> dict[str, Any]:
-    """The validated stored course; a missing ``course.json`` is an empty course."""
-    return _readable(workspace, storage.load(workspace.record))
+    """The validated stored course; a missing ``course.json`` is an empty course.
+    Each new revision read is kept (``last_read``)."""
+    stored = storage.load(workspace.record)
+    record = _readable(workspace, stored)
+    if stored:
+        _keep_read(workspace, stored)
+    return record
+
+
+def _kept(workspace: Workspace) -> tuple[Path, str]:
+    """Where a course's last read is kept, and its name's stem."""
+    stem = hashlib.sha256(str(workspace.directory).encode()).hexdigest()[:16]
+    return workspaces.support_directory() / "last-read", stem
+
+
+def _keep_read(workspace: Workspace, stored: dict[str, Any]) -> None:
+    """Keep the course as read, once per revision: a revision already kept
+    costs one look for its file. Nothing is kept when the folder can't be
+    written; the course is then planned as before."""
+    folder, stem = _kept(workspace)
+    target = folder / f"{stem}.{stored.get('revision', 0)}.json"
+    try:
+        if target.is_file():
+            return
+        folder.mkdir(parents=True, exist_ok=True)
+        storage.publish_text(target, storage.encode(stored))
+        # Only older revisions go: another engine process may have kept a
+        # newer one meanwhile, which stays.
+        revision = int(stored.get("revision", 0))
+        for old, kept in _copies(folder, stem):
+            if kept < revision:
+                old.unlink(missing_ok=True)
+    except OSError:
+        return
+
+
+def _copies(folder: Path, stem: str) -> list[tuple[Path, int]]:
+    """A course's kept copies with their revisions, oldest first: by number,
+    so revision 10 is newer than revision 9."""
+    found = []
+    for path in folder.glob(f"{stem}.*.json"):
+        revision = path.name[len(stem) + 1 : -len(".json")]
+        if revision.isdigit():
+            found.append((path, int(revision)))
+    return sorted(found, key=lambda item: item[1])
+
+
+def last_read(workspace: Workspace) -> dict[str, Any] | None:
+    """The course as it was last read, for the other courses' plan while its
+    own record can't be read, so their days keep the room it takes (round
+    19, m5: Real Analysis unreadable changed Probability's and Calculus's
+    rows on Home); None when none was kept or the copy can't be read."""
+    folder, stem = _kept(workspace)
+    try:
+        found = _copies(folder, stem)
+        return _readable(workspace, storage.load(found[-1][0])) if found else None
+    except (ValueError, OSError):
+        return None
+
+
+def for_plan(workspace: Workspace) -> dict[str, Any] | None:
+    """A course as the other courses' plan reads it: its record, else as it
+    was last read (``last_read``); None when neither can be read."""
+    try:
+        return read(workspace)
+    except (ValueError, OSError):
+        return last_read(workspace)
 
 
 def history() -> dict[str, dict[str, Any]]:
@@ -116,10 +183,8 @@ def _others(workspace: Workspace) -> dict[str, dict[str, Any]]:
     for other in courses(workspace):
         if other.directory == workspace.directory:
             continue
-        try:
-            others[str(other.directory)] = read(other)
-        except (ValueError, OSError):
-            continue
+        if (found := for_plan(other)) is not None:
+            others[str(other.directory)] = found
     return others
 
 
