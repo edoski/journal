@@ -994,17 +994,24 @@ export interface SortAnswer {
 	sort: { topic: string; arc: string }[];
 }
 
-/** The misses of one sort by several readers: a topic is a miss when more
- *  than half of them put it away from its arc (two of three, as B1 counts),
- *  with every arc name they read it as and how many did. Pure. */
-export function majorityMisses(readings: readonly SortMiss[][]): SortMiss[] {
+/** The share of a sort's readers that makes a topic a miss. The arcs
+ *  jury's B1 counts two of three readers; a topic one reader in three puts
+ *  away fails such a trio about half the time (arc calibration 4: four of
+ *  the jury's five misses in rounds 2 and 3 had one of the pass's three
+ *  readers away), so the pass reads five and counts two. */
+export const SORT_MISS_SHARE = 0.4;
+
+/** The misses of one sort by several readers: a topic is a miss when at
+ *  least SORT_MISS_SHARE of them put it away from its arc, with every arc
+ *  name they read it as and how many did. Pure. */
+export function sortedAway(readings: readonly SortMiss[][]): SortMiss[] {
 	const of = readings.length;
 	const away = new Map<string, SortMiss>();
 	for (const m of readings.flat()) {
 		const seen = away.get(m.topic);
 		away.set(m.topic, seen ? { ...seen, readsAs: [...new Set([...seen.readsAs, ...m.readsAs])], away: seen.away + 1 } : { ...m, away: 1, of });
 	}
-	return [...away.values()].filter((m) => m.away * 2 > of);
+	return [...away.values()].filter((m) => m.away >= SORT_MISS_SHARE * of);
 }
 
 /** Misses from several sorts, once each: the later sort's count, with every
@@ -1101,7 +1108,7 @@ export function sortProblems(misses: readonly SortMiss[], submit: ArcSubmit): st
 	if (borderline && (basis.includes(only!.topic.toLowerCase()) || basis.includes(only!.title.toLowerCase()))) return null;
 	const lines = misses.map((m) => `- "${m.title}" (${m.topic}), in "${m.arc}", reads as part of ${m.readsAs.map((a) => `"${a}"`).join(" or ")}${m.away === m.of && m.of > 1 ? ` (every reader)` : ""}.`);
 	return [
-		"Fresh readers sorted the topic titles into the arc names alone, as the learner will read them after days away (rule 8's name test), and most of them put these topics in another arc than yours:",
+		"Fresh readers sorted the topic titles into the arc names alone, as the learner will read them after days away (rule 8's name test), and two or more of them put these topics in another arc than yours:",
 		...lines,
 		misses.length === 1
 			? borderline

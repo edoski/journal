@@ -31,7 +31,7 @@ import {
 	lastEdgesEntry,
 	formationWords,
 	liveTopics,
-	majorityMisses,
+	sortedAway,
 	mergeMisses,
 	passDue,
 	purposeAnswerProblems,
@@ -92,9 +92,9 @@ const ARCS_TOOL = "submit_arcs";
 const SORT_TOOL = "submit_sort";
 const PURPOSE_TOOL = "submit_purpose";
 const NEVER_SUBMITTED = "The grouping pass never submitted.";
-/** Blind readers per cut, as the arcs rubric's B1 counts them: a topic is a
- *  miss when two of the three put it away from its arc. */
-const SORT_READERS = 3;
+/** Blind readers per sort: a topic is a miss when two of the five put it
+ *  away from its arc (SORT_MISS_SHARE). */
+const SORT_READERS = 5;
 /** Fresh readers per topic, for the same reason: a use one reader in two
  *  finds is missed only when both miss it, and a drop needs them all. */
 const NEEDS_READERS = 2;
@@ -830,7 +830,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			});
 			const reads = (await Promise.all(Array.from({ length: SORT_READERS }, reader))).filter((r): r is SortAnswer => r !== null);
 			if (reads.length > 0) {
-				const now = majorityMisses(reads.map((read) => sortMisses(quiz, read, a)));
+				const now = sortedAway(reads.map((read) => sortMisses(quiz, read, a)));
 				sorted = standingMisses(seen, now, a);
 				seen = mergeMisses(seen, now);
 				log({ step: "sort", kind: "sorted", misses: sorted });

@@ -38,7 +38,7 @@ import {
 	type ArcSubmit,
 	type EdgeSubmit,
 	type SortAnswer,
-	majorityMisses,
+	sortedAway,
 	purposeAnswerProblems,
 	purposeProblems,
 	withdrawal,
@@ -518,11 +518,11 @@ describe("the cut's shape rules", () => {
 		assert.match(sortProblems([...borderline, { ...borderline[0]!, topic: "chain", title: "Chain rule" }], { ...good, basis: "riemann chain" })!, /At most one may stay/);
 	});
 
-	it("three blind readers, as the arcs rubric's B1 counts: a topic two of them put away is a miss, with every arc they read it as", () => {
+	it("five blind readers: a topic two of them put away is a miss, with every arc they read it as", () => {
 		const m = (topic: string, readsAs: string[]) => ({ topic, title: topic, arc: "A", readsAs, away: 1, of: 1 });
-		assert.deepEqual(majorityMisses([[m("x", ["B"])], [m("x", ["C"]), m("y", ["B"])], []]), [{ ...m("x", ["B", "C"]), away: 2, of: 3 }], "y, one reader of three, is no miss");
-		assert.deepEqual(majorityMisses([[m("y", ["B"])], []]), [], "of two readers, both must put it away");
-		assert.deepEqual(majorityMisses([[], [], []]), []);
+		assert.deepEqual(sortedAway([[m("x", ["B"])], [m("x", ["C"]), m("y", ["B"])], [], [], []]), [{ ...m("x", ["B", "C"]), away: 2, of: 5 }], "y, one reader of five, is no miss");
+		assert.deepEqual(sortedAway([[m("y", ["B"])], [], []]), [], "of three readers that finished, one is no miss");
+		assert.deepEqual(sortedAway([[], [], [], [], []]), []);
 	});
 
 	it("a miss an earlier sort found stands while its names stand, so resending the same cut cannot pass on luckier readers", () => {
@@ -687,7 +687,7 @@ function memoryLedgers(): ArcPassLedgers & { all: Map<string, ArcPassLedger> } {
  *  `loopBreaks` by each loop's use ("topic<-need"), else a break at the use, the cut with each of `cuts` in turn (the next
  *  one after a refusal), and each blind sort reader with `readsAs` for a
  *  title it names (every reader, or only the first `readers` of each sort's
- *  three), else the topic's own arc in the cut it reads; it counts the edge and cut calls apart from
+ *  five), else the topic's own arc in the cut it reads; it counts the edge and cut calls apart from
  *  the readers', the sort's and the purpose check's. */
 function scriptedModel(
 	edges: EdgeSubmit,
@@ -734,7 +734,7 @@ function scriptedModel(
 			return fauxAssistantMessage([fauxToolCall("submit_purpose", { false: falseOf } as unknown as ToolCall["arguments"], { id: `purpose-${state.purposes}` })], { stopReason: "toolUse" });
 		}
 		if (body.includes("## Arc names, in study order")) {
-			const reader = state.sorts++ % 3;
+			const reader = state.sorts++ % 5;
 			const topics = body.split("## Topics")[1]!;
 			const answer = cuts[Math.min(cut - 1, cuts.length - 1)]!;
 			const handleOf = new Map(Object.entries(CALC).map(([h, t]) => [t.title, h]));
@@ -1027,7 +1027,7 @@ describe("the grouping pass (real engine, scripted model)", { skip: realEngineMi
 		const result = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "apply" });
 		assert.equal(result.status, "formed", JSON.stringify(result));
 		assert.deepEqual(result.status === "formed" && result.sort?.map((m) => m.topic), ["continuity"]);
-		assert.equal(model.sorts, 3, "three blind readers");
+		assert.equal(model.sorts, 5, "five blind readers");
 	});
 
 	it("the cut reads which topics the record's exam leaves out, so it can keep the exam's boundary (AIKR: 50 topics left out of Module 1)", async () => {
