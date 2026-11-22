@@ -51,7 +51,18 @@ export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | unde
 	// not his turn (round 17, m13: the card read "Your turn" with nothing to answer).
 	if (tree.nodes.length > 0 && tree.nodes.every((node) => taught.has(node.id))) return asks(last) ? "mid-lesson" : "closed";
 	if (current === null) return "mid-lesson";
-	return asks(last) && tree.edges.some((edge) => edge.from === current) ? "mid-lesson" : "closed";
+	if (asks(last) && tree.edges.some((edge) => edge.from === current)) return "mid-lesson";
+	// A turn that ended with no words of its own, no question and no close (`lesson_progress` with `close`), steps
+	// still ahead, ended nowhere: the lesson is left where it stopped, never finished, so every surface keeps
+	// "Continue … lesson · Left off today" (round 19, M2: after marking a prediction the tutor's turn stopped empty,
+	// and the lesson left Home, the sidebar and its page's Now). A sign-off in its own words still ends it.
+	return silent(last) && stepsLeft(tree, messages) ? "left" : "closed";
+}
+
+/** Whether a reply has no words of its own: what it said, if anything, went
+ *  through `send_to_user` earlier in its turn. Pure. */
+function silent(reply: Extract<LhMessage, { role: "assistant" }>): boolean {
+	return !reply.content.some((block) => block.type === "text" && block.text.trim() !== "");
 }
 
 /** Whether the turn after his Done for today has settled, whatever it did
