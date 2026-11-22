@@ -19,6 +19,7 @@ import path from "node:path";
 import { courseLabel, type CourseLink } from "../core/contracts/course.ts";
 import { emit } from "../core/events.ts";
 import { newSetupNoteMessage, sessionModeOf } from "../core/native-messages.ts";
+import { freeHandle, siteName, takenHandles, webAddress } from "../core/course-context.ts";
 import { expandHome, type LearningCreated, type MaterialSurvey, type NewLearning } from "../core/setup.ts";
 import { surveyMaterial } from "../agent/subagents/material-survey.ts";
 import type { CourseMapStatus } from "../agent/subagents/course-map-builder.ts";
@@ -132,17 +133,37 @@ export async function createLearning(chatId: string, input: NewLearning): Promis
 		workspace = created.course.workspace;
 	}
 
+	// Linked at once, so a retry of the call finds it made, never a twin.
+	const link: CourseLink = { workspace, title };
+	stores.chatStore.linkCourse(chatId, link);
+	// The arcs may form even once he has begun studying: he asked for it set up.
+	const ledger = stores.arcPassLedgers.get(workspace);
+	stores.arcPassLedgers.save(workspace, { state: "new", at: ledger?.at ?? new Date().toISOString(), topics: ledger?.topics ?? 0, asked: input.asked.trim() });
+
+	// Its facts and its websites in one save.
+	const shown = await stores.courseRecords.run(workspace, { verb: "show", handles: "all" });
+	const taken = takenHandles(shown.ok ? shown.json : {});
+	const sites: Record<string, { path: string; title: string }> = {};
+	for (const site of input.websites ?? []) {
+		const url = webAddress(site.address);
+		if (!url) continue;
+		const name = site.title?.trim() || siteName(url);
+		const handle = freeHandle("site", name, taken);
+		taken.add(handle);
+		sites[handle] = { path: url, title: name };
+	}
 	const facts: Record<string, unknown> = {
 		...(input.goal?.trim() ? { goal: input.goal.trim() } : {}),
 		...(input.kind === "self-study" ? { preferences: { kind: "self-study" } } : {}),
 		...(input.kind === "course" && input.exam && Object.keys(input.exam).length > 0 ? { exam: input.exam } : {}),
+		...(Object.keys(sites).length > 0 ? { sources: sites } : {}),
 	};
+	const more: string[] = [];
 	if (Object.keys(facts).length > 0) {
 		const saved = await stores.courseRecords.run(workspace, { verb: "save", changes: facts });
 		// It exists now: what the engine refused is said, and corrected with course_save.
-		if (!saved.ok) console.error(`[setup ${chatId}] facts refused in ${workspace}: ${saved.message}`);
+		if (!saved.ok) more.push(`the course record refused its facts: ${saved.message}`);
 	}
-	const more: string[] = [];
 	if (input.files?.length) {
 		const files = input.files.map((f) => path.resolve(expandHome(f, home()))).filter((f) => fs.existsSync(f) && !isFolder(f));
 		const added = await addMaterial(workspace, files.map((f) => ({ path: path.basename(f), bytes: fs.readFileSync(f) })));
@@ -152,15 +173,6 @@ export async function createLearning(chatId: string, input: NewLearning): Promis
 		const linked = await courseContexts().linkFolder(workspace, folder);
 		if (!linked.ok) more.push(`${folder}: ${linked.error}`);
 	}
-	for (const site of input.websites ?? []) {
-		const linked = await courseContexts().addWebsite(workspace, site.address, site.title);
-		if (!linked.ok) more.push(`${site.address}: ${linked.error}`);
-	}
-	// The arcs may form even once he has begun studying: he asked for it set up.
-	const ledger = stores.arcPassLedgers.get(workspace);
-	stores.arcPassLedgers.save(workspace, { state: "new", at: ledger?.at ?? new Date().toISOString(), topics: ledger?.topics ?? 0, asked: input.asked.trim() });
-	const link: CourseLink = { workspace, title };
-	stores.chatStore.linkCourse(chatId, link);
 	emit("courses-changed", {});
 	emit("record-changed", { chatId });
 	startCourseMap(workspace);
@@ -186,6 +198,7 @@ export function noteMapBuilt(workspace: string, status: Extract<CourseMapStatus,
 		const record = stores.chatStore.getChat(chat.id);
 		if (!record || sessionModeOf(record.messages, record.kind) !== "setup") continue;
 		if (record.messages.some((m) => m.id.startsWith(MAP_NOTE))) continue;
+		console.info(`[setup ${chat.id}] its course's map ${status.state}: waking it`);
 		void deliverJobResult(newSetupNoteMessage(chat.id, `map_${status.at.replace(/\W/g, "")}`, mapNoteText(status)));
 	}
 }

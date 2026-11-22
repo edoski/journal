@@ -59,8 +59,9 @@ export function courseMapBuilder(): CourseMapBuilder {
 		onBuilt: (workspace, title) => emit("work-finished", { kind: "course-map", workspace, title, at: new Date().toISOString() }),
 		onStatus: (workspace) => {
 			emit("courses-changed", {});
-			void arcPass().settle(workspace);
+			// Read before the pass claims the course, which reads as building.
 			const status = courseMapBuilder().status(workspace);
+			void arcPass().settle(workspace);
 			if (status.state === "built" || status.state === "failed") {
 				// A setup conversation waits on its course's first map.
 				void import("./setup.ts").then((m) => m.noteMapBuilt(workspace, status));

@@ -14,7 +14,7 @@
 
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { invalidInputResult, serverExecute, toToolResult } from "../tool-execute.ts";
+import { invalidInputResult, toToolResult } from "../tool-execute.ts";
 import { LEARNING_KINDS, type LearningCreated, type NewLearning } from "../../core/setup.ts";
 import type { CourseLink } from "../../core/contracts/course.ts";
 import type { SteerMessage } from "../../core/contracts/jobs.ts";
@@ -85,17 +85,16 @@ export function setupTools(ctx: SetupToolContext): Record<string, AgentTool<any>
 			"Once it succeeds this conversation belongs to it, and you correct anything with course_save.",
 		parameters: createInput,
 		executionMode: "sequential",
-		execute: async (toolCallId, input, signal) => {
+		execute: async (_toolCallId, input) => {
 			const made = madeIn(ctx);
 			if (made) return invalidInputResult("create_learning", [`${made.title} is set up already in this conversation: change it with course_save`]);
 			if (input.kind === "self-study" && input.exam) return invalidInputResult("create_learning", ["a self-study has no exam: leave exam out, or make it a course"]);
 			if (input.kind === "self-study" && !input.goal?.trim()) return invalidInputResult("create_learning", ["a self-study needs its goal: one sentence on what he wants to be able to do"]);
-			let created: LearningCreated = { ok: false, error: "it could not be set up" };
-			const result = await serverExecute("create_learning", createInput, async (given) => {
-				created = await ctx.create(given);
-				return created.ok ? { ...created, note: "Set up. Its topic map is being built from the material; a new message says when it is ready." } : null;
-			})(toolCallId, input, signal);
-			return created.ok ? result : invalidInputResult("create_learning", [created.error]);
+			// No tool timeout: making a course is a run of engine calls, each
+			// with its own limit, and one cut short would be retried into a twin.
+			const created = await ctx.create(input);
+			if (!created.ok) return invalidInputResult("create_learning", [created.error]);
+			return toToolResult({ ...created, note: "Set up. Its topic map is being built from the material; a new message says when it is ready." });
 		},
 	};
 	const teach = teachHandoffTool(ctx, { problemActive: false }).teach!;

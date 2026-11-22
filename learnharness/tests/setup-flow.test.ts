@@ -190,13 +190,21 @@ describe("creating on the real engine", { skip: realEngineMissing(LEARNING_ENGIN
 	it("makes a self-study in his study folder with its goal, no exam and the self-study kind", async () => {
 		existingCourse();
 		const chat = chatStore.createChat("Git rebase");
-		const made = await createLearning(chat.id, { kind: "self-study", title: "Git rebase", goal: "Rebase a feature branch onto main without losing work", asked: "I want to learn git rebase well" });
+		const made = await createLearning(chat.id, {
+			kind: "self-study",
+			title: "Git rebase",
+			goal: "Rebase a feature branch onto main without losing work",
+			websites: [{ address: "https://git-scm.com/book/en/v2/Git-Branching-Rebasing", title: "Pro Git: Rebasing" }, { address: "git-scm.com/docs/git-rebase" }],
+			asked: "I want to learn git rebase well",
+		});
 		assert.ok(made.ok, JSON.stringify(made));
 		assert.equal(path.dirname(made.workspace), STUDY, "a self-study with no folder goes where his courses are");
 		const saved = record(made.workspace);
 		assert.equal(saved.preferences.kind, "self-study");
 		assert.equal(saved.goal, "Rebase a feature branch onto main without losing work");
 		assert.equal(saved.exam?.date, undefined);
+		assert.deepEqual(Object.values(saved.sources as Record<string, { path: string }>).map((s) => s.path).sort(), ["https://git-scm.com/book/en/v2/Git-Branching-Rebasing", "https://git-scm.com/docs/git-rebase"], "its open websites, in the one save with its facts");
+		assert.equal(chatStore.getChat(chat.id)?.course?.workspace, made.workspace);
 	});
 
 	it("lists his study folders, his university folder and his downloads for the agent to look in first", async () => {
