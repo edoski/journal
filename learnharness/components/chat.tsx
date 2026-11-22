@@ -1951,7 +1951,7 @@ export function Chat({
 							{thinking && <ActivityLine testId="thinking-placeholder" label={compacting ? COMPACTING_LINE : (streamingToolActivity(messages) ?? idleLine)} />}
 							{replyCut && !courseGone && !gone && <ReplyCut cut={replyCut} onRetry={() => void send({ type: "continue" })} />}
 							{/* A failed turn whose cause is gone (signed in again): Retry alone. */}
-							{!error && retryable && !claudeLimit && !courseGone && !gone && <ReplyCut cut="failed" onRetry={retryFailedTurn} />}
+							{!error && retryable && !claudeLimit && !courseGone && !gone && <ReplyCut cut={isSignedOutLine(failure?.errorMessage) ? "signed-in" : "failed"} onRetry={retryFailedTurn} />}
 							{openingError && <p role="alert" className="text-body text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
