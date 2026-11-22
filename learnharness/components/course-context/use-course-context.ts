@@ -19,7 +19,7 @@ export interface CourseContextApi {
 	open: (handle: string) => ContextChange;
 }
 
-const UNREACHABLE = "LearnHarness could not be reached. Check it is running, then try again.";
+const UNREACHABLE = "Chiron could not be reached. Check it is running, then try again.";
 
 /**
  * A course's context (GET /api/courses/context), read on mount and again

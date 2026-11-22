@@ -151,7 +151,7 @@ test("a turn whose tool server did not connect fails instead of running without 
 	const { engine } = scripted([init(false), ...textReply]);
 	const messages = await turn(engine);
 	assert.equal(messages.length, 1, "no reply reached the record");
-	assert.match(failureOf(messages), /could not load LearnHarness's tools/);
+	assert.match(failureOf(messages), /could not load Chiron's tools/);
 });
 
 test("Claude Code that ends without a result fails the turn", async () => {

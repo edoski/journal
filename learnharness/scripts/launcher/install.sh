@@ -24,7 +24,7 @@ while [ $# -gt 0 ]; do
 done
 
 id="com.learnharness.launcher"
-name="$(sed -nE 's/.*PRODUCT_NAME: "([^"]+)".*/\1/p' "$app_src/electron/product.cjs")"
+name="$(sed -nE 's/^const PRODUCT_NAME = "([^"]+)";$/\1/p' "$app_src/electron/product.cjs")"
 electron="$checkout/learnharness/node_modules/electron/dist/Electron.app"
 [ -n "$name" ] || { echo "no PRODUCT_NAME in electron/product.cjs" >&2; exit 1; }
 [ -d "$electron" ] || { echo "no Electron in $checkout/learnharness: run npm ci and node node_modules/electron/install.js there" >&2; exit 1; }

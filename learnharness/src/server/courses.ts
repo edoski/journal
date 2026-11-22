@@ -85,7 +85,7 @@ export type CourseCreation = { ok: true; course: CourseSummary } | CourseFailure
 
 /** Every error reads as a sentence the learner can act on; the engine's own
  *  words go to the server log. */
-const ENGINE_FAILED = "LearnHarness could not reach your courses. Try again, and restart the app if it keeps happening.";
+const ENGINE_FAILED = "Chiron could not reach your courses. Try again, and restart the app if it keeps happening.";
 
 function engineFailure(what: string, message: string): CourseFailure {
 	console.error(`[courses] ${what}: ${message}`);

@@ -1,5 +1,5 @@
 /**
- * LearnHarness — the Electron shell (wrapper milestone, 2026-09-17).
+ * Chiron (LearnHarness) — the Electron shell (wrapper milestone, 2026-09-17).
  *
  * What this process is and is not:
  *   IS:  a thin launcher + security guard around the app's real server —
@@ -33,15 +33,14 @@ const path = require("node:path");
 // renderer owns the number; this is the IPC widen target).
 const SIDEBAR_AUTOCLOSE = 928;
 
-const { PRODUCT_NAME } = require("./product.cjs");
+const { PRODUCT_NAME, nameApp } = require("./product.cjs");
 
-// APP NAME → userData (owner, 2026-10-10): the Application Support dir is
-// exactly "LearnHarness" in dev AND packaged. Packaged Electron would
-// otherwise derive it from package.json "name" (now lowercase
-// "learnharness"), and productName metadata alone doesn't reach app.name.
-// Must run before the LH_DEV_URL suffix below — dev becomes
+// APP NAME → userData (owner, 2026-10-10; renamed Chiron 2026-11-19): the
+// menu says PRODUCT_NAME, while the Application Support dir stays exactly
+// "LearnHarness" (DATA_FOLDER) in dev AND packaged, so the rename moved no
+// data. Must run before the LH_DEV_URL suffix below — dev becomes
 // "LearnHarness-dev".
-app.setName(PRODUCT_NAME);
+nameApp(app, process.env);
 const DATA_DIR = () => path.join(app.getPath("userData"), "data");
 
 /** The packaged standalone server (extraResources → Resources/server).

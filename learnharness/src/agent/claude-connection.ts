@@ -32,7 +32,7 @@ export function parseClaudeAuthStatus(stdout: string): ClaudeConnection {
 		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
 		status = parsed as Record<string, unknown>;
 	} catch {
-		return { state: "error", message: "Claude Code returned a sign-in status LearnHarness could not read. Update Claude Code, then press Refresh." };
+		return { state: "error", message: "Claude Code returned a sign-in status Chiron could not read. Update Claude Code, then press Refresh." };
 	}
 	if (status.loggedIn !== true) return { state: "signed-out" };
 	const authMethod = text(status.authMethod) ?? "unknown";

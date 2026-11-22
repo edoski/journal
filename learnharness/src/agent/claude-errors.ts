@@ -23,8 +23,8 @@ export function claudeErrorMessage({ rateLimit, status, code, text = "" }: { rat
 	return CLAUDE_FAILED;
 }
 
-/** LearnHarness runs only CLAUDE_MODEL, so there is nothing to fall back to. */
-export const CLAUDE_MODEL_MISSING = `${CLAUDE_MODEL.name} is not available on this Claude plan or this Claude Code version, and LearnHarness runs only ${CLAUDE_MODEL.name}. Update Claude Code, or use an account whose plan includes it.${NO_KEY}`;
+/** Chiron runs only CLAUDE_MODEL, so there is nothing to fall back to. */
+export const CLAUDE_MODEL_MISSING = `${CLAUDE_MODEL.name} is not available on this Claude plan or this Claude Code version, and Chiron runs only ${CLAUDE_MODEL.name}. Update Claude Code, or use an account whose plan includes it.${NO_KEY}`;
 
 /** resetsAt arrives as Unix seconds. */
 export function claudeResetTime(resetsAt: number): string {
@@ -32,10 +32,10 @@ export function claudeResetTime(resetsAt: number): string {
 	return `at ${new Date(ms).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}`;
 }
 
-export const CLAUDE_API_KEY_REFUSAL = `Claude Code would bill an API key here, not your Claude plan, so LearnHarness stopped the request. Remove the API key from Claude Code's settings, then retry.${NO_KEY}`;
+export const CLAUDE_API_KEY_REFUSAL = `Claude Code would bill an API key here, not your Claude plan, so Chiron stopped the request. Remove the API key from Claude Code's settings, then retry.${NO_KEY}`;
 export const CLAUDE_MISSING = `Claude Code was not found. Install Claude Code, run \`claude\` in a terminal and sign in, then press Refresh in Settings → Accounts.${NO_KEY}`;
 export const CLAUDE_ACCOUNT_GONE = `This Claude account is no longer set up in T3 Code. Choose another one with Use this account in Settings → Accounts.${NO_KEY}`;
-export const CLAUDE_TOOLS_MISSING = `Claude Code could not load LearnHarness's tools, so the turn was stopped.${NO_KEY}`;
+export const CLAUDE_TOOLS_MISSING = `Claude Code could not load Chiron's tools, so the turn was stopped.${NO_KEY}`;
 export const CLAUDE_ABORTED = "Claude request cancelled.";
 
 /** A loop-level failure on a Claude turn: keep curated text, mask the rest. */
