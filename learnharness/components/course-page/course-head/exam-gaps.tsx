@@ -10,8 +10,6 @@ import {
 	DropdownMenuGroup,
 	DropdownMenuItem,
 	DropdownMenuLabel,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
 	DropdownMenuSub,
 	DropdownMenuSubContent,
 	DropdownMenuSubTrigger,
@@ -47,6 +45,24 @@ export function examGapWhich(course: StudyCourse, gaps: ExamGaps): string[] {
 }
 
 /**
+ * What Or another offers, from the line's `ways` (the pick first): the
+ * alternatives only, never the pick the line above already offers (round
+ * 19, m10: it opened on "Review Random variables and distributions ✓"
+ * under "Review Random variables and distributions today"). It opens on
+ * the next way, in the same order, and folds the rest behind More, each
+ * group by what it is: the plan's own for today, then the topics it
+ * leaves out (round 17, m6; round 18, m6: 17 options at once). Pure.
+ */
+export function anotherWays<W extends { planned: boolean }>(ways: readonly W[]): { next: W | null; more: { label: string; ways: W[] }[] } {
+	const [, next = null, ...rest] = ways;
+	const groups = [
+		{ label: EXAM_GAP_WORDS.planned, ways: rest.filter((way) => way.planned) },
+		{ label: EXAM_GAP_WORDS.leftOut, ways: rest.filter((way) => !way.planned) },
+	];
+	return { next, more: groups.filter((group) => group.ways.length > 0) };
+}
+
+/**
  * Under the head's first line, when the exam's plan leaves topics out
  * (spec: course-head.md, `examGaps`): why, in the engine's reasons, naming
  * the topics the final review leaves out that the first line does not,
@@ -54,7 +70,8 @@ export function examGapWhich(course: StudyCourse, gaps: ExamGaps): string[] {
  * topics left out). Start it (or Review it) today opens a lesson on the one
  * topic the line names; otherwise the first is the pick, named on its press
  * ("Review Binomial distribution today"), and Or another opens a menu
- * that marks the pick and folds the rest behind More (round 18, m6); with
+ * of the other ways alone, the next first and the rest behind More
+ * (`anotherWays`; round 18, m6; round 19, m10); with
  * none he can take today, Ask alone. A topic he began
  * reads Continue and opens its session, as its topic page does
  * (`topicPress`; round 12, 1 D5). Ask the tutor opens a lesson that asks,
@@ -90,7 +107,8 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 	// The pick: the first way, today's plan before the topics left out, a
 	// review before a start (round 8: eight options and no pick; rounds 10
 	// and 11: the tutor's and Home's order).
-	const [pick, ...others] = ways;
+	const [pick] = ways;
+	const another = anotherWays(ways);
 	return (
 		<p data-slot="course-exam-gaps" className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-4 text-body font-normal text-muted-foreground">
 			{why && (
@@ -121,7 +139,7 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 					<Button variant="quiet" size="xs" data-slot="exam-gaps-pick" className={PRESS} disabled={starting !== null} onClick={() => open(pick!.topic)}>
 						<MathText>{examGapPickWords(verb(pick!), pick!.topic.title)}</MathText>
 					</Button>
-				{others.length > 0 && (
+				{another.next && (
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button variant="quiet" size="xs" data-slot="exam-gaps-another" className={PRESS} disabled={starting !== null}>
@@ -129,19 +147,14 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start">
-						{/* One option marked, the head's own way in, and the rest folded behind More (round 18, m6: 17
-						    options with none marked); behind it, each by what it is, the plan's own for today, then the
-						    topics it leaves out (round 17, m6). */}
-						<DropdownMenuRadioGroup value={pick!.topic.handle}>
-							<DropdownMenuRadioItem value={pick!.topic.handle} data-slot="exam-gaps-marked" onSelect={() => open(pick!.topic)}>
-								<MathText>{`${pressWord(verb(pick!))} ${pick!.topic.title}`}</MathText>
-							</DropdownMenuRadioItem>
-						</DropdownMenuRadioGroup>
-						<DropdownMenuSub>
-							<DropdownMenuSubTrigger data-slot="exam-gaps-more">{EXAM_GAP_WORDS.more}</DropdownMenuSubTrigger>
-							<DropdownMenuSubContent>
-								{[{ label: EXAM_GAP_WORDS.planned, ways: others.filter((way) => way.planned) }, { label: EXAM_GAP_WORDS.leftOut, ways: others.filter((way) => !way.planned) }].map((group) =>
-									group.ways.length === 0 ? null : (
+						<DropdownMenuItem data-slot="exam-gaps-next" onSelect={() => open(another.next!.topic)}>
+							<MathText>{`${pressWord(verb(another.next))} ${another.next.topic.title}`}</MathText>
+						</DropdownMenuItem>
+						{another.more.length > 0 && (
+							<DropdownMenuSub>
+								<DropdownMenuSubTrigger data-slot="exam-gaps-more">{EXAM_GAP_WORDS.more}</DropdownMenuSubTrigger>
+								<DropdownMenuSubContent>
+									{another.more.map((group) => (
 										<DropdownMenuGroup key={group.label} data-slot="exam-gaps-group">
 											<DropdownMenuLabel>{group.label}</DropdownMenuLabel>
 											{group.ways.map((way) => (
@@ -150,10 +163,10 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 												</DropdownMenuItem>
 											))}
 										</DropdownMenuGroup>
-									),
-								)}
-							</DropdownMenuSubContent>
-						</DropdownMenuSub>
+									))}
+								</DropdownMenuSubContent>
+							</DropdownMenuSub>
+						)}
 					</DropdownMenuContent>
 				</DropdownMenu>
 				)}

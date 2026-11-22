@@ -346,9 +346,13 @@ body {
    rather than run past the column and be clipped (round 14, m37: "P(X≥2) =
    1 − P(X=0) − P(X=1) ≈ 0.756" read "≈ 0.7"), and in a course page row's
    title, which wraps before its fact (round 17, M3: "P(A∪B)=P(A)+P(B)−P(A∩B)"
-   ran under "Back Tue 17 Nov"). One that fits stays on one line. */
+   ran under "Back Tue 17 Nov"), and in a calendar entry's title, which wraps
+   in its day's column (round 19, m7: the same title read "Properties of
+   probability: P(A∪B)=P(A)+P(E", cut at the column's edge). One that fits
+   stays on one line. */
 [data-slot="topic-attempt-text"] .katex { white-space: normal; }
 [data-slot="course-topic-title"] .katex { white-space: normal; }
+[data-slot="calendar-entry-title"] .katex { white-space: normal; }
 
 /* In an Earlier row a formula that fits the row is one box, so it moves to
    the next line whole; only one wider than the row is narrowed to it and

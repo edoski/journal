@@ -115,13 +115,15 @@ describe("a left lesson on the calendar says Home's words (round 18, m12)", () =
 	});
 	const lesson = chat({ id: "inv", title: "Invertible matrices lesson", ended: "left", topics: ["invertible"], ownTopics: ["invertible"], tasks: ["invertible-lesson"], updatedAt: `${TODAY}T11:00:00.000Z` });
 
-	it("reads Continue Invertible matrices lesson with Home's status, never Unfinished", () => {
+	it("reads Continue Invertible matrices lesson with the day it was left, never Unfinished", () => {
 		const entry = calendarEntries({ courses: [withPlan()], chats: [lesson], scope: null }).find((e) => e.day === "2026-11-10" && e.kind === "task")!;
 		const row = { kind: "session" as const, chat: lesson, course: withPlan() };
 		assert.equal(entry.title, lessonTitle(row), "Home's row's title");
 		assert.equal(entry.title, "Continue Invertible matrices lesson");
 		const words = lookWords(entry, TODAY);
 		assert.notEqual(words, "Unfinished");
-		assert.equal(words, nowLine(row).slot, "Home's row's status");
+		// Home's "Left off today" read from Tue 10's cell names the day (round 19, m6: Mon 9 read "Left off today" for Sun 8).
+		assert.equal(nowLine(row).slot, "Left off today");
+		assert.equal(words, "Left off 9 Nov", "Home's status, as Tue 10 reads it");
 	});
 });

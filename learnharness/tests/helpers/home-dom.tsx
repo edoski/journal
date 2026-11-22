@@ -14,7 +14,6 @@ import { HomeBody } from "../../components/study-home/study-home.tsx";
 import { ServerEventsProvider } from "../../components/server-events.tsx";
 import { lessonOf } from "../../components/study-home/lesson-facts.ts";
 import { needsYouNow } from "../../components/study-home/needs-you.ts";
-import { todayCourses } from "../../components/study-home/study-facts.ts";
 import { CHATS, COURSES, TODAY } from "../fixtures/now-demo.ts";
 
 let root: Root | null = null;
@@ -24,7 +23,7 @@ export const pushed: string[] = [];
 const router = { push: (href: string) => pushed.push(href), replace: () => {}, prefetch: () => {}, back: () => {}, forward: () => {}, refresh: () => {} };
 
 export const { rows } = needsYouNow(COURSES, CHATS, TODAY);
-const ready = { rows, lessons: rows.map(lessonOf), courses: todayCourses(rows, COURSES), chats: CHATS, done: [], exam: null, misfit: null, asks: [], busy: false, onContinue: () => {} };
+const ready = { rows, lessons: rows.map(lessonOf), courses: COURSES, chats: CHATS, done: [], exam: null, misfit: null, asks: [], busy: false, onContinue: () => {} };
 
 export async function unmount() {
 	await act(async () => root?.unmount());

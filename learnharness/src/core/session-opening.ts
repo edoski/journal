@@ -10,7 +10,8 @@
  */
 
 import type { TopicReview } from "./contracts/course-map.ts";
-import { firstStartedTopicOf, sessionPlanTopicOf, sessionTaskTopicsOf, plannedTopicsOf, type LhMessage } from "./native-messages.ts";
+import { firstStartedTopicOf, savedAnswerTopicsOf, sessionPlanTopicOf, sessionTaskTopicsOf, sessionTasksOf, plannedTopicsOf, type LhMessage } from "./native-messages.ts";
+import { phaseAt3Lh } from "./phases.ts";
 
 /** The opening a review is started with: "Review " and the titles. */
 const REVIEW_OPENING = /^Review\s+\S/;
@@ -61,6 +62,20 @@ export function openedByApp(record: { appOpening?: true; title: string; topics?:
  *  and as its session, "Tutor writing" on both). */
 export function openedAsReview(record: { title?: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): boolean {
 	return reviewOpening(record) && lessonTakenUp(record) === null;
+}
+
+/** Whether a session opened on no topic (Ask the tutor) ran his review: its
+ *  saves answered course topics while it taught no lesson (no probe
+ *  concluded, no plan, no task), so it is that review, by its topics and
+ *  its course's review name, and Home's review line picks it up (round
+ *  19, M5: "Yes" to the exam-eve Ask saved Binomial and Random variables
+ *  answers and left the committee question open, which the close called
+ *  "your Probability review", while Home's review line started a new
+ *  session on another question). Pure. */
+export function answeredAsReview(record: { topics?: readonly string[]; named?: true; kind?: string; messages: readonly { role: string; content?: unknown }[] }): boolean {
+	const messages = record.messages as readonly LhMessage[];
+	if ((record.topics ?? []).length > 0 || !record.named || record.kind === "practice") return false;
+	return savedAnswerTopicsOf(messages).length > 0 && phaseAt3Lh(messages) === "probe" && plannedTopicsOf(messages).length === 0 && sessionTasksOf(messages).length === 0;
 }
 
 /** Opened on topics with a review's words, whatever it did after. */
@@ -122,18 +137,35 @@ export function reviewRecord(record: { title: string; topics?: readonly string[]
 	return lessonTakenUp(record) === null && (openedAsReview(record) || isReviewSession(record));
 }
 
-/** The one of a review's topics its plan re-teaches: the topic its newest
- *  plan names, when that is one of the review's own, so its map and its
- *  open question are that topic's alone (round 18, M2: the Probability
- *  review re-taught Inclusion-exclusion, and Random variables' and
- *  Binomial's pages drew its map and read "Left off 8 Nov"). Null for a
- *  session not a review, a review of one topic, or one whose plan names
- *  none. Pure. */
-export function retaughtTopicOf(record: { title: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): string | null {
+/** The topic a session's plan steps are on: its step map is that topic's
+ *  alone, and a question of its lesson with no topic of its own is open
+ *  on it. The topic its newest plan names (`goal.topic`) when the session
+ *  belongs to it (`own`); else a review of one topic, that topic, and a
+ *  review of several, none; else the first topic it was opened on that it
+ *  belongs to, or its one topic. Null for a session that belongs to no
+ *  topic yet (round 18, M2: the Probability review re-taught
+ *  Inclusion-exclusion, and Random variables' and Binomial's pages drew
+ *  its map; round 19, M4: the 5 Nov lesson opened on Random variables and
+ *  Binomial drew its map, all on Random variables, on both pages). Pure. */
+export function stepsOnOf(record: { title: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }, own: readonly string[]): string | null {
+	const planned = plannedTopicsOf(record.messages as readonly LhMessage[]).at(-1);
+	if (planned && own.includes(planned)) return planned;
 	const opened = record.topics ?? [];
-	if (opened.length < 2 || !reviewRecord(record)) return null;
-	const topic = plannedTopicsOf(record.messages as readonly LhMessage[]).at(-1);
-	return topic && opened.includes(topic) ? topic : null;
+	if (reviewRecord(record)) return opened.length === 1 && own.includes(opened[0]!) ? opened[0]! : null;
+	return opened.find((topic) => own.includes(topic)) ?? (own.length === 1 ? own[0]! : null);
+}
+
+/** Where a session in progress puts You are here: the topic its steps are
+ *  on (`stepsOn`), else, on a summary made elsewhere that leaves it out,
+ *  the topics it belongs to; none when its work is a task that holds more
+ *  than that topic, a problem sheet, which is his work and not a lesson
+ *  (round 19, M4: Continue on Problem sheet 4, whose task holds Rank,
+ *  Basis and Kernel, moved You are here from Eigen to Basis). Pure. */
+export function lessonHereOf(chat: { stepsOn?: string; tasks?: readonly string[]; ownTopics?: readonly string[] }): readonly string[] {
+	const own = chat.ownTopics ?? [];
+	const { stepsOn } = chat;
+	if ((chat.tasks ?? []).length > 0 && !(stepsOn && own.every((topic) => topic === stepsOn))) return [];
+	return stepsOn ? [stepsOn] : own;
 }
 
 /** The topics a session teaches as its lesson: the topics a session not a

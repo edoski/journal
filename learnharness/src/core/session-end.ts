@@ -51,7 +51,18 @@ export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | unde
 	// not his turn (round 17, m13: the card read "Your turn" with nothing to answer).
 	if (tree.nodes.length > 0 && tree.nodes.every((node) => taught.has(node.id))) return asks(last) ? "mid-lesson" : "closed";
 	if (current === null) return "mid-lesson";
-	return asks(last) && tree.edges.some((edge) => edge.from === current) ? "mid-lesson" : "closed";
+	if (asks(last) && tree.edges.some((edge) => edge.from === current)) return "mid-lesson";
+	// A turn that ended with no words of its own, no question and no close (`lesson_progress` with `close`), steps
+	// still ahead, ended nowhere: the lesson is left where it stopped, never finished, so every surface keeps
+	// "Continue … lesson · Left off today" (round 19, M2: after marking a prediction the tutor's turn stopped empty,
+	// and the lesson left Home, the sidebar and its page's Now). A sign-off in its own words still ends it.
+	return silent(last) && stepsLeft(tree, messages) ? "left" : "closed";
+}
+
+/** Whether a reply has no words of its own: what it said, if anything, went
+ *  through `send_to_user` earlier in its turn. Pure. */
+function silent(reply: Extract<LhMessage, { role: "assistant" }>): boolean {
+	return !reply.content.some((block) => block.type === "text" && block.text.trim() !== "");
 }
 
 /** Whether the turn after his Done for today has settled, whatever it did
@@ -280,6 +291,23 @@ export function sinceLastClose(messages: readonly LhMessage[]): readonly LhMessa
 		if (closed || (i !== current && isDoneTonight(m))) return messages.slice(i + 1);
 	}
 	return messages;
+}
+
+/** The topics the work open on him is asked on, as the tutor tagged it: an
+ *  open practice problem's `topics`, else the `topic` of the question that
+ *  waits on him or that his Done for today left (round 19, M4: Problem
+ *  sheet 4's kernel question read "Your turn" on Basis and Rank too, the
+ *  9 Nov review's urn question "Left off" on Random variables). Empty when
+ *  nothing is open or the tutor tagged no topic. Pure. */
+export function openWorkTopicsOf(messages: readonly LhMessage[]): string[] {
+	const problem = activeProblemOf(messages);
+	const listed = (value: unknown) => (Array.isArray(value) ? value.filter((t): t is string => typeof t === "string" && t.trim() !== "") : []);
+	if (problem) return listed((problem.input as { topics?: unknown } | null)?.topics);
+	const left = leftQuestionRepose(messages)[0];
+	const call = left?.role === "assistant" ? left.content.find((block) => block.type === "toolCall") : undefined;
+	const input = danglingQuestionOf(messages)?.input ?? (call?.type === "toolCall" ? call.arguments : undefined);
+	const topic = (input as { topic?: unknown } | null | undefined)?.topic;
+	return typeof topic === "string" && topic.trim() ? [topic.trim()] : [];
 }
 
 function isDoneTonight(m: LhMessage): boolean {

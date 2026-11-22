@@ -196,6 +196,7 @@ function mapExamOf(value: unknown, listed: ReadonlySet<string>, block: ArcBlock)
 	const handles = (v: unknown) => strings(v).filter((h) => listed.has(h)) as TopicHandle[];
 	const finalReview = str(e.final_review);
 	const doesNotFit = handles(e.does_not_fit);
+	const fellPast = handles(e.fell_past).filter((h) => doesNotFit.includes(h));
 	const unreviewed = handles(e.unreviewed);
 	const arcs = block.arcs && Array.isArray(e.arcs) ? strings(e.arcs).flatMap((a) => block.arcOf(a) ?? []) : null;
 	const leavesOut = handles(e.leaves_out);
@@ -210,6 +211,7 @@ function mapExamOf(value: unknown, listed: ReadonlySet<string>, block: ArcBlock)
 		...(past ? { past } : {}),
 		...(finalReview ? { finalReview } : {}),
 		...(doesNotFit.length > 0 ? { doesNotFit } : {}),
+		...(fellPast.length > 0 ? { fellPast } : {}),
 		...(unreviewed.length > 0 ? { unreviewed } : {}),
 		...(Object.keys(reasons).length > 0 ? { reasons } : {}),
 		...(arcs ? { arcs } : {}),

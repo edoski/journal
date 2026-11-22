@@ -13,7 +13,7 @@ import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contrac
 import { doesNotFitOf, finalReviewOf, planDays, plannedOf, scheduleOf } from "../src/server/calendar.ts";
 import { finalReviewGapWords } from "../components/study-words.ts";
 import { courseMove, todaySteps } from "../components/study-home/study-facts.ts";
-import { calendarEntries, distanceWords, dueDay, finalReviewWords, lookOf, misfitWords, moreWords, quietBetween, roadLines, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
+import { calendarEntries, distanceWords, dueDay, finalReviewWords, lookOf, lookWords, misfitWords, moreWords, quietBetween, roadLines, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
 
 const TODAY = "2026-11-08";
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -316,6 +316,41 @@ describe("calendar entries", () => {
 		const entries = calendarEntries({ courses: [LINALG], chats: [], scope: null });
 		assert.equal(quietBetween(entries, "2026-11-30", "2026-12-07"), true);
 		assert.equal(quietBetween(entries, "2026-11-02", "2026-11-09"), false);
+	});
+});
+
+/**
+ * Round 19, m6 (1 n6, 2 N4, 3 n4): the Stirling's formula lesson left on
+ * Tue 10 read "Stirling's formula lesson · Left off today" on Tue 10 and
+ * again "Continue Stirling's formula lesson · Left off today" on Wed 11, one
+ * lesson twice; Mon 9 read "Continue Problem sheet 4: rank and nullity ·
+ * Left off today" for a sheet left on Sun 8. A lesson left today is one
+ * entry of left work, "Continue …" on the next study day, saying the day it
+ * was left ("Left off 8 Nov"); the day he worked in it shows what he did.
+ */
+describe("a lesson left for next time on the calendar (round 19, m6)", () => {
+	const stirling = { key: "stirling-lesson", title: "Stirling's formula lesson", step: "The trapezoid sum", updated: TODAY, topics: ["stirling" as TopicHandle] };
+	const PROB_LEFT = course(
+		"/study/prob",
+		"Probability",
+		{ tasks: [stirling], topics: [topic("stirling", { title: "Stirling's formula", level: "attempted", tasks: ["stirling-lesson"] }), topic("odds", { title: "Odds", review: { kind: "scheduled", date: "2026-11-09" } })] },
+		{ planned: [{ date: "2026-11-09", reviews: ["odds" as TopicHandle], new: [] }] },
+	);
+	const lesson = chat({ id: "stirling", title: "Stirling's formula lesson", course: { workspace: "/study/prob", title: "Probability" }, ended: "left", topics: ["stirling"], ownTopics: ["stirling"], tasks: ["stirling-lesson"], updatedAt: `${TODAY}T11:00:00` });
+	const entries = () => calendarEntries({ courses: [PROB_LEFT], chats: [lesson], scope: null });
+	const ofLesson = (e: ReturnType<typeof calendarEntries>[number]) => (e.kind === "session" && e.chat.id === "stirling") || (e.kind === "task" && e.task.key === "stirling-lesson");
+
+	it("lists the left lesson once, as Continue on the next study day, and the day he left it as what he did", () => {
+		const left = entries().filter(ofLesson).filter((e) => lookWords(e, TODAY).startsWith("Left off"));
+		assert.deepEqual(left.map((e) => `${e.day} ${e.title}`), ["2026-11-09 Continue Stirling's formula lesson"]);
+		const worked = entries().filter(ofLesson).filter((e) => e.day === TODAY);
+		assert.deepEqual(worked.map((e) => `${e.title} · ${lookWords(e, TODAY)}`), ["Stirling's formula lesson · Lesson"]);
+	});
+
+	it("says on a later day the day it was left, never Left off today", () => {
+		const later = entries().filter((e) => e.day > TODAY && ofLesson(e));
+		assert.deepEqual(later.map((e) => lookWords(e, TODAY)), ["Left off 8 Nov"]);
+		assert.ok(entries().every((e) => e.day === TODAY || lookWords(e, TODAY) !== "Left off today"), "no later day says Left off today");
 	});
 });
 

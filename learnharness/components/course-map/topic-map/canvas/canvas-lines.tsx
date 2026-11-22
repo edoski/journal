@@ -15,6 +15,39 @@ export interface CanvasLine {
 	points: readonly Point[];
 	prerequisite: TopicHandle;
 	topic: TopicHandle;
+	/** The ids of the cards at its two ends, prerequisite first; unset, its topics' handles (a trail's cards have ids
+	 *  of their own). */
+	cards?: readonly [string, string];
+}
+
+/** A box on the drawing, in its own units. */
+export interface DrawingBox {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+/**
+ * The lines a frame shows (canvas.md, Lines): each only while a card at
+ * each of its ends is in view, some of it clear of the frame's fade
+ * (`clear`, the part of the drawing the frame shows inside its fade; null
+ * before the frame is measured, which shows every line). A card the camera
+ * leaves out of view, or wholly under the fade, takes its lines with it, so
+ * no line runs from a card he cannot see across an empty field (round 19,
+ * m13: after a full day, Calculus I's map showed one card under lines that
+ * led nowhere). Pure.
+ */
+export function linesInView(lines: readonly CanvasLine[], cardOf: (id: string) => DrawingBox | null, clear: DrawingBox | null): readonly CanvasLine[] {
+	if (!clear) return lines;
+	const seen = (id: string) => {
+		const card = cardOf(id);
+		return card !== null && card.x < clear.x + clear.width && clear.x < card.x + card.width && card.y < clear.y + clear.height && clear.y < card.y + card.height;
+	};
+	return lines.filter((line) => {
+		const [from, to] = line.cards ?? [line.prerequisite, line.topic];
+		return seen(from) && seen(to);
+	});
 }
 
 /** How a line reads: at rest, lit with the topic in focus or the lit
@@ -159,6 +192,9 @@ export function piecesPath(pieces: readonly Piece[], snap: Snap): string {
 		.join(" ");
 }
 
+/** A drawing with no fade at its edges: a card is in view as soon as any of it is in the frame. */
+const NO_FADE = { x: 0, y: 0 };
+
 const STROKE: Record<LineInk, string> = { rest: "stroke-map-line", lit: "stroke-map-line-lit", receded: "stroke-map-line-receded" };
 
 /** The screen's device pixels per CSS pixel; 0 on a server render, which draws unsnapped. */
@@ -204,11 +240,30 @@ export function LinePaths({ pieces, snap, scale = 1, ref }: { pieces: ReadonlyMa
  */
 export function CanvasLinesEdge({ data }: EdgeProps<CanvasLinesFlowEdge>) {
 	const focus = useCanvas()?.focus ?? null;
-	const chain = useContext(TopicMapContext)?.lit ?? null;
+	const map = useContext(TopicMapContext);
+	const chain = map?.lit ?? null;
+	const fade = map?.fade ?? NO_FADE;
+	// Every camera move draws again: which cards are in view, and where the drawing's pixels fall (its screen matrix,
+	// read once it is placed).
+	const [tx, ty, zoom] = useStore((s) => s.transform);
+	const frameWidth = useStore((s) => s.width);
+	const frameHeight = useStore((s) => s.height);
+	// The cards as the canvas places them now (its node list changes with every new drawing; the lookup is kept).
+	const nodes = useStore((s) => s.nodes);
+	const cards = useMemo(() => new Map(nodes.map((node) => [node.id, { ...node.position, width: node.width ?? node.measured?.width ?? 0, height: node.height ?? node.measured?.height ?? 0 }])), [nodes]);
+	const clear =
+		frameWidth > 0 && frameHeight > 0 ? { x: (fade.x - tx) / zoom, y: (fade.y - ty) / zoom, width: (frameWidth - 2 * fade.x) / zoom, height: (frameHeight - 2 * fade.y) / zoom } : null;
+	const cardOf = (id: string): DrawingBox | null => cards.get(id) ?? null;
 	const lines = data?.lines;
-	const pieces = useMemo(() => trackPieces(lines ?? [], focus, chain), [lines, focus, chain]);
-	// Every camera move draws again; the drawing's screen matrix, read once it is placed, says where its pixels fall.
-	useStore((s) => s.transform);
+	// Which lines are in view, as one string, so the track is worked out again only when they change, not on every
+	// camera frame.
+	const inView = linesInView(lines ?? [], cardOf, clear)
+		.map((line) => line.key)
+		.join("\n");
+	const pieces = useMemo(() => {
+		const keys = new Set(inView.split("\n"));
+		return trackPieces((lines ?? []).filter((line) => keys.has(line.key)), focus, chain);
+	}, [lines, inView, focus, chain]);
 	const dpr = useSyncExternalStore(subscribeDpr, readDpr, serverDpr);
 	const box = useRef<SVGGElement>(null);
 	const [screen, setScreen] = useState<readonly [number, number, number] | null>(null);

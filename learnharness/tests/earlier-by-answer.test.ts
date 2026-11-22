@@ -14,6 +14,7 @@ import { attemptMark, type SessionEntry } from "../components/unit-inbox/topic-p
 const entry = (id: string, updatedAt: string): SessionEntry => ({
 	chat: { id, title: id, kind: "teach", createdAt: updatedAt, updatedAt, messageCount: 4, phase: "teach", pendingQuestion: false, pendingProblem: false, busy: false } as ChatListItem,
 	own: true,
+	maps: true,
 	state: "finished",
 	day: updatedAt.slice(0, 10),
 	when: updatedAt.slice(0, 10),

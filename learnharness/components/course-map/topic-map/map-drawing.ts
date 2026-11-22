@@ -53,7 +53,7 @@ export function trailOf(course: CourseMap, from: ArcHandle, to: ArcHandle, shown
 export function mapEdges(layout: TopicMapLayout, trail: Trail | null = null): Edge[] {
 	const needs = layout.routes.map((r): CanvasLine => ({ key: `${r.prerequisite}>${r.topic}`, points: r.points, prerequisite: r.prerequisite, topic: r.topic }));
 	const trailed = trail
-		? trail.layout.routes.map((r): CanvasLine => ({ key: `trail:${r.prerequisite}>${r.topic}`, points: r.points.map(([x, y]) => [x + trail.dx, y + trail.dy] as const), prerequisite: r.prerequisite, topic: r.topic }))
+		? trail.layout.routes.map((r): CanvasLine => ({ key: `trail:${r.prerequisite}>${r.topic}`, points: r.points.map(([x, y]) => [x + trail.dx, y + trail.dy] as const), prerequisite: r.prerequisite, topic: r.topic, cards: [`trail:${r.prerequisite}`, `trail:${r.topic}`] as const }))
 		: [];
 	const first = layout.routes.find((route) => route.points.length > 0);
 	return linesEdge([...needs, ...trailed], first ? { source: first.prerequisite, target: first.topic } : null);

@@ -12,7 +12,7 @@ import type { SessionEntry, TopicAction } from "../components/unit-inbox/topic-p
 import { chat } from "./fixtures/now-demo.ts";
 
 const session = (id: string, nodes: string[]): SessionEntry =>
-	({ chat: chat(id, { title: id }), state: "left", day: "2026-11-08", own: true, plan: { tree: { nodes: nodes.map((n) => ({ id: n, title: n })), edges: [], version: 1 }, current: nodes[0], visited: [] } }) as unknown as SessionEntry;
+	({ chat: chat(id, { title: id }), state: "left", day: "2026-11-08", own: true, maps: true, plan: { tree: { nodes: nodes.map((n) => ({ id: n, title: n })), edges: [], version: 1 }, current: nodes[0], visited: [] } }) as unknown as SessionEntry;
 
 describe("a lesson's plan as the topic page's map", () => {
 	it("draws no map for one step, the sheet's part (c) alone", () => {

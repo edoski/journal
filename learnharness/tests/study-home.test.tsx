@@ -20,7 +20,6 @@ import {
 	titleList,
 	todayRows,
 	openSessions,
-	todayCourses,
 	courseMove,
 	withLessonHere,
 	type TodayRow,
@@ -211,7 +210,6 @@ describe("today's lines", () => {
 			["Linear Algebra: Review Linear independence, Rank, Span", "Real Analysis: Review Sequences", "session q", "session w", "Probability: Continue Bayes' rule", "Linear Algebra: Continue Problem sheet 4"],
 			"each course's review first; Linear Algebra's due review keeps its line beside the waiting lesson on another topic, and its open task its own, as the calendar lists both",
 		);
-		assert.deepEqual(todayCourses(rows).map((c) => c.map.title), ["Linear Algebra", "Real Analysis", "Probability"], "each course once for the map's tabs");
 	});
 
 	it("lets a session that works on the step stand for it", () => {

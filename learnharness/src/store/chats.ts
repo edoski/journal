@@ -18,8 +18,8 @@ import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
 import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, isQuestionRepose, opensTurn, savedAnswerTimesOf, savedAnswerTopicsOf, savedTaskTimesOf, startsMovedOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
-import { leftQuestionRepose, offersStop, sessionEndOf } from "../core/session-end.ts";
-import { lessonTakenUp, openedAsReview, retaughtTopicOf } from "../core/session-opening.ts";
+import { leftQuestionRepose, offersStop, openWorkTopicsOf, sessionEndOf } from "../core/session-end.ts";
+import { answeredAsReview, lessonTakenUp, openedAsReview, stepsOnOf } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
 import { stoppedByHim } from "../core/turn-cut.ts";
 import { failedResponseAtEnd } from "../core/input-events.ts";
@@ -115,6 +115,7 @@ function listChats(): ChatSummary[] {
 					const tasked = sessionTaskTopicsOf(messages);
 					const taken = lessonTakenUp({ ...summary, messages });
 					const own = tasked.length > 0 ? tasked : taken ? [taken] : summary.topics?.length ? summary.topics : kind === "practice" ? firstProblemTopicsOf(messages) : summary.named ? savedAnswerTopicsOf(messages) : [];
+					const stepsOn = stepsOnOf({ ...summary, messages }, own);
 					return {
 						// turns stay out of the list payload (list =
 						// summaries; usage aggregates ride the full record, the picker
@@ -150,8 +151,10 @@ function listChats(): ChatSummary[] {
 						...(learnerWords(messages).length <= 1 ? { untouched: true as const } : {}),
 						tasks: sessionTasksOf(messages),
 						...((t) => (t ? { taskTitle: t } : {}))(sessionTaskTitleOf(messages)),
-						review: openedAsReview({ title: summary.title, topics: summary.topics, messages }),
-						...((t) => (t ? { retaught: t } : {}))(retaughtTopicOf({ ...summary, messages })),
+						// An Ask session that ran his review is that review (round 19, M5).
+						review: openedAsReview({ title: summary.title, topics: summary.topics, messages }) || answeredAsReview({ ...summary, kind, messages }),
+						...((on) => (on ? { stepsOn: on } : {}))(stepsOn),
+						...((on) => (on.length > 0 ? { openOn: on } : {}))(openOn(messages, own, stepsOn)),
 						...((moved) => (moved.length > 0 ? { startsMoved: moved } : {}))([...new Set([...startsMovedOf(messages), ...(summary.startsMoved ?? [])])]),
 						studied: studiedIn(messages),
 						...inputTimes(messages),
@@ -167,6 +170,21 @@ function listChats(): ChatSummary[] {
 	} catch {
 		return [];
 	}
+}
+
+/** The topics the work open on him is asked on (`ChatSummary.openOn`): an
+ *  open problem's own, else those the tutor tagged its question with that
+ *  the session belongs to, else the topic its steps are on (a lesson's
+ *  question, or a review's re-teach); else none, so a review's untagged
+ *  question still reads on each of its topics. Empty when nothing is open. */
+function openOn(messages: readonly LhMessage[], own: readonly string[], stepsOn: string | null): string[] {
+	const problem = activeProblemOf(messages) !== null;
+	if (!problem && danglingQuestionOf(messages) === null && leftQuestionRepose(messages).length === 0) return [];
+	const tagged = openWorkTopicsOf(messages);
+	const owned = tagged.filter((topic) => own.includes(topic));
+	if (owned.length > 0) return owned;
+	if (problem) return tagged;
+	return stepsOn ? [stepsOn] : [];
 }
 
 /** When a session's work came, on the messages' own clock: its newest
@@ -198,7 +216,7 @@ function workOf(messages: readonly LhMessage[]): Work {
 function closedByNewerWork(chat: ChatSummary, all: readonly ChatSummary[], work: ReadonlyMap<string, Work>): ChatSummary {
 	if (!chat.pendingQuestion) return chat;
 	const since = work.get(chat.id)?.last ?? 0;
-	const open = chat.review ? (chat.retaught ? [chat.retaught] : (chat.ownTopics ?? [])) : [];
+	const open = chat.review ? (chat.openOn ?? chat.ownTopics ?? []) : [];
 	const tasks = chat.review ? [] : (chat.tasks ?? []);
 	const newer = all.some((other) => {
 		const theirs = other.id !== chat.id && other.course?.workspace === chat.course?.workspace ? work.get(other.id) : undefined;

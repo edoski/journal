@@ -435,6 +435,11 @@ const chatOf = (href: string | null | undefined) => {
 /** What each surface that opens a session says of where it stands, by session. */
 async function sessionStatuses(s: Survey): Promise<Map<string, Array<[string, string]>>> {
 	const { lookWords } = await import("../components/calendar/calendar-facts.ts");
+	const { leftOffWords } = await import("../components/study-words.ts");
+	const { daysBetween } = await import("../components/unit-inbox/units.ts");
+	// A later day's cell names the day work was left as that day reads it ("Left off 8 Nov" on Mon 9; round 19, m6):
+	// the same fact as today's "Left off today", so it is read back in today's words.
+	const asToday = (words: string, day: string) => (day > s.today && words === leftOffWords(daysBetween(s.today, day), day) ? leftOffWords(0, s.today) : words);
 	const said = new Map<string, Array<[string, string]>>();
 	const say = (id: string | null, surface: string, words: string) => {
 		if (!id || !SESSION_STATUS.test(statusWords(words))) return;
@@ -444,7 +449,7 @@ async function sessionStatuses(s: Survey): Promise<Map<string, Array<[string, st
 	for (const card of s.sidebar) say(chatOf(card.opens), `the sidebar ("${card.title}"${card.shelf ? `, ${card.shelf}` : ""})`, card.status);
 	for (const { entry, opens } of s.calendar) {
 		const id = entry.kind === "session" ? entry.chat.id : entry.kind === "task" ? chatOf(opens) : null;
-		say(id, `the calendar (${entry.kind} "${entry.title}", ${short(entry.day)})`, lookWords(entry, s.today));
+		say(id, `the calendar (${entry.kind} "${entry.title}", ${short(entry.day)})`, asToday(lookWords(entry, s.today), entry.day));
 	}
 	for (const [key, page] of s.pages) say(chatOf(page.opens), `its topic page (${key.split("#")[1]})`, page.note);
 	return said;

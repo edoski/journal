@@ -57,7 +57,12 @@ export function ArcMap({
 	useArcKeys(arcs, value, onSelect, goHere);
 	return (
 		<div ref={root} data-slot="arc-map" className="flex min-h-0 flex-1">
-			{arcs && index && <ArcIndex className="mt-6 w-64 shrink-0 self-start" arcs={arcs} value={whole ? null : value} here={here} onSelect={onSelect} />}
+			{/* The list's column is as tall as the drawing beside it, and the list no taller than its column (`ArcIndex`). */}
+			{arcs && index && (
+				<div data-slot="arc-map-index" className="mt-6 flex min-h-0 w-64 shrink-0 flex-col">
+					<ArcIndex arcs={arcs} value={whole ? null : value} here={here} onSelect={onSelect} />
+				</div>
+			)}
 			<div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", arcs && index && "ml-8")}>{children}</div>
 		</div>
 	);

@@ -7,7 +7,7 @@ import { HomeMap } from "@/components/study-home/home-map";
 import { neighbourCourse, useHomeKeys } from "@/components/study-home/home-keys";
 import { followedRow, lineKey } from "@/components/study-home/agenda-rows/row-facts";
 import { lessonOf } from "@/components/study-home/lesson-facts";
-import type { TodayRow } from "@/components/study-home/study-facts";
+import { byUrgency, type TodayRow } from "@/components/study-home/study-facts";
 import { Today } from "@/components/study-home/today";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,10 @@ import { useListWalk } from "@/components/list-walk/use-list-walk";
 import { HomeComposer } from "@/components/course-page/course-composer";
 
 /** The map's share of the column while Today shows: enough to see where
- *  the current topic sits, so Today's rows lead (Edo, 12 Nov 2026). */
+ *  the current topic sits, so Today's rows lead (Edo, 12 Nov 2026). It
+ *  shrinks to what Today and the composer leave, with no least height of its
+ *  own: a fixed one pushed the composer out of the window at browser zoom 1.5
+ *  (round 19, carry-in 4). */
 const MAP_SHARE = "basis-1/2";
 
 /**
@@ -35,7 +38,7 @@ export function StudyHome() {
 	const [enlarged, setEnlarged] = useState(false);
 
 	return (
-		<HomeFrame quiet={enlarged} className={cn("flex h-full flex-col gap-5", HOME_FRAME, enlarged ? "max-w-none" : HOME_WIDTH)}>
+		<HomeFrame quiet={enlarged} className={homeColumn(enlarged)}>
 			{(ready) => <HomeBody ready={ready} enlarged={enlarged} onEnlarge={setEnlarged} />}
 		</HomeFrame>
 	);
@@ -53,6 +56,11 @@ export const HOME_WIDTH = "max-w-[80rem]";
  *  2026: the button "should be vertically aligned with the course page
  *  titles on the homepage"). */
 const HOME_FRAME = cn(PAGE_COLUMN, "pt-[calc(var(--lh-band-centre)-1rem)]");
+
+/** Home's column, the map over Today and the composer; enlarged, the map takes the whole window's width. */
+export function homeColumn(enlarged: boolean): string {
+	return cn("flex h-full flex-col gap-5", HOME_FRAME, enlarged ? "max-w-none" : HOME_WIDTH);
+}
 
 /** What picks the map's course: a Today line he points at, or a tab he chose. */
 type Chosen = { by: "line"; key: string } | { by: "tab"; workspace: string };
@@ -79,7 +87,8 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 	const tie = useMapTie({ onHold: (at) => setChosen({ by: "line", key: at.key }) });
 
 	const followed = chosen?.by !== "tab" ? followedRow(rows, chosen?.by === "line" ? chosen.key : null, chats) : null;
-	const workspace = chosen?.by === "tab" ? chosen.workspace : (followed?.course?.map.workspace ?? courses[0]!.map.workspace);
+	// The tabs keep the read's order (round 19, m9); with no line to follow, the most urgent course shows.
+	const workspace = chosen?.by === "tab" ? chosen.workspace : (followed?.course?.map.workspace ?? byUrgency(courses)[0]!.map.workspace);
 	const lesson = useMemo(() => (followed ? lessonOf(followed) : null), [followed]);
 	const followedTopics = useMemo<ReadonlySet<TopicHandle> | null>(() => (lesson?.topics.length ? new Set(lesson.topics) : null), [lesson]);
 	// Only the line the map follows wears its fill while he points at it, so no row has a card behind it at rest.
@@ -111,7 +120,7 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 
 	return (
 		<>
-			<div className={cn("flex min-h-0 flex-col", enlarged ? "flex-1" : cn(MAP_SHARE, "min-h-48 shrink"))}>
+			<div className={cn("flex min-h-0 flex-col", enlarged ? "flex-1" : cn(MAP_SHARE, "shrink"))}>
 				<HomeMap
 					courses={courses}
 					chats={chats}

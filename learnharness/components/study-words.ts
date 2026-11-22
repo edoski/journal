@@ -212,15 +212,6 @@ export function leftOffWords(days: number | null, today: string): string {
 	return `Left off ${days <= 0 ? "today" : shortDay(dayBefore(today, days))}`;
 }
 
-/** Where an old lesson's map stopped, when nothing resumes it: "Stopped
- *  here today", "Stopped here on 6 Nov"; "Left off here" is only for a
- *  lesson the page resumes (round 16, m22: the 5 and 6 Nov lessons' maps
- *  said "Left off at A worked example" with no Resume anywhere). */
-export function stoppedHereWords(days: number, today: string): string {
-	const day = pastDay(days, today);
-	return days <= 1 ? `Stopped here ${day}` : `Stopped here on ${day}`;
-}
-
 /** A review the engine has dated ahead, by its day, never a count of
  *  days (round 8: "Back in 2d" where the tutor said Tuesday 10 November):
  *  "Back Tue 10 Nov". */
@@ -898,14 +889,13 @@ export const READY_FACT_WORDS = {
 /** An arc not started whose topics the plan gives no day yet, on the road's line. */
 export const ARC_NOT_PLANNED = "Not planned yet";
 
-/** An arc under way, when the plan starts its next topic, on the road's line: "Planned 10 Dec". */
-export function arcPlannedWords(day: string): string {
-	return `Planned ${shortDay(day)}`;
-}
-
-/** When an arc's first new topic starts, on the road's line: "Starts 15 Nov". */
-export function arcStartsWords(day: string): string {
-	return `Starts ${shortDay(day)}`;
+/** When the plan starts an arc's next new topic, on the road's line, in
+ *  the word a topic's row, Home and the calendar use for a planned start:
+ *  "Planned today", "Planned 10 Dec". One word whether the arc is under way
+ *  or not started (round 19, m8: arc 6 read "Starts 18 Nov" beside arc 7's
+ *  "Planned 18 Nov" for the same fact). */
+export function arcPlannedWords(day: string, today: string): string {
+	return day <= today ? "Planned today" : `Planned ${shortDay(day)}`;
 }
 
 /** A course without arcs, not ready: the topics not yet solid, else those

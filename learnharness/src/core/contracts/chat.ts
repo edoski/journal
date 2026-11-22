@@ -561,10 +561,15 @@ export interface ChatSummary {
 	 *  words (`openedAsReview`), whatever it is named now. The list always
 	 *  sets it; a summary made elsewhere may leave it out. */
 	review?: boolean;
-	/** The one of a review's topics its plan re-teaches (`retaughtTopicOf`):
-	 *  its map and what it left are that topic's alone, never its other
-	 *  topics' (round 18, M2). Absent otherwise. */
-	retaught?: string;
+	/** The topic its plan's steps are on (`stepsOnOf`): its step map is
+	 *  that topic's alone, never its other topics' (round 18, M2; round 19,
+	 *  M4). Absent when it belongs to no one topic. */
+	stepsOn?: string;
+	/** The topics the work open on him is asked on (`openWorkTopicsOf`), or
+	 *  for a lesson's question the topic its steps are on: "Your turn" and
+	 *  "Left off" mark these alone (round 19, M4). Absent when nothing is
+	 *  open, or a review's open question names no topic. */
+	openOn?: readonly string[];
 	/** The topics whose start its saves moved (`startsMovedOf`): while it
 	 *  is open, Home keeps a start it moved off today (round 18, M4).
 	 *  Absent when none. */

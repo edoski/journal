@@ -71,10 +71,11 @@ function useStepCard(steps: readonly StepData[], across: number) {
  * map's card less what a step lacks, its width from the pane, at most
  * four across, every card as tall as the tallest title needs
  * (`useStepCard`). The ringed step carries "Your turn", else `leftOff`
- * ("Left off here" when the page resumes the lesson, else "Stopped here
- * on 6 Nov"), the step after it "Next", and every step opens the lesson.
+ * ("Left off here" when the page resumes the lesson), the step after it
+ * "Next"; with nothing to resume it names neither (`mapLeftOff`). Every
+ * step opens the lesson.
  */
-export function LessonMap({ entry, label, leftOff }: { entry: PlannedEntry; label: string; leftOff: string }) {
+export function LessonMap({ entry, label, leftOff }: { entry: PlannedEntry; label: string; leftOff: string | null }) {
 	const { plan } = entry;
 	const waits = entry.state === "your-turn";
 	const href = `/chat/${entry.chat.id}`;
@@ -125,7 +126,7 @@ export function LessonMap({ entry, label, leftOff }: { entry: PlannedEntry; labe
 		() => ({
 			edges: drawing.needs,
 			current: ring,
-			caption: `${label}: ${steps.length} steps, each below the steps it rests on.${current ? ` ${waits ? `Your turn on ${mathPlain(current.title)}` : `${leftOff}: ${mathPlain(current.title)}`}.` : ""}`,
+			caption: `${label}: ${steps.length} steps, each below the steps it rests on.${current && (waits || leftOff) ? ` ${waits ? `Your turn on ${mathPlain(current.title)}` : `${leftOff}: ${mathPlain(current.title)}`}.` : ""}`,
 		}),
 		[drawing.needs, ring, label, steps.length, current, waits, leftOff],
 	);

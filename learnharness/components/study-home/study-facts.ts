@@ -1,10 +1,10 @@
-import { courseReviewName, isReviewSession, taskTopics, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
+import { courseReviewName, isReviewSession, lessonHereOf, taskTopics, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
 import { continueMove, sessionState, type SessionState } from "@/components/nav/session-state";
 import { SOLID, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { CONTINUE_OPENING } from "@/components/start/course-facts";
 import { localDay } from "@/components/day-change";
-import { lessonBegun } from "@/components/study-words";
+import { lapsedNow, lessonBegun } from "@/components/study-words";
 
 /** "Span", "Span, Rank", "Span, Rank, Basis and dimension": every title,
  *  in order, joined by commas only, since a title may hold its own "and"
@@ -71,7 +71,10 @@ export function todaySteps(course: StudyCourse): NextStep[] {
 	const tasks = focused ? [focused, ...map.tasks.filter((t) => t !== focused)] : map.tasks;
 	const current = map.topics.find((t) => t.handle === map.current);
 	const steps: NextStep[] = [];
-	const reviews = todaysReview(course);
+	// The topic he got wrong last time leads, so the review opens on the slip its line names (round 19, m11:
+	// "Calculus I review · Not right last time: The chain rule" opened on cylindrical shells).
+	const due = todaysReview(course);
+	const reviews = [...due.filter((t) => lapsedNow(t.signals)), ...due.filter((t) => !lapsedNow(t.signals))];
 	if (reviews.length > 0) {
 		steps.push({ kind: "review", titles: reviews.map((t) => t.title), topics: reviews.map((t) => t.handle), then: tasks[0]?.title ?? current?.title ?? null });
 	}
@@ -366,16 +369,6 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 	return [...plan, ...unplaced(waiting), ...tasks, ...unplaced(leftovers), ...later];
 }
 
-/** The courses of Today's lines, each once, in the lines' order: a course
- *  with a waiting lesson and its review on two lines is one course. Then
- *  every other course of `all` with nothing today, most urgent first, so
- *  Home's tabs still reach every map. Pure. */
-export function todayCourses(rows: readonly TodayRow[], all: readonly StudyCourse[] = []): StudyCourse[] {
-	const listed = [...new Set(rows.flatMap((r) => (r.course ? [r.course] : [])))];
-	const workspaces = new Set(listed.map((c) => c.map.workspace));
-	return [...listed, ...byUrgency(all).filter((c) => !workspaces.has(c.map.workspace))];
-}
-
 /** The exam in words while the course is in its run-up, else null. Pure. */
 export function runupExam(course: StudyCourse): string | null {
 	return course.unready === null ? null : examWords(course);
@@ -395,7 +388,8 @@ export type CourseMove = { kind: "open"; chat: ChatListItem } | { kind: "start";
 /**
  * A course's line, pressed: take up its step (the course's next step when
  * none is given). A review opens a session
- * on those topics that is still to pick up, else starts a review of them,
+ * on those topics that is still to pick up, else the course's newest
+ * review still to pick up, else starts a review of them,
  * named for them; never an older lesson. An open task or the current topic
  * continues the lesson that holds it, as the session model says
  * (`continueMove`), else starts one. With nothing to take up, a session
@@ -406,9 +400,19 @@ export function courseMove(course: StudyCourse, chats: readonly ChatListItem[], 
 	const opening = stepWords(step);
 	if (step.kind === "none") return { kind: "start", opening: CONTINUE_OPENING, topics: [] };
 	const held = step.kind === "task" ? taskSessions(chats, workspace, step.key) : topicSessions(chats, workspace, step.topics[0] ?? "").filter((c) => covers(c, step));
-	const move = step.kind === "review" ? (pickUp(held) ? continueMove(held) : null) : continueMove(held);
+	// A review picks up the course's newest review he can still pick up, before it starts another, so the
+	// question a close sent him back to is the one it opens (round 19, M5: three Probability sessions held open
+	// review questions while Home started a fourth).
+	const reviews = step.kind === "review" ? [...held, ...openReviews(chats, workspace)] : held;
+	const move = step.kind === "review" ? (pickUp(reviews) ? continueMove(reviews.filter((c) => PICK_UP.has(sessionState(c)))) : null) : continueMove(held);
 	if (move?.kind === "open") return { kind: "open", chat: move.chat };
 	return { kind: "start", opening, topics: step.topics, ...(move ? { from: move.from.id } : {}) };
+}
+
+/** The course's reviews he can still pick up, newest first: never one
+ *  whose course was deleted. Pure. */
+function openReviews(chats: readonly ChatListItem[], workspace: string): ChatListItem[] {
+	return chats.filter((c) => c.course?.workspace === workspace && !c.courseDeleted && isReviewSession(c) && PICK_UP.has(sessionState(c))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 /** The states a session is picked up from: it waits on the learner, the
@@ -434,7 +438,9 @@ export function withLessonHere(courses: readonly StudyCourse[], chats: readonly 
 		const { workspace, topics } = course.map;
 		const newest = chats.filter((c) => c.course?.workspace === workspace && c.messageCount > 0).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
 		if (!newest || newest.kind !== "teach" || !IN_PROGRESS.has(sessionState(newest))) return course;
-		const here = topics.find((t) => (newest.ownTopics ?? []).includes(t.handle));
+		// Where its lesson's steps are, never a task's topics (round 19, M4: Problem sheet 4 moved it to Basis).
+		const at = lessonHereOf(newest);
+		const here = topics.find((t) => at.includes(t.handle));
 		return here && here.handle !== course.map.current ? { ...course, map: { ...course.map, current: here.handle } } : course;
 	});
 }

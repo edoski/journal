@@ -67,8 +67,8 @@ export interface NearExam {
 	 *  M2). */
 	wontFit?: readonly string[];
 	/** Of `wontFit`, the topics that fell past the exam today: the plan
-	 *  gave each a start before the exam as yesterday ended (the engine's
-	 *  `moved`, `from`). */
+	 *  gave each a start before the exam as his last study day ended (the
+	 *  engine's `fell_past`, or `moved`'s `from`). */
 	fellToday?: readonly string[];
 }
 
@@ -91,9 +91,12 @@ export function nearExam(exams: readonly NearExam[]): NearExam | null {
 export function homeExams(courses: readonly StudyCourse[]): NearExam[] {
 	return courses.flatMap(({ map }) => {
 		if (!map.exam) return [];
-		const { date, daysLeft, doesNotFit = [] } = map.exam;
+		const { date, daysLeft, doesNotFit = [], fellPast = [] } = map.exam;
 		const misfits = doesNotFit.flatMap((h) => map.topics.find((t) => t.handle === h) ?? []);
-		const fell = misfits.filter((t) => t.moved !== undefined && t.moved.from < date);
+		// Those the plan still started before the exam as his last study day ended, whatever moved them (round 19,
+		// M1: a review pace that fell moved five with no cause his study gave, and Home said nothing), or that a
+		// move his study caused put past it.
+		const fell = misfits.filter((t) => fellPast.includes(t.handle) || (t.moved !== undefined && t.moved.from < date));
 		return [{ course: map.title, date, daysLeft, workspace: map.workspace, wontFit: misfits.map((t) => t.title), fellToday: fell.map((t) => t.title) }];
 	});
 }

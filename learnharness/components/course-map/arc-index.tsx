@@ -26,27 +26,68 @@ const ROW = 24;
  * never move, whichever arc shows (Edo, 16 Nov
  * 2026: "how can I tell which arc I'm at?… extremely compact and minimalist"; "not
  * clear enough boundary and hierarchy… arcs are something that's contained
- * within a course").
+ * within a course"). The list is never taller than the room it is given: a
+ * map with less room than its arcs need scrolls the list (no scrollbar is
+ * drawn), keeps the arc shown in view, and fades the list's edge where more
+ * arcs lie past it (round 19, carry-in 4: at zoom 1.25 and up its twelve rows
+ * ran down over Today's heading).
  */
 export function ArcIndex({ arcs, value, here, onSelect, className }: { arcs: readonly CourseMapArc[]; value: ArcHandle | null; here: ArcHandle | null; onSelect: (arc: ArcHandle) => void; className?: string }) {
 	const at = arcs.findIndex((a) => a.handle === value);
 	const nav = useRef<HTMLElement>(null);
 	// The shown row's place and height, measured, since a two-line name makes its row taller.
 	const [bar, setBar] = useState<{ top: number; height: number } | null>(null);
+	// Whether more rows lie past the list's top or bottom edge, while the room is shorter than the list, and how deep
+	// its edges fade: a row's height, less in a list with too little room for the shown row and two whole fades.
+	const [cut, setCut] = useState({ above: false, below: false });
+	const [fade, setFade] = useState(ROW);
 	useLayoutEffect(() => {
 		const list = nav.current;
 		if (!list || at < 0) return;
 		const measure = () => {
 			const row = list.querySelectorAll<HTMLElement>('[data-slot="arc-index-row"]')[at];
-			if (row) setBar((was) => (was && was.top === row.offsetTop && was.height === row.offsetHeight ? was : { top: row.offsetTop, height: row.offsetHeight }));
+			if (!row) return;
+			setBar((was) => (was && was.top === row.offsetTop && was.height === row.offsetHeight ? was : { top: row.offsetTop, height: row.offsetHeight }));
+			// The arc shown in view, clear of the faded edges.
+			const depth = Math.max(0, Math.min(ROW, (list.clientHeight - row.offsetHeight) / 2));
+			setFade(depth);
+			const top = row.offsetTop - depth;
+			const bottom = row.offsetTop + row.offsetHeight + depth;
+			if (top < list.scrollTop) list.scrollTop = top;
+			else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
 		};
 		measure();
 		const sizes = new ResizeObserver(measure);
 		sizes.observe(list);
 		return () => sizes.disconnect();
 	}, [at, arcs]);
+	useLayoutEffect(() => {
+		const list = nav.current;
+		if (!list) return;
+		const read = () => {
+			const above = list.scrollTop > 0.5;
+			const below = list.scrollTop + list.clientHeight < list.scrollHeight - 0.5;
+			setCut((was) => (was.above === above && was.below === below ? was : { above, below }));
+		};
+		read();
+		list.addEventListener("scroll", read, { passive: true });
+		const sizes = new ResizeObserver(read);
+		sizes.observe(list);
+		return () => {
+			list.removeEventListener("scroll", read);
+			sizes.disconnect();
+		};
+	}, [arcs]);
+	const mask = cut.above || cut.below ? `linear-gradient(to bottom, ${cut.above ? `transparent, #000 ${fade}px` : "#000"}, ${cut.below ? `#000 calc(100% - ${fade}px), transparent` : "#000"})` : undefined;
 	return (
-		<nav ref={nav} data-slot="arc-index" aria-label="Arcs" className={cn("relative flex flex-col border-l border-white/10 pl-4", className)}>
+		<nav
+			ref={nav}
+			data-slot="arc-index"
+			aria-label="Arcs"
+			// The scroll box clips: 2px of room around the rows for a row's focus ring, its rows where they were.
+			className={cn("relative -my-0.5 flex min-h-0 flex-col overflow-y-auto overscroll-contain border-l border-white/10 py-0.5 pr-0.5 pl-4", className)}
+			style={mask ? { maskImage: mask } : undefined}
+		>
 			{at >= 0 && (
 				<span
 					aria-hidden="true"
@@ -72,7 +113,7 @@ export function ArcIndex({ arcs, value, here, onSelect, className }: { arcs: rea
 							blurAfterPointerClick(e);
 							onSelect(arc.handle);
 						}}
-						className="lh-no-drag group/arc flex items-center gap-2 rounded-md py-0.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						className="lh-no-drag group/arc flex shrink-0 items-center gap-2 rounded-md py-0.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						style={{ minHeight: ROW }}
 					>
 						<ArcLabel number={i + 1} handle={arc.handle} title={arc.title} here={shown} wrap />

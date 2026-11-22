@@ -279,8 +279,9 @@ describe("dock selection (toggleOption / toggleOther)", () => {
 
 describe("explainInputBase / explainInputProblems (the commitment contract)", () => {
 	it("has ONE authoring field — no explanation remnant (owner ruling 2026-09-27), and no details line under the question (Edo, 14 Nov 2026)", () => {
+		// Beside them only the optional course topic the question is asked on, a tag, not authoring (round 19, M4).
 		const keys = Object.keys(explainInputBase.properties);
-		assert.deepEqual(keys, ["question", "correctAnswer"]);
+		assert.deepEqual(keys, ["question", "correctAnswer", "topic"]);
 	});
 
 	it("the teach object LEADS with the required pair (type, nodeId) — base fields follow", () => {

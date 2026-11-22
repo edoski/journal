@@ -409,8 +409,9 @@ function Flow({
 				else links.current.delete(handle);
 			},
 			openArc: onOpenArc,
+			fade: frameMargin,
 		}),
-		[lit, marked, pointedAt, tabStop, layout, graph.edges, follow, onOpenArc, trail],
+		[lit, marked, pointedAt, tabStop, layout, graph.edges, follow, onOpenArc, trail, frameMargin],
 	);
 
 	return (

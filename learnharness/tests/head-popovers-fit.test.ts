@@ -188,11 +188,12 @@ describe("the head's facts when they wrap (round 18, m9)", () => {
 
 /**
  * Round 18, m6 (1 n4, `76b`): on the 17 Nov exam eve, "Or another" listed
- * 17 options with none marked. It opens on one, marked: the head's own way
- * in, its pick; the rest fold behind More.
+ * 17 options with none marked; the rest fold behind More. Round 19, m10
+ * (1 n10, `76b`): it then opened on the head's own way in, the line above
+ * it. It offers alternatives only: the next way, then More.
  */
-describe("Or another on the exam eve (round 18, m6)", () => {
-	it("marks the head's own way in and folds the rest behind More", async () => {
+describe("Or another on the exam eve (round 18, m6; round 19, m10)", () => {
+	it("offers only other ways than the head's own, the next first and the rest behind More", async () => {
 		const page = await shell.open("browser", { sidebar: "open", search: "&case=eve" });
 		await page.waitForSelector('[data-slot="course-topic-row"]');
 		await page.click('[data-slot="course-ready-fact"]');
@@ -205,15 +206,15 @@ describe("Or another on the exam eve (round 18, m6)", () => {
 			const rows = [...menu.querySelectorAll('[role^="menuitem"]')].filter((row) => row.closest('[data-slot="dropdown-menu-content"]') === menu);
 			return rows.map((row) => ({ words: row.textContent, checked: row.getAttribute("aria-checked"), more: row.getAttribute("aria-haspopup") === "menu" }));
 		});
-		assert.equal(top.length, 2, `one marked option and More: ${JSON.stringify(top)}`);
-		assert.equal(top[0]!.checked, "true", "the first is marked");
-		assert.equal(`${top[0]!.words} today`, pick, "the marked one is the head's own way in");
+		assert.equal(top.length, 2, `one other way and More: ${JSON.stringify(top)}`);
+		assert.notEqual(`${top[0]!.words} today`, pick, "never the head's own way in, which the line above offers");
+		assert.equal(top[0]!.checked, null, "nothing marked: every option is another way");
 		assert.ok(top[1]!.more && top[1]!.words === "More", "the rest are behind More");
 		await page.click('[data-slot="exam-gaps-more"]');
 		await page.waitForSelector('[data-slot="dropdown-menu-sub-content"]');
 		const rest = await page.evaluate(() => [...document.querySelectorAll('[data-slot="dropdown-menu-sub-content"] [role="menuitem"]')].map((row) => row.textContent));
 		await page.close();
-		assert.equal(rest.length, 9, `the nine topics with no room, behind More: ${rest.join(", ")}`);
-		assert.ok(!rest.some((words) => `${words} today` === pick), "the marked one is not again behind More");
+		assert.equal(rest.length, 8, `the other topics with no room, behind More: ${rest.join(", ")}`);
+		assert.ok(!rest.some((words) => `${words} today` === pick || words === top[0]!.words), "neither the head's own way in nor the menu's first again behind More");
 	});
 });
