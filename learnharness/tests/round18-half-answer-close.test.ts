@@ -59,8 +59,8 @@ describe("the half-answer close's words (round 18, m15)", () => {
 		assert.ok(rules(await closing(), send("Your half answer to the wheel question is waiting for you. Your next Probability study is tomorrow, Monday 9 November.")).includes("half-answer"));
 	});
 
-	it("a close that names the lesson, sets off the title and names the rest passes", async () => {
-		assert.deepEqual(rules(await closing(), send("Your half answer to the first question waits in your Linear maps and their matrices lesson. Starting “Any matrix represents a linear map” moves to Tuesday 10 November, and the rest are on your calendar.")), []);
+	it("a close that names the lesson and its day, sets off the title and names the rest passes", async () => {
+		assert.deepEqual(rules(await closing(), send("Your half answer to the first question waits in your Linear maps and their matrices lesson, which continues on Tuesday 10 November. Starting “Any matrix represents a linear map” moves to Tuesday 10 November, and the rest are on your calendar.")), []);
 	});
 
 	it("titles in a list, or opening a sentence, read as they are", () => {

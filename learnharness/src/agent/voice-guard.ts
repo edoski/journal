@@ -737,6 +737,10 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `A topic's title straight after a comma reads as a new sentence: ${quoted(b.excerpt)}. Open the sentence on it, or set it off in quotes ("Starting “${b.excerpt}” moves to …").`;
 		case "vague-moves":
 			return `Later moves said with nothing he can act on: ${quoted(b.excerpt)}. Name each move with its new day, or leave out the ones the close is not about.`;
+		case "vague-day":
+			return `A topic named with no day he can act on: ${quoted(b.excerpt)}. Name its day from the close's days, copied as written, or leave the topic out.`;
+		case "half-answer-day":
+			return `His half answer is named with no day for its lesson: ${quoted(b.excerpt)}. Say when that lesson continues, copied from the close's days ("…waits in your Poisson distribution lesson, which continues tomorrow, Monday 9 November.").`;
 		case "split-display":
 			return `Two displays joined by a lone "${b.excerpt}" leave it alone on a line between them. Write short equations inline in the sentence ("$h(1,1) = (1,0,2)$ ${b.excerpt} $h(1,-1) = (3,2,0)$"), or set both in one display.`;
 		case "nothing-above":
@@ -885,6 +889,13 @@ export function titleAfterComma(text: string, titles: readonly string[]): string
  *  moved too", round 18, m15): each move is named with its day, or the
  *  rest are on his calendar, or they are left out. */
 const VAGUE_MOVES = /\b(?:later|other|more|further) (?:starts|lessons|topics|reviews)\b(?![^.?!]*\bcalendar\b)[^.?!]{0,30}\b(?:moved|move|shifted|shift|too)\b|\b(?:starts|lessons|reviews|topics) (?:after it |after that |behind it )?(?:moved|move|shift(?:ed)?) too\b/i;
+
+/** A topic's return said with no day: "on a later day", "later on your
+ *  calendar", "you pick those up next" (round 19, m15). */
+const VAGUE_DAY = /\b(?:on |for )?(?:a|some) later (?:day|date)\b|\blater (?:on|in) (?:your|the) calendar\b|\b(?:another|a future) day\b|\bpick (?:it|them|those|these|that|this) up (?:next|later)\b/i;
+
+/** Words that give a day: today, tomorrow, a weekday or a date. */
+const DAY_WORDS = /\b(?:today|tomorrow|(?:mon|tues|wednes|thurs|fri|satur|sun)day|\d{1,2} (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)\b/i;
 
 /** A half answer he left, said with no session to find it in, or as
  *  "there" (round 18, m15: "Your half answer in the Linear maps and their
@@ -1698,6 +1709,14 @@ export class VoiceGuard {
 		if (pointer) out.push({ rule: "pointer", excerpt: pointer });
 		const unplaced = halfAnswerUnplaced(text);
 		if (unplaced) out.push({ rule: "half-answer", excerpt: unplaced });
+		// A close names a day for every topic it names (round 19, m15: "Mechanics
+		// of matrix multiplication comes back on a later day on your calendar",
+		// "you pick those up next"), and his half answer's lesson its next day.
+		const closes = kind === "close" || this.closing || this.dayItems !== null;
+		const vagueDay = closes ? sentences(text).map((s) => s.trim()).find((s) => VAGUE_DAY.test(s) && !DAY_WORDS.test(s)) : undefined;
+		if (vagueDay) out.push({ rule: "vague-day", excerpt: vagueDay });
+		const halfNoDay = closes && !unplaced ? sentences(text).map((s) => s.trim()).find((s) => /\bhalf(?:-finished)? answer\b/i.test(s) && !DAY_WORDS.test(s)) : undefined;
+		if (halfNoDay) out.push({ rule: "half-answer-day", excerpt: halfNoDay });
 		const commaTitle = titleAfterComma(text, this.titles);
 		if (commaTitle) out.push({ rule: "title-comma", excerpt: commaTitle });
 		const vague = VAGUE_MOVES.exec(text);

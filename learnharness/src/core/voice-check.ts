@@ -83,7 +83,9 @@ export type VoiceRule =
 	| "half-answer"
 	| "title-comma"
 	| "vague-moves"
-	| "split-display";
+	| "split-display"
+	| "vague-day"
+	| "half-answer-day";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
