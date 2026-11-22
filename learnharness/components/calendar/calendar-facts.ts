@@ -384,11 +384,11 @@ export function calendarEntries({
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) => {
 			const held = topic.review?.kind === "scheduled" && topic.review.date === day && topic.review.held ? topic.review : null;
 			const told = topic.review?.date === day ? topic.moved : undefined;
-			const since = held || told ? movedWords(held, today, told) : null;
+			const since = told ? movedWords(told, today) : null;
 			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held && !told ? heldExamWords(held) : null, ...facts(topic) });
 		};
 		const fresh = (topic: CourseMapTopic, day: string) =>
-			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? (leftOutWords(topic, map.exam) ?? (topic.moved ? movedWords(null, today, topic.moved) : startsAfterWords(topic.startsAfter))) : null, ...facts(topic) });
+			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? (leftOutWords(topic, map.exam) ?? (topic.moved ? movedWords(topic.moved, today) : startsAfterWords(topic.startsAfter))) : null, ...facts(topic) });
 		const topicOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle);
 		// Today's review is every review the daily plan makes today: `plan`'s `due` names only its first five, so a
 		// sixth went unshown today and its first entry was the day after the exam the plan puts its next review on,
