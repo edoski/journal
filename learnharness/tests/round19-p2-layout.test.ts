@@ -67,6 +67,8 @@ describe("Home's map at browser zoom 1.25 and up (round 19, carry-in 4)", () => 
 			const arcs = seen.parts.arcs!;
 			assert.ok(seen.shown.top >= arcs.top - 0.5 && seen.shown.bottom <= arcs.bottom + 0.5, `the arc shown ${JSON.stringify(seen.shown)} in view in its list ${JSON.stringify(arcs)}`);
 			assert.ok(seen.composer.bottom <= seen.window.height, `the composer (bottom ${seen.composer.bottom}) inside the window (${seen.window.height})`);
+			// The column's foot is PAGE_COLUMN's 24px: the map grows into the rest (Edo, 23 Nov 2026: "so much free space" under the chat box).
+			assert.ok(seen.window.height - seen.composer.bottom <= 24 + 1, `the composer rests on the column's foot, ${seen.window.height - seen.composer.bottom}px above the window's bottom`);
 		});
 	}
 });

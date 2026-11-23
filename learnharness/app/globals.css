@@ -593,7 +593,15 @@ body {
 }
 /* The lights sit over the rail's head, so its edge starts under the band:
    the head covers the rail's border, and no line runs through the lights. */
+/* In the Mac app the button stands beside the lights, not in the rail, so the
+   head is the window's whole 52px band and the icons start 8px under it:
+   ending the head on the tab underline put Home's icon against the lights
+   (Edo, 23 Nov 2026: "sidebar busted in collapsed state"). */
+.lh-electron .lh-rail-icons {
+	padding-top: 0.5rem;
+}
 .lh-electron .lh-rail-head {
+	height: calc(52px / var(--lh-zoom));
 	align-self: flex-start;
 	width: calc(100% + 1px);
 	background: var(--color-background);
