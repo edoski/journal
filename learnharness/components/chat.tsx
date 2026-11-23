@@ -94,7 +94,7 @@ import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
 import { boxAfterClose, boxLine, forgetRescue, keepRescue, overtakenDraft, rescuedBox, typedAfterSend, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendKeepingWords } from "@/components/lesson/sent-draft";
-import { LESSON_WORDS } from "@/components/study-words";
+import { LESSON_WORDS, shortDay } from "@/components/study-words";
 import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, leftDraftAt, leftDraftOf, takeCarry, takeKeptPhotos, takeLessonBoxes } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
@@ -188,6 +188,7 @@ export function Chat({
 	appOpening = false,
 	course,
 	place,
+	resumed,
 	initiallyCourseDeleted = false,
 	continueTask = false,
 }: {
@@ -199,6 +200,10 @@ export function Chat({
 	/** Where the lesson sits in its course (its topic and arc), read once
 	 *  when the page opened; absent when the course map could not say. */
 	place?: LessonPlace;
+	/** Opened on a later study day than he last studied it (`resumedOn`):
+	 *  the day, and the message the date divider stands before, null for
+	 *  whatever comes next. */
+	resumed?: { day: string; before: string | null };
 	/** The course was deleted: the lesson is history, with no box to write in. */
 	initiallyCourseDeleted?: boolean;
 	initialMessages: LhMessage[];
@@ -993,6 +998,10 @@ export function Chat({
 	// before the reply began) says so, with Try again (turn-cut.ts).
 	const replyCut = status === "ready" && !busy && !error ? replyCutOf(nativeMessages) : null;
 	const sendAllowed = !pending && !activeProblem;
+	// The date divider of a session picked up on a later day: before the
+	// left question asked again, else before the first message this view adds.
+	const [openedWith] = useState(() => new Set(initialMessages.map((m) => m.id)));
+	const resumedBefore = resumed ? (resumed.before ?? messages.find((m) => !openedWith.has(m.id))?.id ?? null) : null;
 	// Try again's key (round 3): Enter on the empty composer, from the field
 	// or anywhere outside one, runs the same retry as the button.
 	// A question or problem still open owns Enter (its own resend).
@@ -1761,7 +1770,8 @@ export function Chat({
 								/>
 							)}
 
-							{messages.map((m, mi) =>
+							{messages.map((m, mi) => [
+								m.id === resumedBefore && <SectionBreak key={`resumed-${m.id}`} testId="resumed-day" label={shortDay(resumed!.day)} />,
 								m.role === "user" && isSubagentSteer(m) ? (
 									// Sub-agent delivery (wake-pipeline steer): NO message bubble — the
 									// artifact card sits in the transcript column directly, full width
@@ -1939,7 +1949,7 @@ export function Chat({
 									</Message>
 									)}
 								</Fragment>
-							))}
+							)])}
 
 							{/* THE placeholder, ACTION-gated (owner, optimistic round
 							    3, 2026-10-02): spinner + shimmered Thinking… from the

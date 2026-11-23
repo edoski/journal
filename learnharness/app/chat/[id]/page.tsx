@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Chat } from "@/components/chat";
-import { openedByApp, sessionTitleOf } from "@/src/core";
+import { openedByApp, resumedOn, sessionTitleOf, studyDay } from "@/src/core";
 import { courseDeleted, getChat, isTurnRunning, lessonPlace, reposeLeftQuestions, turnFailure } from "@/src/server";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +36,8 @@ export default async function ChatPage({
 				// native messages).
 				initialMessages={chat.messages}
 			initialError={turnFailure(chat.id)}
+			// Back on a later study day: the date divider where it picks up.
+			resumed={resumedOn(chat.messages, chat.updatedAt, studyDay()) ?? undefined}
 			initialPrompt={prompt}
 			// Continue on the open task it holds (continueHref).
 			continueTask={go === "task"}
