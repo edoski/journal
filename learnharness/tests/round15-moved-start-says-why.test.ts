@@ -46,9 +46,9 @@ describe("a save that moves a start he was told tells the close (round 15, m2)",
 		assert.equal(worded.starts_moved.poisson.moved.from_words, "Monday 9 November");
 	});
 
-	it("the save's contract asks the close to say it", () => {
+	it("the save's contract asks the close to say it, through its close receipt (round 20, M3)", () => {
 		const records = { run: async () => ({ ok: true, json: {} }), map: async () => ({ ok: false }), forgotten: () => false } as never;
 		const tools = courseTools({ course: { workspace: "/s/pr", title: "Probability" }, records, arcs: false });
-		assert.match(tools.course_save!.description, /`starts_moved` lists each first lesson his study today moved off a day he was told: your closing words say it/);
+		assert.match(tools.course_save!.description, /Its `close` is the session's close receipt so far: the topics this session answered, each with its day, and each start its saves moved; the session's last words copy `close.says`/);
 	});
 });

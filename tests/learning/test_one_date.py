@@ -104,6 +104,8 @@ def test_a_save_tells_the_day_the_plan_puts_the_next_review(
     topics = run(monkeypatch, capsys, root, "map")["topics"]
     review = {item["topic"]: item["review"] for item in topics}
     assert receipt["reviews"]["today"]["planned"] == review["today"]
+    # The close names the topic from the receipt alone (round 20, M3).
+    assert receipt["reviews"]["today"]["title"] == "today"  # untitled: its handle
     assert review["today"] > day(1)
     assert receipt["due_count"] == 0
     shown = run(monkeypatch, capsys, root, "show", "today")["items"]["today"]

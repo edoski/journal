@@ -349,7 +349,7 @@ export const CONCLUDE_ACK_TEXT =
  *  like THINKING_LABEL. The button/Enter-on-empty path appends the
  *  marker; the model reads this and poses (or wraps) per the doctrine. */
 export const NEXT_PROBLEM_TEXT =
-	"[NEXT PROBLEM] — the learner's explicit go-ahead: pose the next problem now per the selection rules, or, if the arc is complete, close in at most two sentences: the one move the session showed was not obvious yet, or what comes next.";
+	"[NEXT PROBLEM] — the learner's explicit go-ahead: pose the next problem now per the selection rules, or, if the arc is complete, close in at most two sentences: the one move the session showed was not obvious yet, then the days of your newest save's `close`, its `close.says` copied as written, and no other topic.";
 
 /** What the agent reads when he presses Done for today: the
  *  done-tonight marker's content, per answering agent (only the teacher
@@ -365,25 +365,19 @@ const DONE_LIMITS = "Never a step, cue, method or hint toward anything he left o
  *  turn; its card said "Partly right" with no reason, straight before the
  *  close (round 11, 4 minor 1). */
 const DONE_GRADED = "An answer he sent before pressing it is still graded and saved as usual; when it was not fully right, first say in one sentence what it missed, as its own message, then close.";
-/** Every topic he answered in the session has a next day, and the close
- *  names it (round 17, 2 m2: a four-topic review's close named only
- *  Conditional probability's, and Binomial, Random variables and
- *  Inclusion-exclusion got none). */
-/** Round 19, m15: "Mechanics of matrix multiplication comes back on a later
- *  day on your calendar", for a topic answered before his last Done for
- *  today; "you pick those up next", with no day. */
-const DONE_DAYS = "and the day each topic the close's `days` lists comes back (the session's topics and those he answered since its last close), by its topic, copied from its words: topics on one day together, and with three different days or more, the soonest and that the rest are on his calendar; a topic he hears of gets its day, never \"a later day\" or \"next\", and a topic `days` does not list is left out";
-/** A start planned for today that the session's saves moved is named,
- *  with its new day and its cause (round 18, M4: a hinted, then partly
- *  right, answer moved Expectation off today, every receipt carried it in
- *  `starts_moved`, and the close named only the review days). */
-const DONE_MOVED = "a start planned for today that his answers moved (a save's `starts_moved` whose `moved.from` is today) is named too, by its title, with its new day and its cause, its day said even when the other days are left to his calendar";
+/** The close's days are its receipt's, the same for every kind of
+ *  session (round 20, M3): exactly the topics this session answered, each
+ *  with its day, the task that goes on and each start its saves moved.
+ *  Round 19's closes recited a day's whole plan ("Wednesday 11 November
+ *  holds your Subspaces and spanning sets, Matrix multiplication, …"),
+ *  left days "on your calendar" and left out what moved. */
+const DONE_RECEIPT = 'the days of the session\'s close receipt (`close` in your newest save\'s or close\'s result, else "The close receipt" below): copy `close.says` as written, which names exactly the topics this session answered, each with its day, the task that goes on and each start its saves moved; name no other topic, and never "on your calendar", "next time" or "a later day"';
 /** Where his half answer waits, and a start's title inside a sentence
  *  (round 18, m15: "…is waiting for you there. Because that lesson is
  *  unfinished, Any matrix represents a linear map moved …, and later
  *  starts moved too."). */
 const DONE_HALF = 'a question he left a half answer on (`draftKept`, `half_answer_on` in the close) is his half answer, waiting in this session by its name (your Invertible matrices lesson, your Probability review), never "there", with the day that lesson continues ("…, which continues tomorrow, Monday 9 November"), and a task step saved over it says to finish his half answer on that question, never that he wrote nothing; a start named inside a sentence has its title set off in quotes (Starting “Any matrix represents a linear map” moves to Tuesday 10 November), and every move he is told is named with its day, never as "later starts moved too"';
-const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one, ${DONE_DAYS}; ${DONE_MOVED}; a topic not started is one he starts, never a review; ${DONE_HALF}. ${DONE_LIMITS}`;
+const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its place (the kernel question, part (c) of the sheet), never by what it asks, then ${DONE_RECEIPT}; a topic not started is one he starts, never a review; ${DONE_HALF}. ${DONE_LIMITS}`;
 /** Practice keeps nothing of a problem dropped at Done for today, so its
  *  close names only what the record keeps (round 9, 3 m7: "You still have
  *  the kernel problem you closed … to pick up"), and only this session's:
@@ -392,7 +386,7 @@ const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, 
  *  problem he left open is named once, as set aside (round 14, m31: "Your
  *  Rank and the column space review is on Wednesday 11 November." left the
  *  4 × 6 system unnamed). */
-const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: a problem he left open, named once by what it is on (the 4 × 6 system), as set aside, never as something he picks up; then only what his record keeps for next time from this session, an open task this session worked on at its place (part (c) of the sheet), never another session's open work, and the day of his next review when the plan gives one, never by what it asks, ${DONE_DAYS}; ${DONE_MOVED}; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
+const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: a problem he left open, named once by what it is on (the 4 × 6 system), as set aside, never as something he picks up; then only what his record keeps from this session, an open task this session worked on at its place (part (c) of the sheet), never another session's open work, never by what it asks, then ${DONE_RECEIPT}; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
 
 export const DONE_TONIGHT_TEXT = {
 	prober:

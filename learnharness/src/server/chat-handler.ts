@@ -38,7 +38,9 @@ import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn
 import { askPrestart, claimPrestart, prestart } from "./prestart.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
 import { continuedTask } from "./task-passage.ts";
-import { activeProblemOf, answeredQuestionsOf, danglingQuestionOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, sessionModeOf, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
+import { activeProblemOf, answeredQuestionsOf, danglingQuestionOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, sessionModeOf, withCloseReceipt, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
+import { sessionSavesOf } from "../core/close-receipt.ts";
+import { closeReceiptFor } from "../agent/tools/course.ts";
 import { createLearning, startSurvey, studyPlaces } from "./setup.ts";
 import { halfAnswerLeft } from "../core/session-end.ts";
 import { remarkableOf } from "../core/answer-marks.ts";
@@ -290,7 +292,7 @@ function turnAgent(
 		// before the transcript's write loses neither the mark nor the
 		// "already saved" (round 8).
 		...(agentKind === "setup" ? { setup: { places: places ?? [] } } : {}),
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, onMoved: keepMoved, review: reviewRecord(record), reviewTopics: record.topics ?? [], lessonTopics: () => lessonTopicsOf(stores.chatStore.getChat(chatId) ?? record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [], halfAnswer: () => halfAnswerLeft(stores.chatStore.getChat(chatId)?.messages ?? merged), courses: keptCourseMaps } } : {}),
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, onMoved: keepMoved, review: reviewRecord(record), reviewTopics: record.topics ?? [], lessonTopics: () => lessonTopicsOf(stores.chatStore.getChat(chatId) ?? record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [], halfAnswer: () => halfAnswerLeft(stores.chatStore.getChat(chatId)?.messages ?? merged), sessionSaves: () => sessionSavesOf(stores.chatStore.getChat(chatId)?.messages ?? merged), courses: keptCourseMaps } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
 	// practitioner — no plan/question tools; problem + conclude, and the
@@ -470,12 +472,14 @@ export async function handleChatInput(
 	// material, as the engine's map names them, drawn the moment he presses
 	// (round 17, M8; round 18, M6).
 	const opened = record;
-	const [courseBrief, courseArcs, task, places] = await Promise.all([
+	const [courseBrief, courseArcs, task, places, closeReceipt] = await Promise.all([
 		learnerInput || handoffWake ? fetchCourseBrief(record) : null,
 		fetchCourseArcs(record),
 		input.type === "task" ? keptCourseMaps().then((maps) => continuedTask(maps.find((m) => m.workspace === opened.course?.workspace), opened.messages)) : null,
 		// A setup session looks first where his study material is kept.
 		sessionModeOf(record.messages, record.kind) === "setup" ? studyPlaces().catch(() => []) : undefined,
+		// His Done for today closes on the session's close receipt (round 20, M3).
+		input.type === "tonight" && opened.course ? closeReceiptFor(stores.courseRecords, opened.course.workspace, opened).catch(() => null) : null,
 	]);
 	const freshRecord = stores.chatStore.getChat(chatId);
 	if (!freshRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
@@ -509,7 +513,7 @@ export async function handleChatInput(
 		appends =
 			input.type === "steers"
 				? input.steers.filter((s) => !steerDelivered(record.messages, s.id)).map((s) => withProbeFeedback(s, record.messages))
-				: inputAppends(record, input.type === "task" ? { type: "task", task } : input);
+				: inputAppends(record, input.type === "task" ? { type: "task", task } : input).map((m) => withCloseReceipt(m, closeReceipt));
 	} catch (err) {
 		if (err instanceof ChatInputError) {
 			return Response.json({ error: err.message }, { status: 400 });
