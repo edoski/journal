@@ -11,8 +11,8 @@ import { closeReceiptFor } from "../src/agent/tools/course.ts";
 import { receiptOfMap, receiptOfSaves, sessionSavesOf, type CloseReceipt } from "../src/core/close-receipt.ts";
 import { VoiceGuard } from "../src/agent/voice-guard.ts";
 import { tonightAppends } from "../src/core/input-events.ts";
-import { newDoneTonightMessage, withCloseReceipt } from "../src/core/native-messages.ts";
-import { rules, send } from "./helpers/round19-turns.ts";
+import { newDoneTonightMessage, newUserMessage, withCloseReceipt } from "../src/core/native-messages.ts";
+import { assistant, rules, send, verdict } from "./helpers/round19-turns.ts";
 import { courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
@@ -277,5 +277,42 @@ describe("the move between topics is its own sentence (round 21, m13)", () => {
 	it("the course prompt asks for a sentence of its own", () => {
 		assert.doesNotMatch(courseRecordPrompt("prober", { arcs: false }), /\("Now Invertible matrices: …"\)\./);
 		assert.match(courseRecordPrompt("prober", { arcs: false }), /\("Next, Invertible matrices\."\)/);
+	});
+});
+
+/**
+ * Round 21, m14 (4 minor 6): Try again after a stop mid-reply said the
+ * stopped nudge's last sentence again ("The ordered field problem is still
+ * open above. Your next move is proving 1/x>0…") and added a hint he never
+ * asked for. A reply that already ended on his move adds no words when
+ * Try again finishes it; one cut before his move goes on from the cut,
+ * never restating what it said.
+ */
+describe("Try again after a stop mid-reply (round 21, m14)", () => {
+	const resumed = (nudge: string) => {
+		const said = send(nudge);
+		return new VoiceGuard([
+			newUserMessage("Since 1 > 0 and x > 0, multiplying gives 1/x > 0."),
+			assistant([said]),
+			{ id: `r-${++n}`, role: "toolResult", toolCallId: said.id, toolName: "send_to_user", content: [{ type: "text", text: "Shown." }], details: {}, isError: false, timestamp: Date.now() } as unknown as LhMessage,
+		], undefined, false, true);
+	};
+	const NUDGE = "Your proof breaks at its first step: you multiply by 1/x before you know its sign. Your next move is proving 1/x > 0 from 1 > 0 and the product of positives.";
+
+	it("a nudge that ended on his move: Try again adds nothing", () => {
+		const guard = resumed(NUDGE);
+		assert.equal(verdict(guard, send("The ordered field problem is still open above. Your next move is proving 1/x > 0 from 1 > 0 and the product of positives."))?.withheld, "after-stop");
+		assert.equal(verdict(resumed(NUDGE), send("Suppose 1/x < 0, and work out what that forces about 1."))?.withheld, "after-stop", "no hint he never asked for");
+		assert.equal(resumed(NUDGE).beforeEnd(), undefined, "the turn ends with no words owed");
+	});
+
+	it("a reply cut before his move goes on from the cut, and never says its last sentence again", () => {
+		const cut = "Your proof breaks at its first step: you multiply by 1/x before you know its sign.";
+		assert.ok(rules(resumed(cut), send("Your proof breaks at its first step, since you multiply by 1/x before knowing its sign.")).includes("repeat"));
+		assert.equal(verdict(resumed(cut), send("Prove 1/x > 0 first, from 1 > 0 and the product of positives.")), null);
+	});
+
+	it("a fresh turn after his answer is no resumed reply", () => {
+		assert.equal(verdict(new VoiceGuard([newUserMessage("Since 1 > 0 and x > 0, multiplying gives 1/x > 0.")], undefined, false, true), send(NUDGE)), null);
 	});
 });

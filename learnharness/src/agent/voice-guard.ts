@@ -896,6 +896,35 @@ const AFTER_ASKING = (text: string): AgentToolResult<unknown> => ({
 	details: { withheld: "after-asking", text },
 });
 
+/** A message in a turn that resumes a reply he stopped after it already
+ *  ended on his move (round 21, m14: Try again after a stopped nudge said
+ *  its last sentence again, then a hint he never asked for). */
+const AFTER_STOP = (said: string, text: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not shown to him: he stopped your reply after it had already ended on his move (${quoted(said)}), and Try again only finishes what was cut. Send nothing more; end your turn with no words.` }],
+	isError: true,
+	details: { withheld: "after-stop", text },
+});
+
+/** The tutor's messages in the reply this turn resumes: what it sent him
+ *  after his latest input, when a stop or a restart cut that reply and Try
+ *  again runs the rest. Empty for a fresh turn, and for the teacher's
+ *  opening after the probe. */
+function resumedSays(messages: readonly LhMessage[]): string[] {
+	const at = messages.findLastIndex(opensTurn);
+	const after = messages.slice(at + 1);
+	// The teacher's opening after the probe ended is a turn of its own.
+	if (at < 0 || after.some((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === PROBE_DONE_TOOL))) return [];
+	const failed = failedOutputCallIds(messages);
+	return after.flatMap((m) => (m.role !== "assistant" ? [] : m.content.flatMap((b) => {
+		const text = b.type === "toolCall" && b.name === SEND_TO_USER_TOOL && !failed.has(b.id) ? sendToUserText(b) : undefined;
+		return text ? [text] : [];
+	})));
+}
+
+/** Whether a message ends on his move: a question, an instruction he can
+ *  act on, or his next move named ("Your next move is proving…"). */
+const endsOnHisMove = (text: string): boolean => leavesAWayOn(text) || /\byour (?:next )?(?:move|step|turn)\b/i.test(sentences(text).at(-1) ?? "");
+
 const DUPLICATE: AgentToolResult<unknown> = {
 	content: [{ type: "text", text: "Not shown again: he already has this message from this turn. Send nothing more of it." }],
 	isError: true,
@@ -1314,6 +1343,9 @@ export class VoiceGuard {
 	/** A message shown this turn ended on a question: it stays the turn's
 	 *  last ask. */
 	private lastAsked = false;
+	/** The last message of a reply he stopped once it had ended on his
+	 *  move, which this turn resumes: it adds no words (round 21, m14). */
+	private readonly stoppedOnMove: string | null;
 	/** His messages this turn read mid-reply that no message ending on a
 	 *  statement has followed yet: each lets one message answer it, after
 	 *  the question too (round 14, 4 major 1: "also, does the ratio test
@@ -1366,6 +1398,8 @@ export class VoiceGuard {
 		titles?: () => Promise<readonly string[]>,
 	) {
 		this.input = turnInputOf(messages);
+		const resumed = resumedSays(messages).at(-1);
+		this.stoppedOnMove = resumed && endsOnHisMove(resumed) ? (sentences(resumed).at(-1)?.trim() ?? resumed) : null;
 		const opened = messages[messages.findLastIndex(opensTurn)];
 		this.closing = opened?.role === "custom" && opened.customType === "done-tonight";
 		const done = opened?.role === "custom" && opened.customType === "done-tonight" ? (opened.details as unknown) : undefined;
@@ -1581,6 +1615,7 @@ export class VoiceGuard {
 			}
 			const answersHim = this.unanswered > 0 && !text.trim().endsWith("?");
 			if (this.lastAsked && this.owed === 0 && !answersHim) return AFTER_ASKING(text);
+			if (this.stoppedOnMove && this.sent === 0 && this.owed === 0 && !answersHim) return AFTER_STOP(this.stoppedOnMove, text);
 			const ruled = this.rulings.length > 0 && this.sent === 0 && !this.heldRulingSaid && !this.rulings.some((r) => sameRuling(text, r));
 			if (ruled) {
 				this.heldRulingSaid = true;
