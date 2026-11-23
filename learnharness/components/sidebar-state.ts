@@ -112,17 +112,20 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 
 	// Whether the server's snapshot landed (settleSnapshot reads it).
 	const refreshInFlightRef = useRef<Promise<boolean> | null>(null);
+	/** Bumped by a course's delete: a list read begun before it is stale. */
+	const deletes = useRef(0);
 	const refresh = useCallback((): Promise<boolean> => {
 		// In-flight coalesce (S6): event bursts may land several refresh
 		// calls at once — one fetch serves them all; anything newer arrives
 		// with the next event's fetch.
 		if (refreshInFlightRef.current) return refreshInFlightRef.current;
 		const reading = (async () => {
+			const begun = deletes.current;
 			try {
 				const res = await fetch("/api/chats", { cache: "no-store" });
 				if (!res.ok) throw new Error(`the sessions list failed: ${res.status}`);
 				const d = (await res.json()) as { chats: ChatListItem[] };
-				setChats(d.chats);
+				if (begun === deletes.current) setChats(d.chats);
 				return true;
 			} catch {
 				// a transient failure keeps the last snapshot
@@ -200,6 +203,14 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 	useServerEvent("turn-started", scheduleEventRefresh);
 	useServerEvent("turn-settled", scheduleEventRefresh);
 	useServerEvent("record-changed", scheduleEventRefresh);
+	// A deleted course's sessions are history at once, on the event that flips its open lesson (round 21, m8: its
+	// card read "Your turn" in both windows for at least 2.4 s, and opened the deleted course's review).
+	useServerEvent("courses-changed", ({ deleted }) => {
+		if (!deleted) return;
+		deletes.current++;
+		setChats((prev) => prev?.map((c) => (c.course?.workspace === deleted ? { ...c, courseDeleted: true } : c)) ?? prev);
+		scheduleEventRefresh();
+	});
 	useServerResync(() => void refreshRef.current());
 	useEffect(
 		() => () => {
