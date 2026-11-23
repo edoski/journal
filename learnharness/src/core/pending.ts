@@ -95,7 +95,7 @@ export function findPendingToolCall(messages: UIMessage[], authority: PendingQue
  * line names a running tool by `streamingToolActivity`.
  */
 export const THINKING_LINE = "Thinking…";
-/** From the probe's end until the lesson's first step reaches him: the
+/** From the probe's end until the lesson's plan reaches him: the
  *  assessment, the hand-off, the plan's reasoning and its map. */
 export const PLANNING_LINE = "Planning the lesson…";
 
@@ -132,20 +132,27 @@ function rewritingQuestion(messages: readonly UIMessage[]): boolean {
 	return false;
 }
 
-/** Whether the probe is ending or has ended and the lesson's first step
- *  has not yet reached him: no words of the tutor's and no question after
- *  a `probe_done` that was not refused (one still settling counts, so the
- *  line does not blink to Thinking… as the probe's turn closes). A refused
- *  question never reached him (round 11 integration: the question sent
- *  beside a refused plan blinked the line to Thinking… twice). Pure. */
+/** Whether the probe is ending or has ended and the lesson's plan and its
+ *  first step have not both reached him since a `probe_done` that was not
+ *  refused (one still settling counts, so the line does not blink to
+ *  Thinking… as the probe's turn closes). The plan may come first, or the
+ *  first step's question may (round 20, M1): the wait under either is the
+ *  other's. A refused call never reached him, and his own words or answer
+ *  mean the lesson has moved on. Pure. */
 export function planningLesson(messages: readonly UIMessage[]): boolean {
+	let planned = false;
+	let stepped = false;
 	for (let m = messages.length - 1; m >= 0; m--) {
-		const parts = messages[m]!.parts;
+		const message = messages[m]!;
+		const parts = message.parts;
 		for (let p = parts.length - 1; p >= 0; p--) {
 			const part = parts[p]!;
-			if (part.type === "tool-probe_done") return part.state !== "output-error";
-			if (part.type === "text" && typeof part.text === "string" && part.text.trim()) return false;
-			if (isToolUIPart(part) && part.state !== "output-error" && (QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) return false;
+			if (part.type === "tool-probe_done") return part.state !== "output-error" && !(planned && stepped);
+			if (message.role === "user" && part.type === "text") return false;
+			const question = isToolUIPart(part) && (QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length));
+			if (question && part.state === "output-available") return false;
+			if (part.type === "tool-plan_init" && part.state === "output-available") planned = true;
+			if ((question && part.state !== "output-error") || (part.type === "text" && typeof part.text === "string" && part.text.trim())) stepped = true;
 		}
 	}
 	return false;

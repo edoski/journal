@@ -109,12 +109,13 @@ describe("teachExplainToolFor: the dynamic plan-nodeId validation (position sign
 		assert.match(msg, /arith/);
 	});
 
-	it("no tree yet: ANY nodeId is rejected — questions wait for plan_init", async () => {
+	it("no tree yet: the lesson's first question names the id its plan will give the step, and only a step id (round 20, M1)", async () => {
 		const chatId = newChat("NodeId: no tree");
 		const tool = teachExplainToolFor({ chatId, chatStore });
-		const res = await boundaryParse(tool, { ...validExplain, nodeId: "anything" });
+		assert.equal((await boundaryParse(tool, { ...validExplain, nodeId: "anything" })).success, true);
+		const res = await boundaryParse(tool, { ...validExplain, nodeId: "Any thing" });
 		assert.equal(res.success, false);
-		assert.match(problemLines(res.error).at(-1)!, /No plan map exists yet — call plan_init/);
+		assert.match(problemLines(res.error).at(-1)!, /is not a step id/);
 	});
 
 	it("missing nodeId is rejected at the boundary (owner ruling 2026-09-26: no untagged questions)", async () => {
@@ -142,20 +143,22 @@ describe("teachExplainToolFor: the dynamic plan-nodeId validation (position sign
 		const chatId = newChat("NodeId: live record");
 		const tool = teachExplainToolFor({ chatId, chatStore });
 
-		const before = await boundaryParse(tool, { ...validExplain, nodeId: "fresh-node" });
-		assert.equal(before.success, false, "no tree yet → rejected");
+		const before = await tool.execute("tc", { ...validExplain, nodeId: "fresh-node" } as never);
+		assert.equal(before.terminate, false, "no tree yet: the first question, posed before the plan (round 20, M1)");
 
 		chatStore.saveTree(chatId, {
 			nodes: [{ id: "fresh-node", title: "Just initialized" }],
 			edges: [],
 			version: 1,
 		});
-		const after = await boundaryParse(tool, { ...validExplain, nodeId: "fresh-node" });
-		assert.equal(after.success, true, "the same id validates once the tree exists — same turn");
+		const after = await tool.execute("tc", { ...validExplain, nodeId: "fresh-node" } as never);
+		assert.equal(after.terminate, true, "the same id validates once the tree exists — same turn — and ends it");
+		assert.equal((await boundaryParse(tool, { ...validExplain, nodeId: "other-node" })).success, false);
 	});
 
 	it("the commitment check chains with the nodeId check — BOTH problems surface", async () => {
 		const chatId = newChat("NodeId: commitment intact");
+		chatStore.saveTree(chatId, { nodes: [{ id: "arith", title: "Arithmetic" }], edges: [], version: 1 });
 		const res = await boundaryParse(teachExplainToolFor({ chatId, chatStore }), {
 			...validExplain,
 			correctAnswer: "   ",

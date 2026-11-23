@@ -119,13 +119,16 @@ export interface AgentBuildOptions {
  * every pose of its reply resolved cleanly). The prober's clean probe_done
  * ends its turn too: the teacher opens the lesson next, and closing words
  * after it were only written to be withheld (round 9: 7 s of the 70 s
- * before teaching).
+ * before teaching). A lesson's first question may come before its plan,
+ * which he reads while the plan is made (round 20, M1): its result does not
+ * end the turn (`questionBeforePlanResult`), and the plan after it does.
  */
 export function endsTurnFor(kind: AgentKind): (toolName: string, earlier?: readonly ToolCall[]) => boolean {
 	return (name, earlier = []) =>
 		(QUESTION_TOOLS as readonly string[]).includes(name) ||
 		(kind === "practice" && name === PRACTICE_PROBLEM_TOOL) ||
 		(kind === "prober" && name === PROBE_DONE_TOOL) ||
+		(kind === "teacher" && name === "plan_init" && earlier.some((c) => (QUESTION_TOOLS as readonly string[]).includes(c.name))) ||
 		MODE_HANDOFF_TOOLS[name] !== undefined ||
 		(name === SEND_TO_USER_TOOL && closedBefore(kind, earlier));
 }
@@ -138,8 +141,6 @@ export function endsTurnFor(kind: AgentKind): (toolName: string, earlier?: reado
  *  with nothing on his screen after a practice problem (round 13, 4 #2). */
 function closedBefore(kind: AgentKind, earlier: readonly ToolCall[]): boolean {
 	if (kind === "practice") return earlier.some((c) => c.name === PRACTICE_CONCLUDE_TOOL);
-	// The lesson's opening, owed after a probe_done whose own was left off (round 19, M7).
-	if (kind === "prober") return earlier.some((c) => c.name === PROBE_DONE_TOOL);
 	if (kind === "teacher") return earlier.some((c) => c.name === LESSON_PROGRESS_TOOL && lessonProgressOf(c.arguments)?.close === true);
 	return false;
 }

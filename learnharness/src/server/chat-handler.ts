@@ -514,6 +514,11 @@ export async function handleChatInput(
 		}
 	}
 
+	// His answer to a question the running turn posed before its plan waits
+	// for that turn, which saves the question when it ends (round 20, M1):
+	// the client posts it again once the turn settles.
+	if (input.type === "answer" && isTurnRunning(chatId)) return Response.json({ error: "A turn is already running for this session" }, { status: 409 });
+
 	// The input's native appends (pure; the honest 400 for an answer with no
 	// pending question call). Computed BEFORE beginTurn so a refused input
 	// leaves no liveness effects; read against the CURRENT record. Wave C:

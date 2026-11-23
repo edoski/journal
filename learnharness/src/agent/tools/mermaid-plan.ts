@@ -42,7 +42,7 @@ export interface PlanParseResult {
 }
 
 const HEADER_RE = /^(graph|flowchart)\s+(td|tb|lr|rl|bt)\s*$/i;
-const SLUG_RE = /^[a-z0-9]+([_-][a-z0-9]+)*$/;
+export const SLUG_RE = /^[a-z0-9]+([_-][a-z0-9]+)*$/;
 /** Any arrow spelling counts as a requires-edge; chains split on it. */
 const ARROW_RE = /-->|==>|-\.->/;
 /** One edge endpoint: `id`, `id[title]`, or `id("title")`. */

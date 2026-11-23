@@ -734,8 +734,12 @@ export class SessionModel {
 	 */
 	async send(input: ChatInput, onAccepted?: () => void, questionKey?: string): Promise<boolean> {
 		const recovering = this.statusValue === "error";
-		if (!this.readyRef && !recovering) return false;
 		const subject = input.type === "answer" ? pendingQuestionOf([...this.base, ...this.tail]) : null;
+		// His answer to the question a turn posed before its plan goes while
+		// that turn draws the plan: it shows at once, and its post waits for
+		// the turn's end (round 20, M1: Enter seemed to do nothing).
+		const answersOpen = input.type === "answer" && subject?.toolCallId === input.toolCallId;
+		if (!this.readyRef && !recovering && !answersOpen) return false;
 		// A render-scoped answer must not move to another occurrence sharing
 		// its id. This identity is local only; the server's wire is unchanged.
 		if (input.type === "answer" && questionKey !== undefined &&

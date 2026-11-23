@@ -3,10 +3,10 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
 import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, lessonProgressInput, PLAN_MAP_CAP, type PlanToolResult, type PlanTree } from "../../core/contracts.ts";
 import type { ChatStore } from "../../core/ports.ts";
-import { createTree, planDropsSteps, planMapTooBig, planStepIsTheTopic, planTitlesGiveAway, PlanTreeError } from "../../core/plan-tree.ts";
+import { createTree, planDropsSteps, planLeavesOutAsked, planMapTooBig, planStepIsTheTopic, planTitlesGiveAway, PlanTreeError } from "../../core/plan-tree.ts";
 import { parseMermaidPlan } from "./mermaid-plan.ts";
 import { closeReceiptFor, type CourseToolContext } from "./course.ts";
-import { sessionTopicsOf } from "../../core/native-messages.ts";
+import { sessionTopicsOf, type LhMessage } from "../../core/native-messages.ts";
 import { halfAnswerLeft, sinceLastClose } from "../../core/session-end.ts";
 import { topicsToIntroduce } from "../../core/contracts/course-map.ts";
 import { planTakesUp, reviewRecord } from "../../core/session-opening.ts";
@@ -134,6 +134,16 @@ async function lessonName(course: CourseToolContext | undefined, topic: string):
 	return `${title ?? topic} lesson`;
 }
 
+/** The plan steps the session's posed questions name (`nodeId`); a refused
+ *  question asked nothing. Pure. */
+function askedSteps(messages: readonly LhMessage[]): string[] {
+	const refused = new Set(messages.flatMap((m) => (m.role === "toolResult" && m.isError ? [m.toolCallId] : [])));
+	return messages.flatMap((m) => (m.role !== "assistant" ? [] : m.content.flatMap((b) => {
+		const nodeId = b.type === "toolCall" && b.name === "explain" && !refused.has(b.id) ? (b.arguments as { nodeId?: unknown }).nodeId : undefined;
+		return typeof nodeId === "string" ? [nodeId] : [];
+	})));
+}
+
 export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> {
 	return {
 		[LESSON_PROGRESS_TOOL]: {
@@ -207,7 +217,7 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 					// A lesson is named "<topic> lesson" (`openingTitle`): a step named after its topic is the lesson too.
 					const lesson = { topic: goal?.topic, titles: [goal?.title, record.title, record.title?.replace(/\s+lesson$/i, "")].filter((t): t is string => typeof t === "string") };
 					const taught = record.tree ? derivePlanStatusesLh(record.tree, record.messages) : null;
-					const problems = [planMapTooBig(next), planTitlesGiveAway(next), planStepIsTheTopic(next, lesson), planDropsSteps(record.tree, next, (taught?.visited.size ?? 0) > 0 || taught?.current != null, taught?.done ?? new Set())].filter((p): p is string => p !== null);
+					const problems = [planMapTooBig(next), planTitlesGiveAway(next), planStepIsTheTopic(next, lesson), planDropsSteps(record.tree, next, (taught?.visited.size ?? 0) > 0 || taught?.current != null, taught?.done ?? new Set()), record.tree ? null : planLeavesOutAsked(next, askedSteps(record.messages))].filter((p): p is string => p !== null);
 					const review = reviewRecord(record);
 					if (review && !goal?.topic) problems.push(reviewPlanNamesNoTopic(record.topics ?? []));
 					if (problems.length > 0) return { ok: false, error: problems.join("\n") };

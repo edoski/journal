@@ -361,12 +361,12 @@ describe("a request to be taught during the opening check", () => {
 		const rule = prober.split("\n").find((l) => l.startsWith("**He asks to be taught instead of asked**"));
 		assert.ok(rule, "the prober's rule for a request to be taught");
 		assert.match(rule, /"teach me", "stop quizzing me"/);
-		assert.match(rule, /explain nothing before the probe's end and ask nothing more/);
+		assert.match(rule, /explain nothing yourself beyond the lesson's first step, and ask nothing more/);
 		assert.match(rule, /Conclude at once with `probe_done`/);
-		// Round 19, M7: in a lesson, probe_done's opening is the first step, which he reads while the teacher plans.
-		assert.match(rule, /In a lesson, its `opening` opens the lesson, as the probe's \*Conclude\* says\. Then end your turn with no words\./);
+		// Round 20, M1: in a lesson, the first step goes to him before the conclusion, so he reads it while the teacher plans.
+		assert.match(rule, /In a lesson, send that first step before the conclusion, as the probe's \*Conclude\* says\. Then end your turn with no words\./);
 		assert.doesNotMatch(prober, /Explain what he asked about directly in this reply, as above, then conclude with `probe_done`/);
 		const tool = probeDoneTool({ chatId: "c", chatStore: {} as never, deliver: () => {} }).probe_done!;
-		assert.match(tool.description, /"teach me\", \"stop quizzing me\"\), from what you measured so far, explaining nothing yourself: the teacher teaches/);
+		assert.match(tool.description, /"teach me\", \"stop quizzing me\"\), from what you measured so far, explaining nothing yourself beyond a lesson's first step: the teacher teaches/);
 	});
 });

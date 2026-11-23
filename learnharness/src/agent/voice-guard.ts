@@ -41,7 +41,7 @@ import { sameQuestionKey } from "../core/shown-help.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
 import type { CloseReceipt } from "../core/close-receipt.ts";
-import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, HIS_MESSAGE, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, probeOpeningText, savedQuestionsOf, SEND_TO_USER_TOOL, sessionTasksOf, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
+import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, HIS_MESSAGE, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, probeOpeningText, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
 import { DOUBT, adviceSentences, closeBreaks, closeMissing, SENTENCE_BUDGETS, sentenceLoad, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, recordMarkWords, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
@@ -278,7 +278,7 @@ function earlierTexts(messages: readonly LhMessage[]): Array<{ text: string; ask
 			: m.content.flatMap((b) => {
 					if (b.type !== "toolCall" || failed.has(b.id)) return [];
 					const asked = (QUESTION_TOOLS as readonly string[]).includes(b.name);
-					// The lesson's opening on the probe's end is a message he read (round 19, M7).
+					// An opening recorded on probe_done (round 19's lessons) is a message he read.
 					const text = b.name === SEND_TO_USER_TOOL ? sendToUserText(b) : asked ? questionText(b) : b.name === PROBE_DONE_TOOL ? (probeOpeningText(b) ?? undefined) : undefined;
 					return text ? [{ text, asked }] : [];
 				}),
@@ -890,26 +890,8 @@ const DUPLICATE: AgentToolResult<unknown> = {
 	details: { withheld: "duplicate" },
 };
 
-/** The probe's end when the guard left its opening off (round 19, M7):
- *  the probe is recorded, and the opening comes as one message, rewritten
- *  to fix what broke the voice; it ends the prober's turn. */
-const OPENING_OWED = (owed: { text: string; breaks: VoiceBreak[]; asks: boolean }): string =>
-	[
-		"Assessment recorded — the teacher plans from it. The lesson's opening was not shown to him: it breaks the voice.",
-		...owed.breaks.map((b) => `- ${fixFor(b, "teach", owed.text)}`),
-		...(owed.asks ? ["- It asks a question: the opening asks nothing, since the teacher poses its question with the plan."] : []),
-		"Send it now with send_to_user, rewritten to fix only these, and say nothing about the change: that message ends your turn.",
-	].join("\n");
-
-/** The owed opening asks nothing: its question comes with the plan. */
-const OPENING_ASKS: AgentToolResult<unknown> = {
-	content: [{ type: "text", text: "Not shown to him: the lesson's opening asks nothing, since the teacher poses its question with the plan. Send it again with send_to_user, ending on a statement." }],
-	isError: true,
-	details: { withheld: "voice", rules: ["opening-asks"] },
-};
-
 /** Words after `probe_done`: the teacher opens the lesson, so the probe
- *  ends with none (its ack says so), save a lesson's owed opening. */
+ *  ends with none (its ack says so), save the rewrites it owes. */
 const AFTER_PROBE = (text: string): AgentToolResult<unknown> => ({
 	content: [{ type: "text", text: "Not shown to him: the probe has ended and the teacher opens the lesson. End your turn with no words." }],
 	isError: true,
@@ -1209,12 +1191,6 @@ export class VoiceGuard {
 	private sent = 0;
 	private duplicates = 0;
 	private probeEnded = false;
-	/** The probe's end may open the lesson (round 19, M7): only a lesson's.
-	 *  A review's or an open task's teacher opens its own. */
-	private readonly opensLesson: boolean;
-	/** The opening the guard left off probe_done, which the prober owes as
-	 *  a message once the probe has ended, and why it was left off. */
-	private openingOwed: { text: string; breaks: VoiceBreak[]; asks: boolean } | null = null;
 	/** A refused message not yet rewritten, and whether a turn-ending call
 	 *  was already held back for it (once a turn). */
 	private owed = false;
@@ -1363,7 +1339,6 @@ export class VoiceGuard {
 		this.posedSinceInput = posedSinceInput(messages);
 		this.reviewTopics = review ? reviewTopicsOf(messages) : [];
 		this.lesson = review ? null : lessonOpenedOn(messages);
-		this.opensLesson = !review && sessionTasksOf(messages).length === 0;
 		this.problemBefore = messages.some((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === PRACTICE_PROBLEM_TOOL));
 		this.openAbove = openAbove(messages);
 		this.stepsAhead = stepsNotDone(messages);
@@ -1403,33 +1378,6 @@ export class VoiceGuard {
 		if (call.name === SAVE_TOOL || call.name === PRACTICE_CONCLUDE_TOOL) for (const result of savedResults(call.name, call.arguments)) this.savedVerdicts.add(result);
 		const refused = this.decide(call);
 		if (refused && call.name === SEND_TO_USER_TOOL) call.arguments = {};
-		if (!refused && call.name === PROBE_DONE_TOOL) this.screenOpening(call);
-	}
-
-	/** A lesson's opening on `probe_done` (round 19, M7) is a teaching turn
-	 *  that asks nothing, since the teacher poses its question with the plan.
-	 *  One that breaks the voice leaves the call before he sees it, and the
-	 *  probe's end asks for it rewritten as a message; any in a review or an
-	 *  open task's session just leaves, since their teacher opens them. */
-	private screenOpening(call: ToolCall): void {
-		const opening = isRecord(call.arguments) ? call.arguments.opening : undefined;
-		if (opening === undefined) return;
-		const text = typeof opening === "string" ? opening : "";
-		const breaks = this.opensLesson && text.trim() ? this.messageBreaks(text, "teach") : [];
-		const asks = sentences(text).some((s) => s.trim().endsWith("?"));
-		if (this.opensLesson && text.trim() && breaks.length === 0 && !asks) {
-			// A clean opening on a retried probe_done is the one he sees: none is owed any more.
-			this.openingOwed = null;
-			this.said.push(text);
-			this.toldNow.push(text);
-			return;
-		}
-		console.info(`[voice] probe_done's opening left out: ${!this.opensLesson ? "not a lesson" : asks ? "it asks a question" : breaks.map((b) => b.rule).join(", ") || "empty"}`);
-		const { opening: _left, ...rest } = call.arguments;
-		call.arguments = rest;
-		// A lesson's opening that broke the voice is rewritten once the probe
-		// has ended, as a message: the probe's end tells the prober what to fix.
-		if (this.opensLesson && text.trim()) this.openingOwed = { text, breaks, asks };
 	}
 
 	/** Read ordinary text as its block ends: he never sees it, so it is
@@ -1502,10 +1450,7 @@ export class VoiceGuard {
 				const partial = tool.name === SAVE_TOOL && savedResults(tool.name, params).includes("partial");
 				if (partial && this.toldWrong) return SAVED_AGAINST_WORDS;
 				const result = await tool.execute(toolCallId, params, signal, onUpdate);
-				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) {
-					this.probeEnded = true;
-					if (this.openingOwed) return { ...result, content: [{ type: "text", text: OPENING_OWED(this.openingOwed) }], terminate: false };
-				}
+				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
 				if (!result.isError && (tool.name === LESSON_PROGRESS_TOOL || tool.name === SAVE_TOOL || tool.name === PRACTICE_CONCLUDE_TOOL)) this.receipt = receiptIn(result) ?? this.receipt;
 				if (!result.isError && tool.name === LESSON_PROGRESS_TOOL && isRecord(params) && params.close === true) this.lessonClosed = true;
 				if (!result.isError && tool.name === SAVE_TOOL) this.savedNow = true;
@@ -1564,10 +1509,7 @@ export class VoiceGuard {
 			if (!text) return null;
 			// A rewrite he is owed goes through, after probe_done too: it is
 			// the answer he asked for, never a closing sentence.
-			// The opening the probe's end asked for: a teaching turn that asks nothing.
-			const opening = this.probeEnded && this.openingOwed !== null;
-			if (opening && sentences(text).some((s) => s.trim().endsWith("?"))) return OPENING_ASKS;
-			const afterProbe = this.probeEnded && !this.owed && !opening;
+			const afterProbe = this.probeEnded && !this.owed;
 			if (this.duplicates < 2 && (afterProbe || this.said.some((s) => s.trim() === text.trim()))) {
 				this.duplicates++;
 				return afterProbe ? AFTER_PROBE(text) : DUPLICATE;
@@ -1579,7 +1521,7 @@ export class VoiceGuard {
 				this.heldRulingSaid = true;
 				return RULING_SAID(this.rulings[0]!);
 			}
-			const kind = opening ? "teach" : this.messageKind();
+			const kind = this.messageKind();
 			const breaks = this.held("message", this.messageBreaks(text, kind));
 			if (breaks.length > 0) {
 				this.refused.set("message", (this.refused.get("message") ?? 0) + 1);
@@ -1598,7 +1540,6 @@ export class VoiceGuard {
 			if (text.trim().endsWith("?")) this.lastAsked = true;
 			else if (this.unanswered > 0) this.unanswered--;
 			this.sent++;
-			if (opening) this.openingOwed = null;
 			return null;
 		}
 		if (call.name === DEMO_TOOL) {

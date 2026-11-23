@@ -212,23 +212,24 @@ export const HANDOFF_TEXT =
 	`each of ${SENTENCE_WORDS} words or fewer, since a longer one counts as two, ` +
 	"then its question, never waiting for plan_init's result; I'll interrupt if I want something else.";
 
-/** The lesson's wake once the probe opened it (round 19, M7): the prober
- *  showed the first step's teaching, written from its assessment, with the
- *  probe's end, so he reads it while the plan's own thinking runs (22 to 33
- *  s, the whole wait). The plan is still made from the whole assessment,
- *  after it, never before it (round 16's plan-early started the plan before
- *  the assessment was written, and blind judges preferred the plans it
- *  replaced); its first step is the one on his screen, and the plan's reply
- *  carries it on to its question. */
+/** The lesson's wake once the probe opened it: the prober sent the first
+ *  step's teaching before its save and assessment, so he reads it while the
+ *  teacher works (round 19, M7, then round 20, M1). The plan's thinking took
+ *  17 to 43 s before its first word, so the step's question comes first, and
+ *  the plan after it, still made from the whole assessment, never before it
+ *  (round 16's plan-early started the plan before the assessment was
+ *  written, and blind judges preferred the plans it replaced). The question
+ *  names the id the plan gives that step (`questionBeforePlanResult`). */
 export function openedHandoffText(opening: string): string {
 	return (
-		"Next: plan the full teaching arc from my current understanding to the goal understanding. " +
+		`The lesson's first step is already on my screen, written from the probe's assessment: "${opening.trim()}" ` +
+		"Before you plan, pose that step's question, alone: that one call, " +
+		`with at most one sentence of ${SENTENCE_WORDS} words or fewer before it, never saying the step's point again, its nodeId the id your plan will give that step. ` +
+		"I work on it while you plan, so plan once its result is back: " +
+		"plan the full teaching arc from my current understanding to the goal understanding, with that step first. " +
 		"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
 		"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
-		"Take your time here and really think this through. " +
-		`The lesson's first step is already on my screen, written from the probe's assessment so I read it while you plan: "${opening.trim()}" ` +
-		"It is the plan's first step, taught. When it's genuinely reasoned out, call plan_init and, in that same reply, pose that step's question, " +
-		`with at most one sentence of ${SENTENCE_WORDS} words or fewer before it, never saying the step's point again and never waiting for plan_init's result; I'll interrupt if I want something else.`
+		"Take your time over the plan and really think it through, then call plan_init; I'll interrupt if I want something else."
 	);
 }
 
