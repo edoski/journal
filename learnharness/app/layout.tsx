@@ -12,7 +12,7 @@ import { PolishHost } from "@/components/dev/polish-host";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const metadata: Metadata = {
-	title: "Learning Harness",
+	title: "Chiron",
 	description: "A teacher agent with a memory — lessons, practice, and a course record of what you know.",
 };
 

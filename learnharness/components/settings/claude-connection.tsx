@@ -52,7 +52,7 @@ export function claudeConnectionSentence(connection: ClaudeConnection | null, ac
 			// His accounts live in T3 Code: with none listed there, the plain
 			// `claude` stands in, and the fix is T3 Code's, not a terminal's
 			// (round 13, 4 minor 6).
-			if (account?.notInT3) return "LearnHarness can't find your Claude accounts in T3 Code. Open T3 Code, check them, then press Refresh.";
+			if (account?.notInT3) return "Chiron can't find your Claude accounts in T3 Code. Open T3 Code, check them, then press Refresh.";
 			return account?.auth === "token"
 				? "This account isn't signed in. Sign in to it again in T3 Code, then press Refresh."
 				: "Run `claude` in a terminal and sign in with your Claude account, then press Refresh.";
@@ -86,7 +86,7 @@ export function claudeUsageSentence(usage: ClaudeUsage): string {
 }
 
 /** The one line under an account whose plan or Claude Code lacks the model. */
-export const CLAUDE_MODEL_MISSING_LINE = `${CLAUDE_MODEL.name} is not available on this account's plan or its Claude Code version, so LearnHarness can't run on it.`;
+export const CLAUDE_MODEL_MISSING_LINE = `${CLAUDE_MODEL.name} is not available on this account's plan or its Claude Code version, so Chiron can't run on it.`;
 
 /** PUTs the account every agent runs on, then tells every reader. */
 export async function chooseClaudeAccount(providerId: string): Promise<void> {

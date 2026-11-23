@@ -8,7 +8,8 @@
 #
 # --checkout defaults to the repository's main checkout (not a worktree);
 # --dest to ~/Applications. Rerun it only when this script or app/ changes:
-# the launcher reinstalls the .app itself when main moves to a new Electron.
+# the launcher reinstalls the .app itself when main moves to a new Electron
+# or renames the app.
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -24,7 +25,7 @@ while [ $# -gt 0 ]; do
 done
 
 id="com.learnharness.launcher"
-name="$(sed -nE 's/.*PRODUCT_NAME: "([^"]+)".*/\1/p' "$app_src/electron/product.cjs")"
+name="$(sed -nE 's/^const PRODUCT_NAME = "([^"]+)";$/\1/p' "$app_src/electron/product.cjs")"
 electron="$checkout/learnharness/node_modules/electron/dist/Electron.app"
 [ -n "$name" ] || { echo "no PRODUCT_NAME in electron/product.cjs" >&2; exit 1; }
 [ -d "$electron" ] || { echo "no Electron in $checkout/learnharness: run npm ci and node node_modules/electron/install.js there" >&2; exit 1; }

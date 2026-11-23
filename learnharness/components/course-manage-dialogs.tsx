@@ -36,7 +36,7 @@ interface OneOpening {
 	fetchLike?: typeof fetch;
 }
 
-const UNREACHABLE = "LearnHarness could not be reached. Check it is running, then try again.";
+const UNREACHABLE = "Chiron could not be reached. Check it is running, then try again.";
 
 /** Send one change to /api/courses; null when it landed, else the plain
  *  sentence to show. */
