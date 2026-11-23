@@ -1,6 +1,6 @@
 /**
- * Today's row keys (Edo's notes, 15 Nov 2026, N3): ↑ ↓ walk only Today's
- * rows, never the tabs or the map above them; ⌘↵ opens the focused row's
+ * Today's row keys (Edo's notes, 15 Nov 2026, N3): ↑ ↓ walk Today's rows,
+ * and ↑ on the first steps onto the map's You are here (round 20, m6); ⌘↵ opens the focused row's
  * course page (c until Home's composer took letters, Edo, 18 Nov 2026; o is
  * gone, since Enter opens a row as on every page). No key fires while he
  * types: there ⌘↵ is the composer's send.
@@ -16,15 +16,18 @@ const at = () => lines().indexOf(lineOf(document.activeElement)!);
 afterEach(unmount);
 
 describe("Today's row keys (N3)", () => {
-	it("↓ and ↑ walk only Today's rows and the lessons Also today folds in, from the first to the last and no further", async () => {
+	it("↓ and ↑ walk Today's rows and the lessons Also today folds in, from the first to the last, and ↑ on the first leaves for the map (round 20, m6)", async () => {
 		await mount();
 		await press("ArrowDown", document.body);
 		assert.equal(at(), 0, "↓ with nothing focused takes the first row, never a tab or a map card");
 		await press("ArrowDown");
 		assert.equal(at(), 1);
 		await press("ArrowUp");
+		assert.equal(at(), 0);
 		await press("ArrowUp");
-		assert.equal(at(), 0, "↑ on the first row stays on it");
+		assert.ok((document.activeElement as HTMLElement).matches('[data-slot="home-map-course"][data-shown] a[data-current]'), "↑ on the first row steps onto You are here");
+		await press("Home");
+		assert.equal(at(), 0, "Home from the map comes back to the first row");
 		const every = [...document.querySelectorAll('[data-slot="study-home"] [data-line]')];
 		assert.ok(every.length > lines().length, "the demo day folds lessons into Also today");
 		for (let i = 0; i < every.length + 2; i++) await press("ArrowDown");

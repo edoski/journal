@@ -44,13 +44,13 @@ Edo's notes, 15 Nov 2026, N1: a wider Home gives the map more room, "but also th
 
 ## Keys
 
-Home owns its keys (`home-keys.ts`, `useHomeKeys`), window-wide while it is mounted and in the capture phase, so they run before the page's arrows (`spatial-arrows.ts`). Today walks as every page's list does (`useListWalk`, `../list-walk/list-walk.md`), with no head: the map above it stays out of the walk (N3). Letters type into the composer (Edo, 18 Nov 2026), so Home's own keys are arrows and ⌘ chords, the registry's bindings. None fires while a dialog, menu or popover is open, and only ⌘E while he types in a field. The ? sheet lists them under Home.
+Home owns its keys (`home-keys.ts`, `useHomeKeys`), window-wide while it is mounted and in the capture phase, so they run before the page's arrows (`spatial-arrows.ts`). Today walks as every page's list does (`useListWalk`, `../list-walk/list-walk.md`), with the map as its head: ↑ on the first line steps onto You are here, and the map's ↓ comes back once its cards have none below (round 20, m6). Letters type into the composer (Edo, 18 Nov 2026), so Home's own keys are arrows and ⌘ chords, the registry's bindings. None fires while a dialog, menu or popover is open, and only ⌘E while he types in a field. The ? sheet lists them under Home.
 
 | Key | What it does |
 |---|---|
 | ← → | the map shows the course left or right of the chosen one, from anywhere on the page outside the map (the map's cards, tabs and arc list keep their own arrows); past the first or last tab the key is the page's again, so ← still reaches the sidebar (Edo's notes, 15 Nov 2026, N2) |
 | ⌘E | presses the map's enlarge button: the map takes Home, and ⌘E again brings it back (N2; f until 18 Nov 2026), from the composer too |
-| ↑ ↓ | walk only Today's lines, the lessons Also today folds in included, never the tabs or the map above them: with nothing focused ↓ takes the first and ↑ the last, and at either end focus stays, ↑ on the first line included (N3) |
+| ↑ ↓ | walk Today's lines, the lessons Also today folds in included: with nothing focused ↓ takes the first and ↑ the last; ↓ on the last line stays; ↑ on the first line steps onto the map's You are here, whose cards ↑ ↓ walk along their needs, and ↓ from a card with none below comes back to the first line (round 20, m6: only ⌘J crossed) |
 | Home End | jump to Today's first or last line, as on every page's list |
 | Esc | leaves the walk; in the composer, hands the keys back to Today's first line, his words kept (round 16, m26) |
 | ↵ | opens the focused line, as a click does, as on every page (o until 18 Nov 2026) |

@@ -5,10 +5,9 @@
  * page's sections, Home and End jump to the list's ends, from nothing
  * focused and from a row, and ↑ on the first row leaves for the head's
  * control above the list: Now's row on the course page, the trail's last
- * link on the topic page. Home's head is the map, whose tabs the walk
- * never reaches (Edo's notes, 15 Nov 2026, N3), so there ↑ keeps the
- * first line. Before, Home and End jumped only on the course page, and
- * the topic page's sections had no walk.
+ * link on the topic page, You are here on Home's map (round 20, m6). Before,
+ * Home and End jumped only on the course page, and the topic page's sections
+ * had no walk.
  */
 import "./helpers/radix-dom.ts";
 import React, { act } from "react";
@@ -90,7 +89,7 @@ const view = () => {
 
 /** Each page, mounted, with its list's rows top to bottom and the head's control the walk leaves for. */
 const pages: { name: string; mount: () => Promise<void>; stops: () => HTMLElement[]; head: () => HTMLElement | null }[] = [
-	{ name: "Home's Today", mount: mountHome, stops: () => all('[data-slot="today"] [data-line]'), head: () => null },
+	{ name: "Home's Today", mount: mountHome, stops: () => all('[data-slot="today"] [data-line]'), head: () => dom.document.querySelector<HTMLElement>('[data-slot="home-map-course"][data-shown] a[tabindex="0"]') },
 	{
 		name: "the course page's road",
 		// Arriving puts focus on Now's row; the walk starts from nothing focused here.
@@ -160,8 +159,38 @@ describe("walking a list with the arrows, one way on every page", () => {
 				return;
 			}
 			assert.ok(focused() === control, "↑ on the first row reaches the head's control");
-			await press("ArrowDown");
+			// Home's head is the map, whose cards walk among themselves first: ↓ comes back once none is below.
+			for (let step = 0; step < 20 && focused() !== rows[0]; step++) {
+				await press("ArrowDown");
+				assert.ok(focused() === rows[0] || (focused() as HTMLElement).matches('[data-slot="home-map-course"] a[data-slot="course-map-node"]'), `↓ walks the map's cards, then the first row: ${(focused() as HTMLElement).outerHTML.slice(0, 120)}`);
+			}
 			assert.ok(focused() === rows[0], "↓ from the head returns to the first row");
 		});
 	}
+});
+
+/**
+ * Round 20, m6 (round 19's m26, 4 minor 5): on Home, ↑ and ↓ stayed on the
+ * first Today row, and ↓ from You are here walked the map's cards and never
+ * reached the rows; only ⌘J crossed. ↑ on the first row steps onto You are
+ * here, and ↓ from the map's last reachable card steps onto the first row.
+ */
+describe("Home's arrows between the map and Today (round 20, m6)", () => {
+	it("↑ on the first row focuses You are here, the shown course's current card", async () => {
+		await mountHome();
+		await press("Home", dom.document.body);
+		await press("ArrowUp");
+		const here = focused() as HTMLElement;
+		assert.ok(here.matches('[data-slot="home-map-course"][data-shown] a[data-slot="course-map-node"][data-current]'), `You are here takes focus: ${here.outerHTML.slice(0, 160)}`);
+	});
+
+	it("↓ from a card with none below it reaches the first row", async () => {
+		await mountHome();
+		const rows = all('[data-slot="today"] [data-line]');
+		const cards = all('[data-slot="home-map-course"][data-shown] a[data-slot="course-map-node"]');
+		const last = cards.find((card) => card.querySelector('[data-slot="topic-glyph"]') && !cards.some((other) => other !== card && other.getBoundingClientRect().top > card.getBoundingClientRect().top)) ?? cards.at(-1)!;
+		last.focus();
+		for (let step = 0; step < 20 && focused() !== rows[0]; step++) await press("ArrowDown");
+		assert.ok(focused() === rows[0], "↓ leaves the map for Today's first row");
+	});
 });

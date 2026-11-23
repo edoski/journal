@@ -111,16 +111,22 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 		openShownCoursePage: () => router.push(courseHref(workspace)),
 	});
 
-	// Today walks as every page's list does. Its head is the map, whose tabs the walk never reaches (N3), so ↑ on the
-	// first line keeps it.
+	// Today walks as every page's list does. Its head is the map: ↑ on the first line steps onto the shown course's card
+	// that takes focus (You are here), and ↓ from the map, once its cards have none below, comes back to the first line
+	// (round 20, m6: the arrows never crossed between them; only ⌘J reached the map).
 	const today = useRef<HTMLDivElement>(null);
-	const walk = useListWalk({ stops: () => Array.from(today.current?.querySelectorAll<HTMLElement>("[data-line]") ?? []) });
+	const map = useRef<HTMLDivElement>(null);
+	const walk = useListWalk({
+		stops: () => Array.from(today.current?.querySelectorAll<HTMLElement>("[data-line]") ?? []),
+		head: () => map.current?.querySelector<HTMLElement>('[data-slot="home-map-course"][data-shown] a[tabindex="0"]') ?? null,
+		region: true,
+	});
 
 	const onPoint = (row: TodayRow, by: PointBy) => tie.point("list", { key: lineKey(row), topics: lessonOf(row).topics }, by);
 
 	return (
 		<>
-			<div className={cn("flex min-h-0 flex-col", enlarged ? "flex-1" : cn(MAP_SHARE, "shrink"))}>
+			<div ref={map} className={cn("flex min-h-0 flex-col", enlarged ? "flex-1" : cn(MAP_SHARE, "shrink"))} onKeyDown={walk.onHeadKeyDown}>
 				<HomeMap
 					courses={courses}
 					chats={chats}
