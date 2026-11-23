@@ -193,8 +193,10 @@ export function MathText({ children }: { children: string }) {
 						<span key={at} data-slot="math-text" dangerouslySetInnerHTML={{ __html: formula(piece.tex) }} />
 					),
 				);
+				// A formula joined to letters ("$k$-permutations") is held whole where a formula may wrap (globals.css).
+				const joined = word.some((piece) => piece.kind === "math") && word.some((piece) => piece.kind === "text");
 				return keepWhole(word) ? (
-					<span key={index} data-slot="math-word" className="whitespace-nowrap">
+					<span key={index} data-slot="math-word" data-joined={joined ? "" : undefined} className="whitespace-nowrap">
 						{parts}
 					</span>
 				) : (

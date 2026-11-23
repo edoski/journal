@@ -1,7 +1,8 @@
 /** The calendar's week of 9 to 15 Nov (round 19, 2 `57-calendar-9-15`),
  *  for a real browser: Sun 15's maths title "Properties of probability:
  *  $P(A\cup B)=P(A)+P(B)-P(A\cap B)$" among the week's reviews, with the
- *  demo's other titles holding maths (tests/learning/golden), in the
+ *  demo's other titles holding maths (tests/learning/golden) and Wed 11's
+ *  "Permutations, $k$-permutations and factorials" (round 21, m11), in the
  *  page beside the sidebar at its default width in Edo's 1512×982 window.
  *  Bundled by tests/helpers/browser-shell.ts. */
 import { createRoot } from "react-dom/client";
@@ -22,6 +23,7 @@ const TOPICS = [
 	topic("cantor", "Cardinality, countable sets and Cantor's theorem $|A| < |\\mathcal{P}(A)|$", "2026-11-12"),
 	topic("squeeze", "The squeeze theorem and $\\lim_{x\\to 0}\\frac{\\sin x}{x}=1$", "2026-11-12"),
 	topic("rv", "Random variables and distributions", "2026-11-10"),
+	topic("perm", "Permutations, $k$-permutations and factorials", "2026-11-11"),
 ];
 const PROB: CalendarCourse = {
 	map: { workspace: "/s/prob", title: "Probability", today: TODAY, revision: 1, exam: null, current: null, focus: null, tasks: [], topics: TOPICS, edges: [] },
