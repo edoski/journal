@@ -42,6 +42,7 @@ import {
 	DONE_TONIGHT_TEXT,
 	SETUP_DONE_TEXT,
 	HANDOFF_TEXT,
+	askedHandoffText,
 	openedHandoffText,
 	REVIEW_HANDOFF_TEXT,
 	TASK_HANDOFF_TEXT,
@@ -300,7 +301,9 @@ export function withProbeFeedback<T extends LhMessage>(steer: T, record: readonl
 	if (steer.role !== "custom" || steer.customType !== "probe-handoff" || typeof steer.content !== "string") return steer;
 	// A lesson the probe opened is planned with its first step on his screen (round 20, M1).
 	const opening = steer.content === HANDOFF_TEXT ? probeOpeningOf(record) : null;
-	const content = opening ? openedHandoffText(opening) : steer.content;
+	// The prober posed the step's question too (round 21, carry-in (a)): the teacher only plans.
+	const asked = opening ? stepQuestionOf(record) : null;
+	const content = asked && opening ? askedHandoffText(opening, asked.question, asked.nodeId) : opening ? openedHandoffText(opening) : steer.content;
 	const said = probeFeedbackOf(record);
 	const feedback = opening && said ? said.filter((text) => text !== opening) : said;
 	// The step on his screen is what he read after his answer, when nothing else was.
@@ -344,6 +347,15 @@ export function probeOpeningOf(messages: readonly LhMessage[]): string | null {
 		m.role !== "assistant" ? [] : m.content.flatMap((b) => (b.type === "toolCall" && b.name === SEND_TO_USER_TOOL && !failed.has(b.id) ? [sendToUserText(b)].filter((t): t is string => !!t?.trim()) : [])),
 	);
 	return shown.at(-1) ?? null;
+}
+
+/** The lesson's first step's question the prober posed with the step
+ *  (round 21, carry-in (a)), while it waits on his answer: its words and
+ *  the step id the plan keeps. Null when none waits. Pure. */
+export function stepQuestionOf(messages: readonly LhMessage[]): { question: string; nodeId: string } | null {
+	const open = danglingQuestionOf(messages);
+	const args = open?.tool === "explain" ? (open.input as { question?: unknown; nodeId?: unknown } | null) : null;
+	return typeof args?.question === "string" && typeof args.nodeId === "string" ? { question: args.question, nodeId: args.nodeId } : null;
 }
 
 /** A `probe_done` call's opening, as his screen draws it, or null. */
@@ -1688,12 +1700,17 @@ export interface QuestionCall extends Omit<PendingQuestion, "key"> {
  * alone is NOT proof of a posed question: failed generations never execute
  * their calls, and older records can contain truncated/unvalidated inputs. */
 export function questionCallsOf(messages: readonly LhMessage[]): QuestionCall[] {
+	let his = false;
 	for (let mi = messages.length - 1; mi >= 0; mi--) {
 		const assistant = messages[mi]!;
+		if (assistant.role === "user") his = true;
 		if (assistant.role !== "assistant") continue;
 		// The plan drawn after the lesson's first question, and the thinking
-		// before it, leave that question open (round 20, M1).
-		if (drawsThePlanOnly(assistant)) continue;
+		// before it, leave that question open (round 20, M1); so does any
+		// reply since his last message that gives him nothing to read, as
+		// the save and the probe's end after the step's question the prober
+		// posed, or the teacher's reads before its plan (round 21, (a)).
+		if (drawsThePlanOnly(assistant) || (!his && givesHimNothing(assistant))) continue;
 		const answered = resultIdsFrom(messages.slice(mi + 1));
 		const calls: QuestionCall[] = [];
 		for (const [contentIndex, block] of assistant.content.entries()) {
@@ -1708,6 +1725,14 @@ export function questionCallsOf(messages: readonly LhMessage[]): QuestionCall[] 
 		return calls; // never revive older calls, even when this message has none
 	}
 	return [];
+}
+
+/** A reply with nothing he reads and nothing he answers: thinking, empty
+ *  text, and calls that neither speak to him nor ask or hand him work. */
+function givesHimNothing(assistant: AssistantMessage): boolean {
+	if (assistant.stopReason === "error" || assistant.stopReason === "aborted") return false;
+	return assistant.content.every((b) => b.type === "thinking" || (b.type === "text" && !b.text.trim()) ||
+		(b.type === "toolCall" && b.name !== SEND_TO_USER_TOOL && !(QUESTION_TOOLS as readonly string[]).includes(b.name) && b.name !== PRACTICE_PROBLEM_TOOL && MODE_HANDOFF_TOOLS[b.name] === undefined));
 }
 
 /** A reply that only thinks and draws the lesson's plan: nothing he reads. */

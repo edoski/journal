@@ -231,6 +231,25 @@ export function questionBeforePlanResult(nodeId: string): AgentToolResult<null> 
 	};
 }
 
+/** The lesson's first step's question, posed by the prober in the reply
+ *  that concludes the probe (round 21, carry-in (a)): he works on it while
+ *  the teacher plans from the assessment, so the reply goes on to the save
+ *  and `probe_done`. Like every question's result, it is in-memory only. */
+export function stepQuestionResult(nodeId: string): AgentToolResult<null> {
+	return {
+		content: [
+			{
+				type: "text",
+				text:
+					`Question posed: he works on it while the teacher plans the lesson with "${nodeId}" as its first step. ` +
+					"Now, in this same reply, save his last probe answer with course_save, then conclude with probe_done. His answer to this question reaches the teacher.",
+			},
+		],
+		details: null,
+		terminate: false,
+	};
+}
+
 /** The practice pose's ack (practice sessions, owner 2026-10-04): unlike
  *  a question, this result is FINAL — it persists (persistTurn filters
  *  only QUESTION_TOOLS placeholders), because the learner's submissions

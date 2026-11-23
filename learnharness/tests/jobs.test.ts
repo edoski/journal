@@ -925,6 +925,33 @@ describe("wake pipeline (src/server/jobs.ts)", () => {
 		assert.equal(firedHandoff.steers[0]!.id, `steer_probe_${chat.id}`, "the handoff IS the wake turn's input");
 	});
 
+	it("the probe's handoff wakes the teacher past the first step's question the prober posed; other wakes wait for his answer (round 21, carry-in (a))", async () => {
+		const chat = chatStore.createChat("Test: plan while he answers");
+		trackChat(chat.id);
+		const step = { type: "toolCall", id: "step-q", name: "explain", arguments: { type: "check", nodeId: "slots", question: "q", correctAnswer: "a" } };
+		const done = { type: "toolCall", id: "call-pd", name: "probe_done", arguments: {} };
+		const [user, reply] = nativeToolMessages("teach me Poisson", "probe_done", "call-pd", {});
+		chatStore.saveMessages(chat.id, [
+			user!,
+			{ ...(reply as object), content: [step, done] } as never,
+			{ id: "r-pd", role: "toolResult", toolCallId: "call-pd", toolName: "probe_done", content: [{ type: "text", text: "ok" }], details: { ok: true }, isError: false, timestamp: 1 } as never,
+		]);
+		const fired: string[] = [];
+		setTurnRunner(async (_cid, input) => {
+			fired.push(...((input as SteerInput).steers as SteerMessage[]).map((s) => s.customType));
+			return 200;
+		});
+		await deliverJobResult(buildProbeHandoffSteer(chat.id));
+		await waitFor(() => fired.includes("probe-handoff"), 8000, "the plan's wake fired with his question open");
+
+		const { chatId: other, steer } = setup();
+		chatStore.saveMessages(other, chatStore.getChat(chat.id)!.messages);
+		const late = deliverJobResult(steer);
+		await delay(1200);
+		assert.deepEqual(fired, ["probe-handoff"], "a job's result still waits for his answer");
+		void late.catch(() => {});
+	});
+
 	it("announces a wake from before its turn is set up until it runs or is refused, so the lesson is never silent meanwhile (round 8/9, the ~10 s before practice)", async () => {
 		const chat = chatStore.createChat("Test: waking announced");
 		trackChat(chat.id);

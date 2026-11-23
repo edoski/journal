@@ -61,8 +61,8 @@ export function probeDoneTool(ctx: ProbeDoneContext): Record<string, AgentTool<a
 				"one strand per dependency the lesson will rest on, with your read of where his edge sits on it " +
 				"(floor, ceiling, misconceptions, what to build from). It streams to the learner live and becomes " +
 				"the handoff artifact the teacher plans from. Call it in the same reply as the course_save of his last answer, " +
-				"after that save. Refused while a question is still open, and after " +
-				"the probe is already concluded. In a lesson, the lesson's first step goes to him with send_to_user earlier in that reply, before the save, so he reads it while the teacher plans. A clean call ends your turn: write nothing after it.",
+				"after that save. Refused while a probe question still waits on his answer, and after " +
+				"the probe is already concluded. In a lesson, the lesson's first step goes to him with send_to_user earlier in that reply, then its question with explain, both before the save, so he reads the step and works on its question while the teacher plans. A clean call ends your turn: write nothing after it.",
 			// The core-owned schema (contracts/probe.ts) — the SAME schema the UI
 			// parse seam (tool-parts.ts) runs, so boundary-valid ⇔ consumer-parseable.
 			parameters: probeDoneInputSchema,

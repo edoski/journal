@@ -23,11 +23,13 @@ import { setupTools, type SetupToolContext } from "./tools/setup.ts";
 import { jobTools, type JobToolContext } from "./tools/jobs.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS } from "../core/pending.ts";
-import { MODE_HANDOFF_TOOLS, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, opensTurn, type LhMessage } from "../core/native-messages.ts";
+import { MODE_HANDOFF_TOOLS, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, danglingQuestionOf, opensTurn, type LhMessage } from "../core/native-messages.ts";
 import { LESSON_PROGRESS_TOOL, lessonProgressOf } from "../core/contracts/plan.ts";
 import { CHAT_EFFORT, CLAUDE_MODEL } from "../core/contracts/claude.ts";
 
 const PROBE_DONE_TOOL = "probe_done";
+/** The prober's `explain`: only the lesson's first step's question. */
+const STEP_QUESTION_TOOL = "explain";
 import { VoiceGuard } from "./voice-guard.ts";
 import { ClosedTurn } from "./closed-turn.ts";
 
@@ -122,13 +124,17 @@ export interface AgentBuildOptions {
  * before teaching). A lesson's first question may come before its plan,
  * which he reads while the plan is made (round 20, M1): its result does not
  * end the turn (`questionBeforePlanResult`), and the plan after it does.
+ * The prober poses that question itself, with the step, in the reply that
+ * concludes the probe (round 21, carry-in (a)): its `explain` goes on to the
+ * save and `probe_done`, and the teacher's plan, made while he answers,
+ * ends the teacher's turn (`asked`: a question waits on him as it starts).
  */
-export function endsTurnFor(kind: AgentKind): (toolName: string, earlier?: readonly ToolCall[]) => boolean {
+export function endsTurnFor(kind: AgentKind, asked = false): (toolName: string, earlier?: readonly ToolCall[]) => boolean {
 	return (name, earlier = []) =>
-		(QUESTION_TOOLS as readonly string[]).includes(name) ||
+		((QUESTION_TOOLS as readonly string[]).includes(name) && !(kind === "prober" && name === STEP_QUESTION_TOOL)) ||
 		(kind === "practice" && name === PRACTICE_PROBLEM_TOOL) ||
 		(kind === "prober" && name === PROBE_DONE_TOOL) ||
-		(kind === "teacher" && name === "plan_init" && earlier.some((c) => (QUESTION_TOOLS as readonly string[]).includes(c.name))) ||
+		(kind === "teacher" && name === "plan_init" && (asked || earlier.some((c) => (QUESTION_TOOLS as readonly string[]).includes(c.name)))) ||
 		MODE_HANDOFF_TOOLS[name] !== undefined ||
 		(name === SEND_TO_USER_TOOL && closedBefore(kind, earlier));
 }
@@ -175,7 +181,9 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	// before he sees it, and one that breaks it is rewritten.
 	const courses = opts.course?.courses;
 	const titles = courses ? () => courses().then((maps) => maps.flatMap((map) => map.topics.map((topic) => topic.title))) : undefined;
-	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind), opts.course?.review === true, opts.course !== undefined, titles);
+	// A question already waits on him: the teacher's plan, made while he answers, ends its turn.
+	const endsTurn = endsTurnFor(kind, danglingQuestionOf((opts.messages ?? []) as LhMessage[]) !== null);
+	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurn, opts.course?.review === true, opts.course !== undefined, titles);
 	// The guard's budgets and refusals are a lesson's (a teaching turn, an
 	// answer, a hint): setting something up teaches nothing, so its messages
 	// keep to the voice its prompt carries, unchecked by them.
@@ -205,7 +213,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 		builtins: FILE_TOOLS,
 		effort: turnEffort((opts.messages ?? []) as LhMessage[]),
 		messages: opts.messages ?? [],
-		endsTurn: endsTurnFor(kind),
+		endsTurn,
 		session: opts.session,
 		sessionStore: opts.sessionStore,
 		compactionInstructions: opts.compactionInstructions,

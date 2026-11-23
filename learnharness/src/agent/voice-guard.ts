@@ -1435,12 +1435,14 @@ export class VoiceGuard {
 	}
 
 	/** Whether a tool's calls pass through the guard: the probe's end too,
-	 *  which it reads only once the probe has ended. */
+	 *  which it reads only once the probe has ended, and every question,
+	 *  the one that does not end the turn too (the prober's step question,
+	 *  round 21). */
 	guards(toolName: string): boolean {
 		// A problem's conclude saves his answer: one the record would not take
 		// owes its verdict in words (round 18, m13: unwrapped, a failed
 		// conclude owed nothing, and "…is what made it work" stood as one).
-		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || toolName === SAVE_TOOL || toolName === PRACTICE_CONCLUDE_TOOL || toolName === DEMO_TOOL || toolName === LESSON_PROGRESS_TOOL || this.endsTurn(toolName);
+		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || toolName === SAVE_TOOL || toolName === PRACTICE_CONCLUDE_TOOL || toolName === DEMO_TOOL || toolName === LESSON_PROGRESS_TOOL || (QUESTION_TOOLS as readonly string[]).includes(toolName) || this.endsTurn(toolName);
 	}
 
 	/** Read a call as it finishes streaming. A refused message's text leaves

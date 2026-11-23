@@ -67,7 +67,7 @@ import {
 	type SteerMessage,
 } from "../core/contracts.ts";
 import type { TurnInput } from "../core/input-events.ts";
-import { hasUnresolvedQuestion, endsInDismissal, endsInQuestionRecovery, nativeInputCause, probeDoneResultIds, type LhMessage } from "../core/native-messages.ts";
+import { hasUnresolvedQuestion, endsInDismissal, endsInQuestionRecovery, nativeInputCause, probeDoneResultIds, stepQuestionOf, type LhMessage } from "../core/native-messages.ts";
 import { closedTonight } from "../core/session-end.ts";
 import { fireJobAbort, isJobLive } from "../agent/subagents/aborts.ts";
 import { stores, effectiveSettings } from "./stores.ts";
@@ -691,7 +691,9 @@ function restorePendingDeliveries(chatId: string): void {
 /**
  * Wait until the chat can take a wake turn: no turn in flight AND no
  * unanswered question call (the record's dangling question — the answer
- * arrives as its tool result, and no turn may run in the window). Only a
+ * arrives as its tool result, and no turn may run in the window), save the
+ * probe's handoff under the first step's question, whose answer waits for
+ * the teacher's plan (the 409 the client posts again after). Only a
  * turn settling or a turn-less record write (a partial answer, a
  * dismissal) opens the gates, so each check waits for the next of those.
  * The learner may take arbitrarily long to answer, and that is correct —
@@ -703,8 +705,12 @@ async function waitForIdle(chatId: string): Promise<void> {
 	for (;;) {
 		const changed = nextChatEvent(chatId, ["turn-settled", "record-changed", "chats-changed"]);
 		const record = stores.chatStore.getChat(chatId);
-		const waiting = (state().queues.get(chatId) ?? []).some((entry) => !entry.waking && !entry.deferred && !entry.handedTo);
-		if (!record || !waiting || !(isTurnRunning(chatId) || hasUnresolvedQuestion(record.messages))) {
+		const pending = (state().queues.get(chatId) ?? []).filter((entry) => !entry.waking && !entry.deferred && !entry.handedTo);
+		// The lesson's plan is made while he answers the first step's question
+		// the prober posed (round 21, carry-in (a)): the probe's handoff wakes
+		// the teacher past it, and his answer waits for that turn.
+		const plansPastIt = pending.some((entry) => entry.steer.customType === "probe-handoff") && record !== null && stepQuestionOf(record.messages) !== null;
+		if (!record || pending.length === 0 || !(isTurnRunning(chatId) || (hasUnresolvedQuestion(record.messages) && !plansPastIt))) {
 			changed.cancel();
 			return;
 		}

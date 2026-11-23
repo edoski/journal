@@ -172,13 +172,14 @@ describe("teachExplainToolFor: the dynamic plan-nodeId validation (position sign
 });
 
 describe("the prober's registry", () => {
-	it("carries the nodeId-less recall, probe_done and the practice handoff", () => {
+	it("carries the nodeId-less recall, the step question's explain, probe_done and the practice handoff", () => {
 		const chatId = newChat("Prober: registry");
 		const tools = createProberTools({ chatId, chatStore, deliver: () => {}, jobStore, spawn: () => {} });
 		// Fix wave (2026-09-20): the owner ruling adds research + pdf dispatch
-		// to the probe phase's registry (demo/visual stay teach-only).
+		// to the probe phase's registry (demo/visual stay teach-only). Round
+		// 21, carry-in (a): `explain` poses the lesson's first step's question.
 		assert.deepEqual(Object.keys(tools).sort(), [
-			"ask_user_question", "name_session", "pdf", "practice", "probe_done", "recall", "research",
+			"ask_user_question", "explain", "name_session", "pdf", "practice", "probe_done", "recall", "research",
 		]);
 	});
 });

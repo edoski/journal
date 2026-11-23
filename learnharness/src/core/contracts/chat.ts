@@ -233,6 +233,23 @@ export function openedHandoffText(opening: string): string {
 	);
 }
 
+/** The lesson's wake once the prober posed the first step's question too
+ *  (round 21, carry-in (a), Edo's lever of 23 Nov): the step and its
+ *  question reached him before the assessment streamed, so the teacher only
+ *  plans, from the whole assessment, while he answers, keeping the step's id
+ *  first; his answer arrives in his next message. */
+export function askedHandoffText(opening: string, question: string, nodeId: string): string {
+	return (
+		`The lesson's first step is already on my screen, written from the probe's assessment: "${opening.trim()}" ` +
+		`Its question is on my screen too, and I am working on it while you plan: "${question.trim()}" (nodeId "${nodeId}"). ` +
+		`Plan the full teaching arc from my current understanding to the goal understanding, with that step first, its id "${nodeId}". ` +
+		"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
+		"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
+		"Take your time over the plan and really think it through, then call plan_init: it ends your turn, and my answer arrives in my next message. " +
+		"Send me nothing else and ask nothing; I'll interrupt if I want something else."
+	);
+}
+
 /** What the wake says of the probe's last answer, read from the record
  *  once the probe's turn has landed (round 15, m13: the first step opened
  *  "Your answer took the limit of the base alone…" under the feedback

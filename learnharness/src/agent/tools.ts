@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { invalidInputResult, questionBeforePlanResult, questionResult, serverExecute } from "./tool-execute.ts";
+import { invalidInputResult, questionBeforePlanResult, questionResult, serverExecute, stepQuestionResult } from "./tool-execute.ts";
 import {
 	askInputSchema,
 	askLabelProblems,
@@ -160,6 +160,33 @@ export const probeExplainTool: AgentTool<typeof explainInputBase> = {
 	},
 };
 
+/** The prober's `explain`: the lesson's first step's question, posed with
+ *  the step in the reply that concludes the probe, so he works on it while
+ *  the teacher plans (round 21, carry-in (a); round 20 had the teacher pose
+ *  it, after the assessment had streamed: 34 to 65 s after his answer).
+ *  Its `nodeId` is the id the plan will give that step: the teacher's first
+ *  plan keeps it (`planLeavesOutAsked`). */
+const stepQuestionTool: AgentTool<typeof explainInputObject> = {
+	name: "explain",
+	label: "explain",
+	description:
+		"Pose the lesson's first step's question, in the reply that concludes the probe: after you send him the step, before course_save and probe_done. " +
+		"Never a probe question: those are `recall`. " +
+		explainDescription("explain", false).replace(/ONE question per turn:.*$/, "") +
+		"Set `nodeId` (required) to the id the lesson's plan gives this step: lowercase words joined by hyphens, as \"row-ops-as-products\". " +
+		"His answer reaches the teacher, which plans the lesson meanwhile with this step first and that id.",
+	parameters: explainInputObject,
+	prepareArguments: prepareQuestionArguments,
+	executionMode: "sequential",
+	execute: async (_toolCallId, input) => {
+		const problems = [...explainInputProblems(input)];
+		const nodeIdProblemText = nodeIdProblem(null, input.nodeId);
+		if (nodeIdProblemText) problems.push(nodeIdProblemText);
+		if (problems.length > 0) return invalidInputResult("explain", problems);
+		return stepQuestionResult(input.nodeId);
+	},
+};
+
 /** The prober's registry context: the probe's own needs (probe_done —
  *  ProbeDoneContext) PLUS the job-dispatch wiring, since the owner ruling
  *  (2026-09-20) puts research + pdf in the probe phase's registry too. */
@@ -213,6 +240,8 @@ export function createProberTools(ctx: ProberToolContext): Record<string, AgentT
 		...(jobs.research ? { research: jobs.research } : {}),
 		pdf: jobs.pdf!,
 		recall: probeExplainTool,
+		// The lesson's first step's question, in the reply that ends the probe.
+		explain: stepQuestionTool,
 		...done,
 		// The opening names the session in its first reply (name-session.ts).
 		...nameSessionTool(ctx),
