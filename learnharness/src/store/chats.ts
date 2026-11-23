@@ -145,7 +145,7 @@ function listChats(): ChatSummary[] {
 						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages), ...own])],
 						ownTopics: own,
 						// The tutor's offer to go on, one of whose options stops for today, asks nothing of him: left where it is (round 18, m4).
-						ended: offersStop(messages) ? "left" : endedBy(sessionEndOf(messages, tree, summary.kind, own), summary.updatedAt, danglingQuestionOf(messages) !== null || leftQuestionRepose(messages).length > 0 || activeProblemOf(messages) !== null),
+						ended: offersStop(messages) ? "left" : endedBy(sessionEndOf(messages, tree, summary.kind), summary.updatedAt, danglingQuestionOf(messages) !== null || leftQuestionRepose(messages).length > 0 || activeProblemOf(messages) !== null),
 						...(stoppedByHim(messages) ? { stopped: true as const } : {}),
 						...(failedResponseAtEnd(messages) ? { failed: true as const } : {}),
 						...(learnerWords(messages).length <= 1 ? { untouched: true as const } : {}),

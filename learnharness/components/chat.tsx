@@ -64,7 +64,6 @@ import {
 	toolQuestionKind,
 	closedTonight,
 	doneTonightAtEnd,
-	firstProblemTopicsOf,
 	sessionEndOf,
 	replyCutOf,
 	latestMarkedAnswer,
@@ -1205,8 +1204,7 @@ export function Chat({
 	// was first taught, for the top bar's roadmap (lesson-roadmap.md).
 	const planTree = useMemo(() => latestTree(messages), [messages]);
 	// The tutor ended the session (a review that closed itself): nothing waits, so nothing to stop (round 14, m32).
-	const ownTopics = useMemo(() => (topics.length > 0 ? topics : mode === "practice" ? firstProblemTopicsOf(nativeMessages) : []), [topics, mode, nativeMessages]);
-	const sessionFinished = useMemo(() => !busy && sessionEndOf(nativeMessages, planTree ?? undefined, startedIn, ownTopics) === "closed", [busy, nativeMessages, planTree, startedIn, ownTopics]);
+	const sessionFinished = useMemo(() => !busy && sessionEndOf(nativeMessages, planTree ?? undefined, startedIn) === "closed", [busy, nativeMessages, planTree, startedIn]);
 	const anchors = useMemo(() => (planTree ? stepAnchors(messages, new Set(planTree.nodes.map((n) => n.id))) : new Map<string, string>()), [planTree, messages]);
 	// A problem's close that marks his answer from before Done for today is
 	// drawn above its line, beside the answer (marks-before-done.ts).

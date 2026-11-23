@@ -1,10 +1,9 @@
 import type { PlanTree } from "./contracts/plan.ts";
 import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, lessonProgressOf } from "./contracts/plan.ts";
 import type { SessionEnd, SessionMode } from "./contracts/chat.ts";
-import { activeProblemOf, danglingQuestionOf, endsInDismissal, nativeInputCause, isQuestionRepose, needsContinuation, NEUTRAL_MARKERS, newQuestionRepose, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, problemInputForConclude, sessionModeOf, sessionTaskStatesOf, type LhMessage } from "./native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, endsInDismissal, nativeInputCause, isQuestionRepose, needsContinuation, NEUTRAL_MARKERS, newQuestionRepose, PRACTICE_CONCLUDE_TOOL, sessionModeOf, sessionTaskStatesOf, type LhMessage } from "./native-messages.ts";
 import { offersStopIn, picksStop } from "./question-core.ts";
 import { phaseAt3Lh } from "./phases.ts";
-import { topicResults, type PracticeConclusion } from "./practice-attempts.ts";
 
 /**
  * How the tutor's last turn left the session, folded from the record (the
@@ -18,21 +17,23 @@ import { topicResults, type PracticeConclusion } from "./practice-attempts.ts";
  * practice waits on him at Next problem while its plan has steps left; any
  * other practice round between problems asks him nothing. His Done for
  * today on work still open (a question or problem it set aside, a task it
- * holds, a session that waited on him, or a round opened on topics, a
- * review or a topic's practice, one of which he has not yet solved without
- * a hint in it, unless the tutor wrapped it) leaves it for next time: "left". Words that
- * end without a question ("Good place to stop") end the session there,
- * like anything else, as does the tutor's own close, and a practice round
- * with its work done: "closed". The questions the app posed again after
+ * holds, a session that waited on him) leaves it for next time: "left".
+ * Words that end without a question ("Good place to stop") end the session
+ * there, like anything else, as does the tutor's own close, and his Done
+ * for today on a practice round between problems, whatever its topics'
+ * solves: the engine's reviews carry those, and its close names no
+ * continuation (round 21, m6: Rank practice closed on its Model solution
+ * read "Left off today" in Sessions and "Continue Rank practice" on Mon 9):
+ * "closed". The questions the app posed again after
  * his Done for today (`leftQuestionRepose`) are not the tutor's turn, so
  * they leave the session as it was: left. Pure.
  */
-export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | undefined, initial: SessionMode = "teach", topics: readonly string[] = []): SessionEnd {
+export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | undefined, initial: SessionMode = "teach"): SessionEnd {
 	const messages = record.at(-1) && isQuestionRepose(record.at(-1)!) ? record.slice(0, -1) : record;
 	const last = [...messages].reverse().find((m) => !(m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)));
 	if (!last) return "closed";
 	const done = doneTonightAt(messages);
-	if (done !== null && closeSettled(messages, last)) return leftOpen(messages, done, tree, initial, topics) ? "left" : "closed";
+	if (done !== null && closeSettled(messages, last)) return leftOpen(messages, done, tree, initial) ? "left" : "closed";
 	if (last.role === "toolResult") {
 		if (needsContinuation(messages)) return "cut";
 		return endsInDismissal(messages) ? "mid-lesson" : "closed";
@@ -93,7 +94,7 @@ function closeSettled(messages: readonly LhMessage[], last: LhMessage): boolean 
  *  back as "Continue … lesson" every later day). His pick of the tutor's
  *  own "Stop here for today" is his Done for today, so the question it
  *  answered owes him nothing. `at` is the Done for today's index. Pure. */
-function leftOpen(messages: readonly LhMessage[], at: number, tree: PlanTree | undefined, initial: SessionMode, topics: readonly string[]): boolean {
+function leftOpen(messages: readonly LhMessage[], at: number, tree: PlanTree | undefined, initial: SessionMode): boolean {
 	// The turn's course brief rides just before the marker, after what it set aside.
 	let start = at;
 	let setAside = false;
@@ -110,8 +111,7 @@ function leftOpen(messages: readonly LhMessage[], at: number, tree: PlanTree | u
 	if (tree && stepsLeft(tree, messages)) return true;
 	if (stopPicked(messages, start)) return false;
 	const before = messages.slice(0, start);
-	if (sessionModeOf(before, initial) === "practice" && !activeProblemOf(before) && practiceUnfinished(before, topics)) return true;
-	const end = before.length > 0 ? sessionEndOf(before, tree, initial, topics) : "closed";
+	const end = before.length > 0 ? sessionEndOf(before, tree, initial) : "closed";
 	return end === "mid-lesson" || end === "cut";
 }
 
@@ -144,39 +144,6 @@ function setAsideByDone(m: LhMessage): boolean {
 	if (m.role === "custom") return m.customType === "problem-dismissed";
 	if (m.role === "toolResult") return (m.details as { dismissed?: unknown } | null)?.dismissed === true || m.toolName === PRACTICE_CONCLUDE_TOOL;
 	return m.role === "assistant" && m.content.length > 0 && m.content.every((b) => b.type === "toolCall" && b.name === PRACTICE_CONCLUDE_TOOL && (b.arguments as { outcome?: unknown } | null)?.outcome === "dismissed");
-}
-
-/** Whether a practice session in the pause between problems still owes
- *  him work: it was opened on topics, one of them he has not yet solved
- *  without a hint in it, and the tutor has not wrapped the round (its
- *  reply to his last Next problem posed nothing). A round he opened with
- *  no topics is his to end. Pure. */
-function practiceUnfinished(messages: readonly LhMessage[], topics: readonly string[]): boolean {
-	if (topics.length === 0 || wrapped(messages)) return false;
-	const solved = new Set<string>();
-	for (const m of messages) {
-		if (m.role !== "assistant") continue;
-		for (const block of m.content) {
-			if (block.type !== "toolCall" || block.name !== PRACTICE_CONCLUDE_TOOL) continue;
-			const c = block.arguments as Partial<PracticeConclusion> | null;
-			if (c?.outcome !== "solved" || !c.result) continue;
-			const posed = problemInputForConclude(messages, block.id)?.topics;
-			const on = Array.isArray(posed) ? posed.filter((t): t is string => typeof t === "string") : [];
-			for (const [topic, result] of topicResults(on, { response: "", ...c, result: c.result })) if (result === "correct") solved.add(topic);
-		}
-	}
-	return topics.some((topic) => !solved.has(topic));
-}
-
-/** The tutor wrapped the round: his latest input was Next problem, and
- *  nothing it said since posed a problem. Pure. */
-function wrapped(messages: readonly LhMessage[]): boolean {
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const m = messages[i]!;
-		if (m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === PRACTICE_PROBLEM_TOOL)) return false;
-		if (m.role !== "assistant" && nativeInputCause(m as never, messages.slice(0, i) as never) === "learner") return m.role === "custom" && m.customType === "practice-next";
-	}
-	return false;
 }
 
 /** Whether the lesson's plan has a step not yet taught: one no tagged
