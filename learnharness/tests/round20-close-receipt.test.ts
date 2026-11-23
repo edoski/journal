@@ -193,6 +193,19 @@ describe("one close receipt for every session (round 20, M3)", () => {
 		assert.ok(closeRules(guard, "Your Conditional probability review comes back on Wednesday 11 November, and Independent events comes back tomorrow.").includes("close-untouched"), "a topic outside the review is still untouched");
 	});
 
+	it("a save during Done for today adds to its receipt and keeps the lesson that goes on (review, round 20)", async () => {
+		const done = receiptOfMap(LA_8, ["eigen", "matmul-mech"], []);
+		const saved = receiptOfSaves([{ topics: ["matmul-mech"], receipt: receiptOf({ "matmul-mech": ["Mechanics of matrix multiplication", "2026-11-12"] }) }], D8);
+		const guard = new VoiceGuard([withCloseReceipt(newDoneTonightMessage("teacher"), done)], undefined, false, true, async () => TITLES);
+		await Promise.resolve();
+		const call: ToolCall = { type: "toolCall", id: `v-${nextId()}`, name: "course_save", arguments: { changes: {} } };
+		guard.screen(call);
+		const tool = { name: "course_save", label: "course_save", description: "", parameters: {} as never, execute: async () => ({ content: [{ type: "text" as const, text: JSON.stringify({ revision: 4, reviews: {}, close: saved }) }], details: null }) } as unknown as AgentTool<never>;
+		await guard.wrap(tool).execute(call.id, call.arguments as never, undefined, undefined);
+		assert.deepEqual(closeRules(guard, "Your Eigenvalues and eigenvectors lesson continues tomorrow, Monday 9 November; your Mechanics of matrix multiplication review comes back on Thursday 12 November."), [], "the save's day wins, the lesson stays");
+		assert.equal(guard.beforeEnd(), undefined, "every topic of the merged receipt was named");
+	});
+
 	it("his Done for today carries the receipt to every kind of agent, and each close copies it", () => {
 		const receipt = receiptOfMap(LA_8, ["matmul-mech"], []);
 		const marker = withCloseReceipt(newDoneTonightMessage("practice"), receipt) as { content: string; details: { close: unknown } };

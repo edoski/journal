@@ -111,6 +111,15 @@ function receipt(topics: CloseTopic[], moved: CloseMove[], continues?: CloseWork
 	return { topics, moved: own, ...(continues ? { continues } : {}), says: saysOf(topics, own, continues) };
 }
 
+/** A receipt a save gave, added to the one the session held (his Done for
+ *  today's, which also holds the lesson and the task that go on): the
+ *  save's topics and moves on its days, the rest kept. */
+export function withSaved(held: CloseReceipt, saved: CloseReceipt): CloseReceipt {
+	const dated = new Set([...saved.topics, ...saved.moved].map((t) => t.handle));
+	const moved = [...saved.moved, ...held.moved.filter((m) => !dated.has(m.handle))];
+	return receipt([...held.topics.filter((t) => !dated.has(t.handle)), ...saved.topics], moved, saved.continues ?? held.continues);
+}
+
 /** The starts a receipt says his study today moved (`starts_moved`). */
 function movesOf(saved: Record<string, unknown> | undefined, today: string, startOf: (handle: string) => string | undefined = () => undefined): CloseMove[] {
 	const moved = isRecord(saved?.starts_moved) ? saved.starts_moved : {};

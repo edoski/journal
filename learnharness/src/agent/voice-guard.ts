@@ -40,7 +40,7 @@ import { normalizeQuestionType, PREDICT_RULE } from "../core/question-core.ts";
 import { sameQuestionKey } from "../core/shown-help.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
-import type { CloseReceipt } from "../core/close-receipt.ts";
+import { withSaved, type CloseReceipt } from "../core/close-receipt.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, HIS_MESSAGE, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, probeOpeningText, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
 import { DOUBT, adviceSentences, closeBreaks, closeMissing, SENTENCE_BUDGETS, sentenceLoad, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, recordMarkWords, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
@@ -1490,7 +1490,9 @@ export class VoiceGuard {
 				if (partial && this.toldWrong) return SAVED_AGAINST_WORDS;
 				const result = await tool.execute(toolCallId, params, signal, onUpdate);
 				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
-				if (!result.isError && (tool.name === LESSON_PROGRESS_TOOL || tool.name === SAVE_TOOL || tool.name === PRACTICE_CONCLUDE_TOOL)) this.receipt = receiptIn(result) ?? this.receipt;
+				// The lesson's close reads the whole plan; a save's receipt adds to the receipt held.
+				const given = !result.isError && (tool.name === LESSON_PROGRESS_TOOL || tool.name === SAVE_TOOL || tool.name === PRACTICE_CONCLUDE_TOOL) ? receiptIn(result) : null;
+				if (given) this.receipt = tool.name === LESSON_PROGRESS_TOOL || !this.receipt ? given : withSaved(this.receipt, given);
 				if (!result.isError && tool.name === LESSON_PROGRESS_TOOL && isRecord(params) && params.close === true) this.lessonClosed = true;
 				if (!result.isError && tool.name === SAVE_TOOL) this.savedNow = true;
 				if (!result.isError) this.titles.push(...titlesIn(result));
