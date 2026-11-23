@@ -99,3 +99,21 @@ describe("round 21, m3: a topic page's start says its day, never another course'
 		assert.equal(facts.starts?.waits ?? null, null);
 	});
 });
+
+describe("round 21, m5: where he stands on a topic it builds on", () => {
+	const binomial = topic("binomial", "Binomial distribution", { level: "attempted", introduced: "2026-11-01", weak: true, right: "unaided", review: { kind: "due", date: "2026-11-10", overdue: 7 } });
+
+	it("says the check is today on a weak topic he got right on his own whose review is due, never \"Check on your own\"", () => {
+		assert.equal(standingWords(0.5, binomial), "Check again today");
+		assert.equal(standingWords(0.5, { ...binomial, review: { kind: "scheduled", date: "2026-11-20" } }), "Check again another day");
+	});
+
+	it("gives Builds on the head's words", () => {
+		const poisson = topic("poisson", "Poisson distribution", { starts: "2026-12-06" });
+		const map = { workspace: "/s/prob", title: "Probability", today: "2026-11-17", revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [binomial, poisson], edges: [{ kind: "needs", topic: h("poisson"), prerequisite: h("binomial") }] } as unknown as CourseMap;
+		const [row] = buildsOn(poisson, map);
+		const head = topicFacts({ course: studied(map), topic: binomial, chats: [], read: null }).standing?.words;
+		assert.equal(row?.words, head);
+		assert.equal(row?.words, "Check again today");
+	});
+});

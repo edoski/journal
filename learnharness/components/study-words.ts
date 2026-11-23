@@ -51,8 +51,9 @@ export const RIGHT_WORDS: Record<RightAnswer, string> = {
  *  words. A weak topic he could do on his own says how he answered it
  *  since its miss: with help when help repaired it. A topic the engine
  *  calls weak never reads right on his own: the engine's check is still
- *  to come, "Check again another day", or "Check on your own" once its
- *  review is due (round 20, m4).
+ *  to come, "Check again another day", or "Check again today" once its
+ *  review is due (round 20, m4; round 21, m5: "Check on your own" on a
+ *  Builds-on row said neither what happened nor what to do).
  *  A topic that slips says `SLIPPING_WORDS` instead (`standingOf`). Pure. */
 export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review" | "signals" | "tasks" | "weak">>): string {
 	if (lessonBegun(topic)) return LESSON_BEGUN;
@@ -60,7 +61,7 @@ export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | 
 	// Right on his own on a topic the engine calls weak is the engine's check still to come, never "Right on your own":
 	// it stays weak until a later day's answer on his own, and its weakness holds back what needs it (round 20, m4:
 	// Binomial read "Right on your own, check another day" while the engine held it weak and held Poisson back).
-	const unaided = () => (topic.weak ? (topic.review?.kind === "due" ? SLIP_WORDS.check : SLIP_WORDS.repaired) : topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS.unaided);
+	const unaided = () => (topic.weak ? (topic.review?.kind === "due" ? CHECK_TODAY : SLIP_WORDS.repaired) : topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS.unaided);
 	if (learning && topic.right) return topic.right === "unaided" ? unaided() : RIGHT_WORDS[topic.right];
 	// No right answer since his newest wrong one, on a topic still being learned.
 	if (topic.level === "assisted") return WRONG_LAST_WORDS;
@@ -88,6 +89,10 @@ export const LESSON_GOES_ON = "Lesson continues";
 /** A topic whose newest answer that counts was not right, and none right
  *  since. */
 const WRONG_LAST_WORDS = "Not right last time";
+
+/** A weak topic he answered right on his own, on the day its check has
+ *  come: its review, today. */
+const CHECK_TODAY = "Check again today";
 
 /** Right on his own, on the day its check has come, and a map card's
  *  short standing for it any day. */
