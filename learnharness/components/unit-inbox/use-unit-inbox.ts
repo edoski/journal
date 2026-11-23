@@ -27,8 +27,11 @@ type StudyRead = { courses: StudyCourse[]; failed: UnreadableCourse[] };
 /** Every course's map, read once per mount and again whenever a course
  *  record changes, a course is added, renamed or deleted, or the day turns
  *  over. Reads never overlap: an event during a read asks for one more
- *  read when it ends, so a burst of events costs at most two. A failed read
- *  keeps the last map. */
+ *  read when it ends, so a burst of events costs at most two. A failed
+ *  read, or one the app could not answer, keeps the last map and is asked
+ *  once more (round 20, m15: right after a delete, under load, the list
+ *  shrank to one course under "Couldn't read your courses" for over
+ *  10 s). Only a window that never read the courses says it could not. */
 function useStudyCourses(): StudyRead | null | "unavailable" {
 	const [courses, setCourses] = useState<StudyRead | null | "unavailable">(null);
 	const reading = useRef(false);
@@ -39,13 +42,16 @@ function useStudyCourses(): StudyRead | null | "unavailable" {
 			return;
 		}
 		reading.current = true;
+		let retried = false;
 		do {
 			again.current = false;
-			try {
-				const listing = (await (await fetch("/api/study", { cache: "no-store" })).json()) as StudyListing;
-				setCourses(listing.available ? { courses: listing.courses, failed: listing.failed } : "unavailable");
-			} catch {
-				setCourses((prev) => prev ?? "unavailable");
+			const listing = await fetch("/api/study", { cache: "no-store" })
+				.then((res) => res.json() as Promise<StudyListing>)
+				.catch(() => null);
+			if (listing?.available) setCourses({ courses: listing.courses, failed: listing.failed });
+			else {
+				setCourses((prev) => (prev === null ? "unavailable" : prev));
+				if (!retried) again.current = retried = true;
 			}
 		} while (again.current);
 		reading.current = false;

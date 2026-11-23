@@ -29,7 +29,7 @@ import { forwardDockWheel, useDockReserve } from "@/components/dock-height";
 import { QueuedSteersBody, type QueuedSteerLine } from "@/components/queued-steers";
 import { useFieldCycle } from "@/components/field-cycle";
 import { JobsContext } from "@/components/jobs-context";
-import { useServerEvent, useServerResync } from "@/components/server-events";
+import { deletedInThisWindow, useServerEvent, useServerResync } from "@/components/server-events";
 import { useSessionBusy } from "@/components/lesson/session-busy";
 import {
 	firstSourceTextParts,
@@ -466,7 +466,7 @@ export function Chat({
 	// The lesson was deleted elsewhere (chats-changed `deleted`).
 	const [gone, setGone] = useState(false);
 	// Its course was deleted: the lesson stays readable as history.
-	const [courseGone, setCourseGone] = useState(initiallyCourseDeleted);
+	const [courseGone, setCourseGone] = useState(() => initiallyCourseDeleted || deletedInThisWindow(course?.workspace));
 	// Bumped when something that held focus goes away (a rename ends, a
 	// confirm closes): the dock puts focus back where he types (focus-home.ts).
 	const [focusEpoch, setFocusEpoch] = useState(0);
