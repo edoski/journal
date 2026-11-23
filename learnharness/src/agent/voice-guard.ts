@@ -1801,7 +1801,8 @@ export class VoiceGuard {
 		if (recordWord) out.push({ rule: "card-words", excerpt: recordWord });
 		const sure = kind === "close" ? narratedConfidence(text) : null;
 		if (sure) out.push({ rule: "confidence", excerpt: sure });
-		if (receipt) out.push(...closeBreaks(text, receipt, this.courseTitles));
+		// A review's own topics are its questions to come, never untouched.
+		if (receipt) out.push(...closeBreaks(text, receipt, this.courseTitles.filter((t) => !this.reviewTopics.includes(t))));
 		if (this.owed > 0 && this.lengthDraft && !out.some((b) => b.rule === "length")) {
 			const { words, clauses } = clausesOf(text);
 			const draft = this.lengthDraft;

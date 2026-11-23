@@ -180,6 +180,19 @@ describe("one close receipt for every session (round 20, M3)", () => {
 		assert.deepEqual(close.topics.map((t) => [t.handle, t.day]), [["rv", "2026-11-15"], ["conditional", "2026-11-12"]]);
 	});
 
+	it("a review's move to its next topic after a save is no close, so naming that topic and today is no untouched topic (review, round 20)", async () => {
+		const opened: LhMessage[] = [brief("Opened on: Conditional probability, Law of total probability, as its review."), newUserMessage("…")];
+		const guard = new VoiceGuard(opened, undefined, true, true, async () => TITLES);
+		await Promise.resolve();
+		const receipt = receiptOfSaves([{ topics: ["conditional"], receipt: receiptOf({ conditional: ["Conditional probability", "2026-11-11"] }) }], D8);
+		const call: ToolCall = { type: "toolCall", id: `v-${nextId()}`, name: "course_save", arguments: { changes: {} } };
+		guard.screen(call);
+		const tool = { name: "course_save", label: "course_save", description: "", parameters: {} as never, execute: async () => ({ content: [{ type: "text" as const, text: JSON.stringify({ revision: 4, reviews: {}, close: receipt }) }], details: null }) } as unknown as AgentTool<never>;
+		await guard.wrap(tool).execute(call.id, call.arguments as never, undefined, undefined);
+		assert.deepEqual(closeRules(guard, "Now your Law of total probability review, also due today."), []);
+		assert.ok(closeRules(guard, "Your Conditional probability review comes back on Wednesday 11 November, and Independent events comes back tomorrow.").includes("close-untouched"), "a topic outside the review is still untouched");
+	});
+
 	it("his Done for today carries the receipt to every kind of agent, and each close copies it", () => {
 		const receipt = receiptOfMap(LA_8, ["matmul-mech"], []);
 		const marker = withCloseReceipt(newDoneTonightMessage("practice"), receipt) as { content: string; details: { close: unknown } };
