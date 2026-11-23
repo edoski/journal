@@ -214,7 +214,7 @@ describe("new course", () => {
 		const res = await createCourse({ root: STUDY, title: "Topology" });
 		assert.equal(res.status, 502);
 		const { error } = (await res.json()) as { error: string };
-		assert.equal(error, "LearnHarness could not reach your courses. Try again, and restart the app if it keeps happening.");
+		assert.equal(error, "Chiron could not reach your courses. Try again, and restart the app if it keeps happening.");
 		assert.ok(fs.existsSync(path.join(STUDY, "topology")));
 
 		// The real init leaves its manifest and no course record; creating

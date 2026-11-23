@@ -48,7 +48,7 @@ test("each non-connected state says what to do, with one Refresh and no sign-in 
 	const cases: [ClaudeAccountStatus, RegExp][] = [
 		[account("claude-subscription", "Claude Code", { state: "missing" }, null, null, "default"), /Claude Code is not installed/],
 		[account("claude-subscription", "Claude Code", { state: "signed-out" }, null, null, "default"), /Run `claude` in a terminal and sign in with your Claude account, then press Refresh/],
-		[{ ...account("claude-subscription", "Claude Code", { state: "signed-out" }, null, "me@example.com", "default"), account: { providerId: "claude-subscription", label: "Claude Code", email: "me@example.com", auth: "default", notInT3: true } }, /^LearnHarness can't find your Claude accounts in T3 Code\. Open T3 Code, check them, then press Refresh\.$/],
+		[{ ...account("claude-subscription", "Claude Code", { state: "signed-out" }, null, "me@example.com", "default"), account: { providerId: "claude-subscription", label: "Claude Code", email: "me@example.com", auth: "default", notInT3: true } }, /^Chiron can't find your Claude accounts in T3 Code\. Open T3 Code, check them, then press Refresh\.$/],
 		[account("claude-subscription-work", "Work", { state: "signed-out" }), /This account isn't signed in\. Sign in to it again in T3 Code, then press Refresh/],
 		[account("claude-subscription", "Claude Code", { state: "not-subscription", authMethod: "api_key" }, null, null, "default"), /signed in with an API key, which would not use your Claude plan\. Run `claude`, then `\/login`/],
 		[account("claude-subscription", "Claude Code", { state: "error", message: "Claude Code could not report its sign-in status." }, null, null, "default"), /could not report its sign-in status/],

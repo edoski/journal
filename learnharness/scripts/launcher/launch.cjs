@@ -14,15 +14,16 @@ const { createHash, randomBytes } = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { removeRenamedBundles } = require("./bundles.cjs");
 const { updateCheckout } = require("./update.cjs");
 const product = require.resolve("../../electron/product.cjs");
 const serverReady = require.resolve("../../electron/server-ready.cjs");
-const { PRODUCT_NAME } = require(product);
+const { PRODUCT_NAME, DATA_FOLDER, nameApp } = require(product);
 const { waitForServer } = require(serverReady);
 
 /** Clear of the Amoreg dev servers (3000 to 3210, 5173, 5733). */
 const PORT = Number(process.env.LH_LAUNCH_PORT) || 4747;
-const LOG_DIR = process.env.LH_LAUNCH_LOGS || path.join(os.homedir(), "Library", "Logs", PRODUCT_NAME);
+const LOG_DIR = process.env.LH_LAUNCH_LOGS || path.join(os.homedir(), "Library", "Logs", DATA_FOLDER);
 
 /** Stops this launch's next dev; set once it starts. */
 let stopServer = () => {};
@@ -39,8 +40,7 @@ function launch({ checkout, bundle }) {
 	log(`launch: ${checkout}${bundle ? ` from ${bundle}` : ""}`);
 	// Until the shell loads, a failed launch must not leave a userData folder
 	// named after the launcher's package.json.
-	app.setName(PRODUCT_NAME);
-	if (process.env.LH_USER_DATA_DIR) app.setPath("userData", path.resolve(process.env.LH_USER_DATA_DIR));
+	nameApp(app, process.env);
 
 	try {
 		const env = shellEnvironment(log);
@@ -51,7 +51,11 @@ function launch({ checkout, bundle }) {
 		if (!fs.existsSync(path.join(appDir, "node_modules", "electron", "path.txt"))) {
 			run("node", ["node_modules/electron/install.js"], appDir, env, log);
 		}
-		if (bundle && reinstallForNewElectron({ appDir, checkout, bundle, env, log })) return;
+		// The update may have renamed the app: the .app follows the name it brought.
+		delete require.cache[product];
+		const { PRODUCT_NAME: name } = require(product);
+		if (bundle && reinstallStaleBundle({ appDir, checkout, bundle, name, env, log })) return;
+		if (bundle) removeRenamedBundles(bundle, name, log);
 
 		const url = `http://127.0.0.1:${PORT}`;
 		const pidFile = path.join(LOG_DIR, `next-dev-${PORT}.pid`);
@@ -128,14 +132,16 @@ function installPackagesIfStale(appDir, env, log) {
 	fs.writeFileSync(stamp, lock);
 }
 
-/** The .app carries its own copy of Electron. When main moved to another
- *  version, rebuild the .app from the checkout's and open the new one. */
-function reinstallForNewElectron({ appDir, checkout, bundle, env, log }) {
+/** The .app carries its own copy of Electron and the app's name. When main
+ *  moved to another Electron version or renamed the app, rebuild the .app
+ *  from the checkout and open the new one. */
+function reinstallStaleBundle({ appDir, checkout, bundle, name, env, log }) {
 	const wanted = JSON.parse(fs.readFileSync(path.join(appDir, "node_modules", "electron", "package.json"), "utf8")).version;
-	if (wanted === process.versions.electron || process.argv.includes("--lh-reinstalled")) return false;
-	log(`Electron ${process.versions.electron} -> ${wanted}: reinstalling ${bundle}`);
+	const named = `${name}.app`;
+	if ((wanted === process.versions.electron && path.basename(bundle) === named) || process.argv.includes("--lh-reinstalled")) return false;
+	log(`${path.basename(bundle)} on Electron ${process.versions.electron} -> ${named} on ${wanted}: reinstalling`);
 	run("/bin/bash", [path.join(appDir, "scripts", "launcher", "install.sh"), "--checkout", checkout, "--dest", path.dirname(bundle)], appDir, env, log);
-	app.relaunch({ args: [...process.argv.slice(1), "--lh-reinstalled"] });
+	app.relaunch({ execPath: path.join(path.dirname(bundle), named, "Contents", "MacOS", "Electron"), args: [...process.argv.slice(1), "--lh-reinstalled"] });
 	app.exit(0);
 	return true;
 }

@@ -135,7 +135,7 @@ export type MaterialAdded = { ok: true; added: string[] } | { ok: false; status:
 export async function addMaterial(workspace: string, files: ReadonlyArray<{ path: string; bytes: Uint8Array }>): Promise<MaterialAdded> {
 	const { materialPath, MATERIAL_FOLDER, listCourses } = await import("./courses.ts");
 	const listing = await listCourses();
-	if (!listing.available) return { ok: false, status: 502, error: "LearnHarness could not reach your courses. Try again." };
+	if (!listing.available) return { ok: false, status: 502, error: "Chiron could not reach your courses. Try again." };
 	if (!listing.courses.some((c) => c.workspace === workspace)) return { ok: false, status: 404, error: "That course is no longer in your list." };
 	const scanned = await stores.courseRecords.run(workspace, { verb: "sources", scan: true });
 	const directory = scanned.ok && typeof (scanned.json as { directory?: unknown }).directory === "string" ? (scanned.json as { directory: string }).directory : workspace;
