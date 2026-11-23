@@ -40,7 +40,6 @@ import {
 	activeProblemOf,
 	newTaskContinueMessage,
 	sessionTasksOf,
-	needsContinuation,
 	sessionModeOf,
 	concludedByDismissalPair,
 	danglingQuestionOf,
@@ -65,7 +64,9 @@ import {
 	newAskedMessage,
 	newUngradedWorkMessage,
 	workAwaitingGradeOf,
+	NEUTRAL_MARKERS,
 } from "./native-messages.ts";
+import { sessionEndOf } from "./session-end.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
 import { markLinks } from "./answer-marks.ts";
 import { isMarkResult, MARK_RESULTS, type MarkResult } from "./contracts/marks.ts";
@@ -101,11 +102,6 @@ export type ChatInput =
 	 *  had typed in the open question's box (`toolCallId`), kept with the
 	 *  question it was left on (`LeftDraft`). */
 	| { type: "tonight"; draft?: { toolCallId: string } & LeftDraft }
-	/** Continue pressed on an open task the session holds, with nothing
-	 *  in it waiting on him: the tutor carries on at the task's step
-	 *  (round 13, 2 M1). `task` is the task's record as the server read it
-	 *  (`taskContinueAppends`); a client's is never kept. */
-	| { type: "task"; task?: ContinuedTask | null }
 	/** His dispute of an answer's mark (Edo, 14 Nov 2026): the answer's
 	 *  call, the attempts that stood for it when he pressed Dispute, and
 	 *  what he said is wrong or the mark he thinks is right (at least one).
@@ -306,8 +302,6 @@ export function parseChatInput(input: unknown): ChatInput {
 			if (!draft.text.trim()) return { type: "tonight" };
 			return { type: "tonight", draft: { toolCallId: draft.toolCallId, text: draft.text, ...(draft.confidence !== undefined ? { confidence: draft.confidence } : {}) } };
 		}
-		case "task":
-			return { type: "task" };
 		case "dispute": {
 			if (typeof i.answerId !== "string" || i.answerId.length === 0) throw new ChatInputError("dispute input requires answerId");
 			const observations = Array.isArray(i.observations) ? i.observations : [];
@@ -400,8 +394,6 @@ export function inputAppends(
 		}
 		case "tonight":
 			return tonightAppends(record, input.draft);
-		case "task":
-			return taskContinueAppends(record, input.task);
 		case "dispute":
 			return disputeAppends(record, input);
 	}
@@ -589,18 +581,21 @@ export function isQuestionTool(name: string): boolean {
 	return (QUESTION_TOOLS as readonly string[]).includes(name);
 }
 
-/** Whether Continue on the task a session holds starts a turn: it holds an
- *  open task, nothing in it waits on him, and no reply is owed (pure). */
-export function taskTurnOwed(messages: LhMessage[]): boolean {
-	return sessionTasksOf(messages).length > 0 && !danglingQuestionOf(messages) && !activeProblemOf(messages) && !needsContinuation(messages);
-}
-
-/** Continue on a task's appends (pure): refused unless the session holds
- *  an open task and nothing in it waits on him, since a posed question or
- *  problem is where he goes on, and his answer is the next input. */
-export function taskContinueAppends(record: { messages: LhMessage[] }, task?: ContinuedTask | null): LhMessage[] {
-	const tasks = sessionTasksOf(record.messages);
-	if (tasks.length === 0) throw new ChatInputError("task input requires a session holding an open task");
-	if (danglingQuestionOf(record.messages) || activeProblemOf(record.messages)) throw new ChatInputError("task input requires nothing waiting on him");
+/** Continue on the task a session holds, as the chat opens (pure): the
+ *  line that shows the step he left it at (`task`, the server's read of the
+ *  map), with no turn, as Resume poses a left question again (round 21, m7).
+ *  None unless it holds an open task, nothing in it waits on him or owes him
+ *  a reply (a posed question or problem is where he goes on, and a cut reply
+ *  waits for Try again), and his last Continue is not still the record's
+ *  end: a reload or a second press draws it once. */
+export function taskContinueAppends(record: { messages: LhMessage[] }, task: ContinuedTask): LhMessage[] {
+	const { messages } = record;
+	const tasks = sessionTasksOf(messages);
+	if (tasks.length === 0 || danglingQuestionOf(messages) || activeProblemOf(messages) || sessionEndOf(messages, undefined) === "cut") return [];
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "custom" || !NEUTRAL_MARKERS.includes(m.customType)) break;
+		if (m.customType === "task-continue") return [];
+	}
 	return [...dismissalConclusion(record), newTaskContinueMessage(tasks, task)];
 }

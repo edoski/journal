@@ -105,12 +105,11 @@ export function continueMove(sessions: readonly ChatListItem[], finished: typeof
 	return chat ? CONTINUE[sessionState(chat)](chat, finished) : null;
 }
 
-/** Whether Continue on a session takes up the task it holds with a turn:
- *  it holds an open task and nothing in it waits on him or runs, so the
- *  tutor carries on at the task's step as it opens (round 13, 2 M1:
- *  Continue Problem sheet 4 opened the sheet's finished chat with an empty
- *  box). Opening it to read it, from the calendar or Earlier, asks for
- *  nothing. */
+/** Whether Continue on a session takes up the task it holds: it holds an
+ *  open task and nothing in it waits on him or runs, so the chat shows the
+ *  task's step as it opens (round 13, 2 M1: Continue Problem sheet 4 opened
+ *  the sheet's finished chat with an empty box; round 21, m7). Opening it
+ *  to read it, from the calendar or Earlier, asks for nothing. */
 export function continuesTask(chat: ChatListItem): boolean {
 	return (chat.tasks?.length ?? 0) > 0 && !chat.busy && !chat.pendingQuestion && !chat.pendingProblem && chat.ended !== "cut" && chat.ended !== "mid-lesson";
 }

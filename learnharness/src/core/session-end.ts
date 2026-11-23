@@ -1,7 +1,7 @@
 import type { PlanTree } from "./contracts/plan.ts";
 import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, lessonProgressOf } from "./contracts/plan.ts";
 import type { SessionEnd, SessionMode } from "./contracts/chat.ts";
-import { activeProblemOf, danglingQuestionOf, endsInDismissal, nativeInputCause, isQuestionRepose, needsContinuation, NEUTRAL_MARKERS, newQuestionRepose, PRACTICE_CONCLUDE_TOOL, sessionModeOf, sessionTaskStatesOf, type LhMessage } from "./native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, endsInDismissal, nativeInputCause, isQuestionRepose, isTaskContinue, needsContinuation, NEUTRAL_MARKERS, newQuestionRepose, PRACTICE_CONCLUDE_TOOL, sessionModeOf, sessionTaskStatesOf, type LhMessage } from "./native-messages.ts";
 import { offersStopIn, picksStop } from "./question-core.ts";
 import { phaseAt3Lh } from "./phases.ts";
 
@@ -230,15 +230,16 @@ export function leftQuestionRepose(messages: readonly LhMessage[]): LhMessage[] 
  *  November" right above "Your turn", with no word that days had passed).
  *  `lastStudied` is the session's last activity on the study clock, ISO (its
  *  `updatedAt`, which the app's re-pose of a left question never moves).
- *  The left question asked again on opening when it ends the transcript
- *  (`{ before: its id }`), else whatever comes next (`{ before: null }`);
- *  null when he last studied it today. Pure. */
+ *  The left question asked again on opening, or the step his Continue on a
+ *  task shows (round 21, m7), when it ends the transcript (`{ before: its
+ *  id }`), else whatever comes next (`{ before: null }`); null when he last
+ *  studied it today. Pure. */
 export function resumedOn(messages: readonly LhMessage[], lastStudied: string, today: string): { day: string; before: string | null } | null {
 	const at = new Date(lastStudied);
 	const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
 	if (Number.isNaN(at.getTime()) || day >= today) return null;
-	const last = messages.findLast((m) => !(m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)));
-	return { day: today, before: last && isQuestionRepose(last) ? last.id : null };
+	const last = messages.findLast((m) => isTaskContinue(m) || !(m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)));
+	return { day: today, before: last && (isQuestionRepose(last) || isTaskContinue(last)) ? last.id : null };
 }
 
 /** The question his Done for today set aside with a half answer in its

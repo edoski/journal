@@ -1,7 +1,7 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Chat } from "@/components/chat";
 import { openedByApp, resumedOn, sessionTitleOf, studyDay } from "@/src/core";
-import { courseDeleted, getChat, isTurnRunning, lessonPlace, reposeLeftQuestions, turnFailure } from "@/src/server";
+import { continueHeldTask, courseDeleted, getChat, isTurnRunning, lessonPlace, reposeLeftQuestions, turnFailure } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +15,12 @@ export default async function ChatPage({
 	const [{ id }, { prompt, continue: go }] = await Promise.all([params, searchParams]);
 	// Back in a session he left for today: its left question is asked again.
 	reposeLeftQuestions(id);
+	// Continue on the open task it holds (`continueHref`): the step he left it at shows, and the address forgets the
+	// press, so a reload never draws it twice.
+	if (go === "task") {
+		await continueHeldTask(id);
+		redirect(`/chat/${id}`);
+	}
 	const chat = getChat(id);
 	if (!chat) notFound();
 	// Where the lesson sits in its course, for the top bar's links.
@@ -39,8 +45,6 @@ export default async function ChatPage({
 			// Back on a later study day: the date divider where it picks up.
 			resumed={resumedOn(chat.messages, chat.updatedAt, studyDay()) ?? undefined}
 			initialPrompt={prompt}
-			// Continue on the open task it holds (continueHref).
-			continueTask={go === "task"}
 			// A teacher turn that outlived its client: the remounted view must
 			// attach (busy shimmer + poll), never resurrect the stale record.
 			initiallyInFlight={isTurnRunning(chat.id)}

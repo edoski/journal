@@ -268,21 +268,21 @@ export const TASK_HANDOFF_TEXT =
 	TASK_STEP_FIRST;
 
 /** The model-facing words of Continue pressed on an open task this session
- *  holds, when nothing in it waits on him (round 13, 2 M1): Continue
- *  Problem sheet 4 opened the sheet's finished chat with no turn, and his
- *  "let us continue the sheet" was planned as a lesson from the basics, so
- *  part (c) was put off to next time. The task's step is the record's, in
- *  the course brief above. The part's text from his material (`passage`),
- *  on his screen from the press, comes with it, so the turn reads no file
- *  to find it (round 18, M6). */
+ *  holds, when nothing in it waits on him (round 13, 2 M1: his "let us
+ *  continue the sheet" was planned as a lesson from the basics, so part (c)
+ *  was put off to next time). His screen shows the step, as the record names
+ *  it, and the part's text from his material (`passage`, round 18, M6); the
+ *  tutor reads these words with his first message after the press, which is
+ *  his try at the step (round 21, m7), so it reads no file and poses
+ *  nothing again. */
 export function taskContinueText(tasks: readonly string[], passage?: string | null): string {
 	const named = tasks.map((key) => `\`${key}\``).join(" and ");
 	return (
-		`[CONTINUE MY TASK] I pressed Continue on my open task ${named}. Carry on at its saved step, as the course record above gives it. ` +
-		(passage ? `My screen already shows its text from my material, so read no file for it:\n\n${passage}\n\n` : "") +
+		`[CONTINUE MY TASK] I pressed Continue on my open task ${named}, and my screen shows its saved step, as the course record gives it` +
+		(passage ? `, with its text from my material, so read no file for it:\n\n${passage}\n\n` : ". ") +
+		"What I send next is my own try at that step, or a question about it: mark a try as my answer to the step, and never pose the step again. " +
 		"It is my task, not a lesson: never a lesson on the topic from its basics. If you plan, plan only that step with plan_init, one node named for the part it is. " +
-		"If the step needs something from me first, such as a part's text, ask me for it in one plain line and end your turn; otherwise pose the step straight away. " +
-		`${TASK_STEP_FIRST} Never say this message.`
+		"Never work the step, or any part of it, yourself. If my try shows a gap, teach it then, on an example of your own, never on my task's own matrix or numbers. Never say this message."
 	);
 }
 

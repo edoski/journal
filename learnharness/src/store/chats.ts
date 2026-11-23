@@ -17,7 +17,7 @@ import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, Sessi
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
-import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, isQuestionRepose, opensTurn, savedAnswerTimesOf, savedAnswerTopicsOf, savedTaskTimesOf, startsMovedOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, isQuestionRepose, isTaskContinue, opensTurn, savedAnswerTimesOf, savedAnswerTopicsOf, savedTaskTimesOf, startsMovedOf, sessionModeOf, sessionTaskTitleOf, sessionTaskTopicsOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
 import { leftQuestionRepose, offersStop, openWorkTopicsOf, sessionEndOf } from "../core/session-end.ts";
 import { answeredAsReview, lessonTakenUp, openedAsReview, stepsOnOf } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
@@ -197,8 +197,15 @@ interface Work {
 	tasked: ReadonlyMap<string, number>;
 }
 
+/** What the app posed again as he opened a session, his work's own words,
+ *  not new work: a left question asked again, or the step of the task he
+ *  pressed Continue on (round 21, m7). */
+function posedAgain(m: LhMessage): boolean {
+	return isQuestionRepose(m) || isTaskContinue(m);
+}
+
 function workOf(messages: readonly LhMessage[]): Work {
-	const last = messages.reduce((at, m) => (isQuestionRepose(m) || typeof m.timestamp !== "number" ? at : Math.max(at, m.timestamp)), 0);
+	const last = messages.reduce((at, m) => (posedAgain(m) || typeof m.timestamp !== "number" ? at : Math.max(at, m.timestamp)), 0);
 	return { last, answered: savedAnswerTimesOf(messages), tasked: savedTaskTimesOf(messages) };
 }
 
@@ -266,7 +273,7 @@ function saveMessages(id: string, messages: LhMessage[]): void {
 	const record = getChat(id);
 	if (!record) throw new Error(`Chat not found: ${id}`);
 	const had = new Set(record.messages.map((m) => m.id));
-	const added = messages.some((m) => !had.has(m.id) && !isQuestionRepose(m));
+	const added = messages.some((m) => !had.has(m.id) && !posedAgain(m));
 	record.messages = messages;
 	if (added) record.updatedAt = studyNow().toISOString();
 	writeChat(record);

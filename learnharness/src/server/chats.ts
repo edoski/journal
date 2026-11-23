@@ -3,6 +3,10 @@ import { isJobLive } from "../agent/subagents/aborts.ts";
 import { titleFromPrompt } from "../core/contracts.ts";
 import { emit } from "../core/events.ts";
 import { leftQuestionRepose } from "../core/session-end.ts";
+import { taskContinueAppends } from "../core/input-events.ts";
+import { keptCourseMaps } from "./course-brief.ts";
+import { continuedTask } from "./task-passage.ts";
+import type { CourseMap } from "../core/contracts/course-map.ts";
 import { stores } from "./stores.ts";
 import { isTurnRunning } from "./turn-liveness.ts";
 import { clearTurnFailure } from "./turn-runs.ts";
@@ -36,6 +40,28 @@ export function reposeLeftQuestions(chatId: string): boolean {
 	// 3 m1); a fresh view reads it with the page.
 	emit("record-changed", { chatId });
 	return true;
+}
+
+/** He pressed Continue on the open task a session holds: the step he left
+ *  it at, with the part's text from his material, goes under the day's
+ *  divider as the chat opens, and the tutor runs only on his first message,
+ *  as a left question is posed again with no turn (round 21, m7: Continue
+ *  Problem sheet 4 showed "Thinking…" for 36.5 s before part (c) came
+ *  back). Nothing while a turn runs, when the map names no such task, or
+ *  when the session asks nothing of the kind (`taskContinueAppends`). */
+export async function continueHeldTask(chatId: string, maps: () => Promise<readonly CourseMap[]> = keptCourseMaps): Promise<void> {
+	const record = stores.chatStore.getChat(chatId);
+	if (!record?.course || isTurnRunning(chatId)) return;
+	const workspace = record.course.workspace;
+	const task = await continuedTask((await maps()).find((m) => m.workspace === workspace), record.messages);
+	const current = stores.chatStore.getChat(chatId);
+	if (!task || !current || isTurnRunning(chatId)) return;
+	const appends = taskContinueAppends(current, task);
+	if (appends.length === 0) return;
+	stores.chatStore.saveMessages(chatId, [...current.messages, ...appends]);
+	// The last turn's failure the server remembers is not where he picks up (round 18, m25).
+	clearTurnFailure(chatId);
+	emit("record-changed", { chatId });
 }
 
 /** How long the wind-down wait may take before the caller gets a retryable

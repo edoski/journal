@@ -693,6 +693,12 @@ export function newQuestionRepose(calls: ReadonlyArray<{ tool: string; input: To
 
 const REPOSE_MODEL = "synthetic-repose";
 
+/** Whether a message is the line of his Continue on a task
+ *  (`newTaskContinueMessage`). */
+export function isTaskContinue(m: LhMessage): boolean {
+	return m.role === "custom" && m.customType === "task-continue";
+}
+
 /** Whether a message is the app's re-pose of his left questions
  *  (`newQuestionRepose`). */
 export function isQuestionRepose(m: LhMessage): boolean {
@@ -770,13 +776,13 @@ export interface ContinuedTask {
 }
 
 /** His Continue on an open task the session holds, with nothing in it
- *  waiting on him (round 13, 2 M1): the turn carries on at the task's step.
- *  With the task's record (`task`), the transcript draws its title, the
- *  part's text from his material and the step he left it at the moment he
- *  presses, before the tutor's turn writes that step out (round 17, M8:
- *  Continue Problem sheet 4 showed "Thinking…" for 42 s before part (c);
- *  round 18, M6: the part's matrix waited 64 to 80 s). The model reads the
- *  content, which carries that text too, so it reads no file to find it. */
+ *  waiting on him (round 13, 2 M1): the transcript draws the task's title,
+ *  the part's text from his material and the step he left it at (`task`),
+ *  and no turn runs until he writes (round 21, m7: Continue Problem sheet 4
+ *  waited 36.5 s on a turn to post part (c) again, which the record already
+ *  held). It asks the tutor nothing by itself, so it is neutral, as Resume's
+ *  question posed again is; the model reads its content, which carries that
+ *  text too, with his first message, so it reads no file to find it. */
 export function newTaskContinueMessage(tasks: readonly string[], task?: ContinuedTask | null): LhMarkerMessage {
 	return {
 		id: newMessageId(),
@@ -1785,7 +1791,7 @@ export function endsInQuestionRecovery(messages: readonly LhMessage[]): boolean 
 
 export type NativeInputCause = "learner" | "automatic" | "neutral" | "unrecognizable";
 /** Markers that carry context, never a new input. */
-export const NEUTRAL_MARKERS: readonly string[] = ["graph-context", "course-context", "session-mode", "plan-block", "problem-dismissed", "compaction", "session-resume"];
+export const NEUTRAL_MARKERS: readonly string[] = ["graph-context", "course-context", "session-mode", "plan-block", "problem-dismissed", "compaction", "session-resume", "task-continue"];
 
 /** Whether a message is an input that starts a new agent turn: exactly
  *  the messages `nativeInputCause` does not call neutral, decided without
@@ -1804,7 +1810,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
 		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort", "setup-note"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-next", "practice-request", "done-tonight", UNGRADED_ANSWER, "dispute", "task-continue"].includes(message.customType)) return "learner";
+		if (["practice-thinking", "practice-next", "practice-request", "done-tonight", UNGRADED_ANSWER, "dispute"].includes(message.customType)) return "learner";
 		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {

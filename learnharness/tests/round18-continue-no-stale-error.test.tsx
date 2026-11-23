@@ -2,8 +2,10 @@
  * Round 18, m25 (1 n9). "The tutor stopped before replying. Try again"
  * flashed for about half a second as Continue on a problem sheet opened:
  * the page drew the last turn's remembered failure until the Continue
- * turn's start cleared it. A Continue's page now opens with no failure
- * line; a page opened any other way still shows a failure it holds.
+ * turn's start cleared it. Since round 21 (m7) Continue runs no turn: the
+ * chat page clears that failure as it shows the step
+ * (`round21-continue-at-once.test.tsx`); a page opened any other way still
+ * shows a failure it holds.
  */
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -57,17 +59,13 @@ const record = [
 // The failure the server remembers from the session's last failed turn.
 const FAILURE = "Claude Code stopped with an error before it finished.";
 
-const page = (continueTask: boolean) =>
+const page = () =>
 	renderToStaticMarkup(
 		<ServerEventsProvider connect={() => quietSource}>
-			<Chat chatId={CHAT} title="Problem sheet 4: rank and nullity" initialMessages={record} initialError={FAILURE} continueTask={continueTask} course={{ workspace: "la", title: "Linear Algebra" }} />
+			<Chat chatId={CHAT} title="Problem sheet 4: rank and nullity" initialMessages={record} initialError={FAILURE} course={{ workspace: "la", title: "Linear Algebra" }} />
 		</ServerEventsProvider>,
 	);
 
-test("Continue's page opens with no failure line from the last turn (round 18, m25)", () => {
-	assert.doesNotMatch(page(true), /stopped before replying/);
-});
-
 test("a page opened without Continue still shows the failure it holds", () => {
-	assert.match(page(false), /stopped before replying/);
+	assert.match(page(), /stopped before replying/);
 });

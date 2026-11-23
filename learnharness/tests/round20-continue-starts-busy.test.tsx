@@ -5,8 +5,9 @@
  * Thinking. Round 18 hid the failure the server remembered, but the
  * sheet's own transcript ended on the failed reply, and the page draws
  * that until the Continue turn, sent once the page has mounted, starts.
- * The owed Continue turn is now busy from the first frame: the page the
- * server draws shows the turn starting, never the last turn's failure.
+ * Since round 21 (m7) Continue runs no turn, and a session whose reply was
+ * cut is no Continue on its task (`continuesTask`): its page shows the
+ * failure and Try again, as its status says.
  */
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -43,7 +44,7 @@ const { Chat } = await import("../components/chat.tsx");
 const { ServerEventsProvider } = await import("../components/server-events.tsx");
 type NotifySource = import("../components/server-events.tsx").NotifySource;
 const quietSource: NotifySource = { close() {}, onOpen() {}, onEvent() {} };
-const { newUserMessage } = await import("../src/core/index.ts");
+const { newUserMessage, taskContinueAppends } = await import("../src/core/index.ts");
 type LhMessage = import("../src/core/index.ts").LhMessage;
 
 
@@ -61,20 +62,14 @@ const record = [
 	{ id: "a_fail", role: "assistant", content: [], stopReason: "error", errorMessage: FAILURE, timestamp: at(5) },
 ] as unknown as LhMessage[];
 
-const page = (continueTask: boolean) =>
+const page = () =>
 	renderToStaticMarkup(
 		<ServerEventsProvider connect={() => quietSource}>
-			<Chat chatId={CHAT} title="Problem sheet 4: rank and nullity" initialMessages={record} continueTask={continueTask} course={{ workspace: "la", title: "Linear Algebra" }} />
+			<Chat chatId={CHAT} title="Problem sheet 4: rank and nullity" initialMessages={record} course={{ workspace: "la", title: "Linear Algebra" }} />
 		</ServerEventsProvider>,
 	);
 
-test("Continue's page, before its turn's first output, shows the turn starting and no failure from the transcript", () => {
-	const html = page(true);
-	assert.doesNotMatch(html, /stopped before replying/);
-	assert.doesNotMatch(html, /try again/i);
-	assert.match(html, /data-testid="thinking-placeholder"/);
-});
-
-test("the same page opened without Continue still shows the failure its transcript holds", () => {
-	assert.match(page(false), /stopped before replying/);
+test("Continue on it shows no step over its cut reply, and its page shows the failure its transcript holds", () => {
+	assert.deepEqual(taskContinueAppends({ messages: record }, { title: "Problem sheet 4: rank and nullity", step: "Part (c)" }), []);
+	assert.match(page(), /stopped before replying/);
 });
