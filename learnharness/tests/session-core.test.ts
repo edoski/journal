@@ -29,6 +29,7 @@ import { endsInFailedTurn, newCompactionMarker, newPlanBlockMessage, projectView
 import { buildProbeHandoffSteer, buildSubagentSteer } from "../src/core/contracts/jobs.ts";
 import { dismissedAnswer } from "../src/core/question-core.ts";
 import { buildAnswer, type QuestionData } from "../src/core/question-core.ts";
+import { replyBudgetText } from "../src/core/voice-check.ts";
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -1875,6 +1876,8 @@ describe("newAnswerResult two audiences", () => {
 			text: "Mercury",
 			confidence: "guessing",
 			thinking: "guessed",
+			// Round 21, m17: the reply's budget, said before the first draft.
+			reply: replyBudgetText("wrong"),
 		});
 		assert.equal(msg.details, full, "details is the full QuestionAnswerData verbatim");
 		const hint = JSON.parse((newAnswerResult("call-2", "explain", { ...full, hintRequested: true }).content as { type: "text"; text: string }[])[0]!.text);

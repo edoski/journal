@@ -59,6 +59,7 @@ import {
 } from "./contracts/chat.ts";
 import { LESSON_PROGRESS_TOOL, lessonProgressOf } from "./contracts/plan.ts";
 import { compactAnswerForModel, normalizeQuestionType, type QuestionAnswerData } from "./question-core.ts";
+import { replyBudgetText } from "./voice-check.ts";
 import { chosenConfidence, type Confidence } from "./contracts/course.ts";
 import type { MarkResult } from "./contracts/marks.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
@@ -232,6 +233,9 @@ export function newAnswerResult(
 	 *  answered it (`asksWhileOpen`): the tutor's answers to them may be
 	 *  help (round 21, m15). */
 	askedFirst: readonly string[] = [],
+	/** What the tutor told him since his last answer, the step and its
+	 *  nudges or hints (`toldWhileOpen`): the reply says none of it again. */
+	told: readonly string[] = [],
 ): LhMessage & ToolResultMessage {
 	// A photo of his working rides the result as image parts after the
 	// answer, and the answer says it is there.
@@ -240,6 +244,9 @@ export function newAnswerResult(
 	const compact = GRADED_QUESTION_TOOLS.includes(toolName) && isRealAnswer(answer) ? { question: toolCallId, ...compactAnswerForModel(answer as QuestionAnswerData) } : compactAnswerForModel(answer as QuestionAnswerData);
 	if (photos?.length) compact.photo = WORKING_PHOTO_NOTE;
 	if (askedFirst.length) compact.asked_first = [...askedFirst];
+	// The reply's budget and what is already said, before the first draft (round 21, m17).
+	const reply = replyOwed(answer, told);
+	if (reply) compact.reply = reply;
 	return {
 		id: newMessageId(),
 		role: "toolResult",
@@ -252,6 +259,38 @@ export function newAnswerResult(
 		isError: false,
 		timestamp: Date.now(),
 	};
+}
+
+/** What the answer's turn must fit, said with it (round 21, m17): its
+ *  budget, the guard's own, and the messages since his last answer, which
+ *  it never says again. Null for a shown answer or a question set aside,
+ *  which set their own length. Pure. */
+function replyOwed(answer: unknown, told: readonly string[]): string | null {
+	const d = answer as { dismissed?: unknown; showMe?: unknown; hintRequested?: unknown } | null;
+	if (!d || typeof d !== "object" || d.dismissed === true || d.showMe === true) return null;
+	const said = told.length ? ` Already said since his last answer, so never again in any words: ${told.map((t) => `"${t.trim()}"`).join(" ")}` : "";
+	return `${replyBudgetText(d.hintRequested === true ? "hint" : "wrong")}${said}`;
+}
+
+/** What the tutor told him while the question `pending` was open and
+ *  since his last answer before it: the messages he read, the step it asks
+ *  about and any nudge or hint on it (round 21, m17: a hint whose cue the
+ *  guard refused as already told, rewritten 16 s later). Pure. */
+export function toldWhileOpen(messages: readonly LhMessage[], pending: { tool: string; input: unknown }): string[] {
+	const key = sameQuestionKey(parseQuestionInput(pending.tool, pending.input)?.question ?? "");
+	if (!key) return [];
+	const failed = failedOutputCallIds(messages);
+	const told: string[] = [];
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName) && isRealAnswer(m.details)) break;
+		if (m.role !== "assistant") continue;
+		const poses = m.content.flatMap((b) => (b.type === "toolCall" && (QUESTION_TOOLS as readonly string[]).includes(b.name) ? [sameQuestionKey(parseQuestionInput(b.name, b.arguments)?.question ?? "")] : []));
+		if (poses.some((k) => k !== key)) break;
+		const sent = m.content.flatMap((b) => (b.type === "toolCall" && b.name === SEND_TO_USER_TOOL && !failed.has(b.id) ? [sendToUserText(b)].filter((t): t is string => !!t?.trim()) : []));
+		told.unshift(...sent);
+	}
+	return told;
 }
 
 /** His messages from Ask while the question `pending` was open, before
