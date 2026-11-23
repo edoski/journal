@@ -23,6 +23,7 @@ import { lessonOf } from "@/components/study-home/lesson-facts";
 import { needsYouNow } from "@/components/study-home/needs-you";
 import { ReadyFact } from "@/components/course-page/course-head/ready-fact";
 import { finalReviewLineWords } from "@/components/study-words";
+import { finalReviewMisses } from "@/components/course-page/course-head/head-facts";
 import { StudiedFact } from "@/components/course-page/course-head/head-parts";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { MAP_FADE, vignette } from "@/components/course-map/map-fade";
@@ -66,7 +67,7 @@ const ready = { rows, lessons: rows.map(lessonOf), courses, chats: CHATS, done: 
 /** Linear Algebra's head on the demo's 8 Nov (round 19, 2 `43b`). */
 const headCourse = { ...LINALG, map: { ...LINALG.map, exam: { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-27", doesNotFit: [], unreviewed: [h("det")], reasons: {} } } } as StudyCourse;
 const headView = { course: headCourse, chats: [] } as unknown as CourseView;
-const SHORT = finalReviewLineWords(headCourse.map.exam!);
+const SHORT = finalReviewLineWords(headCourse.map.exam!, finalReviewMisses(headCourse.map).map((t) => t.title));
 
 /** Calculus I after a full day: a chain of eight topics, "You are here" on the last, Improper integrals. */
 const CALC_CHAIN = ["Limits", "Continuity", "Derivatives", "Chain rule", "Implicit differentiation", "Riemann sums", "Fundamental theorem of calculus", "Improper integrals"];

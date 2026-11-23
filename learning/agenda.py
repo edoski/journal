@@ -81,6 +81,15 @@ day). It is not a share of the day: like a day off, the plan proposes
 nothing on it, and nothing he does or leaves that day reads as his limit or
 his study days.
 
+The Journal's day off (its schedule's ``OFF`` days, ``Capacity.rests``,
+read by ``retrieval.journal_rests``) may hold reviews but starts no new
+topic (Edo, 23 Nov 2026): a first lesson is the heaviest study. Its new
+topics' room goes to the next day that takes starts (``capacity._room``),
+so every other day keeps the starts it had; an exam's pace spreads over the
+days that take starts; and a start he was told for a day off moves to the
+next one, past his limit as a start he left does, every other day he was
+told kept.
+
 New topics come only from the ready set: topics whose prerequisites are all
 solid and not lapsed, and that no taught but not yet solid competing method
 (``contrasts``) would interfere with. A course with an exam ahead first gets
@@ -860,6 +869,14 @@ def _study_days(week: Capacity, first: date, last: date) -> int:
     )
 
 
+def _start_days(week: Capacity, first: date, last: date) -> int:
+    """The days from ``first`` to ``last`` the plan starts new topics on
+    (``Capacity.starts``): a pace spreads over them, never a Journal day off."""
+    return sum(
+        week.starts(first + timedelta(days=n)) for n in range((last - first).days + 1)
+    )
+
+
 def _room_after(week: Capacity, day: date, last: date) -> int | None:
     """The new topics his shown limit holds from the day after ``day`` to
     ``last``, as the days take them (``_whole``); None while he has shown
@@ -867,7 +884,7 @@ def _room_after(week: Capacity, day: date, last: date) -> int | None:
     if not week.on(day).new.shown:
         return None
     days = (day + timedelta(days=n) for n in range(1, (last - day).days + 1))
-    return sum(_whole(week, other, "new") for other in days if week.studies(other))
+    return sum(_whole(week, other, "new") for other in days if week.starts(other))
 
 
 def _reviews(
@@ -1267,7 +1284,7 @@ def _new(
     for course in exams:
         end = course.new_end(day)
         assert end is not None
-        left = _study_days(week, day, end)
+        left = _start_days(week, day, end)
         if left > 0 and course.scoped:
             rest = len(course.scoped)
             after = _room_after(week, day, end)
@@ -1276,7 +1293,7 @@ def _new(
                 rest
                 if course.reviewing(day)
                 else max(
-                    capacity.pace(rest, left, day, week.studies),
+                    capacity.pace(rest, left, day, week.starts),
                     rest - after if after is not None else 0,
                 )
             )
@@ -1300,7 +1317,7 @@ def _new(
         taken = take(course, min(room, pace), set(course.scoped))
         end = course.new_end(day)
         assert end is not None
-        left = _study_days(week, day, end)
+        left = _start_days(week, day, end)
         if (
             room - taken > 0
             and taken < pace
@@ -1684,10 +1701,11 @@ def plan(
     today: date,
     days: int,
     week: Capacity | None = None,
+    rests: frozenset[date] = frozenset(),
 ) -> Plan:
     """Every course's plan for ``days`` days from today, together
     (``replay``)."""
-    return replay(records, today, days, week).now
+    return replay(records, today, days, week, rests=rests).now
 
 
 def afresh(
@@ -1695,11 +1713,13 @@ def afresh(
     today: date,
     days: int,
     week: Capacity | None = None,
+    rests: frozenset[date] = frozenset(),
 ) -> Plan:
     """The plan made afresh from the records as they stand, by the module's
     rules alone: what a day begins from after one he left work owed or
     missed (``replay``)."""
-    return _planned(records, today, days, week, None)
+    weekly = (week or capacity.of(records.values(), today)).rested(rests)
+    return _planned(records, today, days, weekly, None)
 
 
 def replay(
@@ -1708,6 +1728,7 @@ def replay(
     days: int,
     week: Capacity | None = None,
     ended: Ended | None = None,
+    rests: frozenset[date] = frozenset(),
 ) -> Replay:
     """Every course's plan for ``days`` days from today, made again from the
     records as he was told it.
@@ -1763,9 +1784,15 @@ def replay(
     the days he has studied (round 16: replaying them took 4.7 s a read
     after 56 study days and 17 s after 400). A day past the year that plan
     reached was never told, so the rules place it (``_Told.covers``).
+
+    ``rests`` are the Journal's days off: they may hold reviews, but no new
+    topic starts on one, and a start he was told for one goes to the next
+    day that takes one, every other told day kept (Edo, 23 Nov 2026).
     """
     with memo.scope():
-        return _day(records, today, days, week, today, told=True, ended=ended)
+        return _day(
+            records, today, days, week, today, told=True, ended=ended, rests=rests
+        )
 
 
 def _day(
@@ -1777,13 +1804,14 @@ def _day(
     *,
     told: bool,
     ended: Ended | None = None,
+    rests: frozenset[date] = frozenset(),
 ) -> Replay:
     """The plan of ``day`` as its saves through ``until`` leave it, for
     ``days`` days, and the plans it was made from (``replay``); with
     ``told`` false, the plan the last day he studied ended with only where
     this day began from it. ``ended``, when it is that day's, is that plan."""
     morning = _at(records, day, None, until)
-    weekly = week or capacity.of(morning.values(), day)
+    weekly = (week or capacity.of(morning.values(), day)).rested(rests)
     studied = last_studied(records, day)
     if studied is None:
         return _afresh(records, day, days, (weekly, morning), until, None)
@@ -1798,7 +1826,7 @@ def _day(
         """The plan as the last day he studied ended: kept, or replayed."""
         if kept is not None:
             return kept
-        found = _day(records, studied, span, week, until, told=False)
+        found = _day(records, studied, span, week, until, told=False, rests=rests)
         known = {name: structure(record) for name, record in records.items()}
         return Ended(studied, found.now, found.since, found.finals, known)
 
@@ -1843,13 +1871,16 @@ def _day(
         )
     finals = before.finals
     morning = _at(records, day, None, until, finals)
-    weekly = week or capacity.of(morning.values(), day)
+    weekly = (week or capacity.of(morning.values(), day)).rested(rests)
     unstudied = {
         name: {
             topic
             for planned in ended_plan.days.get(name, [])[(day - studied).days :]
-            if not weekly.studies(date.fromisoformat(planned["date"]))
-            for topic in (*planned["reviews"], *planned["new"])
+            for on in [date.fromisoformat(planned["date"])]
+            for topic in (
+                *(planned["reviews"] if not weekly.studies(on) else ()),
+                *(planned["new"] if not weekly.starts(on) else ()),
+            )
         }
         for name in live
     }
@@ -2195,7 +2226,12 @@ def _planned(
                 for topic in told.kept(course.name, day, "new"):
                     if course.moves(topic) or topic in starts[course.name]:
                         continue
-                    if topic in course.untaught and course.ready(topic):
+                    # A start he was told for a Journal day off goes to the next day that takes one (Edo, 23 Nov 2026).
+                    if (
+                        topic in course.untaught
+                        and course.ready(topic)
+                        and week.starts(day)
+                    ):
                         course.start(topic, day, course.front(course.startable(day)))
                         course.why[topic] = told.plan.why[course.name][topic]
                         starts[course.name].append(topic)
@@ -2205,9 +2241,12 @@ def _planned(
                         course.moving.add(topic)
         new = (
             _new(courses, day, max(new_room, 0), week, begun, passed)
-            if told is None
-            or beyond
-            or any(course.starts_moving() for course in courses)
+            if week.starts(day)
+            and (
+                told is None
+                or beyond
+                or any(course.starts_moving() for course in courses)
+            )
             else _kept_new(courses, day, week)
         )
         for course in courses:
@@ -2285,7 +2324,7 @@ def _reasons(
         return {}
     eve = exam.day - timedelta(days=1)
     reasons: dict[str, Reason] = {}
-    no_day = not _study_days(week, today, eve)
+    no_day = not _start_days(week, today, eve)
     for topic in late:
         ready = course.ready_on.get(topic)
         if no_day:
@@ -2323,7 +2362,7 @@ def _full(
             held[planned["date"]] = held.get(planned["date"], 0) + len(planned[kind])
     for offset in range((last - first).days + 1):
         day = first + timedelta(days=offset)
-        if not week.studies(day):
+        if not (week.starts(day) if kind == "new" else week.studies(day)):
             continue
         if not getattr(week.on(day), kind).shown:
             return False

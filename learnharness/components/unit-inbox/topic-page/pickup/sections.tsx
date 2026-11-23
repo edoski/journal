@@ -12,7 +12,9 @@ import { BuildsOnList, EarlierDays, MaterialList, NextList, NowRow, ScheduledEnt
  * The history pane, Pick up's sections (spec: pickup.md): the history sorted by
  * relevance into Now, Next, Scheduled and Earlier, each under a quiet
  * divider. Now is the weightiest row, marked in the accent; an empty
- * section is not drawn. While Now starts a topic, Builds on and In your
+ * section is not drawn, Now with nothing to take up today included
+ * (round 21, m4: "Now · Nothing due today" headed pages with nothing to
+ * do, Scheduled below giving the day). While Now starts a topic, Builds on and In your
  * material say why it comes now. The sections are the page's list walk
  * (`listRef`, `onWalkKey`; list-walk.md).
  */
@@ -38,9 +40,11 @@ export function SectionsPane({
 	return (
 		<HistoryPane className={className}>
 			<div ref={listRef} onKeyDown={onWalkKey} className="contents">
-				<Section label="Now">
-					<NowRow now={now} facts={facts} busy={busy} onAct={onAct} shown={shown} onShow={onShow} marked />
-				</Section>
+				{now.kind !== "study" && (
+					<Section label="Now">
+						<NowRow now={now} facts={facts} busy={busy} onAct={onAct} shown={shown} onShow={onShow} marked />
+					</Section>
+				)}
 				{why && why.builds.length > 0 && (
 					<Section label="Builds on">
 						<BuildsOnList builds={why.builds} onPoint={onPoint} />

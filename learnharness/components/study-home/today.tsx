@@ -9,7 +9,7 @@ import type { RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { MathLine } from "@/components/ui/math-line";
 import { MathText } from "@/components/ui/math-text";
 import { Button } from "@/components/ui/button";
-import { EXAM_GAP_WORDS, EXAM_SESSION_WORDS, examLineWords } from "@/components/study-words";
+import { EXAM_GAP_WORDS, EXAM_SESSION_WORDS } from "@/components/study-words";
 import { examGapAskCreation } from "@/components/unit-inbox/start-unit";
 import { useStartScope } from "@/components/start/start-scope";
 
@@ -44,15 +44,15 @@ export function Today({ done, exam = null, misfit = exam, asks = [], ...props }:
 }
 
 /** Under the exam's question, when its plan has no room to start every
- *  topic before it, the exam line the course head says (`examLineWords`):
+ *  topic before it, the exam line the course head says (`examLine`):
  *  one sentence and the first topic he can still start, the names behind
  *  Ask the tutor, which opens the session the head's opens and names them
  *  (round 17, M2: nine exam topics fell after the exam, and Home never said
  *  so; round 20, M2: then an 11-name list). Nothing while every topic fits. */
 function ExamMisfit({ exam }: { exam: NearExam }) {
 	const { start, starting } = useStartScope();
-	if (!exam.wontFit?.length || !exam.workspace) return null;
-	const words = examLineWords(exam, exam.firstStart ?? null);
+	if (!exam.wontFit?.length || !exam.workspace || !exam.line) return null;
+	const words = exam.line;
 	const workspace = exam.workspace;
 	return (
 		<p data-slot="today-exam-misfit" className="-mt-1 flex min-w-0 flex-wrap items-start gap-x-3 text-callout text-warning">

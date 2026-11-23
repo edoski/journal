@@ -19,7 +19,7 @@ import { MathText } from "@/components/ui/math-text";
 import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords, finalReviewMissWords, pressWord } from "@/components/study-words";
 import { examGapAskCreation, topicPress } from "@/components/unit-inbox/start-unit";
 import { useStartScope } from "@/components/start/start-scope";
-import { examGaps, type ExamGaps } from "@/components/course-page/course-head/head-facts";
+import { examGaps, finalReviewMisses, type ExamGaps } from "@/components/course-page/course-head/head-facts";
 import { continueHref } from "@/components/nav/session-state";
 import { misfitWords } from "@/components/calendar/calendar-facts";
 
@@ -35,13 +35,16 @@ const PRESS = "h-auto min-h-6 min-w-0 shrink justify-start px-0 has-[>svg]:px-0 
  * and Variance of sums"), then the taught topics the final review leaves
  * out but one the why names, since it starts too late ("Binomial is not
  * revisited in the final review from 14 Nov"; round 18, m7: it repeated
- * the why's late topic). Empty with nothing left out. Pure.
+ * the why's late topic), never the one the head's line names (round 21,
+ * m2). Empty with nothing left out. Pure.
  */
 export function examGapWhich(course: StudyCourse, gaps: ExamGaps): string[] {
 	const { exam } = course.map;
 	if (!exam) return [];
 	const start = misfitWords(gaps.start.map((t) => t.title));
-	const rest = gaps.review.filter((t) => exam.reasons?.[t.handle] !== "too_late").map((t) => t.title);
+	const missed = finalReviewMisses(course.map);
+	const lined = gaps.start.length === 0 && missed.length === 1 ? missed[0]!.handle : null;
+	const rest = gaps.review.filter((t) => exam.reasons?.[t.handle] !== "too_late" && t.handle !== lined).map((t) => t.title);
 	return [...(start ? [start] : []), ...(rest.length > 0 ? [finalReviewMissWords(rest, exam, course.map.today)] : [])];
 }
 

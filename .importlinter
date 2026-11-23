@@ -101,6 +101,7 @@ allow_indirect_imports = True
 ignore_imports =
     learning.cli -> sync.study.context
     learning.planning -> sync.study.context
+    learning.retrieval -> sync.study.context
 
 [importlinter:sync_finance_through_adapter]
 name = Journal sync reads finance only through its finance adapter

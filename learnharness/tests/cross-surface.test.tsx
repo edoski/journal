@@ -142,7 +142,8 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 	const visits = topicsToVisit(courses, today, chats);
 	await app.visitEach(
 		visits.map(({ course, topic }) => unitHref(course.map.workspace, topic.handle)),
-		(page) => !!page.querySelector('[data-slot="pickup-now"]'),
+		// A topic with nothing to take up today draws no Now (round 21, m4), so a page is read once its sections are.
+		(page) => !!page.querySelector('[data-slot="pickup-section"]'),
 		async (page, pathname) => {
 			const { course, topic } = visits.find((v) => unitHref(v.course.map.workspace, v.topic.handle) === pathname)!;
 			const press = page.querySelector('[data-slot="pickup-now-press"]');
@@ -330,7 +331,9 @@ function openTasks(app: DemoApp, s: Survey): Array<{ course: CalendarCourse; tas
  * calendar's exam panel named 8 to 17 topics in an amber block and said
  * nothing he could do. The exam line, wherever it is drawn, is one sentence
  * that names at most the first topic he can still start, and when the plan
- * starts that topic today Home's Today starts it.
+ * starts that topic today Home's Today starts it. Round 21, M1 (1 M1): it
+ * says "Start with" only of a start the plan dates today, and names a later
+ * one with its day.
  */
 function assertExamLine(s: Survey): void {
 	const LINE = /Not every exam topic fits before [^.]+\.(?: Start with (.+?)\.)?/;
@@ -341,6 +344,7 @@ function assertExamLine(s: Survey): void {
 		const first = words.match(LINE)?.[1];
 		if (!first) continue;
 		const topic = s.courses.flatMap((c) => c.map.topics).find((t) => t.title === first);
+		if (topic?.starts !== s.today) failures.push(`${where} says to start with ${first}, which the plan starts ${topic?.starts ?? "on no day"}, not today: "${words}"`);
 		if (topic?.starts === s.today && !s.home.some((l) => l.title.startsWith("Start ") && l.title.includes(first))) {
 			failures.push(`${where} says to start with ${first}, planned today, which Home's Today does not start: ${s.home.map((l) => l.title).join(" | ")}`);
 		}
@@ -645,7 +649,7 @@ async function assertFinishedLesson(app: DemoApp, s: Survey, id: string) {
 	const own = new Set(chat.ownTopics ?? []);
 	for (const row of s.needsYou.get(ws) ?? []) if (own.has(row.handle) && /Left off|Your turn/.test(row.text)) problems.push(`its course page's Needs you lists "${row.text}"`);
 	for (const handle of own) {
-		await app.visit(unitHref(ws, handle), { fresh: true, ready: () => !!document.querySelector('[data-slot="pickup-now"]') });
+		await app.visit(unitHref(ws, handle), { fresh: true, ready: () => !!document.querySelector('[data-slot="pickup-section"]') });
 		const press = document.querySelector('[data-slot="pickup-now-press"]');
 		const opens = press ? await app.lookAt(press) : null;
 		if (chatOf(opens) === id) problems.push(`its topic page (${handle}) offers "${text(press)}" on it: "${text(document.querySelector('[data-slot="pickup-now"]'))}"`);

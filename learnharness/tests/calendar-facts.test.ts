@@ -138,12 +138,17 @@ describe("calendar entries", () => {
 		assert.equal(eigen?.kind === "new" && eigen.action.kind, "start");
 		const exam = entries.find((e) => e.kind === "exam");
 		assert.deepEqual(exam?.kind === "exam" && exam.doesNotFit, ["Eigenvalues"]);
-		assert.equal(misfitWords(["Eigenvalues", "Rank"]), "No room before the exam to start Eigenvalues and Rank");
+		// Round 21, m1: titles joined by commas, since a title may hold its own "and".
+		assert.equal(misfitWords(["Eigenvalues", "Rank and the column space"]), "No room before the exam to start Eigenvalues, Rank and the column space");
 		assert.equal(misfitWords([]), null);
 		// Round 20, M2: the panel's exam line is one sentence and the topic to start with, naming at most one topic.
-		assert.equal(examLineWords({ date: "2026-11-19", daysLeft: 2 }, "Expectation and linearity"), "Not every exam topic fits before Thursday. Start with Expectation and linearity.");
-		assert.equal(examLineWords({ date: "2026-12-03", daysLeft: 25 }, null), "Not every exam topic fits before 3 Dec.");
-		assert.equal(examLineWords({ date: "2026-11-19", daysLeft: 1 }, null), "Not every exam topic fits before tomorrow’s exam.");
+		assert.equal(examLineWords({ date: "2026-11-19", daysLeft: 2 }, { title: "Expectation and linearity", day: "2026-11-17" }, "2026-11-17"), "Not every exam topic fits before Thursday. Start with Expectation and linearity.");
+		assert.equal(examLineWords({ date: "2026-12-03", daysLeft: 25 }, null, "2026-11-08"), "Not every exam topic fits before 3 Dec.");
+		assert.equal(examLineWords({ date: "2026-11-19", daysLeft: 1 }, null, "2026-11-18"), "Not every exam topic fits before tomorrow’s exam.");
+		// Round 21, M1: a start the plan dates after today is named with its day, never as today's.
+		assert.equal(examLineWords({ date: "2026-11-19", daysLeft: 2 }, { title: "Stirling's formula", day: "2026-11-18" }, "2026-11-17"), "Not every exam topic fits before Thursday. Start Stirling's formula tomorrow.");
+		assert.equal(examLineWords({ date: "2026-11-27", daysLeft: 10 }, { title: "Variance", day: "2026-11-20" }, "2026-11-17"), "Not every exam topic fits before 27 Nov. Start Variance on Friday.");
+		assert.equal(examLineWords({ date: "2026-12-03", daysLeft: 25 }, { title: "Variance", day: "2026-11-30" }, "2026-11-08"), "Not every exam topic fits before 3 Dec. Start Variance on 30 Nov.");
 	});
 
 	it("says why a review waits on the day the plan holds it to, naming the exams it waits for, and only there", () => {

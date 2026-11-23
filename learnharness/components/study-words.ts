@@ -1,4 +1,4 @@
-import { currentArc, type ArcHandle, type ArcState, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, movedWhy, type RightAnswer, type StartsWhy, type TopicHandle, type TopicMoved, type TopicSignals, type UnreadableProblem } from "@/src/core";
+import { currentArc, type ArcHandle, type ArcState, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, movedWhy, type RightAnswer, type StartsWhy, type TopicHandle, type TopicMoved, type TopicSignals, titleList, type UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -51,8 +51,9 @@ export const RIGHT_WORDS: Record<RightAnswer, string> = {
  *  words. A weak topic he could do on his own says how he answered it
  *  since its miss: with help when help repaired it. A topic the engine
  *  calls weak never reads right on his own: the engine's check is still
- *  to come, "Check again another day", or "Check on your own" once its
- *  review is due (round 20, m4).
+ *  to come, "Check again another day", or "Check again today" once its
+ *  review is due (round 20, m4; round 21, m5: "Check on your own" on a
+ *  Builds-on row said neither what happened nor what to do).
  *  A topic that slips says `SLIPPING_WORDS` instead (`standingOf`). Pure. */
 export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review" | "signals" | "tasks" | "weak">>): string {
 	if (lessonBegun(topic)) return LESSON_BEGUN;
@@ -60,7 +61,7 @@ export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | 
 	// Right on his own on a topic the engine calls weak is the engine's check still to come, never "Right on your own":
 	// it stays weak until a later day's answer on his own, and its weakness holds back what needs it (round 20, m4:
 	// Binomial read "Right on your own, check another day" while the engine held it weak and held Poisson back).
-	const unaided = () => (topic.weak ? (topic.review?.kind === "due" ? SLIP_WORDS.check : SLIP_WORDS.repaired) : topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS.unaided);
+	const unaided = () => (topic.weak ? (topic.review?.kind === "due" ? CHECK_TODAY : SLIP_WORDS.repaired) : topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS.unaided);
 	if (learning && topic.right) return topic.right === "unaided" ? unaided() : RIGHT_WORDS[topic.right];
 	// No right answer since his newest wrong one, on a topic still being learned.
 	if (topic.level === "assisted") return WRONG_LAST_WORDS;
@@ -88,6 +89,10 @@ export const LESSON_GOES_ON = "Lesson continues";
 /** A topic whose newest answer that counts was not right, and none right
  *  since. */
 const WRONG_LAST_WORDS = "Not right last time";
+
+/** A weak topic he answered right on his own, on the day its check has
+ *  come: its review, today. */
+const CHECK_TODAY = "Check again today";
 
 /** Right on his own, on the day its check has come, and a map card's
  *  short standing for it any day. */
@@ -440,7 +445,7 @@ export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly
 	const first = sentence([
 		...(by(start, "no_study_day").length > 0 ? ["no study day is left before the exam"] : []),
 		...(startFull.length > 0 ? ["your pace fills every study day before the exam"] : []),
-		...(notReady.length > 0 ? [name ? `what ${listWords(notReady)} ${notReady.length === 1 ? "needs" : "need"} won’t be solid in time` : "what comes first won’t be solid in time"] : []),
+		...(notReady.length > 0 ? [name ? `what ${titleList(notReady)} ${notReady.length === 1 ? "needs" : "need"} won’t be solid in time` : "what comes first won’t be solid in time"] : []),
 	]);
 	const paceSaid = startFull.length > 0;
 	const named = names && (start.length > 0 || reasons(review) > 1);
@@ -448,10 +453,12 @@ export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly
 	const noDay = by(review, "no_study_day");
 	const late = by(review, "too_late");
 	const second = sentence([
-		...(noDay.length > 0 ? [named ? `no study day is left in the final review for ${listWords(noDay)}` : "no study day is left in the final review"] : []),
-		...(full.length > 0 ? [named ? `the final review has no room for ${listWords(full)}${paceSaid ? "" : " at your pace"}` : paceSaid ? "the final review is full too" : "your pace fills every day of the final review"] : []),
+		...(noDay.length > 0 ? [named ? `no study day is left in the final review for ${titleList(noDay)}` : "no study day is left in the final review"] : []),
+		// The final review's pace alone is a plan fact he can do nothing with: said only beside the exam's own pace
+		// (round 21, m2: "Your pace fills every day of the final review." under one topic left out).
+		...(full.length > 0 && (named || paceSaid) ? [named ? `the final review has no room for ${titleList(full)}${paceSaid ? "" : " at your pace"}` : "the final review is full too"] : []),
 		// A topic that starts too late is always named, names or not (round 18, m7: "One starts too close…", one what?).
-		...(late.length > 0 ? [`${listWords(late)} ${startsWord(late)} too close to the exam for a review`] : []),
+		...(late.length > 0 ? [`${titleList(late)} ${startsWord(late)} too close to the exam for a review`] : []),
 	]);
 	const both = [first, second].filter((s): s is string => s !== null);
 	return both.length > 0 ? both.join(" ") : null;
@@ -486,7 +493,7 @@ function finalReviewName(exam: Pick<CourseExam, "finalReview">, today: string): 
  *  they had no day; the calendar's "No room in it for" reads under its
  *  final review). */
 export function finalReviewMissWords(titles: readonly string[], exam: Pick<CourseExam, "finalReview">, today: string): string {
-	return `${listWords(titles)} ${titles.length === 1 ? "is" : "are"} not revisited in ${finalReviewName(exam, today)}`;
+	return `${titleList(titles)} ${titles.length === 1 ? "is" : "are"} not revisited in ${finalReviewName(exam, today)}`;
 }
 
 /** His opening words in a lesson Ask the tutor starts, naming the topics. */
@@ -507,18 +514,29 @@ function examDayWords(exam: Pick<CourseExam, "date" | "daysLeft">): string {
 /** The exam line, one sentence wherever the exam's plan cannot start
  *  every topic before it (Home, the course head, the calendar's exam
  *  panel), and what he can do: start the first topic the plan still
- *  starts before it (`first`). The names are one press away, in the
- *  head's Which topics (round 20, M2: an 11-name amber block on all three
- *  on the exam eve, saying nothing he could do). Pure. */
-export function examLineWords(exam: Pick<CourseExam, "date" | "daysLeft">, first: string | null): string {
-	return `Not every exam topic fits before ${examDayWords(exam)}.${first ? ` Start with ${first}.` : ""}`;
+ *  starts before it (`start`), "Start with Expectation and linearity."
+ *  when the plan starts it today, else on its day, "Start Stirling's
+ *  formula tomorrow." (round 21, M1: once Expectation was begun the line
+ *  said "Start with Joint distributions…", which the plan starts the next
+ *  day). The names are one press away, in the head's Which topics (round
+ *  20, M2: an 11-name amber block on all three on the exam eve, saying
+ *  nothing he could do). Pure. */
+export function examLineWords(exam: Pick<CourseExam, "date" | "daysLeft">, start: { title: string; day: string } | null, today: string): string {
+	const line = `Not every exam topic fits before ${examDayWords(exam)}.`;
+	if (!start) return line;
+	const days = Math.round((Date.parse(`${start.day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+	if (days <= 0) return `${line} Start with ${start.title}.`;
+	const when = days === 1 ? "tomorrow" : `on ${days < 7 ? EXAM_WEEKDAY.format(new Date(`${start.day}T00:00:00Z`)) : shortDay(start.day)}`;
+	return `${line} Start ${start.title} ${when}.`;
 }
 
 /** The exam line when every topic starts in time but the final review
- *  leaves taught topics out, the names in the head's Which topics (round
- *  20, M2: Linear Algebra's head named 11 to 17 topics). Pure. */
-export function finalReviewLineWords(exam: Pick<CourseExam, "date" | "daysLeft">): string {
-	return `Your final review before ${examDayWords(exam)} leaves some topics out.`;
+ *  leaves taught topics out (`missed`): the one it leaves out by name,
+ *  else the names in the head's Which topics (round 20, M2: Linear
+ *  Algebra's head named 11 to 17 topics; round 21, m2: "leaves some
+ *  topics out" for one). Pure. */
+export function finalReviewLineWords(exam: Pick<CourseExam, "date" | "daysLeft">, missed: readonly string[]): string {
+	return `Your final review before ${examDayWords(exam)} leaves ${missed.length === 1 ? `out ${missed[0]}` : "some topics out"}.`;
 }
 
 /** Why a topic the exam ahead leaves out (`exam.leavesOut`) starts when

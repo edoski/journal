@@ -41,7 +41,7 @@ describe("Home's heading (1 §2, 4 §2)", () => {
 	// are we studying for Thursday's Probability exam?". Under the question it says so, never by count, with what he
 	// can do: the first topic he can still start, and Ask the tutor (round 20, M2: then an 11-name list).
 	it("says, under the exam's question, that not every topic fits and which to start with, with Ask the tutor", () => {
-		const exam = { course: "Probability", date: "2026-11-19", daysLeft: 2, workspace: "/s/prob", wontFit: ["Poisson distribution", "Geometric distribution", "Variance"], firstStart: "Expectation and linearity" };
+		const exam = { course: "Probability", date: "2026-11-19", daysLeft: 2, workspace: "/s/prob", wontFit: ["Poisson distribution", "Geometric distribution", "Variance"], line: "Not every exam topic fits before Thursday. Start with Expectation and linearity." };
 		const page = render(<Today rows={[]} done={[]} exam={exam} busy={false} onContinue={() => {}} />);
 		const line = page.querySelector("[data-slot=today-exam-misfit]");
 		assert.ok(line, "the line under the heading");

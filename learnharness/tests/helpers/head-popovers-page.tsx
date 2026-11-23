@@ -17,8 +17,7 @@ import { ReadyFact } from "@/components/course-page/course-head/ready-fact";
 import type { MistakeRow } from "@/components/course-page/standing/standing-model";
 import { StudiedFact } from "@/components/course-page/course-head/head-parts";
 import { CourseTopicRow } from "@/components/course-page/course-topic-row";
-import { firstExamStart } from "@/components/calendar/calendar-facts";
-import { examLineWords } from "@/components/study-words";
+import { examLine } from "@/components/calendar/calendar-facts";
 import type { CourseTopic, CourseView } from "@/components/course-page/course-model";
 import type { CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
 
@@ -120,7 +119,7 @@ createRoot(document.getElementById("root")!).render(
 														title="Probability"
 														standing={
 															<>
-																<ReadyFact view={eveView} ready={{ kind: "short", words: examLineWords(eve.map.exam!, firstExamStart(eve.map)?.title ?? null) }} />
+																<ReadyFact view={eveView} ready={{ kind: "short", words: examLine(eve.map)!.words }} />
 																<StudiedFact words="Studied 10 Nov" session={null} />
 															</>
 														}
@@ -136,7 +135,7 @@ createRoot(document.getElementById("root")!).render(
 													compact
 													title={which === "gaps" ? "Probability" : "Linear Algebra"}
 													actions={which === "mistakes" ? <MistakesPress rows={MISTAKES} /> : undefined}
-													standing={which === "gaps" ? <ReadyFact view={view} ready={{ kind: "short", words: examLineWords(course.map.exam!, firstExamStart(course.map)?.title ?? null) }} /> : undefined}
+													standing={which === "gaps" ? <ReadyFact view={view} ready={{ kind: "short", words: examLine(course.map)!.words }} /> : undefined}
 												/>
 											</MistakesHead>
 										)}

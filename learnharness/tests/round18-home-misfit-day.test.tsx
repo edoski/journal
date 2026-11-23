@@ -25,6 +25,7 @@ const NINTH: NearExam = {
 	workspace: "/s/prob",
 	wontFit: ["Martingales", "Variance of sums", "Negative binomial distribution", "Poisson distribution", "Hypergeometric distribution"],
 	fellToday: ["Negative binomial distribution", "Poisson distribution", "Hypergeometric distribution"],
+	line: "Not every exam topic fits before 19 Nov.",
 };
 
 describe("Home names the exam's topics with no room before it on the day one falls (round 18, M1)", () => {

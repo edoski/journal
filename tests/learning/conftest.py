@@ -23,6 +23,17 @@ def private_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[No
     )
 
 
+@pytest.fixture(autouse=True)
+def no_journal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """No Journal schedule unless a test writes one: the plan reads the
+    Journal's days off (``retrieval.journal_rests``), and the real vault's
+    would move the starts every test expects."""
+    from learning import retrieval
+
+    vault = tmp_path / "no-journal"
+    monkeypatch.setattr(retrieval, "journal_vault", lambda: vault)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def real_registry_untouched(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
     """No test registers a course in his real registry, by any path: a

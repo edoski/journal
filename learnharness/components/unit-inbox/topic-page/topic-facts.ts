@@ -1,6 +1,6 @@
 import { isReviewSession, markHow, namedArc, topicOpening, type ArcHandle, type NamedArc, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, lessonBegun, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyShort, startsWhyTells, startsWhyWords, studiedDaysWords, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
+import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, lessonBegun, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsWhyShort, startsWhyTells, startsWhyWords, studiedDaysWords, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
 import { closedReview, continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, mapsOn, shelfOf, taskSessions, topicSession, topicSessions, worksOn, type SessionFact } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -125,8 +125,9 @@ export interface TopicFacts {
 	 *  when nothing holds it back. */
 	waits: string | null;
 	/** A topic not started that the engine's plan starts later: the day of
-	 *  its first lesson and, when it waits behind other courses' new
-	 *  topics, which (`startsAfterWords`); null otherwise. */
+	 *  its first lesson and, for a day he was told that his study moved,
+	 *  what moved it (`movedWords`); never which courses' new topics come
+	 *  first (round 21, m3); null otherwise. */
 	starts: { day: string; waits: string | null } | null;
 	/** A lesson he began: the day the engine's daily plan first reviews the
 	 *  topic, after the lesson goes on (the topic read's `firstReview`);
@@ -418,7 +419,7 @@ export function topicFacts({
 		// A topic the exam leaves out stays left out once he starts it: its review says so (the demo world's
 		// Simulation of continuous probabilities, introduced by a probe two days before the exam, read only "Left off today").
 		waits: (topic.level !== "new" ? examWords(topic, map) : null) ?? waitsWords(topic, map),
-		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : topic.moved ? movedWords(topic.moved, map.today) : startsAfterWords(topic.startsAfter) } : null,
+		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) || !topic.moved ? null : movedWords(topic.moved, map.today) } : null,
 		firstReview: lessonBegun(topic) ? (read?.firstReview ?? null) : null,
 		startsWhy: topic.level === "new" ? startsReason(topic, map) : null,
 		exam: topic.level === "new" ? examWords(topic, map) : null,
