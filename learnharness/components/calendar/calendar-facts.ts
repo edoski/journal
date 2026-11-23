@@ -1,4 +1,4 @@
-import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
+import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween, leftWords } from "@/components/unit-inbox/units";
 import { dayAndNearWords, distanceWords, heldExamWords, longDayWords, nextSessionWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
@@ -37,6 +37,8 @@ export type CalendarEntry =
 			road: readonly RoadWeek[];
 			finalReview: string | null;
 			doesNotFit: readonly string[];
+			/** The first topic the plan still starts before the exam, while some do not fit (`firstExamStart`). */
+			firstStart: string | null;
 			unreviewed: readonly ExamGapTopic[];
 			allStarted: boolean;
 			next: NextMove | null;
@@ -62,7 +64,9 @@ export type CalendarEntry =
 			day: string;
 			title: string;
 			course: CourseRef;
-			task: CourseMapTask;
+			/** The open task, or null for a session left for next time
+			 *  that holds none (practice on its topics). */
+			task: CourseMapTask | null;
 			topic: CourseMapTopic | null;
 			/** Continue, as Home's line for the task takes it (`courseMove`):
 			 *  the session that holds it, else a new one (round 13, N6: it
@@ -381,14 +385,14 @@ export function calendarEntries({
 				const reason = reasons[h];
 				return reason ? { title: titleOf(h), reason } : { title: titleOf(h) };
 			});
-			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, nextSession: nextSessionWords(map.exam), road, finalReview, doesNotFit: doesNotFit.map(titleOf), unreviewed, allStarted, next });
+			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, nextSession: nextSessionWords(map.exam), road, finalReview, doesNotFit: doesNotFit.map(titleOf), firstStart: firstExamStart(map)?.title ?? null, unreviewed, allStarted, next });
 		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, chats) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) => {
 			const held = topic.review?.kind === "scheduled" && topic.review.date === day && topic.review.held ? topic.review : null;
 			const told = topic.review?.date === day ? topic.moved : undefined;
 			const since = told ? movedWords(told, today) : null;
-			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held && !told ? heldExamWords(held) : null, ...facts(topic) });
+			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held && !told ? heldExamWords(held, map.title) : null, ...facts(topic) });
 		};
 		const fresh = (topic: CourseMapTopic, day: string) =>
 			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? (leftOutWords(topic, map.exam) ?? (topic.moved ? movedWords(topic.moved, today) : startsAfterWords(topic.startsAfter))) : null, ...facts(topic) });
@@ -436,21 +440,25 @@ export function calendarEntries({
 			if (holder && isReviewSession(holder) && sessionState(holder) === "left") continue;
 			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: holder?.title ?? task.title, course, task, topic: holders[0] ?? null, move: taskMove(studied, chats, task), status: openWorkStatus(studied, holder ?? null, task) });
 		}
-		// The rest of a lesson he left for next time today goes on the course's next study day the plan holds, as the
-		// close says it carries on (round 17, m14: only the next day's reviews showed). One entry that continues it, in
-		// the words of Home's row for it, its title and its status (round 18, m12: "Invertible matrices lesson ·
-		// Unfinished" here, "Continue Invertible matrices lesson · Left off today" on Home). It is the one entry of the left
-		// work, and it says the day it was left as that day reads from its own, "Left off 10 Nov", never "Left off today"
-		// on a later day; today's entry is what he did (round 19, m6: "Stirling's formula lesson · Left off today" on Tue 10
-		// and "Continue Stirling's formula lesson · Left off today" on Wed 11).
+		// The rest of work he left for next time today goes on the course's next study day the plan holds, as the close
+		// says it carries on (round 17, m14: only the next day's reviews showed). One entry that continues it, in the words
+		// of Home's row for it, its title and its status (round 18, m12: "Invertible matrices lesson · Unfinished" here,
+		// "Continue Invertible matrices lesson · Left off today" on Home). It is the one entry of the left work, and it
+		// says the day it was left as that day reads from its own, "Left off 10 Nov", never "Left off today" on a later
+		// day; today's entry is what he did (round 19, m6). Every session the session state reads as left is such work,
+		// practice as a lesson; a review rides with its topics' next review (round 20, m3: Rank practice, whose close said
+		// it continues Monday, was missing from Mon 9, and read "Left off today" on Sun 8 beside the lessons' "Lesson").
+		// Work whose topic the plan starts on a later day is that start.
 		const next = planned.find((day) => day.date > today)?.date;
-		for (const task of next ? map.tasks : []) {
-			const holders = taskTopics(task, map).map((t) => t.handle);
-			const lesson = ofToday(map.workspace).find((chat) => sessionType(chat) === "lesson" && sessionState(chat) === "left" && holdsTask(chat, task, holders));
-			if (!lesson || planned.some((day) => day.date > today && day.new.some((h) => holders.includes(h)))) continue;
-			carried.add(lesson.id);
-			const title = lessonTitle({ kind: "session", chat: lesson, course: studied });
-			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}@${next}`, day: next!, title, course, task, topic: taskTopics(task, map)[0] ?? null, move: { kind: "open", chat: lesson }, status: leftWords(lesson, next!) });
+		for (const chat of next ? ofToday(map.workspace) : []) {
+			if (sessionState(chat) !== "left" || sessionType(chat) === "review") continue;
+			const task = map.tasks.find((t) => holdsTask(chat, t, taskTopics(t, map).map((h) => h.handle))) ?? null;
+			const holders = task ? taskTopics(task, map).map((t) => t.handle) : (chat.ownTopics ?? []);
+			if (planned.some((day) => day.date > today && day.new.some((h) => holders.includes(h)))) continue;
+			carried.add(chat.id);
+			const title = lessonTitle({ kind: "session", chat, course: studied });
+			const id = task ? `task:${map.workspace}#${task.key}@${next}` : `left:${chat.id}@${next}`;
+			entries.push({ kind: "task", id, day: next!, title, course, task, topic: task ? (taskTopics(task, map)[0] ?? null) : sessionTopic(chat, courses), move: { kind: "open", chat }, status: leftWords(chat, next!) });
 		}
 	}
 	for (const chat of chats) {
@@ -535,7 +543,21 @@ function listWords(items: readonly string[]): string {
 	return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-/** The topics the plan has no room to start before the exam, named. */
+/** The first topic the exam's plan still starts before the exam, the one
+ *  the exam line says to start with (`examLineWords`): of the topics not
+ *  started that the exam examines and that fit, the earliest the plan
+ *  starts, in path order on one day, so on the exam eve it is the start
+ *  Home's Today offers (round 20, M2). Null with none. Pure. */
+export function firstExamStart(map: Pick<CourseMap, "topics" | "exam">): CourseMapTopic | null {
+	const { exam } = map;
+	if (!exam) return null;
+	const out = new Set<string>([...(exam.doesNotFit ?? []), ...(exam.leavesOut ?? [])]);
+	const fits = map.topics.filter((t) => t.level === "new" && t.starts !== undefined && t.starts < exam.date && !out.has(t.handle));
+	return fits.sort((a, b) => a.starts!.localeCompare(b.starts!))[0] ?? null;
+}
+
+/** The topics the plan has no room to start before the exam, named: the
+ *  course head's Which topics. */
 export function misfitWords(titles: readonly string[]): string | null {
 	return titles.length > 0 ? `No room before the exam to start ${listWords(titles)}` : null;
 }

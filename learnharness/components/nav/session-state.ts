@@ -1,4 +1,4 @@
-import type { ChatListItem } from "@/src/core";
+import { isReviewSession, type ChatListItem } from "@/src/core";
 
 /**
  * Where a session stands, the one model Home, the topic page, the calendar
@@ -29,6 +29,14 @@ export function sessionState(chat: ChatListItem): SessionState {
 	if (chat.ended === "left") return "left";
 	if (chat.pendingQuestion || chat.pendingProblem || chat.ended === "mid-lesson") return "your-turn";
 	return chat.ended === "cut" ? "paused" : "finished";
+}
+
+/** A review he closed with Done for today on an open question: it rides
+ *  with the topic's next review rather than leading the topic as a session
+ *  to resume (round 10, 1 m7: Eigen's page read "Now · Resume · Left off
+ *  today" on the review that had just dated the next one). Pure. */
+export function closedReview(chat: ChatListItem): boolean {
+	return isReviewSession(chat) && sessionState(chat) === "left";
 }
 
 /** Edo's open choice for Continue on a finished lesson: reopen it, or

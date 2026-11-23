@@ -156,7 +156,8 @@ export function reaskedFrom(messages: ReadonlyArray<{ parts: readonly QuestionPa
 		for (const part of message.parts) {
 			if (!asked(part)) continue;
 			if (part.toolCallId === toolCallId) {
-				if (previous?.toolCallId && leftOpen(previous.output)) return asksAgain(previous, part) ? previous.toolCallId : null;
+				const left = previous ? leftOpen(previous.output) : null;
+				if (previous?.toolCallId && left) return asksAgain(previous, part) ? previous.toolCallId : null;
 				const same = lastOfKind.get(questionKindOf(part));
 				return same?.toolCallId && leftForToday(same.output) && asksAgain(same, part) ? same.toolCallId : null;
 			}
@@ -209,11 +210,21 @@ function sameType(a: QuestionPart, b: QuestionPart): boolean {
 	return type(a) === type(b);
 }
 
+/** The tutor's announcement of the topic a review moves to ("Now
+ *  Inclusion-exclusion principle: "), which leads its first question and
+ *  is no part of it: asked again after a hint, the question drops it
+ *  (round 20, m9: "How many integers from 1 to 60…" printed in full under
+ *  its first posting, and his words never came back into the box). */
+const TOPIC_LEAD = /^\s*now\s[^:?\n]+:\s*/i;
+
 function sameQuestionWords(a: QuestionPart, b: QuestionPart): boolean {
 	const words = (part: QuestionPart) => (part.input as { question?: unknown } | undefined)?.question;
 	const x = words(a);
 	const y = words(b);
-	return typeof x === "string" && typeof y === "string" && sameQuestionKey(x) === sameQuestionKey(y);
+	if (typeof x !== "string" || typeof y !== "string") return false;
+	if (sameQuestionKey(x) === sameQuestionKey(y)) return true;
+	const key = wordsKey(x.replace(TOPIC_LEAD, ""));
+	return key !== "" && key === wordsKey(y.replace(TOPIC_LEAD, ""));
 }
 
 /** Whether `next` asks again, in the same words, a question he answered:
@@ -239,6 +250,22 @@ function sameStep(a: QuestionPart, b: QuestionPart): boolean {
 export function leftOpenOf(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>, toolCallId: string): LeftOpen | null {
 	for (const message of messages) {
 		for (const part of message.parts) if (part.toolCallId === toolCallId) return leftOpen(part.output);
+	}
+	return null;
+}
+
+/** The question he set aside to ask the tutor something, while it is the
+ *  newest question the lesson holds: its call and words. Null when the
+ *  newest question was answered, or none was set aside. Pure. */
+export function askedAsideOf(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): { toolCallId: string; question: string } | null {
+	for (let mi = messages.length - 1; mi >= 0; mi--) {
+		const parts = messages[mi]!.parts;
+		for (let pi = parts.length - 1; pi >= 0; pi--) {
+			const part = parts[pi]!;
+			if (!asked(part)) continue;
+			const question = (part.input as { question?: unknown } | undefined)?.question;
+			return part.toolCallId && leftOpen(part.output) === "asked" && typeof question === "string" ? { toolCallId: part.toolCallId, question } : null;
+		}
 	}
 	return null;
 }
@@ -310,13 +337,6 @@ export function spokenAbove(messages: ReadonlyArray<{ parts: ReadonlyArray<Quest
  *  maths delimiters and spacing never tell two copies apart. */
 function wordsKey(text: string): string {
 	return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
-}
-
-/** The re-asks (`askedAgain`) that follow a hint: the hint may itself end
- *  in a question, so their words are drawn again under "Your turn", never
- *  pointed at as "the question above" (round 12, 3 D11; round 19, m21). */
-export function askedAfterHint(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
-	return new Set(reasks(messages).filter((r) => r.after === "hint").map((r) => r.id));
 }
 
 function reasks(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): Array<{ id: string; after: LeftOpen | null }> {

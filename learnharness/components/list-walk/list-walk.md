@@ -8,8 +8,8 @@ Tab is dead app-wide (owner, 17 Sep 2026), so lists walk with arrows. The walk i
 |---|---|
 | ↓ ↑ | step to the next or previous stop; at either end focus stays |
 | Home, End | jump to the list's first or last stop |
-| ↑ on the first stop | steps onto the head's control above the list (`head`): Now's row on the course page, the trail's last link on the topic page. Home's head is the map, whose tabs and cards the walk never reaches (Edo's notes, 15 Nov 2026, N3), so there ↑ keeps the first line |
-| ↓ or Home on the head's control | steps back onto the first stop; End jumps to the last; Esc leaves it |
+| ↑ on the first stop | steps onto the head's control above the list (`head`): Now's row on the course page, the trail's last link on the topic page, You are here on Home's map (round 20, m6: the arrows never crossed between the map and Today; before, the map was out of the walk, Edo's notes of 15 Nov 2026, N3) |
+| ↓ or Home on the head's control | steps back onto the first stop; End jumps to the last; Esc leaves it. A head with arrows of its own (`region`, Home's map) keeps its ↓ while it has somewhere to go (a card below), and the ↓ it leaves unclaimed, from any part of it, steps onto the first stop |
 | Esc | leaves the walk: focus goes, and the next arrow enters again |
 | with nothing focused | ↓ or Home enters at the first stop, ↑ or End at the last |
 
@@ -17,6 +17,6 @@ The page names its stops top to bottom (`stops`, read at each key) and wires two
 
 | Page | Stops | Head |
 |---|---|---|
-| Home | Today's lines, the lessons Also today folds in included (`data-line`) | none (N3) |
+| Home | Today's lines, the lessons Also today folds in included (`data-line`) | the map: the shown course's card that takes focus (You are here), a `region` |
 | Course page | each arc's or group's header, an arc's Check it, the rows of the open one (`walkStops`) | Now's row (`course-action`), which takes focus when the page arrives with focus nowhere (`c` on Home, a link; round 15, 4 free) |
 | Topic page | each row's press in the sections, Now's first: Builds on, Next, Earlier, Show the rest | the head's trail, its last link |

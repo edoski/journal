@@ -34,6 +34,7 @@ await signInTestClaude();
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
 const FEEDBACK = "The base and the exponent change together, so the limit cannot be taken one part at a time.";
+const STEP = "Picture the hour cut into slots so short that two calls never share one.";
 
 it("the wake in the record quotes the probe's last feedback as already said", async () => {
 	const chat = chatStore.createChat("Poisson distribution", { workspace: "/study/probability", title: "Probability" });
@@ -46,6 +47,9 @@ it("the wake in the record quotes the probe's last feedback as already said", as
 		result("r1", "q1", "recall", { question: "q1", kind: "explain", text: "1", questionText: "What does $(1 - 3/n)^n$ approach?", answers: ["1"], answeredAt: "2026-11-08T10:00:00Z" }) as never,
 		assistant("a2", { type: "toolCall", id: "s1", name: "send_to_user", arguments: { message: FEEDBACK } }) as never,
 		result("r2", "s1", "send_to_user", null) as never,
+		// A lesson's probe ends on the first step it sends after the feedback (round 20, M1).
+		assistant("a2b", { type: "toolCall", id: "s2", name: "send_to_user", arguments: { message: STEP } }) as never,
+		result("r2b", "s2", "send_to_user", null) as never,
 		assistant("a3", { type: "toolCall", id: "p1", name: "probe_done", arguments: { assessment: { summary: "…" } } }) as never,
 		result("r3", "p1", "probe_done", { ok: true }) as never,
 	]);
@@ -61,4 +65,5 @@ it("the wake in the record quotes the probe's last feedback as already said", as
 	const wake = chatStore.getChat(chat.id)!.messages.find((m) => m.id === steer.id);
 	assert.ok(wake, "the wake is in the record");
 	assert.ok(String(wake.content).includes(`I have already read the probe's feedback on my last answer: "${FEEDBACK}"`), String(wake.content));
+	assert.ok(String(wake.content).startsWith(`The lesson's first step is already on my screen, written from the probe's assessment: "${STEP}"`), String(wake.content));
 });

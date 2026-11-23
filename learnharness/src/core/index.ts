@@ -27,6 +27,7 @@ export * from "./lesson-place.ts";
 // task-session.ts: the task his Continue picked up, and where the session left it (pure).
 export * from "./task-session.ts";
 export * from "./session-opening.ts";
+export { titleList } from "./close-receipt.ts";
 export { courseReviewName, sessionTitleOf } from "./session-naming.ts";
 export * from "./phases.ts";
 export * from "./pending.ts";
@@ -48,7 +49,7 @@ export * from "./view.ts";
 export * from "./tool-parts.ts";
 export * from "./answer-presentation.ts";
 export * from "./answer-marks.ts";
-export { closedTonight, doneTonightAtEnd, leftQuestionRepose, sessionEndOf } from "./session-end.ts";
+export { closedTonight, doneTonightAtEnd, leftQuestionRepose, resumedOn, sessionEndOf } from "./session-end.ts";
 export { replyCutOf, replyNeverCame, resumesByItself } from "./turn-cut.ts";
 export { sameQuestionKey } from "./shown-help.ts";
 export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL, CLAUDE_USAGE_URL, CLAUDE_LIMIT_TEXT, CLAUDE_ACCOUNT_SIGNED_OUT, CLAUDE_SIGNED_OUT_STARTS, CLAUDE_FAILED, NO_KEY, claudeProviderId, isClaudeProvider, isClaudeLimitFailure, nextClaudeAccount, soonestClaudeReset } from "./contracts/claude.ts";
@@ -71,3 +72,4 @@ export * from "./spatial-nav.ts";
 export * from "./session-markdown.ts";
 // demo-frame.ts: the base every demo runs on, and its controls' contrast check (pure).
 export * from "./demo-frame.ts";
+export { studyDay } from "./day-words.ts";

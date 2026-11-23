@@ -81,7 +81,7 @@ describe("the lesson's marks while the record can't be read", () => {
 		const handlers = new Map<string, (data: string) => void>();
 		const source: NotifySource = { close() {}, onOpen() {}, onEvent: (name, cb) => void handlers.set(name, cb) };
 		function Marks() {
-			const marks = useAnswerMarks("c1", WS, 1);
+			const marks = useAnswerMarks("c1", WS, "1:u1");
 			return <p data-testid="marks">{Object.keys(marks).join(",")}</p>;
 		}
 		const host = document.createElement("div");

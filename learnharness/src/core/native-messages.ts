@@ -269,15 +269,18 @@ export function newHandoffMessage(chatId: string, review = false, task = false):
  *  turn has landed (`probeFeedbackText`). Every other steer as it is. */
 export function withProbeFeedback<T extends LhMessage>(steer: T, record: readonly LhMessage[]): T {
 	if (steer.role !== "custom" || steer.customType !== "probe-handoff" || typeof steer.content !== "string") return steer;
-	// A lesson the probe opened (round 19, M7) is planned with its first step on his screen.
+	// A lesson the probe opened is planned with its first step on his screen (round 20, M1).
 	const opening = steer.content === HANDOFF_TEXT ? probeOpeningOf(record) : null;
 	const content = opening ? openedHandoffText(opening) : steer.content;
-	const line = probeFeedbackText(probeFeedbackOf(record));
+	const said = probeFeedbackOf(record);
+	const feedback = opening && said ? said.filter((text) => text !== opening) : said;
+	// The step on his screen is what he read after his answer, when nothing else was.
+	const line = opening && feedback?.length === 0 ? "" : probeFeedbackText(feedback);
 	return line ? { ...steer, content: `${content} ${line}` } : content === steer.content ? steer : { ...steer, content };
 }
 
-/** What the tutor told him after his last answer to a question: its
- *  messages, as he read them. Null when no answer came. Pure. */
+/** What the tutor told him after his last answer to a question, until the
+ *  probe's end: its messages, as he read them. Null when no answer came. Pure. */
 export function probeFeedbackOf(messages: readonly LhMessage[]): string[] | null {
 	const at = messages.findLastIndex((m) => m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName) && !m.isError && isRealAnswer(m.details));
 	if (at < 0) return null;
@@ -287,7 +290,6 @@ export function probeFeedbackOf(messages: readonly LhMessage[]): string[] | null
 		if (m.role !== "assistant") continue;
 		for (const b of m.content) {
 			if (b.type !== "toolCall") continue;
-			// What follows the probe's end is the lesson's opening (`probeOpeningOf`).
 			if (b.name === PROBE_DONE_TOOL) return said;
 			const text = b.name === SEND_TO_USER_TOOL && !failed.has(b.id) ? sendToUserText(b) : undefined;
 			if (text?.trim()) said.push(text);
@@ -296,30 +298,23 @@ export function probeFeedbackOf(messages: readonly LhMessage[]): string[] | null
 	return said;
 }
 
-/** The lesson's opening his screen shows from the concluded `probe_done`
- *  (round 19, M7): the first step's teaching, written with the assessment,
- *  which he reads while the teacher plans; or, when the voice guard left it
- *  off the call, the message that rewrote it after the probe's end. Null
- *  when none was shown. Pure. */
+/** A lesson's opening (round 20, M1): the first step the prober sent him in
+ *  the turn that concluded the probe, before its save and assessment, so he
+ *  reads it while the teacher plans. It is that turn's last message he was
+ *  shown, a rewrite sent after the probe's end included; null when the turn
+ *  showed none or the probe has not ended. Pure. */
 export function probeOpeningOf(messages: readonly LhMessage[]): string | null {
-	const concluded = new Set(messages.flatMap((m) => (m.role === "toolResult" && probeDoneResultIds(messages).has(m.id) ? [m.toolCallId] : [])));
+	const results = probeDoneResultIds(messages);
+	const concluded = new Set(messages.flatMap((m) => (m.role === "toolResult" && results.has(m.id) ? [m.toolCallId] : [])));
+	const ended = messages.findIndex((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && concluded.has(b.id)));
+	if (ended < 0) return null;
 	const failed = failedOutputCallIds(messages);
-	let ended = false;
-	for (const m of messages) {
-		if (m.role !== "assistant") continue;
-		for (const b of m.content) {
-			if (b.type !== "toolCall") continue;
-			if (b.name === PROBE_DONE_TOOL && concluded.has(b.id)) {
-				const opening = probeOpeningText(b);
-				if (opening) return opening;
-				ended = true;
-			} else if (ended && b.name === SEND_TO_USER_TOOL && !failed.has(b.id)) {
-				const text = sendToUserText(b);
-				if (text?.trim()) return text;
-			}
-		}
-	}
-	return null;
+	const next = messages.findIndex((m, i) => i > ended && opensTurn(m));
+	const turn = messages.slice(messages.slice(0, ended).findLastIndex(opensTurn) + 1, next < 0 ? undefined : next);
+	const shown = turn.flatMap((m) =>
+		m.role !== "assistant" ? [] : m.content.flatMap((b) => (b.type === "toolCall" && b.name === SEND_TO_USER_TOOL && !failed.has(b.id) ? [sendToUserText(b)].filter((t): t is string => !!t?.trim()) : [])),
+	);
+	return shown.at(-1) ?? null;
 }
 
 /** A `probe_done` call's opening, as his screen draws it, or null. */
@@ -754,6 +749,15 @@ export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT | "s
 		details: {},
 		timestamp: Date.now(),
 	};
+}
+
+/** His Done for today with the session's close receipt (close-receipt.ts),
+ *  read from the plan as he pressed it: the agent that answers it names
+ *  exactly the receipt's topics, each with its day, whatever kind of
+ *  session it closes (round 20, M3). Any other message is left as it is. */
+export function withCloseReceipt(message: LhMessage, receipt: unknown): LhMessage {
+	if (message.role !== "custom" || message.customType !== "done-tonight" || typeof message.content !== "string" || receipt === null || receipt === undefined) return message;
+	return { ...message, content: `${message.content}\nThe close receipt: ${JSON.stringify(receipt)}`, details: { ...(message.details as object), close: receipt } };
 }
 
 /** The task Continue picks up, as the engine's record names it: its title
@@ -1648,6 +1652,9 @@ export function questionCallsOf(messages: readonly LhMessage[]): QuestionCall[] 
 	for (let mi = messages.length - 1; mi >= 0; mi--) {
 		const assistant = messages[mi]!;
 		if (assistant.role !== "assistant") continue;
+		// The plan drawn after the lesson's first question, and the thinking
+		// before it, leave that question open (round 20, M1).
+		if (drawsThePlanOnly(assistant)) continue;
 		const answered = resultIdsFrom(messages.slice(mi + 1));
 		const calls: QuestionCall[] = [];
 		for (const [contentIndex, block] of assistant.content.entries()) {
@@ -1662,6 +1669,12 @@ export function questionCallsOf(messages: readonly LhMessage[]): QuestionCall[] 
 		return calls; // never revive older calls, even when this message has none
 	}
 	return [];
+}
+
+/** A reply that only thinks and draws the lesson's plan: nothing he reads. */
+function drawsThePlanOnly(assistant: AssistantMessage): boolean {
+	if (assistant.stopReason === "error" || assistant.stopReason === "aborted") return false;
+	return assistant.content.every((b) => b.type === "thinking" || (b.type === "text" && !b.text.trim()) || (b.type === "toolCall" && b.name === "plan_init"));
 }
 
 /** Background wakes must still wait for an explicit learner action when a
@@ -1910,6 +1923,10 @@ export function needsContinuation(record: readonly LhMessage[]): boolean {
 	// so the record ends on their result and nothing is owed (round 14, M1:
 	// a continue after the close asked the left question again).
 	if (results.some((m) => m.toolName === SEND_TO_USER_TOOL && !m.isError) && closedInTurn(messages, start)) return false;
+	// The plan drawn after the lesson's first question ends its turn on
+	// purpose, and the question waits for his answer (round 20, M1: a
+	// continue asked it again).
+	if (results.some((m) => m.toolName === "plan_init" && !m.isError) && danglingQuestionOf(messages) !== null) return false;
 	const answered = new Set(results.map((m) => m.toolCallId));
 	const calls = (content as Array<{ type?: string; id?: string }>).filter(
 		(b) => b.type === "toolCall" && typeof b.id === "string",

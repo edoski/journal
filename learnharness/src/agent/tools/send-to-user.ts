@@ -9,7 +9,9 @@ import { SENTENCE_BUDGETS, SENTENCE_WORDS } from "../../core/voice-check.ts";
  *  (round 11: 22 refusals for a sentence opening on a formula or a turn past
  *  its budget; round 12: a point made twice, 18 of the evaluators' 81
  *  refusals, and length 14, each one more model round trip; round 13: 6
- *  length refusals in 35 reading turns, so each budget is given by number). voice-check
+ *  length refusals in 35 reading turns, so each budget is given by number;
+ *  round 20: a chained display, which refused every probe's-end opening
+ *  in round 19's runs and both of round 20's first-run messages). voice-check
  *  holds the examples and the counts to them. */
 export const MESSAGE_DRAFT_LINES: readonly string[] = [
 	"Every sentence opens with a word, never a symbol or a formula (\"The matrix $A$ takes vectors with 5 entries.\", " +
@@ -20,6 +22,9 @@ export const MESSAGE_DRAFT_LINES: readonly string[] = [
 		`a clause after a colon or a semicolon is one more sentence, and a sentence over ${SENTENCE_WORDS} words is two.`,
 	"A point is made once: what he was told earlier in the session is never said again, in other words, a display or a callout; say only what is new.",
 	"A handoff between teaching and practice takes no words of its own (never \"Switching to an explanation of the basis test.\"): go straight to the explanation or the problem.",
+	"A display, and each piece of maths inside a sentence, states one kind of relation, never two chained " +
+		"(\"$P(X=0) = 0.998^{1000} \\approx e^{-2}$\" and \"$h = \\frac1n \\to 0$\" mix = with ≈ and with →): " +
+		"give the second relation its own display line, or say it in words.",
 	"Words are prose, never maths type: only the maths goes in $…$ (\"$A$ is invertible exactly when $\\det A \\neq 0$.\", never \"$A \\text{ is invertible exactly when } \\det A \\neq 0$.\").",
 	"Every answer in the record stays saved, an earlier day's included, so never tell him one is unsaved or not saved.",
 ];

@@ -20,7 +20,8 @@ async function closingWithDays(): Promise<VoiceGuard> {
 	const guard = new VoiceGuard([newUserMessage("Eigenvalues and eigenvectors"), assistant([ask]), answered(ask, "Dismissed.", { dismissed: true, reason: "tonight", draftKept: LEFT_DRAFT_TEXT }), doneTonight()], undefined, false, true);
 	const call: ToolCall = { type: "toolCall", id: `c-${nextId()}`, name: "lesson_progress", arguments: { done: [], close: true } };
 	guard.screen(call);
-	const receipt = JSON.stringify({ ok: true, days: { eigen: { continues: "2026-11-09", continues_words: "tomorrow, Monday 9 November" } }, day_items: { "2026-11-09": { day_words: "tomorrow, Monday 9 November", items: ["Eigenvalues and eigenvectors lesson continues"], lesson: ["Eigenvalues and eigenvectors"] } } });
+	const eigen = { handle: "eigen", title: "Eigenvalues and eigenvectors", kind: "continues", day: "2026-11-09", day_words: "tomorrow, Monday 9 November" };
+	const receipt = JSON.stringify({ ok: true, close: { topics: [eigen], moved: [], says: "Your Eigenvalues and eigenvectors lesson continues tomorrow, Monday 9 November." } });
 	const tool = { name: "lesson_progress", label: "lesson_progress", description: "", parameters: {} as never, execute: async () => ({ content: [{ type: "text" as const, text: receipt }], details: null }) } as unknown as AgentTool<never>;
 	await guard.wrap(tool).execute(call.id, call.arguments as never, undefined, undefined);
 	return guard;
@@ -43,12 +44,11 @@ describe("m15: a close names a day for every topic it names (1 n2, 3 n4)", () =>
 
 	it("a close with its days passes", async () => {
 		assert.deepEqual(rules(await closingWithDays(), send("Your half answer to the eigenline question waits in your Eigenvalues and eigenvectors lesson, which continues tomorrow, Monday 9 November.")), []);
-		assert.deepEqual(rules(await closingWithDays(), send("Your Mechanics review is on Wednesday 11 November, and the rest are on your calendar.")), []);
 	});
 
 	it("the close's instructions ask for every named topic's day, this sitting's topics only, and the half answer's lesson day", () => {
-		assert.match(DONE_TONIGHT_TEXT.teacher, /those he answered since its last close/);
-		assert.match(DONE_TONIGHT_TEXT.teacher, /never "a later day" or "next"/);
+		assert.match(DONE_TONIGHT_TEXT.teacher, /exactly the topics this session answered/);
+		assert.match(DONE_TONIGHT_TEXT.teacher, /never "on your calendar", "next time" or "a later day"/);
 		assert.match(DONE_TONIGHT_TEXT.teacher, /with the day that lesson continues/);
 		assert.match(DONE_TONIGHT_TEXT.teacher, /never that he wrote nothing/);
 	});

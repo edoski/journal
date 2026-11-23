@@ -67,8 +67,13 @@ export function seenThrough(g: ScrollGeometry, seenBefore: number): number {
 /** What the cue above the dock shows. */
 export type ScrollCue = "new-reply" | "down" | null;
 
-export function scrollCueOf(g: ScrollGeometry, seen: number): ScrollCue {
-	if (contentEnd(g) - seen > UNREAD_MIN) return "new-reply";
+/** "New reply" only while the tutor's reply grew since he last read to the
+ *  end (`replyGrew`): what grows on its own (maths and figures settling
+ *  after the first paint, a notice under the transcript) is no reply
+ *  (round 20, m16: the pill showed for 3 s on opening a closed lesson, and
+ *  when the unreadable notice appeared). */
+export function scrollCueOf(g: ScrollGeometry, seen: number, replyGrew = true): ScrollCue {
+	if (replyGrew && contentEnd(g) - seen > UNREAD_MIN) return "new-reply";
 	return g.scrollHeight - g.clientHeight - g.scrollTop > AWAY_MIN ? "down" : null;
 }
 

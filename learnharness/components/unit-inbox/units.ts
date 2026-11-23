@@ -1,8 +1,8 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { leftOffWords, overdueWords, reviewWords, slipMark, STANDING_WORDS, type SlipKey } from "@/components/study-words";
+import { leftOffWords, overdueWords, reviewWords, slipMark, STANDING_WORDS, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
 import { slipBeside } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
-import { currentSessions, pausedWords, resumableSession, sessionState } from "@/components/nav/session-state";
+import { closedReview, currentSessions, pausedWords, resumableSession, sessionState } from "@/components/nav/session-state";
 
 /**
  * The sidebar's topics. Each unit (a course map topic the learner has
@@ -232,6 +232,38 @@ export function studiedWords(at: string, today: string): string {
  *  "Left off today", "Left off 6 Nov". `today` is the engine's day. Pure. */
 export function leftWords(chat: Pick<ChatListItem, "updatedAt">, today: string): string {
 	return leftOffWords(Math.max(0, daysBetween(dayOf(chat.updatedAt), today)), today);
+}
+
+/** The session that speaks for a topic: of those of its own that work on
+ *  it (`worksOn`), the one to pick up (`resumableSession`, against every
+ *  session `chats`), never a review he closed with Done for today, which
+ *  rides with the topic's next review (`closedReview`). Its page's Now
+ *  resumes it, and its head and its map card say its status (round 20,
+ *  m4). Null when none. Pure. */
+export function topicSession(sessions: readonly ChatListItem[], handle: string, chats: readonly ChatListItem[]): ChatListItem | null {
+	return resumableSession(sessions.filter((chat) => worksOn(chat, handle) && !closedReview(chat)), chats);
+}
+
+/** What an open session says, as a fact: "Your turn", the tutor writing,
+ *  its stop ("Stopped by you", `pausedWords`), or the day he left it
+ *  ("Left off today", `leftWords`); null for a finished one. The one
+ *  wording of a session's status on its topic: its page's Now, its head
+ *  and its map card say it (round 20, m4). Pure. */
+export type SessionFact = { kind: "your-turn" | "working" | "stopped" | "task"; words: string };
+
+export function sessionFact(chat: ChatListItem, today: string): SessionFact | null {
+	switch (sessionState(chat)) {
+		case "your-turn":
+			return { kind: "your-turn", words: "Your turn" };
+		case "working":
+			return { kind: "working", words: TUTOR_WRITING };
+		case "paused":
+			return { kind: "stopped", words: pausedWords(chat) };
+		case "left":
+			return { kind: "task", words: leftWords(chat, today) };
+		case "finished":
+			return null;
+	}
 }
 
 /** A topic row's one status. `asked`: Today reviews the topic

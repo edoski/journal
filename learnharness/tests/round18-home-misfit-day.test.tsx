@@ -70,7 +70,7 @@ describe("Home names the exam's topics with no room before it on the day one fal
 		const page = parseHTML(`<html><body>${renderToStaticMarkup(<Today rows={[]} done={[]} exam={null} misfit={misfitExam([NINTH])} busy={false} onContinue={() => {}} />)}</body></html>`).document;
 		const line = page.querySelector("[data-slot=today-exam-misfit]");
 		assert.ok(line, "the line under the heading");
-		assert.match(line.textContent ?? "", /^No room before the exam to start Martingales, .*Hypergeometric distribution/);
+		assert.match(line.textContent ?? "", /^Not every exam topic fits before 19 Nov\./);
 		assert.equal(line.querySelector("button")?.textContent, "Ask the tutor");
 	});
 });

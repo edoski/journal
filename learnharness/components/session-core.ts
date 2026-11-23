@@ -459,7 +459,7 @@ export class SessionModel {
 					// start+end only, no streaming partials). Without this the
 					// live stream dropped the marker until the settle sync.
 					const mid = message.id;
-					if (mid === undefined) return false;
+					if (mid === undefined) return this.keepToolResult(message as LhMessage);
 					// Adoption/refetch may already carry this durable message before
 					// its start/end is replayed. The record owns that identity;
 					// adding it to the tail would duplicate it until the next sync.
@@ -543,6 +543,27 @@ export class SessionModel {
 			default:
 				return false; // agent_start/turn_start/tool_execution_start|update: no view work
 		}
+	}
+
+	/** A tool result the Claude Code run streams as its own message, with no
+	 *  id until the record stamps one: kept in the tail by its call, as
+	 *  `turn_end`'s results batch is, so a concluded problem stays
+	 *  concluded and its Model solution stays drawn once the stream ends
+	 *  and its executions are dropped, until the settle sync lands the
+	 *  record's copy (round 20, M4: the dock re-showed the answered
+	 *  problem for 3 s after the turn). Another id-less message is no
+	 *  view work. */
+	private keepToolResult(message: LhMessage): boolean {
+		if (message.role !== "toolResult") return false;
+		const call = message.toolCallId;
+		const isResult = (m: LhMessage) => m.role === "toolResult" && m.toolCallId === call;
+		if (this.base.some(isResult)) return false;
+		this.mutate(() => {
+			const idx = this.tail.findIndex(isResult);
+			const kept = { ...message, id: idx === -1 ? localId() : this.tail[idx]!.id } as LhMessage;
+			this.tail = idx === -1 ? [...this.tail, kept] : this.tail.with(idx, kept);
+		});
+		return true;
 	}
 
 	/** Consume one SSE body to its [DONE] terminal. The turn-settled
@@ -713,8 +734,12 @@ export class SessionModel {
 	 */
 	async send(input: ChatInput, onAccepted?: () => void, questionKey?: string): Promise<boolean> {
 		const recovering = this.statusValue === "error";
-		if (!this.readyRef && !recovering) return false;
 		const subject = input.type === "answer" ? pendingQuestionOf([...this.base, ...this.tail]) : null;
+		// His answer to the question a turn posed before its plan goes while
+		// that turn draws the plan: it shows at once, and its post waits for
+		// the turn's end (round 20, M1: Enter seemed to do nothing).
+		const answersOpen = input.type === "answer" && subject?.toolCallId === input.toolCallId;
+		if (!this.readyRef && !recovering && !answersOpen) return false;
 		// A render-scoped answer must not move to another occurrence sharing
 		// its id. This identity is local only; the server's wire is unchanged.
 		if (input.type === "answer" && questionKey !== undefined &&

@@ -84,7 +84,8 @@ describe("the readiness answer's ways in", () => {
 			};
 		});
 		await page.close();
-		assert.equal(m.words[0], "Review Random variables and distributions today");
+		// Which topics first, since the head's line names no topic left out (round 20, M2), then the pick.
+		assert.deepEqual(m.words.slice(0, 2), ["Which topics", "Review Random variables and distributions today"]);
 		assert.ok(Math.abs(m.first - m.left) < 1, `the first press's words start where the popover's lines do (${m.first} against ${m.left})`);
 		assert.deepEqual(m.over, [], "no press runs past the popover's edge");
 	});
@@ -141,14 +142,15 @@ describe("the exam eve at the new world's size (round 17, M3)", () => {
 		const why = await page.evaluate(() => document.querySelector('[data-slot="exam-gaps-why"]')?.textContent ?? "");
 		assert.ok(why.split(/\s+/).length <= 30, `the why is short: "${why}"`);
 		assert.doesNotMatch(why, /Variance|Martingales|Geometric/, "it lists no topic");
-		// Round 18, m7 (1 n5): Which topics repeated the head's line word for word. The head's line names every topic
-		// with no room here, so the answer has nothing behind Which topics and says no sentence of the line.
+		// Round 18, m7 (1 n5): Which topics repeated the head's line word for word. Round 20, M2: the head's line is one
+		// sentence naming no topic left out, so the names are behind Which topics, and the answer says no sentence of it.
 		const answer = await page.evaluate(() => ({
 			head: document.querySelector('[data-slot="course-ready-fact"]')?.textContent ?? "",
 			popover: document.querySelector('[data-slot="course-ready-detail"]')?.textContent ?? "",
 			whichPress: document.querySelector('[data-slot="exam-gaps-which-press"]') !== null,
 		}));
-		assert.equal(answer.whichPress, false, "no Which topics with nothing the head's line does not say");
+		assert.equal(answer.whichPress, true, "the names the head's line leaves out are behind Which topics");
+		assert.doesNotMatch(answer.head, /Variance|Martingales|Geometric/, "the head's line names no topic left out");
 		assert.ok(!answer.popover.includes(answer.head), "no sentence of the head's line in its answer");
 		assert.doesNotMatch(answer.popover, /\bOne starts\b|\bsome start\b/i, "no topic left unnamed");
 		await page.close();
@@ -163,7 +165,7 @@ describe("the exam eve at the new world's size (round 17, M3)", () => {
  * that wraps starts on the line's left edge.
  */
 describe("the head's facts when they wrap (round 18, m9)", () => {
-	it("puts Studied on its own line at the line's left edge, with no divider before it", async () => {
+	it("puts Studied, when it wraps, at the line's left edge, with no divider before it", async () => {
 		const page = await shell.open("browser", { sidebar: "open", search: "&case=eve" });
 		await page.waitForSelector('[data-slot="course-studied"]');
 		const m = await page.evaluate(() => {
@@ -180,9 +182,12 @@ describe("the head's facts when they wrap (round 18, m9)", () => {
 			return { lineLeft, iconLeft: studied.querySelector("svg")!.getBoundingClientRect().left, wrapped: box.top >= ready.bottom - 0.5, divider: shown };
 		});
 		await page.close();
-		assert.ok(m.wrapped, "Studied wraps under the readiness line at 1512 px");
-		assert.equal(m.divider, false, "no divider drawn before a fact");
-		assert.ok(Math.abs(m.iconLeft - m.lineLeft) < 0.5, `Studied's mark starts on the line's left edge (${m.iconLeft} against ${m.lineLeft})`);
+		// Round 20, M2: the exam line is one short sentence, so Studied may keep its place on the line at 1512 px,
+		// its divider before it; once it wraps, the divider is gone and it starts on the line's left edge.
+		if (m.wrapped) {
+			assert.equal(m.divider, false, "no divider drawn before a fact that wrapped");
+			assert.ok(Math.abs(m.iconLeft - m.lineLeft) < 0.5, `Studied's mark starts on the line's left edge (${m.iconLeft} against ${m.lineLeft})`);
+		}
 	});
 });
 

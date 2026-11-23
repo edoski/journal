@@ -16,7 +16,6 @@
  */
 
 import { Type, type Static } from "typebox";
-import { SENTENCE_WORDS } from "../voice-check.ts";
 
 /** One dependency strand the planned lesson will rest on. */
 export interface ProbeStrand {
@@ -37,10 +36,6 @@ export interface ProbeAssessment {
 /** probe_done tool input (the assessment the prober authors). */
 export interface ProbeDoneInput {
 	assessment: ProbeAssessment;
-	/** A lesson's first step, taught from the assessment and shown to him
-	 *  with the probe's end, so he reads it while the teacher plans (round
-	 *  19, M7). Never in a review or an open task's session. */
-	opening?: string;
 }
 
 // The TypeBox schema of that input — SINGLE SOURCE OF TRUTH, lived by the
@@ -73,17 +68,6 @@ export const probeDoneInputSchema = Type.Object({
 			),
 		},
 		{ description: "The learner assessment — the probe's distilled output." },
-	),
-	opening: Type.Optional(
-		Type.String({
-			description:
-				"In a lesson only, written after the assessment: the lesson's first step, taught to him from where the summary says the teaching should enter, " +
-				"shown to him at once so he reads it while the teacher plans. A teaching turn in the voice's budget: one idea, two to four sentences of " +
-				`${SENTENCE_WORDS} words or fewer ` +
-				"(a longer one counts as two, and each clause after a colon or a semicolon as one more), at most one display, stating one relation; " +
-				"standing on what he holds, never saying again what your feedback on his last answer said, with no question and no line about the lesson's goal: " +
-				"the teacher plans with it as the first step and poses its question. Left out in his review and in a session that carries on his open task.",
-		}),
 	),
 });
 

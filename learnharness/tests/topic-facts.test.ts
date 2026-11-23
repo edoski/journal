@@ -232,7 +232,7 @@ describe("where he stands, in the app's one wording", () => {
 	it("says Slipping only on a topic he is losing, and a fixed miss on a topic still being learned in its standing alone (round 11, 3 N1)", () => {
 		const kernel = { ...TOPICS.kernel, right: "unaided" as const, review: null, signals: { ...QUIET, confidentErrors: 2, repaired: true } };
 		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf, TODAY).map((mark) => mark.words)].join(". ");
-		assert.equal(said(kernel), "Right on your own, check another day");
+		assert.equal(said(kernel), "Check again another day", "weak still: the check to come, never Right on your own (round 20, m4)");
 		assert.equal(said({ ...TOPICS.matmul, review: null }), "Slipping. Not right last time");
 		assert.equal(slipOf(MAP, kernel), null, "nothing open: the sidebar says no slip beside it either");
 	});
@@ -246,6 +246,51 @@ describe("where he stands, in the app's one wording", () => {
 		assert.deepEqual(headMarks(TOPICS.determinant, titleOf, TODAY), [{ kind: "review", words: "Due 4 Nov" }]);
 		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: null }, titleOf, TODAY), []);
 		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: { kind: "scheduled", date: "2026-11-09" } }, titleOf, TODAY), [{ kind: "review", words: "Back Mon 9 Nov" }]);
+	});
+});
+
+/**
+ * Round 20, m4 (3 n5, 2 A1): mid-lesson the topic read its last mark ("Not
+ * right last time"); after a lesson with three counted misses its head read
+ * "Right on your own, check another day"; Binomial read the same while the
+ * engine held it weak, the weakness that held Poisson back. While a session
+ * on the topic is open, the head says the session's status, as its row and
+ * its card do; otherwise the engine's standing, a weak topic's check to
+ * come and never "Right on your own".
+ */
+describe("a topic's head while a session on it is open, and after (round 20, m4)", () => {
+	const invertible = topic("invertible", { title: "Invertible matrices", level: "assisted", introduced: TODAY, right: "unaided", weak: true, signals: { ...QUIET, confidentErrors: 1, repaired: true } });
+	const course: StudyCourse = { ...COURSE, map: { ...MAP, topics: [...MAP.topics, invertible] } };
+	const facts = (chats: ChatListItem[], t: CourseMapTopic = invertible) => topicFacts({ course, topic: t, chats, read: null });
+	const lesson = (over: Partial<ChatListItem>) => chat({ title: "Invertible matrices lesson", topics: ["invertible"], updatedAt: `${TODAY}T10:00:00`, ...over });
+
+	it("says Your turn while the lesson waits on his answer", () => {
+		assert.deepEqual(facts([lesson({ pendingQuestion: true })]).now, { kind: "your-turn", words: "Your turn" });
+	});
+
+	it("says Left off today once he left it with Done for today", () => {
+		assert.deepEqual(facts([lesson({ ended: "left" })]).now, { kind: "task", words: "Left off today" });
+	});
+
+	it("says the engine's standing once no session on it is open: a weak topic's check, never Right on your own", () => {
+		const after = facts([lesson({ ended: "closed" })]);
+		assert.equal(after.now, null);
+		assert.equal(after.standing?.words, "Check again another day");
+		const binomial = topic("binomial", { title: "Binomial distribution", level: "assisted", right: "unaided", weak: true, review: { kind: "scheduled", date: "2026-11-10" }, signals: { ...QUIET, gap: "Counts the places for k as n", repaired: true } });
+		assert.doesNotMatch(facts([], binomial).standing?.words ?? "", /Right on your own/);
+		const solid = { ...binomial, weak: false, signals: QUIET };
+		assert.equal(facts([], solid).standing?.words, "Right on your own, check another day", "not weak: right on his own, its check another day");
+	});
+
+	it("never takes a review he closed with Done for today, which its page's Now does not resume either", () => {
+		const review = chat({ title: "Review Invertible matrices", topics: ["invertible"], ended: "left", updatedAt: `${TODAY}T10:00:00` });
+		const read = facts([review]);
+		assert.equal(read.now, null);
+		assert.notEqual(read.action.kind, "resume");
+	});
+
+	it("never takes a session that works on another topic", () => {
+		assert.equal(facts([lesson({ pendingQuestion: true, openOn: ["rank"] })]).now, null);
 	});
 });
 
@@ -301,7 +346,7 @@ describe("what went wrong", () => {
 	it("is nothing once he fixed it on his own, so it never sits under 'Check again another day' as a mistake still open", () => {
 		const gap = "Forgot why det(A - lambda I) = 0 and guessed the reason backwards";
 		const fixed = topic("eigen", { level: "assisted", weak: true, signals: { ...QUIET, gap, repaired: true } });
-		assert.deepEqual(headMarks(fixed, (x) => x, TODAY).map((mark) => mark.words), [], "its standing says it: Right on your own, check another day");
+		assert.deepEqual(headMarks(fixed, (x) => x, TODAY).map((mark) => mark.words), [], "its standing says it: Check again another day");
 		assert.equal(mistakeOf(fixed, [missed]), null);
 		const helped = topic("eigen", { level: "assisted", weak: true, signals: { ...QUIET, gap, repaired: true, repairedWithHelp: true } });
 		assert.equal(mistakeOf(helped, [missed]), gap, "help may have carried the right answer: still a mistake to fix");
@@ -333,7 +378,7 @@ describe("when a topic comes up", () => {
 		// Round 17, 3 m4: "No room in the final review…" beside "Planned Wed 18 Nov" read as a contradiction.
 		assert.equal(examOf(topic("poisson", { starts: "2026-11-18", startsWhy: { kind: "next" } })).startsWhy?.words, "Too close to the exam for a review before it");
 		const bayes = topic("bayes", { level: "independent", introduced: "2026-10-01", review: { kind: "scheduled", date: "2026-12-15", held: { exam: null, since: "2026-11-11" } } });
-		assert.equal(examOf(bayes).waits, "Not revisited in the final review, full at your pace");
+		assert.equal(examOf(bayes).waits, "Not in your final review before the 19 Nov exam");
 	});
 
 	it("still says the exam leaves out a topic he started, beside the lesson he left (demo world, 17 Nov: Simulation of continuous probabilities read only Left off today)", () => {
@@ -352,14 +397,14 @@ describe("when a topic comes up", () => {
 		const facts = topicFacts({ course: { ...COURSE, map: { ...COURSE.map, exam, topics: [...COURSE.map.topics, binomial] } }, topic: binomial, chats: [], read: null });
 		assert.ok(binomial.review?.kind === "scheduled" && binomial.review.date < exam.date, "its review comes before the exam");
 		assert.doesNotMatch(facts.waits ?? "", /No review before the exam/);
-		assert.equal(facts.waits, "Not revisited in the final review, full at your pace");
+		assert.equal(facts.waits, "Not in your final review before the 19 Nov exam", "never full at your pace (round 20, M2)");
 	});
 
-	it("names the final review's first day beside a review before it (round 11 integration: Binomial read Review today and No room in the final review)", () => {
+	it("names the final review beside a review before it (round 11 integration: Binomial read Review today and No room in the final review)", () => {
 		const exam = { date: "2026-11-19", daysLeft: 11, finalReview: "2026-11-13", unreviewed: [h("binomial")], reasons: { binomial: "full" } as const };
 		const binomial = topic("binomial", { level: "assisted", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-11" } });
 		const facts = topicFacts({ course: { ...COURSE, map: { ...COURSE.map, exam, topics: [...COURSE.map.topics, binomial] } }, topic: binomial, chats: [], read: null });
-		assert.equal(facts.waits, "Not revisited in the final review from 13 Nov, full at your pace");
+		assert.equal(facts.waits, "Not in your final review before the 19 Nov exam");
 	});
 
 	it("says from which told day a review or a start moved and what of his study moved it", () => {

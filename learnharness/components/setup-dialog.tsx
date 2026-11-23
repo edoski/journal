@@ -86,7 +86,7 @@ export function SetupDialog({ open, onClose }: SetupDialogProps) {
 				</Hint>
 				<div className="flex flex-col gap-6" data-testid="setup-stage-keys">
 					<SettingsGroup>
-						<ClaudeConnectionRow />
+						<ClaudeConnectionRow notice={false} />
 					</SettingsGroup>
 				</div>
 			</DialogContent>

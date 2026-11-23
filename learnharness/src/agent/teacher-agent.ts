@@ -119,13 +119,16 @@ export interface AgentBuildOptions {
  * every pose of its reply resolved cleanly). The prober's clean probe_done
  * ends its turn too: the teacher opens the lesson next, and closing words
  * after it were only written to be withheld (round 9: 7 s of the 70 s
- * before teaching).
+ * before teaching). A lesson's first question may come before its plan,
+ * which he reads while the plan is made (round 20, M1): its result does not
+ * end the turn (`questionBeforePlanResult`), and the plan after it does.
  */
 export function endsTurnFor(kind: AgentKind): (toolName: string, earlier?: readonly ToolCall[]) => boolean {
 	return (name, earlier = []) =>
 		(QUESTION_TOOLS as readonly string[]).includes(name) ||
 		(kind === "practice" && name === PRACTICE_PROBLEM_TOOL) ||
 		(kind === "prober" && name === PROBE_DONE_TOOL) ||
+		(kind === "teacher" && name === "plan_init" && earlier.some((c) => (QUESTION_TOOLS as readonly string[]).includes(c.name))) ||
 		MODE_HANDOFF_TOOLS[name] !== undefined ||
 		(name === SEND_TO_USER_TOOL && closedBefore(kind, earlier));
 }
@@ -138,8 +141,6 @@ export function endsTurnFor(kind: AgentKind): (toolName: string, earlier?: reado
  *  with nothing on his screen after a practice problem (round 13, 4 #2). */
 function closedBefore(kind: AgentKind, earlier: readonly ToolCall[]): boolean {
 	if (kind === "practice") return earlier.some((c) => c.name === PRACTICE_CONCLUDE_TOOL);
-	// The lesson's opening, owed after a probe_done whose own was left off (round 19, M7).
-	if (kind === "prober") return earlier.some((c) => c.name === PROBE_DONE_TOOL);
 	if (kind === "teacher") return earlier.some((c) => c.name === LESSON_PROGRESS_TOOL && lessonProgressOf(c.arguments)?.close === true);
 	return false;
 }
@@ -172,7 +173,9 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	const systemPrompt = [composed, ...(opts.course ? [courseRecordPrompt(kind, { arcs: opts.course.arcs })] : []), foldersPrompt(opts.course, opts.setup)].join("\n\n---\n\n");
 	// Every message and question of the turn is read against the voice
 	// before he sees it, and one that breaks it is rewritten.
-	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind), opts.course?.review === true, opts.course !== undefined);
+	const courses = opts.course?.courses;
+	const titles = courses ? () => courses().then((maps) => maps.flatMap((map) => map.topics.map((topic) => topic.title))) : undefined;
+	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind), opts.course?.review === true, opts.course !== undefined, titles);
 	// The guard's budgets and refusals are a lesson's (a teaching turn, an
 	// answer, a hint): setting something up teaches nothing, so its messages
 	// keep to the voice its prompt carries, unchecked by them.
@@ -191,9 +194,9 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			...(opts.course ? Object.values(courseTools(opts.course)) : []),
 			...(opts.tools === undefined ? [withArgumentHeal(sendToUserTool)] : []),
 		].map(spoken).map((tool) => closing.wrap(tool)),
-		screen: (call) => {
+		screen: (call, reply) => {
 			closing.screen(call);
-			if (lesson) voice.screen(call);
+			if (lesson) voice.screen(call, reply);
 		},
 		settle: (message) => voice.settle(message),
 		heard: () => voice.heard(),

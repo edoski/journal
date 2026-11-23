@@ -5,7 +5,8 @@
  * eigenvalues? · Practice problems now · Stop here for today" headed an
  * offer, which asks nothing of him (`2` `61`). Now no "Your turn" stands
  * without a question under it or the words "on the question above", and an
- * offer to go on has none.
+ * offer to go on has none. Round 20, m9: after a Hint it is "on the
+ * question above" too, with no question posted again.
  */
 import React from "react";
 import assert from "node:assert/strict";
@@ -32,14 +33,7 @@ function heldBy(view: { turn: string | null; below: string }): boolean {
 }
 
 describe("the transcript's Your turn (round 19, m21)", () => {
-	it("after a hint, the question asked again stands under Your turn", () => {
-		const view = drawn(<ProseQuestion tool="explain" toolCallId="q2" input={check} open repeat afterHint />);
-		assert.equal(view.turn, "Your turn");
-		assert.match(view.below, /Which lines through the origin/);
-		assert.ok(heldBy(view));
-	});
-
-	it("after his side question, the mark points at the question above", () => {
+	it("after a hint or his side question, the mark points at the question above (round 20, m9)", () => {
 		const view = drawn(<ProseQuestion tool="explain" toolCallId="q2" input={check} open repeat />);
 		assert.equal(view.turn, "Your turn, on the question above");
 	});

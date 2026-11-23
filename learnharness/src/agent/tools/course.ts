@@ -21,6 +21,8 @@ import { RUNG_HELP } from "../../core/practice-attempts.ts";
 import type { AnsweredQuestion } from "../../core/native-messages.ts";
 import { studyDay, withDayWords } from "../../core/day-words.ts";
 import { DOUBT } from "../../core/voice-check.ts";
+import { closeTopicsOf, receiptOfMap, receiptOfSaves, sessionSavesOf, type CloseReceipt, type SessionSave } from "../../core/close-receipt.ts";
+import { sessionTasksOf, type LhMessage } from "../../core/native-messages.ts";
 
 /** What the course tools close over. */
 export interface CourseToolContext {
@@ -65,13 +67,17 @@ export interface CourseToolContext {
 	/** The steps of this session's lesson plan as they stand when a save
 	 *  runs (the plan may be written in the same turn). Absent: none. */
 	planSteps?: () => readonly { id: string; title: string }[];
-	/** Every course's map as the daily plan reads them, so a close names
-	 *  each day whole across his courses (round 15, m3). Absent: this
-	 *  course's alone. */
+	/** Every course's map as the daily plan reads them, kept from the
+	 *  turn's start, so the voice guard knows every topic's title and a
+	 *  close names none its receipt does not hold (round 20, M3). */
 	courses?: () => Promise<readonly CourseMap[]>;
 	/** The question his Done for today left a half answer on, by its words
 	 *  (session-end.ts `halfAnswerLeft`); null or absent: none. */
 	halfAnswer?: () => string | null;
+	/** The saves the session made since its last close, before this turn
+	 *  (close-receipt.ts `sessionSavesOf`), so each save's receipt carries
+	 *  the close of the whole sitting. Absent: none. */
+	sessionSaves?: () => readonly SessionSave[];
 }
 
 /** An attempt's line that names a slip in his answer (round 19, m1: o95
@@ -390,7 +396,43 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 	const result = await saveRuled(ctx, changes, problem);
 	const moved = result.ok && isObject(result.json) && isObject(result.json.starts_moved) ? Object.keys(result.json.starts_moved) : [];
 	if (moved.length > 0) ctx.onMoved?.(moved);
-	return result;
+	if (!result.ok || !isObject(result.json) || !isObject(result.json.reviews)) return result;
+	// Every save carries the close of the sitting so far, so a close that
+	// follows it, a review's own included, names every topic the session
+	// answered with its day (round 20, M3: the 10 Nov review's close named
+	// only its last save's topic).
+	const saves = turnSaves.get(ctx) ?? [];
+	turnSaves.set(ctx, saves);
+	saves.push({ topics: answeredTopics(changes), receipt: result.json });
+	return { ...result, json: { ...result.json, close: receiptOfSaves([...(ctx.sessionSaves?.() ?? []), ...saves], studyDay()) } };
+}
+
+/** This turn's saves that went through, in order: the close of a turn that
+ *  saved reads them beside the session's earlier saves. */
+const turnSaves = new WeakMap<CourseToolContext, SessionSave[]>();
+
+/** The topics a patch's attempts answer. */
+function answeredTopics(changes: unknown): string[] {
+	const listed = patchOf(changes)?.observations;
+	return Array.isArray(listed) ? listed.flatMap((o) => (isObject(o) && Array.isArray(o.topics) ? o.topics.filter((t): t is string => typeof t === "string") : [])) : [];
+}
+
+/** The session's close receipt as the plan holds it after its saves, this
+ *  turn's included: the lesson's own topics and every topic it answered
+ *  since its last close, each with its day, the starts its saves moved,
+ *  and the task it holds when that goes on. The lesson's close and Done
+ *  for today give it; null when the course's map cannot be read. */
+export async function closeReceiptFor(
+	records: CourseRecords,
+	workspace: string,
+	record: { title: string; topics?: readonly string[]; messages: readonly LhMessage[] },
+	ctx?: CourseToolContext,
+): Promise<CloseReceipt | null> {
+	const mapped = await records.map(workspace);
+	if (!mapped.ok) return null;
+	const inTurn = ctx ? (turnSaves.get(ctx) ?? []) : [];
+	const saves = [...sessionSavesOf(record.messages), ...inTurn];
+	return receiptOfMap(mapped.map, [...closeTopicsOf(record), ...inTurn.flatMap((s) => s.topics)], saves, sessionTasksOf(record.messages));
 }
 
 async function saveRuled(ctx: CourseToolContext, changes: unknown, problem?: { id: string; seen: boolean }): Promise<CourseResult> {
@@ -410,7 +452,7 @@ async function saveRuled(ctx: CourseToolContext, changes: unknown, problem?: { i
 		const question = named.questions[i];
 		return question ? answers.get(question)?.seenBefore === true : problem?.seen === true;
 	});
-	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: { ...patch, observations: asideOf(ctx, ruled.observations) } });
+	const result = await savedOnce(ctx, { ...patch, observations: asideOf(ctx, ruled.observations) });
 	if (result.ok) for (const key of problem ? [problem.id] : named.questions) if (key) saved.add(key);
 	// A problem's attempts are kept under its conclude, so its card shows while
 	// the turn still runs (round 15, 2 D2: First try / Then came only after a
@@ -421,6 +463,16 @@ async function saveRuled(ctx: CourseToolContext, changes: unknown, problem?: { i
 	const receipt = result.json as Record<string, unknown>;
 	const notes = Array.isArray(receipt.notes) ? receipt.notes : [];
 	return { ...result, json: { ...receipt, notes: [...notes, note] } };
+}
+
+/** One save of his answers. A save that timed out may have landed with no
+ *  receipt, and the receipt is what links each answer to its mark: it is
+ *  sent again once, identical, which the engine takes as the save it
+ *  already holds and answers with its ids (round 20, M4: "save did not
+ *  finish in time", o134 written, and no mark even after a reload). */
+async function savedOnce(ctx: CourseToolContext, changes: Record<string, unknown>): Promise<CourseResult> {
+	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes });
+	return !result.ok && result.timedOut ? ctx.records.run(ctx.course.workspace, { verb: "save", changes }) : result;
 }
 
 /** The registered tool names (the transcript card registry and the prompt
@@ -515,7 +567,7 @@ export function courseTools(ctx: CourseToolContext): Record<string, AgentTool<an
 			description:
 				`Record into ${course}'s shared study record. Applies one merge patch and returns a receipt: new observation ids, the reviews it set, ` +
 				"level changes, the focus and current path topic, the due count, and notes worth acting on. " +
-				"Its `starts_moved` lists each first lesson his study today moved off a day he was told: your closing words say it, its new day and its `moved` cause as written, and, with `past_exam`, that it now comes after the exam. " +
+				"Its `close` is the session's close receipt so far: the topics this session answered, each with its day, and each start its saves moved; the session's last words copy `close.says` and name no other topic. " +
 				"A refused patch saved nothing; " +
 				"the error names the field and the fix. Resending a save that failed is safe; an answer already saved is refused.",
 			parameters: saveInput,

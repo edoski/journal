@@ -32,7 +32,10 @@
  * 9. a topic's page resumes a session only when the session's own record
  *    did work on the topic: a press opened it there, it saved an answer or
  *    a task on it, or its plan teaches it, never because his question named
- *    the topic (round 16, M3: 1 M2; M4: 3 N1).
+ *    the topic (round 16, M3: 1 M2; M4: 3 N1);
+ * 10. a topic whose page resumes a session of its own says that session's
+ *    status in its head and on Home's map card, and a topic with none says
+ *    no session's status there (round 20, m4: 3 n5).
  *
  * It seeds its own copy of the world each run (about a minute) and reads
  * the real engine, so it runs where the seed and the engine are installed.
@@ -64,6 +67,8 @@ interface TopicPage {
 	scheduledOn: string | undefined;
 	text: string;
 	opens: string | null;
+	/** The head's standing fact: where he stands, or its open session's status. */
+	head: string;
 }
 
 interface Survey {
@@ -72,6 +77,8 @@ interface Survey {
 	courses: readonly CalendarCourse[];
 	chats: readonly ChatListItem[];
 	home: Array<HomeLine & { opens: string | null }>;
+	/** Home's map cards, by the topic page each opens: the words in each card's header. */
+	cards: Map<string, string>;
 	sidebar: Array<SidebarCard & { opens: string | null }>;
 	calendar: Awaited<ReturnType<DemoApp["calendar"]>>["drawn"];
 	pages: Map<string, TopicPage>;
@@ -80,6 +87,8 @@ interface Survey {
 	/** Each course page's Needs you: its rows' topics and words. */
 	needsYou: Map<string, Array<{ handle: string; text: string }>>;
 	briefs: Map<string, string>;
+	/** Home's exam line under its heading, if it draws one. */
+	misfit: string | null;
 }
 
 const keyOf = (workspace: string, handle: string) => `${workspace}#${handle}`;
@@ -111,8 +120,15 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 
 	await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 || !!document.querySelector('[data-slot="day-heading"]') });
 	// Where each line and card goes, read where it is drawn.
+	const misfitLine = document.querySelector('[data-slot="today-exam-misfit"]');
+	const misfit = misfitLine ? text(misfitLine) : null;
 	const home: Survey["home"] = [];
 	for (const line of app.homeLines()) home.push({ ...line, opens: await app.lookAt(line.el) });
+	const cards: Survey["cards"] = new Map();
+	for (const card of document.querySelectorAll('[data-slot="home-map-course"] a[data-slot="course-map-node"]')) {
+		// The status slot's pause for a screen reader (", ") is not its words.
+		cards.set(card.getAttribute("href") ?? "", text(card.querySelector('[data-slot="topic-need"], [data-slot="topic-standing"]')).replace(/^,\s*/, ""));
+	}
 	const sidebar: Survey["sidebar"] = [];
 	for (const card of app.sidebarCards()) {
 		// A Sessions row is itself the press that opens its session (since the shelves went, 16 Nov 2026).
@@ -138,6 +154,8 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 				scheduledOn: scheduledDay(page.querySelector('[data-slot="pickup-scheduled"]'), today),
 				text: `${text(page.querySelector('[data-slot="page-head"]'))} ${text(page.querySelector('[data-slot="topic-panes"]'))}`,
 				opens: press ? await app.lookAt(press) : null,
+				// The screen reader's pause before the fact (". ") is not its words.
+				head: text(page.querySelector('[data-slot="page-head"] [data-kind="standing"]')).replace(/^\.\s*/, ""),
 			});
 		},
 	);
@@ -176,7 +194,7 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 			if (brief) briefs.set(course.map.workspace, brief.text);
 		}),
 	);
-	return { label, today, courses, chats, home, sidebar, calendar, pages, heads, rows, needsYou, briefs };
+	return { label, today, courses, chats, home, cards, sidebar, calendar, pages, heads, rows, needsYou, briefs, misfit };
 }
 
 // ─── 1. one day per topic ──────────────────────────────────────────────────
@@ -307,6 +325,32 @@ function openTasks(app: DemoApp, s: Survey): Array<{ course: CalendarCourse; tas
 }
 
 /** Whether a link opens a session's chat, however it asks the chat to open. */
+/**
+ * Round 20, M2 (1 N2, 2 A2): on the exam eve Home, the course head and the
+ * calendar's exam panel named 8 to 17 topics in an amber block and said
+ * nothing he could do. The exam line, wherever it is drawn, is one sentence
+ * that names at most the first topic he can still start, and when the plan
+ * starts that topic today Home's Today starts it.
+ */
+function assertExamLine(s: Survey): void {
+	const LINE = /Not every exam topic fits before [^.]+\.(?: Start with (.+?)\.)?/;
+	const failures: string[] = [];
+	const said: Array<[string, string]> = [...(s.misfit ? [["Home", s.misfit] as [string, string]] : []), ...[...s.heads].map(([ws, head]) => [`${short(ws)}'s head`, head] as [string, string])];
+	for (const [where, words] of said) {
+		if (/No room before the exam to start|full at your pace/.test(words)) failures.push(`${where} names the topics left out: "${words}"`);
+		const first = words.match(LINE)?.[1];
+		if (!first) continue;
+		const topic = s.courses.flatMap((c) => c.map.topics).find((t) => t.title === first);
+		if (topic?.starts === s.today && !s.home.some((l) => l.title.startsWith("Start ") && l.title.includes(first))) {
+			failures.push(`${where} says to start with ${first}, planned today, which Home's Today does not start: ${s.home.map((l) => l.title).join(" | ")}`);
+		}
+	}
+	for (const { entry, detail } of s.calendar.filter((d) => d.entry.kind === "exam")) {
+		if (/No room before the exam to start|No room in it for/.test(detail)) failures.push(`the calendar's ${entry.title} names the topics left out: "${detail}"`);
+	}
+	assert.ok(failures.length === 0, `${s.label}: ${failures.join("\n")}`);
+}
+
 const opensChat = (href: string | null | undefined, id: string) => href?.split("?")[0] === `/chat/${id}`;
 
 async function assertContinueOpensTask(app: DemoApp, s: Survey) {
@@ -365,7 +409,7 @@ async function assertContinueOpensTask(app: DemoApp, s: Survey) {
 		}
 		// The calendar.
 		for (const { entry, opens } of s.calendar) {
-			if (entry.kind === "task" && entry.task.key === task.key && entry.course.workspace === course.map.workspace) {
+			if (entry.kind === "task" && entry.task?.key === task.key && entry.course.workspace === course.map.workspace) {
 				offered = true;
 				went("the calendar", opens);
 			}
@@ -385,6 +429,9 @@ async function assertContinueOpensTask(app: DemoApp, s: Survey) {
 /** The words a topic page warns with, and the ones the head and the panel say a topic is left out with. */
 const EXAM_WARNING = /not on the exam|after the exam|before the exam|too close to the exam/i;
 
+/** The exam line's words when a topic has no room before the exam (`examLineWords`). */
+const EXAM_LINE = /Not every exam topic fits before/;
+
 function assertExamWarnings(s: Survey) {
 	const problems: string[] = [];
 	for (const course of s.courses) {
@@ -397,25 +444,25 @@ function assertExamWarnings(s: Survey) {
 			if (!page) continue;
 			const leftOut = exam.leavesOut?.includes(topic.handle) ?? false;
 			const noRoom = exam.doesNotFit?.includes(topic.handle) ?? false;
-			const said = [["the course head", head], ["the exam panel", panel]].filter(([, words]) => /no room before the exam/i.test(words!) && names(words!, topic.title)).map(([where]) => where);
+			// The exam line names no topic left out (round 20, M2): a topic with no room is one the line speaks for.
+			const said = [["the course head", head], ["the exam panel", panel]].filter(([, words]) => EXAM_LINE.test(words!)).map(([where]) => where);
 			const warned = EXAM_WARNING.test(page.text);
 			if (leftOut && !warned) problems.push(`${topic.title}: the exam leaves it out, its page says nothing of the exam ("${page.note || page.scheduled || page.now}")`);
 			if (noRoom && said.length > 0 && !warned) problems.push(`${topic.title}: ${said.join(" and ")} say there is no room before the exam to start it, its page says nothing of the exam ("${page.note || page.scheduled || page.now}")`);
 			if (warned && !leftOut && !noRoom && !(exam.unreviewed ?? []).includes(topic.handle)) problems.push(`${topic.title}: its page warns of the exam ("${page.text.match(EXAM_WARNING)?.[0]}"), the plan leaves nothing of it out`);
 		}
 		// The course page says each loss in the topic page's own words, an exam topic with no room apart from one the
-		// exam leaves out, and its head names every exam topic with no room (round 15, M7: all three read "After the
-		// exam", the loss behind "Not all of it fits").
+		// exam leaves out, and its head says the exam line exactly when one has no room, the names behind its Which
+		// topics (round 15, M7: all three read "After the exam", the loss behind "Not all of it fits"; round 20, M2).
 		for (const topic of course.map.topics) {
 			const row = s.rows.get(keyOf(course.map.workspace, topic.handle));
 			if (!row || !topic.starts || topic.starts <= exam.date) continue;
 			const want = exam.leavesOut?.includes(topic.handle) ? "Not on the exam" : exam.doesNotFit?.includes(topic.handle) ? "Not before the exam" : null;
 			if (want && row !== want) problems.push(`${topic.title}: its course page row says "${row}", not "${want}"`);
 		}
-		for (const handle of exam.doesNotFit ?? []) {
-			const title = course.map.topics.find((t) => t.handle === handle)?.title ?? handle;
-			if (!names(head, title)) problems.push(`${title}: the exam has no room for it, the course head does not name it ("${head}")`);
-		}
+		const lost = (exam.doesNotFit ?? []).map((h) => course.map.topics.find((t) => t.handle === h)?.title ?? h);
+		if (lost.length > 0 && !EXAM_LINE.test(head)) problems.push(`${lost.join(", ")}: the exam has no room for them, the course head does not say so ("${head}")`);
+		if (lost.length === 0 && EXAM_LINE.test(head)) problems.push(`the course head says not every exam topic fits, and the plan fits them all ("${head}")`);
 	}
 	assert.ok(problems.length === 0, `${s.label}:\n  ${problems.join("\n  ")}`);
 }
@@ -473,6 +520,32 @@ async function assertOneStatusEverywhere(s: Survey) {
 		}
 	}
 	assert.ok(problems.length === 0, `${s.label}: one session, two statuses or two lines:\n  ${problems.join("\n  ")}`);
+}
+
+// ─── 10. a topic with an open session says its status ──────────────────────
+
+/** Round 20, m4 (3 n5, 2 A1): mid-lesson, Home's map card for the topic being taught read "Not right last time", and
+ *  its head read its last mark. A topic whose page resumes a session of its own (Now's Resume or Open) says that
+ *  session's status, as Now does, in its head and on Home's map card; a topic with none never says a session's
+ *  status there. */
+async function assertSessionStatusOnTopic(s: Survey) {
+	const { unitHref } = await import("../components/unit-inbox/unit-href.ts");
+	const status = /^(Your turn|Tutor writing|Left off |Stopped by you|Try again|Reply cut off)/;
+	const problems: string[] = [];
+	for (const course of s.courses) {
+		for (const topic of course.map.topics) {
+			const page = s.pages.get(keyOf(course.map.workspace, topic.handle));
+			if (!page) continue;
+			const resumes = page.press === "Resume" || page.press === "Open";
+			const card = s.cards.get(unitHref(course.map.workspace, topic.handle));
+			const said: Array<[string, string]> = [["its head", page.head], ...(card !== undefined ? ([["Home's map card", card]] as Array<[string, string]>) : [])];
+			for (const [where, words] of said) {
+				if (resumes && words !== page.note) problems.push(`${topic.title}: Now resumes its session ("${page.note}"), ${where} says "${words}"`);
+				if (!resumes && status.test(words)) problems.push(`${topic.title}: no session of its own to resume (Now "${page.now} · ${page.press}"), ${where} says "${words}"`);
+			}
+		}
+	}
+	assert.ok(problems.length === 0, `${s.label}: a topic's open session:\n  ${problems.join("\n  ")}`);
 }
 
 // ─── 7. Needs you is what Today asks ───────────────────────────────────────
@@ -635,7 +708,7 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 	async function holds(label: string, also: (s: Survey) => Promise<void> | void = () => {}) {
 		const s = await survey(app, label);
 		const failures: string[] = [];
-		for (const check of [() => assertOneDay(s), () => assertOneStatus(s), () => assertExamWarnings(s), () => assertNeedsYouOnToday(s), () => assertOneStatusEverywhere(s), () => also(s), () => assertContinueOpensTask(app, s), () => assertFiledByWork(app, s)]) {
+		for (const check of [() => assertOneDay(s), () => assertOneStatus(s), () => assertExamWarnings(s), () => assertNeedsYouOnToday(s), () => assertOneStatusEverywhere(s), () => assertSessionStatusOnTopic(s), () => also(s), () => assertContinueOpensTask(app, s), () => assertFiledByWork(app, s)]) {
 			try {
 				await check();
 			} catch (err) {
@@ -850,7 +923,11 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 
 	it("Tue 17 Nov, two days before the Probability exam", async () => {
 		app.day("2026-11-17");
-		await holds("Tue 17 Nov", (s) => (finishedLesson ? assertFinishedLesson(app, s, finishedLesson) : assert.fail("the Tue 10 step finished the Linear maps lesson")));
+		await holds("Tue 17 Nov", async (s) => {
+			assertExamLine(s);
+			if (finishedLesson) await assertFinishedLesson(app, s, finishedLesson);
+			else assert.fail("the Tue 10 step finished the Linear maps lesson");
+		});
 	});
 
 	it("Tue 17 Nov, Ask the tutor from the Probability head, two review answers, then Done for today (round 16, M3: 1 M2)", async () => {

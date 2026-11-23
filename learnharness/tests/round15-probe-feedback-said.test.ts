@@ -43,8 +43,11 @@ describe("the teacher's wake quotes the probe's last feedback as already said (r
 	});
 
 	it("the lesson's wake and a task's quote it and ask the first step never to say its point again", () => {
+		// A lesson's probe ends on the first step it sent after the feedback (round 20, M1).
+		const step = call("s-2", SEND_TO_USER_TOOL, { message: "Picture the hour cut into slots so short that two calls never share one." });
+		const lesson = [...probe.slice(0, -2), assistant("a-4b", step), result(step), ...probe.slice(-2)];
 		for (const [review, task] of [[false, false], [true, false], [false, true]] as const) {
-			const content = String(withProbeFeedback(buildProbeHandoffSteer("chat_1", review, task), probe).content);
+			const content = String(withProbeFeedback(buildProbeHandoffSteer("chat_1", review, task), review || task ? probe : lesson).content);
 			assert.ok(content.includes(`I have already read the probe's feedback on my last answer: "${FEEDBACK}"`), content);
 			assert.match(content, /never says its point again, in any words/);
 			assert.doesNotMatch(content, /got only its mark/);

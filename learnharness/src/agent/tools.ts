@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { invalidInputResult, questionResult, serverExecute } from "./tool-execute.ts";
+import { invalidInputResult, questionBeforePlanResult, questionResult, serverExecute } from "./tool-execute.ts";
 import {
 	askInputSchema,
 	askLabelProblems,
@@ -10,10 +10,11 @@ import {
 	explainInputProblems,
 	parseOptionsIfString,
 } from "../core/question-core.ts";
-import type { JobRecord, SteerMessage } from "../core/contracts.ts";
+import type { JobRecord, PlanTree, SteerMessage } from "../core/contracts.ts";
 import type { JobStore } from "../core/ports.ts";
 import { jobTools, type DemoInput, type PdfInput, type ResearchInput, type VisualInput } from "./tools/jobs.ts";
 import { planTools, type PlanToolContext } from "./tools/plan.ts";
+import { SLUG_RE } from "./tools/mermaid-plan.ts";
 import { probeDoneTool, type ProbeDoneContext } from "./tools/probe.ts";
 import { nameSessionTool } from "./tools/name-session.ts";
 import { withPracticeHandoff } from "./tools/handoff.ts";
@@ -110,7 +111,8 @@ function explainDescription(name: "explain" | "recall", nodeId: boolean): string
 		"after seeing his words. He never sees the commitment: your reply to his answer is all he reads of it. His answer arrives with `confidence` " +
 		"when he marked one: guessing or confident, his own one-tap read of it; none means he left it unmarked. " +
 		(nodeId
-			? "Set `nodeId` (required) to the plan node this question is about — validated at call time against the session's plan map. "
+			? "Set `nodeId` (required) to the plan node this question is about — validated at call time against the session's plan map; " +
+				"before the plan exists, the id your plan_init will give that step. "
 			: "") +
 		"ONE question per turn: call a single " + name + ", then end your turn — his answer determines the next."
 	);
@@ -130,10 +132,12 @@ export function teachExplainToolFor(
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
 			const problems = [...explainInputProblems(input)];
-			const nodeIdProblemText = nodeIdProblem(ctx, input.nodeId);
+			const tree = ctx.chatStore.getChat(ctx.chatId)?.tree ?? null;
+			const nodeIdProblemText = nodeIdProblem(tree, input.nodeId);
 			if (nodeIdProblemText) problems.push(nodeIdProblemText);
 			if (problems.length > 0) return invalidInputResult("explain", problems);
-			return questionResult();
+			// The lesson's first question may come before its plan (round 20, M1).
+			return tree ? questionResult() : questionBeforePlanResult(input.nodeId);
 		},
 	};
 }
@@ -218,17 +222,14 @@ export function createProberTools(ctx: ProberToolContext): Record<string, AgentT
 // ─── the teacher's question tool (explain carries the position field) ────────
 
 /** The nodeId-against-live-tree check the teacher's explain chains after
- *  the commitment check. */
-function nodeIdProblem(ctx: Pick<PlanToolContext, "chatId" | "chatStore">, nodeId: string): string | null {
-	const record = ctx.chatStore.getChat(ctx.chatId);
-	const known = record?.tree?.nodes.map((n) => n.id) ?? [];
+ *  the commitment check. Before the session's first plan, the id is the
+ *  one the plan will give the step this question is about (round 20, M1:
+ *  the lesson's first question comes while the plan is made). */
+function nodeIdProblem(tree: PlanTree | null, nodeId: string): string | null {
+	if (!tree) return SLUG_RE.test(nodeId) ? null : `nodeId "${nodeId}" is not a step id: lowercase words (a-z, 0-9) joined by hyphens or underscores, the id your plan_init will give this step.`;
+	const known = tree.nodes.map((n) => n.id);
 	if (!known.includes(nodeId)) {
-		return (
-			`nodeId "${nodeId}" matches no node in this session's plan map. ` +
-			(known.length > 0
-				? `Copy one of your plan_init slugs exactly (${known.slice(0, 5).join(", ")}${known.length > 5 ? ", …" : ""}).`
-				: "No plan map exists yet — call plan_init before posing questions.")
-		);
+		return `nodeId "${nodeId}" matches no node in this session's plan map. Copy one of your plan_init slugs exactly (${known.slice(0, 5).join(", ")}${known.length > 5 ? ", …" : ""}).`;
 	}
 	return null;
 }

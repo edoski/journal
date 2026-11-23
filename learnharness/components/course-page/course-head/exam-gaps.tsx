@@ -21,6 +21,7 @@ import { examGapAskCreation, topicPress } from "@/components/unit-inbox/start-un
 import { useStartScope } from "@/components/start/start-scope";
 import { examGaps, type ExamGaps } from "@/components/course-page/course-head/head-facts";
 import { continueHref } from "@/components/nav/session-state";
+import { misfitWords } from "@/components/calendar/calendar-facts";
 
 /** A way in, as a link in the line: its words start on the body's left
  *  edge and wrap inside the popover (round 15, 1 m7: the first ran past
@@ -28,20 +29,20 @@ import { continueHref } from "@/components/nav/session-state";
 const PRESS = "h-auto min-h-6 min-w-0 shrink justify-start px-0 has-[>svg]:px-0 text-left whitespace-normal text-body text-link hover:text-link";
 
 /**
- * What Which topics lists: only the topics left out that neither the
- * head's line nor the why names (round 18, m7: on 8 Nov it repeated the
- * head's "No room before the exam to start Martingales and Variance…" word
- * for word, then the why's late topic). The head's line names the topics
- * with no room to start, or with none the taught topics the final review
- * leaves out (`examReady`); the why names a topic that starts too late.
- * What is left is the final review's, in its own words ("No room in the
- * final review from 14 Nov for Binomial"). Empty with nothing more. Pure.
+ * What Which topics lists: the topics the exam line leaves unnamed (round
+ * 20, M2: the line is one sentence, so the names are here). The topics
+ * with no room to start ("No room before the exam to start Martingales
+ * and Variance of sums"), then the taught topics the final review leaves
+ * out but one the why names, since it starts too late ("Binomial is not
+ * revisited in the final review from 14 Nov"; round 18, m7: it repeated
+ * the why's late topic). Empty with nothing left out. Pure.
  */
 export function examGapWhich(course: StudyCourse, gaps: ExamGaps): string[] {
 	const { exam } = course.map;
-	if (gaps.start.length === 0 || !exam) return [];
+	if (!exam) return [];
+	const start = misfitWords(gaps.start.map((t) => t.title));
 	const rest = gaps.review.filter((t) => exam.reasons?.[t.handle] !== "too_late").map((t) => t.title);
-	return rest.length > 0 ? [finalReviewMissWords(rest, exam, course.map.today)] : [];
+	return [...(start ? [start] : []), ...(rest.length > 0 ? [finalReviewMissWords(rest, exam, course.map.today)] : [])];
 }
 
 /**
@@ -67,9 +68,9 @@ export function anotherWays<W extends { planned: boolean }>(ways: readonly W[]):
  * (spec: course-head.md, `examGaps`): why, in the engine's reasons, naming
  * the topics the final review leaves out that the first line does not,
  * then a way in (`ways`: today's plan for the course first, then the
- * topics left out). Start it (or Review it) today opens a lesson on the one
- * topic the line names; otherwise the first is the pick, named on its press
- * ("Review Binomial distribution today"), and Or another opens a menu
+ * topics left out). The first is the pick, named on its press, since the
+ * exam line names no topic left out (round 20, M2) ("Review Binomial
+ * distribution today"), and Or another opens a menu
  * of the other ways alone, the next first and the rest behind More
  * (`anotherWays`; round 18, m6; round 19, m10); with
  * none he can take today, Ask alone. A topic he began
@@ -100,10 +101,6 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 		else start(creation, { key: `gap:${topic.handle}` });
 	};
 	const verb = (way: { topic: CourseMapTopic; starts: boolean }) => (!way.starts ? "review" : press(way.topic).continues ? "continue" : "start");
-	// "Start it today" only where "it" is the one topic the line names; with two
-	// named, the press names its own (round 12, 1 m2: "No room… for Inner
-	// products and Orthogonal projection… Start it today").
-	const only = ways.length === 1 && !ways[0]!.planned && named.length === 1 ? ways[0]! : null;
 	// The pick: the first way, today's plan before the topics left out, a
 	// review before a start (round 8: eight options and no pick; rounds 10
 	// and 11: the tutor's and Home's order).
@@ -116,7 +113,7 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 					<MathText>{why}</MathText>
 				</span>
 			)}
-			{why && which.length > 0 && (
+			{which.length > 0 && (
 				<Button variant="quiet" size="xs" data-slot="exam-gaps-which-press" aria-expanded={listed} className={PRESS} onClick={() => setListed((open) => !open)}>
 					{EXAM_GAP_WORDS.which}
 				</Button>
@@ -130,11 +127,7 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 					))}
 				</span>
 			)}
-			{ways.length === 0 ? null : only ? (
-				<Button variant="quiet" size="xs" className={PRESS} disabled={starting !== null} onClick={() => open(only.topic)}>
-					{EXAM_GAP_WORDS[verb(only)]}
-				</Button>
-			) : (
+			{ways.length === 0 ? null : (
 				<>
 					<Button variant="quiet" size="xs" data-slot="exam-gaps-pick" className={PRESS} disabled={starting !== null} onClick={() => open(pick!.topic)}>
 						<MathText>{examGapPickWords(verb(pick!), pick!.topic.title)}</MathText>

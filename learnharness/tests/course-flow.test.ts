@@ -340,7 +340,9 @@ describe("a course-linked turn", () => {
 		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show" && v !== "map"), ["resume", "save"], "the turn brief's resume, which the agent's resume shares, and conclude's save");
 		assert.equal(verbs.filter((v) => v === "map").length, 1, "the brief reads every course's daily plan, once");
 		assert.equal(verbs.filter((v) => v === "show").length, 1, "each turn asks whether the course has arcs; no record changed between the two, so the second turn's answer is the first's run");
-		assert.equal(verbs.filter((v) => v === "plan").length, 1, "the brief reads the daily plan, practice's exam run-up with it, once");
+		// Every course's plan is its entry in one `plan --all` (round 20, B1), never a read of this course's own.
+		assert.equal(verbs.filter((v) => v === "plan").length, 0, "no course's own plan");
+		assert.equal(engineCalls().filter((c) => c.args[0] === "plan" && c.args[1] === "--all" && c.args[3] !== "1").length, 1, "the brief reads the daily plan, practice's exam run-up with it, once");
 		const save = linked.find((c) => c.args[2] === "save")!;
 		const statement = "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.";
 		assert.deepEqual(JSON.parse(save.stdin), {

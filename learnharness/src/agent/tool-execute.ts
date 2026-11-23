@@ -212,6 +212,25 @@ export function questionResult(): AgentToolResult<null> {
 	};
 }
 
+/** The lesson's first question when the plan is not written yet (round
+ *  20, M1): he reads it while the plan is made, so the turn goes on to
+ *  `plan_init`, which ends it (teacher-agent.ts `endsTurnFor`). Like every
+ *  question's result, it is in-memory only. */
+export function questionBeforePlanResult(nodeId: string): AgentToolResult<null> {
+	return {
+		content: [
+			{
+				type: "text",
+				text:
+					`Question posed: he reads it while you plan. Now plan the whole lesson, taking your time, with "${nodeId}" as its first step's id, ` +
+					"and call plan_init: it ends your turn, and his answer arrives in his next message, tagged with this call's id. Send nothing else.",
+			},
+		],
+		details: null,
+		terminate: false,
+	};
+}
+
 /** The practice pose's ack (practice sessions, owner 2026-10-04): unlike
  *  a question, this result is FINAL — it persists (persistTurn filters
  *  only QUESTION_TOOLS placeholders), because the learner's submissions

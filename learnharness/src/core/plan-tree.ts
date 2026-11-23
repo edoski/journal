@@ -177,6 +177,17 @@ export function planDropsSteps(before: Pick<PlanTree, "nodes"> | null | undefine
 	);
 }
 
+/** A first plan that leaves out a step his question already asked about
+ *  (round 20, M1: the lesson's first question comes while its plan is
+ *  made, naming the id the plan gives that step). `asked`: the nodeIds of
+ *  the session's questions. Pure. */
+export function planLeavesOutAsked(next: Pick<PlanTree, "nodes">, asked: readonly string[]): string | null {
+	const kept = new Set(next.nodes.map((n) => n.id));
+	const missing = [...new Set(asked)].filter((id) => !kept.has(id));
+	if (missing.length === 0) return null;
+	return `Your question already asked about ${missing.map((id) => `"${id}"`).join(", ")}, which this plan leaves out. Give that step that id, first in the plan, and call plan_init again.`;
+}
+
 /** A relation between two things, in plain text or TeX: a title holding
  *  one states a result rather than naming an idea. */
 const RELATION = /[=≠≈≡∼≃≅∝→↦⇒⟹⇔⟺≤≥<>∈⊂⊆~]|->|\\(?:to|rightarrow|Rightarrow|longrightarrow|Longrightarrow|implies|iff|Leftrightarrow|mapsto|leq?|geq?|neq?|approx|sim|simeq|cong|equiv|propto|in|subset|subseteq|lt|gt)(?![A-Za-z])/;

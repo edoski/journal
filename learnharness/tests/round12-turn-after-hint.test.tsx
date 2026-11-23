@@ -12,7 +12,7 @@ import React from "react";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { askedAfterHint, proseAnswer, proseHintRequest, proseQuestionSpec } from "../components/lesson/prose/prose-question-data.ts";
+import { askedAgain, proseAnswer, proseHintRequest, proseQuestionSpec } from "../components/lesson/prose/prose-question-data.ts";
 import { YourTurn } from "../components/lesson/prose/prose-question.tsx";
 import { dismissedAnswer, emptyDockSelection } from "../src/core/index.ts";
 
@@ -20,15 +20,16 @@ const check = { question: "What is $C^{-1}$, and why?", correctAnswer: "The quar
 const ask = (id: string, input: unknown, output?: unknown) => ({ type: "tool-explain", toolCallId: id, input, output });
 const words = { type: "text" };
 
-describe("the mark after a hint is Your turn alone", () => {
-	it("a re-ask after a hint is known as one", () => {
+describe("the mark after a hint", () => {
+	it("a re-ask after a hint is known as one, so it reads as the question above (round 20, m9)", () => {
 		const hinted = proseHintRequest(proseQuestionSpec("explain", "q1", check)!, "C^-1 = C ?");
-		assert.deepEqual([...askedAfterHint([{ parts: [ask("q1", check, hinted)] }, { parts: [words, ask("q2", check)] }])], ["q2"]);
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted)] }, { parts: [words, ask("q2", check)] }])], ["q2"]);
 	});
 
-	it("a re-ask after his side question is not", () => {
+	it("a new question after his side question is not a re-ask", () => {
 		const aside = dismissedAnswer("explain", check.question, "asked");
-		assert.deepEqual([...askedAfterHint([{ parts: [ask("q1", check, aside)] }, { parts: [words, ask("q2", check)] }])], []);
+		const other = { question: "What is $C^2$?", correctAnswer: "The half turn.", type: "check" };
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, aside)] }, { parts: [words, ask("q2", other)] }])], []);
 		assert.equal(proseAnswer(proseQuestionSpec("explain", "q1", check)!, emptyDockSelection(), "x", "neutral").text, "x");
 	});
 

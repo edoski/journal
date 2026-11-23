@@ -38,7 +38,9 @@ import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn
 import { askPrestart, claimPrestart, prestart } from "./prestart.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
 import { continuedTask } from "./task-passage.ts";
-import { activeProblemOf, answeredQuestionsOf, danglingQuestionOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, sessionModeOf, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
+import { activeProblemOf, answeredQuestionsOf, danglingQuestionOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, sessionModeOf, withCloseReceipt, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
+import { sessionSavesOf } from "../core/close-receipt.ts";
+import { closeReceiptFor } from "../agent/tools/course.ts";
 import { createLearning, startSurvey, studyPlaces } from "./setup.ts";
 import { halfAnswerLeft } from "../core/session-end.ts";
 import { remarkableOf } from "../core/answer-marks.ts";
@@ -172,6 +174,30 @@ listenForCourseMaps();
 // A new lesson's opening turn settling is work he waited on (work-finished.ts).
 listenForLessonOpenings(stores.chatStore);
 
+/** Keeps a save's links with the lesson the moment the engine took it, then
+ *  announces them (`record-changed`), so the window reads the marks again
+ *  with the links in place. The engine's write announces the course
+ *  (`course-changed`) before the links are kept, and a marks read then
+ *  finds no link for the answer, the receipt reaching the transcript only
+ *  when the turn ends (round 20, M4: a mark showed 3 s after the next
+ *  question, or only after a reload). An answer in words is keyed by his
+ *  newest message (`HIS_MESSAGE`). */
+export function keepAnswerSaves(chatId: string, saidId: string | null, links: readonly { question: string; observation: string }[]): void {
+	const keyed: Record<string, string[]> = {};
+	for (const { question, observation } of links) {
+		const key = question === HIS_MESSAGE ? saidId : question;
+		if (key) keyed[key] = [...(keyed[key] ?? []), observation];
+	}
+	if (Object.keys(keyed).length === 0) return;
+	try {
+		stores.chatStore.saveAnswerSaves(chatId, keyed);
+	} catch {
+		// The lesson was deleted mid-turn: nothing to keep the links with.
+		return;
+	}
+	emit("record-changed", { chatId });
+}
+
 /** The route-facing entry: parse {chatId, input} and run one turn. */
 export async function handleChatRequest(
 	req: Request,
@@ -248,18 +274,7 @@ function turnAgent(
 	// the record's id field strips at the wire in toLlmMessages).
 	// His newest message: the one an answer in words names (HIS_MESSAGE).
 	const lastSaidId = merged.findLast((m) => m.role === "user")?.id ?? null;
-	const keepSaves = (links: { question: string; observation: string }[]) => {
-		const keyed: Record<string, string[]> = {};
-		for (const { question, observation } of links) {
-			const key = question === HIS_MESSAGE ? lastSaidId : question;
-			if (key) keyed[key] = [...(keyed[key] ?? []), observation];
-		}
-		try {
-			stores.chatStore.saveAnswerSaves(chatId, keyed);
-		} catch {
-			// The lesson was deleted mid-turn: nothing to keep the links with.
-		}
-	};
+	const keepSaves = (links: { question: string; observation: string }[]) => keepAnswerSaves(chatId, lastSaidId, links);
 	// Home rereads the session list on record-changed, so a start the save
 	// moved stays on it while the turn still runs (round 18, M4).
 	const keepMoved = (topics: string[]) => {
@@ -290,7 +305,7 @@ function turnAgent(
 		// before the transcript's write loses neither the mark nor the
 		// "already saved" (round 8).
 		...(agentKind === "setup" ? { setup: { places: places ?? [] } } : {}),
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, onMoved: keepMoved, review: reviewRecord(record), reviewTopics: record.topics ?? [], lessonTopics: () => lessonTopicsOf(stores.chatStore.getChat(chatId) ?? record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [], halfAnswer: () => halfAnswerLeft(stores.chatStore.getChat(chatId)?.messages ?? merged), courses: keptCourseMaps } } : {}),
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, onMoved: keepMoved, review: reviewRecord(record), reviewTopics: record.topics ?? [], lessonTopics: () => lessonTopicsOf(stores.chatStore.getChat(chatId) ?? record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [], halfAnswer: () => halfAnswerLeft(stores.chatStore.getChat(chatId)?.messages ?? merged), sessionSaves: () => sessionSavesOf(stores.chatStore.getChat(chatId)?.messages ?? merged), courses: keptCourseMaps } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
 	// practitioner — no plan/question tools; problem + conclude, and the
@@ -470,12 +485,14 @@ export async function handleChatInput(
 	// material, as the engine's map names them, drawn the moment he presses
 	// (round 17, M8; round 18, M6).
 	const opened = record;
-	const [courseBrief, courseArcs, task, places] = await Promise.all([
+	const [courseBrief, courseArcs, task, places, closeReceipt] = await Promise.all([
 		learnerInput || handoffWake ? fetchCourseBrief(record) : null,
 		fetchCourseArcs(record),
 		input.type === "task" ? keptCourseMaps().then((maps) => continuedTask(maps.find((m) => m.workspace === opened.course?.workspace), opened.messages)) : null,
 		// A setup session looks first where his study material is kept.
 		sessionModeOf(record.messages, record.kind) === "setup" ? studyPlaces().catch(() => []) : undefined,
+		// His Done for today closes on the session's close receipt (round 20, M3).
+		input.type === "tonight" && opened.course ? closeReceiptFor(stores.courseRecords, opened.course.workspace, opened).catch(() => null) : null,
 	]);
 	const freshRecord = stores.chatStore.getChat(chatId);
 	if (!freshRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
@@ -497,6 +514,11 @@ export async function handleChatInput(
 		}
 	}
 
+	// His answer to a question the running turn posed before its plan waits
+	// for that turn, which saves the question when it ends (round 20, M1):
+	// the client posts it again once the turn settles.
+	if (input.type === "answer" && isTurnRunning(chatId)) return Response.json({ error: "A turn is already running for this session" }, { status: 409 });
+
 	// The input's native appends (pure; the honest 400 for an answer with no
 	// pending question call). Computed BEFORE beginTurn so a refused input
 	// leaves no liveness effects; read against the CURRENT record. Wave C:
@@ -509,7 +531,7 @@ export async function handleChatInput(
 		appends =
 			input.type === "steers"
 				? input.steers.filter((s) => !steerDelivered(record.messages, s.id)).map((s) => withProbeFeedback(s, record.messages))
-				: inputAppends(record, input.type === "task" ? { type: "task", task } : input);
+				: inputAppends(record, input.type === "task" ? { type: "task", task } : input).map((m) => withCloseReceipt(m, closeReceipt));
 	} catch (err) {
 		if (err instanceof ChatInputError) {
 			return Response.json({ error: err.message }, { status: 400 });

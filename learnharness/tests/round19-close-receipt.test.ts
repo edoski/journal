@@ -36,6 +36,7 @@ const TODAY = "2026-11-08";
 const topic = (handle: string, title: string, over: Record<string, unknown>) => ({ handle, title, level: "attempted", introduced: "2026-11-01", ...over });
 const MAP = {
 	today: TODAY,
+	tasks: [],
 	topics: [
 		topic("eigen", "Eigenvalues and eigenvectors", { review: { kind: "scheduled", date: "2026-11-09" } }),
 		topic("matmul", "Mechanics of matrix multiplication", { review: { kind: "scheduled", date: "2026-11-11" } }),
@@ -64,10 +65,12 @@ async function closeReceipt(messages: LhMessage[]): Promise<Record<string, unkno
 	return JSON.parse((res.content[0] as { text: string }).text) as Record<string, unknown>;
 }
 
+/** The topics the close receipt names (round 20, M3: `close` replaced `days`). */
+const handles = (body: Record<string, unknown>) => (body["close"] as { topics: { handle: string }[] }).topics.map((t) => t.handle);
+
 describe("the close's days name only what this sitting touched (round 19, m15)", () => {
 	it("the first close names Mechanics, answered in it", async () => {
-		const days = (await closeReceipt(morning("")))["days"] as Record<string, unknown>;
-		assert.deepEqual(Object.keys(days).sort(), ["eigen", "matmul"]);
+		assert.deepEqual(handles(await closeReceipt(morning(""))).sort(), ["eigen", "matmul"]);
 	});
 
 	it("the same day's second close, after a resume that never touched Mechanics, names the lesson alone", async () => {
@@ -81,8 +84,7 @@ describe("the close's days name only what this sitting touched (round 19, m15)",
 			result("s3", "course_save", { ok: true }),
 			newDoneTonightMessage("teacher"),
 		];
-		const days = (await closeReceipt(resumed))["days"] as Record<string, unknown>;
-		assert.deepEqual(Object.keys(days), ["eigen"]);
+		assert.deepEqual(handles(await closeReceipt(resumed)), ["eigen"]);
 	});
 });
 

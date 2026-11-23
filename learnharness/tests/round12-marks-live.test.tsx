@@ -33,12 +33,12 @@ afterEach(async () => {
 
 const MARK = { rows: [{ id: "o24", topics: ["poisson"], label: null, result: "correct", grade: "solid", helped: false, predicted: false, gaveUp: false, uncertain: false, sure: "guess" }], disputed: false };
 
-function Marks({ settled }: { settled: number | null }) {
+function Marks({ settled }: { settled: string | null }) {
 	const marks = useAnswerMarks(CHAT, WS, settled);
 	return <p data-testid="marks">{Object.keys(marks).join(",")}</p>;
 }
 
-async function mount(settled: number | null) {
+async function mount(settled: string | null) {
 	let saved = false;
 	let reads = 0;
 	globalThis.fetch = ((input: string) => {
@@ -51,7 +51,7 @@ async function mount(settled: number | null) {
 	const host = document.createElement("div");
 	document.body.appendChild(host);
 	root = createRoot(host);
-	const render = (s: number | null) => act(async () => root!.render(<ServerEventsProvider connect={() => source}><Marks settled={s} /></ServerEventsProvider>));
+	const render = (s: string | null) => act(async () => root!.render(<ServerEventsProvider connect={() => source}><Marks settled={s} /></ServerEventsProvider>));
 	await render(settled);
 	const fire = (name: string, payload: unknown) => act(async () => handlers.get(name)!(JSON.stringify(payload)));
 	const shown = () => document.querySelector("[data-testid=marks]")!.textContent;
@@ -60,7 +60,7 @@ async function mount(settled: number | null) {
 
 describe("an answer's mark shows as soon as the record holds it", () => {
 	it("a save that lands after the stream ended shows with the turn's settle, no reload", async () => {
-		const page = await mount(12);
+		const page = await mount("12:m12");
 		assert.equal(page.shown(), "");
 		page.save();
 		await page.fire("turn-settled", { chatId: CHAT });
@@ -75,14 +75,14 @@ describe("an answer's mark shows as soon as the record holds it", () => {
 	});
 
 	it("answers saved later (the record came back) show when the session's record changes", async () => {
-		const page = await mount(12);
+		const page = await mount("12:m12");
 		page.save();
 		await page.fire("record-changed", { chatId: CHAT });
 		assert.equal(page.shown(), "toolu_e6");
 	});
 
 	it("another course's or session's change reads nothing", async () => {
-		const page = await mount(12);
+		const page = await mount("12:m12");
 		const before = page.reads();
 		await page.fire("course-changed", { workspace: "/study/linear-algebra" });
 		await page.fire("turn-settled", { chatId: "chat_other" });
@@ -107,13 +107,13 @@ describe("an answer's mark shows as soon as the record holds it", () => {
 		const host = document.createElement("div");
 		document.body.appendChild(host);
 		root = createRoot(host);
-		const render = (s: number | null) => act(async () => root!.render(<ServerEventsProvider connect={() => source}><Marks settled={s} /></ServerEventsProvider>));
+		const render = (s: string | null) => act(async () => root!.render(<ServerEventsProvider connect={() => source}><Marks settled={s} /></ServerEventsProvider>));
 		const fire = (name: string, payload: unknown) => act(async () => handlers.get(name)!(JSON.stringify(payload)));
 		await render(null);
 		// The turn ends: its persist, its settle, then the window's own record.
 		await fire("record-changed", { chatId: CHAT });
 		await fire("turn-settled", { chatId: CHAT });
-		await render(14);
+		await render("14:m14");
 		assert.equal(pending.length, 1, "one read at a time: the events wait for it");
 		await act(async () => pending[0]!.resolve());
 		assert.equal(document.querySelector("[data-testid=marks]")!.textContent, "toolu_e6", "the first read's marks show as soon as it returns");

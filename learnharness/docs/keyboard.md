@@ -66,8 +66,10 @@ spec `components/list-walk/list-walk.md`):
   list's first or last row. **Esc** leaves the walk.
 - **↑ on the first row** steps onto the head's control above the list:
   Now's row on the course page, the trail's last link on the topic page,
-  and **↓** from there comes back. Home's head is the map, which the walk
-  never reaches (Edo, 15 Nov 2026, N3), so there ↑ keeps the first line.
+  and **↓** from there comes back. Home's head is the map: ↑ steps onto
+  You are here, its cards walk among themselves, and the ↓ they leave
+  unclaimed (no card below) comes back to the first line (round 20, m6;
+  before, the map was out of the walk, Edo's notes of 15 Nov 2026, N3).
 - With nothing focused, ↓ or Home enters at the first row, ↑ or End at
   the last (window capture phase, ahead of the page's spatial arrows).
 - A page's own keys sit on top: Home's ← →, ⌘E and ⌘↵

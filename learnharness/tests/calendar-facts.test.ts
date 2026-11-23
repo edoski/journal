@@ -11,7 +11,7 @@ import type { CalendarCourse } from "../src/core/contracts/calendar.ts";
 import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { doesNotFitOf, finalReviewOf, planDays, plannedOf, scheduleOf } from "../src/server/calendar.ts";
-import { finalReviewGapWords } from "../components/study-words.ts";
+import { examLineWords, FINAL_REVIEW_GAP_WORDS } from "../components/study-words.ts";
 import { courseMove, todaySteps } from "../components/study-home/study-facts.ts";
 import { calendarEntries, distanceWords, dueDay, finalReviewWords, lookOf, lookWords, misfitWords, moreWords, quietBetween, roadLines, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
 
@@ -140,6 +140,10 @@ describe("calendar entries", () => {
 		assert.deepEqual(exam?.kind === "exam" && exam.doesNotFit, ["Eigenvalues"]);
 		assert.equal(misfitWords(["Eigenvalues", "Rank"]), "No room before the exam to start Eigenvalues and Rank");
 		assert.equal(misfitWords([]), null);
+		// Round 20, M2: the panel's exam line is one sentence and the topic to start with, naming at most one topic.
+		assert.equal(examLineWords({ date: "2026-11-19", daysLeft: 2 }, "Expectation and linearity"), "Not every exam topic fits before Thursday. Start with Expectation and linearity.");
+		assert.equal(examLineWords({ date: "2026-12-03", daysLeft: 25 }, null), "Not every exam topic fits before 3 Dec.");
+		assert.equal(examLineWords({ date: "2026-11-19", daysLeft: 1 }, null), "Not every exam topic fits before tomorrow’s exam.");
 	});
 
 	it("says why a review waits on the day the plan holds it to, naming the exams it waits for, and only there", () => {
@@ -338,7 +342,7 @@ describe("a lesson left for next time on the calendar (round 19, m6)", () => {
 	);
 	const lesson = chat({ id: "stirling", title: "Stirling's formula lesson", course: { workspace: "/study/prob", title: "Probability" }, ended: "left", topics: ["stirling"], ownTopics: ["stirling"], tasks: ["stirling-lesson"], updatedAt: `${TODAY}T11:00:00` });
 	const entries = () => calendarEntries({ courses: [PROB_LEFT], chats: [lesson], scope: null });
-	const ofLesson = (e: ReturnType<typeof calendarEntries>[number]) => (e.kind === "session" && e.chat.id === "stirling") || (e.kind === "task" && e.task.key === "stirling-lesson");
+	const ofLesson = (e: ReturnType<typeof calendarEntries>[number]) => (e.kind === "session" && e.chat.id === "stirling") || (e.kind === "task" && e.task?.key === "stirling-lesson");
 
 	it("lists the left lesson once, as Continue on the next study day, and the day he left it as what he did", () => {
 		const left = entries().filter(ofLesson).filter((e) => lookWords(e, TODAY).startsWith("Left off"));
@@ -351,6 +355,48 @@ describe("a lesson left for next time on the calendar (round 19, m6)", () => {
 		const later = entries().filter((e) => e.day > TODAY && ofLesson(e));
 		assert.deepEqual(later.map((e) => lookWords(e, TODAY)), ["Left off 8 Nov"]);
 		assert.ok(entries().every((e) => e.day === TODAY || lookWords(e, TODAY) !== "Left off today"), "no later day says Left off today");
+	});
+});
+
+/**
+ * Round 20, m3 (3 n3, 2 free): after Rank practice's Done for today, whose
+ * close said it "continues tomorrow, Monday 9 November", Mon 9 listed only
+ * the two lessons left the same day, and Sun 8 read "Rank practice · Left
+ * off today" beside the lessons' "Lesson". Every session left for next time
+ * today is left work on the next study day, practice as a lesson, from the
+ * session state Home reads; the day he worked in it says what he did.
+ */
+describe("practice left for next time on the calendar (round 20, m3)", () => {
+	const invertible = { key: "invertible-lesson", title: "Invertible matrices lesson", step: "Left and right inverses", updated: TODAY, topics: ["invertible" as TopicHandle] };
+	const LA_LEFT = course(
+		"/study/linalg",
+		"Linear Algebra",
+		{
+			tasks: [invertible],
+			topics: [
+				topic("invertible", { title: "Invertible matrices", level: "attempted", tasks: ["invertible-lesson"] }),
+				topic("rank", { title: "Rank", level: "assisted" }),
+				topic("odds", { title: "Odds", review: { kind: "scheduled", date: "2026-11-09" } }),
+			],
+		},
+		{ planned: [{ date: "2026-11-09", reviews: ["odds" as TopicHandle], new: [] }] },
+	);
+	const lesson = chat({ id: "inv", title: "Invertible matrices lesson", ended: "left", topics: ["invertible"], ownTopics: ["invertible"], tasks: ["invertible-lesson"], updatedAt: `${TODAY}T11:00:00` });
+	const practice = chat({ id: "rank", title: "Rank practice", kind: "practice", ended: "left", topics: ["rank"], ownTopics: ["rank"], updatedAt: `${TODAY}T12:00:00` });
+	const entries = () => calendarEntries({ courses: [LA_LEFT], chats: [lesson, practice], scope: null });
+	const said = (day: string) => entries().filter((e) => e.day === day && e.kind !== "review").map((e) => `${e.title} · ${lookWords(e, TODAY)}`);
+
+	it("continues Rank practice on Mon 9 beside the lesson, saying the day he left it", () => {
+		assert.deepEqual(said("2026-11-09").sort(), ["Continue Invertible matrices lesson · Left off 8 Nov", "Continue Rank practice · Left off 8 Nov"]);
+	});
+
+	it("says on Sun 8 what he did, practice as a lesson", () => {
+		assert.deepEqual(said(TODAY).sort(), ["Invertible matrices lesson · Lesson", "Rank practice · Practice"]);
+	});
+
+	it("opens the left practice from its Mon 9 entry", () => {
+		const next = entries().find((e) => e.day === "2026-11-09" && e.title === "Continue Rank practice");
+		assert.ok(next?.kind === "task" && next.move.kind === "open" && next.move.chat.id === "rank");
 	});
 });
 
@@ -538,12 +584,8 @@ describe("the plan's reasons and gaps in the calendar", () => {
 		const entries = calendarEntries({ courses: [COURSE], chats: [], scope: null });
 		const exam = entries.find((e) => e.kind === "exam");
 		assert.deepEqual(exam?.kind === "exam" && exam.unreviewed, [{ title: "Kernel" }]);
-		assert.deepEqual(finalReviewGapWords([{ title: "Kernel" }, { title: "Rank", reason: "full" }]), ["No room in it for Kernel and Rank"]);
-		assert.deepEqual(
-			finalReviewGapWords([{ title: "Binomial", reason: "full" }, { title: "Poisson", reason: "too_late" }, { title: "Geometric", reason: "no_study_day" }]),
-			["No room in it for Binomial", "Poisson starts too close to the exam for a review", "No study day left in it for Geometric"],
-			"round 9 (1 D8): the calendar says why as the head does, never \"No room\" for a topic that starts too close",
-		);
+		// Round 20, M2: one sentence under the final review, never a list of names ("No room in it for…").
+		assert.equal(FINAL_REVIEW_GAP_WORDS, "Not every topic is revisited in it");
 		const fresh = entries.find((e) => e.kind === "new");
 		assert.equal(fresh?.kind === "new" && fresh.waits, "After Probability's new topics");
 	});

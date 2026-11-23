@@ -64,11 +64,18 @@ describe("a session between practice problems (m7, m8)", () => {
 	});
 });
 
-describe("a map card (m8)", () => {
-	it("says the topic's own fact, never where a session on it stands", () => {
+describe("a map card (m8; round 20, m4)", () => {
+	it("says the topic's own fact, never the sidebar's word for a session or a task", () => {
 		for (const kind of ["your-turn", "working", "stopped", "task"] as const) {
 			assert.equal(cardLine({ place: "today", fact: { kind, words: "Your turn" } }), null, kind);
 		}
 		assert.deepEqual(cardLine({ place: "today", fact: { kind: "review", words: "Due today" } }), { kind: "review", words: "Due today" });
+	});
+
+	it("says what the topic's own open session says, over any other fact (round 20, m4: mid-lesson it read Not right last time)", () => {
+		const fact = { kind: "slip", words: "Not right last time", slip: "lapsed" } as const;
+		assert.deepEqual(cardLine({ place: "today", fact, now: { kind: "your-turn", words: "Your turn" } }), { kind: "your-turn", words: "Your turn" });
+		assert.deepEqual(cardLine({ place: "learning", fact, now: { kind: "task", words: "Left off today" } }), { kind: "task", words: "Left off today" });
+		assert.deepEqual(cardLine({ place: "learning", fact, now: null }), fact);
 	});
 });

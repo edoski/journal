@@ -1515,7 +1515,8 @@ def _where(sources: dict[str, Any], item: dict[str, Any]) -> list[dict[str, Any]
 
 def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:
     """A save's receipt with each review it set on the day the daily plan
-    puts it (``planned``), and ``due_count`` as the reviews the plan puts
+    puts it (``planned``) and its topic's ``title``, so a close names it
+    with no other read (round 20, M3), and ``due_count`` as the reviews the plan puts
     today: the days the learner is told are the days every view shows.
     ``starts_moved`` lists each first lesson his study today moved off a
     day he was told, by title, with its new day and why (``moved``, the
@@ -1527,14 +1528,19 @@ def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:
     record = records.load(workspace)
     today = clock.today()
     planned, moves = _planned_and_moves(workspace, record, today)
-    reviews = {
-        topic: {**review, "planned": planned.review(topic, review["due"])}
-        for topic, review in receipt["reviews"].items()
-    }
-    due, _ = tonight(progress.due(record, today), planned, record)
 
     def title(key: str) -> str:
         return str(record["topics"].get(key, {}).get("title") or key)
+
+    reviews = {
+        topic: {
+            **review,
+            "planned": planned.review(topic, review["due"]),
+            "title": title(topic),
+        }
+        for topic, review in receipt["reviews"].items()
+    }
+    due, _ = tonight(progress.due(record, today), planned, record)
 
     def past_exam(topic: str) -> bool:
         exam = progress.exam_for(record, topic)

@@ -82,4 +82,6 @@ export interface AnswerMark {
 /** GET /api/chats/:id/marks: each marked answer's mark, keyed by the
  *  answer's tool call (a question's call, or a practice problem's
  *  conclude). An answer the engine holds no attempt for is absent. */
-export type AnswerMarksResponse = { ok: true; marks: Record<string, AnswerMark> } | { ok: false; error: string };
+/** A failed read (the record can't be read) may carry `marks`: those the
+ *  session's own saves sent, for answers the window has none for. */
+export type AnswerMarksResponse = { ok: true; marks: Record<string, AnswerMark> } | { ok: false; error: string; marks?: Record<string, AnswerMark> };

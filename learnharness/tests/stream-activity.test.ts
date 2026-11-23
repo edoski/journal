@@ -40,7 +40,7 @@ describe("streamingToolActivity (the turn-activity label)", () => {
 		assert.deepEqual([...lines].sort(), ["Building a demo…", "Making a visual…", "Planning the lesson…", "Thinking…", "Writing a question…"]);
 	});
 
-	it("from the probe's end to the lesson's first step, every wait reads Planning the lesson…", () => {
+	it("from the probe's end to the lesson's plan, every wait reads Planning the lesson…", () => {
 		// Round 11, 3 M1: 51 s of "Planning the lesson…", then "Searching
 		// file contents…", then "Drawing up the plan…" for one wait.
 		const probeEnd = msg("assistant", [{ type: "text", text: "That's not right." }, toolPart("probe_done", "output-available")]);
@@ -52,7 +52,8 @@ describe("streamingToolActivity (the turn-activity label)", () => {
 		const firstStep = msg("assistant", [toolPart("plan_init", "output-available"), { type: "text", text: "Picture the hour cut into slots." }]);
 		assert.equal(workingLine([probeEnd, firstStep]), "Thinking…", "once his first step arrives, the line is Thinking… again");
 		const asked = msg("assistant", [toolPart("explain", "input-available")]);
-		assert.equal(planningLesson([probeEnd, asked]), false);
+		assert.equal(planningLesson([probeEnd, asked]), true, "the first step's question comes before the plan (round 20, M1)");
+		assert.equal(planningLesson([probeEnd, asked, msg("assistant", [toolPart("plan_init", "output-available")])]), false, "the plan ends the wait");
 		assert.equal(planningLesson([msg("assistant", [toolPart("probe_done", "input-available")])]), true, "a probe_done still settling keeps the line (live run 3: a 0.3 s Thinking… blink)");
 		assert.equal(planningLesson([msg("assistant", [toolPart("probe_done", "output-error")])]), false, "a refused probe_done is not the probe's end");
 		assert.equal(planningLesson([msg("user", [{ type: "text", text: "hi" }])]), false);

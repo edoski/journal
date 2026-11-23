@@ -2,7 +2,7 @@ import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-fact
 import { dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type StartsReason, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import type { ChatListItem, TopicRef } from "@/src/core";
 import { earlierSessions, trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
-import { daysBetween, leftWords } from "@/components/unit-inbox/units";
+import { daysBetween, leftWords, sessionFact } from "@/components/unit-inbox/units";
 import { continueHref, pausedWords } from "@/components/nav/session-state";
 import { FIRST_LESSON, TUTOR_WRITING, leftOffWords, movedWords, overdueWords, pressWord, startsAfterWords, type PressWord } from "@/components/study-words";
 
@@ -134,7 +134,8 @@ export function nowItem(facts: TopicFacts): NowItem {
 				...base,
 				icon: action.kind === "open" ? "working" : left ? "task" : "your-turn",
 				words: sessionName(action.chat, facts),
-				note: action.kind === "open" ? TUTOR_WRITING : left ? leftWords(action.chat, facts.today) : entry?.state === "paused" ? pausedWords(action.chat) : "Your turn",
+				// The session's one status on its topic, as its head and map card say it (round 20, m4).
+				note: sessionFact(action.chat, facts.today)?.words ?? null,
 				chat: action.chat.id,
 				href: continueHref(action.chat),
 			};

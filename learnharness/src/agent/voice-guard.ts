@@ -40,9 +40,9 @@ import { normalizeQuestionType, PREDICT_RULE } from "../core/question-core.ts";
 import { sameQuestionKey } from "../core/shown-help.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
-import { studyDay } from "../core/day-words.ts";
-import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, HIS_MESSAGE, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, probeOpeningText, savedQuestionsOf, SEND_TO_USER_TOOL, sessionTasksOf, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { DOUBT, adviceSentences, partialDay, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, recordMarkWords, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { withSaved, type CloseReceipt } from "../core/close-receipt.ts";
+import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, HIS_MESSAGE, isRealAnswer, nativeInputCause, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, probeOpeningText, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
+import { DOUBT, adviceSentences, closeBreaks, closeMissing, SENTENCE_BUDGETS, sentenceLoad, pointsBack, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, recordMarkWords, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -278,7 +278,7 @@ function earlierTexts(messages: readonly LhMessage[]): Array<{ text: string; ask
 			: m.content.flatMap((b) => {
 					if (b.type !== "toolCall" || failed.has(b.id)) return [];
 					const asked = (QUESTION_TOOLS as readonly string[]).includes(b.name);
-					// The lesson's opening on the probe's end is a message he read (round 19, M7).
+					// An opening recorded on probe_done (round 19's lessons) is a message he read.
 					const text = b.name === SEND_TO_USER_TOOL ? sendToUserText(b) : asked ? questionText(b) : b.name === PROBE_DONE_TOOL ? (probeOpeningText(b) ?? undefined) : undefined;
 					return text ? [{ text, asked }] : [];
 				}),
@@ -628,7 +628,7 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 		case "pointer":
 			return `His open question is the last thing he reads, right above this message, so a pointer to it tells him nothing: ${quoted(b.excerpt)}. Leave it out, and send nothing when nothing else is left to say.`;
 		case "arrival":
-			return `His answer's card already shows it came and how it was marked: ${quoted(b.excerpt)}. Leave the line out; when he asked whether it went through, the mark under his answer says so.`;
+			return `His answer's card already shows it came and how it was marked: ${quoted(b.excerpt)}. Leave the line out, unless he asked whether it went through: then answer him in one sentence on the answer itself, as "It is saved, marked right with help.", from its save's receipt.`;
 		case "own-words":
 			return `Never talk about your own earlier words: ${quoted(b.excerpt)}. When what you said earlier changes what he should do, say what is true as itself ("This problem is the first of the set."); otherwise leave it out.`;
 		case "mark-case":
@@ -704,10 +704,18 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `Never tell him an answer is not saved: every answer in the record stays saved, an earlier day's included, and the app itself says when his record can't be read: ${quoted(b.excerpt)}. Leave it out.`;
 		case "guess":
 			return `${b.excerpt.startsWith("he wrote ") ? `He asked to guess first (${b.excerpt})` : `You invited a guess (${quoted(b.excerpt)})`}, so his answer is a guess before he is told, never a counted attempt: pose it as a prediction, \`type: predict\`, tagged with the step it grows from, so it is kept and never counts. Ask the open question again once his guess is answered.`;
-		case "moved-start":
-			return `His answers today moved a start planned for today, and the close never says so: ${b.excerpt}. Name it in the close, by its title, with its new day and its cause as the receipt gives it.`;
-		case "day-part":
-			return `A day you name with what it holds is named whole, or by itself alone: ${b.excerpt.replace(/: /, " also holds ")}. Name every item of that day from the close's \`day_items\`, or only the day.`;
+		case "close-calendar":
+			return `Every day this close names is in the session's close receipt, so name it, never "on your calendar" or "next time": ${quoted(b.excerpt)}. Copy the day from \`close.says\`.`;
+		case "close-untouched":
+			return `This session never answered ${b.excerpt}, so the close leaves ${b.excerpt.includes(", ") ? "them" : "it"} out: it names exactly the topics in its close receipt, each with its day (\`close.says\`), and nothing else.`;
+		case "close-day": {
+			const items = b.excerpt.split(";").map((item) => item.split("|"));
+			return `A topic the close names has its day in the same sentence: ${items.map(([title, day]) => `${title} is ${day}`).join("; ")}, as \`close.says\` words it.`;
+		}
+		case "title-and":
+			return `"${b.excerpt}" reads as more topics than there are, since a title holds its own "and". Join titles with commas only, as \`close.says\` does.`;
+		case "row-label":
+			return `${quoted(b.excerpt)} is the press that opened the lesson, never its name. Name the topic by its title.`;
 		case "card": {
 			const [card, said] = [b.excerpt.slice(0, b.excerpt.indexOf("|")), b.excerpt.slice(b.excerpt.indexOf("|") + 1)];
 			return `His answer card already says "${card}" above your reply, and your opening says it again: ${quoted(said)}. Open on where it broke, the fact itself, never on the verdict, and never soften it.`;
@@ -765,50 +773,7 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 	}
 }
 
-type DayItems = Record<string, { day_words: string; items: string[]; lesson: string[] }>;
-
-/** A start planned for today that his study today moved, as the save's
- *  receipt gives it (`starts_moved`): its title, its new day in words and
- *  the topics it waits on, by title. */
-type MovedStart = { title: string; starts_words: string; waits_on: string[]; past_exam: boolean };
-
-/** The starts planned for `today` that the session's saves moved: the
- *  last receipt's `starts_moved` (each lists every start his study today
- *  moved, so a later save that put one back drops it), those whose
- *  `moved.from` is today. Every close he asks for with Done for today
- *  names them (round 18, M4: a hinted, then partly right, Random variables
- *  answer moved Expectation off today, and a missed Homomorphisms answer
- *  moved Linear maps off today; every save receipt carried the move and
- *  neither close named it). */
-function movedToday(result: { content: ReadonlyArray<{ type: string; text?: string }> }, today: string): MovedStart[] | null {
-	const text = result.content.find((c) => c.type === "text")?.text;
-	let receipt: unknown;
-	try {
-		receipt = text ? JSON.parse(text) : null;
-	} catch {
-		return null;
-	}
-	if (!isRecord(receipt)) return null;
-	const moved = isRecord(receipt.starts_moved) ? receipt.starts_moved : {};
-	return Object.values(moved).flatMap((entry) => {
-		if (!isRecord(entry) || !isRecord(entry.moved) || entry.moved.from !== today || typeof entry.title !== "string") return [];
-		const waits = Array.isArray(entry.moved.waits_on) ? entry.moved.waits_on.filter((t): t is string => typeof t === "string") : [];
-		return [{ title: entry.title, starts_words: typeof entry.starts_words === "string" ? entry.starts_words : "", waits_on: waits, past_exam: entry.past_exam === true }];
-	});
-}
-
-/** The session's last receipt's starts moved off today (`movedToday`). */
-function movedTodayOf(messages: readonly LhMessage[], today: string): MovedStart[] {
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const m = messages[i]!;
-		if (m.role !== "toolResult" || m.toolName !== SAVE_TOOL || m.isError) continue;
-		const found = movedToday(m, today);
-		if (found) return found;
-	}
-	return [];
-}
-
-/** A close that names a day he studies on. */
+/** A close needs a day before it names a topic: today, tomorrow or a weekday. */
 const NAMES_A_DAY = /\b(?:today|tomorrow|(?:mon|tues|wednes|thurs|fri|satur|sun)day)\b/i;
 
 /** Whether `text` names a start by its title, read past emphasis and quotes. */
@@ -818,54 +783,38 @@ function namesTitle(text: string, title: string): boolean {
 
 const plainWords = (s: string) => s.replace(/[*_"“”‘’]/g, "").replace(/\s+/g, " ").toLowerCase();
 
-/** Whether `text` names a moved start by its title and its new day, the
- *  receipt's "Sunday 15 November" read as "15 November" or "15 Nov"
- *  (integration, round 18: a close said Expectation's start "moved from
- *  today … is on your calendar", and he could not tell when it starts). */
-function namesMove(text: string, moved: MovedStart): boolean {
-	if (!namesTitle(text, moved.title)) return false;
-	const day = /(\d{1,2}) ([a-z]{3})[a-z]*/i.exec(moved.starts_words);
-	const tomorrow = /^tomorrow\b/i.test(moved.starts_words) && /\btomorrow\b/i.test(text);
-	return !day || tomorrow || new RegExp(`\\b${day[1]} ${day[2]}`, "i").test(plainWords(text));
-}
-
-function movedWords(moved: MovedStart): string {
-	const why = moved.waits_on.length > 0 ? `, since it waits on ${moved.waits_on.join(" and ")}` : "";
-	return `${moved.title} was planned for today and now starts ${moved.starts_words}${moved.past_exam ? ", after the exam" : ""}${why}`;
-}
-
-const MOVED_START_NOTE = (moved: MovedStart[]) =>
-	`Your close never said that his answers today moved a start planned for today: ${moved.map(movedWords).join("; ")}. Send him one sentence that says it, with its new day and its cause as the receipt gives it.`;
-
-/** The close result's `day_items` (lesson_progress), or null. */
-function dayItemsIn(result: AgentToolResult<unknown>): DayItems | null {
-	const text = result.content.find((c): c is { type: "text"; text: string } => c.type === "text")?.text;
+/** The JSON a tool result carries: a save's receipt, a conclude's after
+ *  "Course record:", the lesson close's result. */
+function resultJson(result: AgentToolResult<unknown>): Record<string, unknown> | null {
+	const text = result.content.find((c): c is { type: "text"; text: string } => c.type === "text")?.text ?? "";
+	const at = text.indexOf("{");
+	if (at < 0) return null;
 	try {
-		const parsed = text ? (JSON.parse(text) as { day_items?: unknown }) : null;
-		return isRecord(parsed?.day_items) ? (parsed.day_items as DayItems) : null;
+		const parsed: unknown = JSON.parse(text.slice(at));
+		return isRecord(parsed) ? parsed : null;
 	} catch {
 		return null;
 	}
 }
 
+/** The close receipt a result carries (`close`), or null. */
+function receiptIn(result: AgentToolResult<unknown>): CloseReceipt | null {
+	const close = resultJson(result)?.close;
+	return isRecord(close) && Array.isArray(close.topics) && Array.isArray(close.moved) ? (close as unknown as CloseReceipt) : null;
+}
+
+/** The note a close owes when it left out part of its receipt. */
+const CLOSE_MISSING_NOTE = (missing: readonly { title: string; day_words: string }[], says: string) =>
+	`Your close never named ${missing.map((m) => `${m.title} (${m.day_words})`).join(", ")}, which this session answered or moved. Send him one sentence with every topic of the close receipt and its day: ${JSON.stringify(says)}.`;
+
 /** The topic titles a result names: the first lessons a save moved
- *  (`starts_moved`, in a save's receipt or a conclude's "Course record:")
- *  and what the close's days hold (`day_items`). */
+ *  (`starts_moved`) and the topics of its close receipt. */
 function titlesIn(result: AgentToolResult<unknown>): string[] {
-	const text = result.content.find((c): c is { type: "text"; text: string } => c.type === "text")?.text ?? "";
-	const at = text.indexOf("{");
-	if (at < 0) return [];
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(text.slice(at));
-	} catch {
-		return [];
-	}
-	if (!isRecord(parsed)) return [];
+	const parsed = resultJson(result);
+	if (!parsed) return [];
 	const moved = isRecord(parsed.starts_moved) ? Object.values(parsed.starts_moved).flatMap((m) => (isRecord(m) && typeof m.title === "string" ? [m.title] : [])) : [];
-	const days = isRecord(parsed.day_items) ? Object.values(parsed.day_items).filter(isRecord) : [];
-	const held = days.flatMap((d) => [...(Array.isArray(d.items) ? d.items : []), ...(Array.isArray(d.lesson) ? d.lesson : [])]).flatMap((t) => (typeof t === "string" ? [t.replace(/ (?:review|starts|lesson continues)$/, "")] : []));
-	return [...moved, ...held];
+	const receipt = receiptIn(result);
+	return [...moved, ...(receipt ? [...receipt.topics, ...receipt.moved].map((t) => t.title) : [])];
 }
 
 /** A topic title set straight after a comma, where its capital reads as a
@@ -941,26 +890,19 @@ const DUPLICATE: AgentToolResult<unknown> = {
 	details: { withheld: "duplicate" },
 };
 
-/** The probe's end when the guard left its opening off (round 19, M7):
- *  the probe is recorded, and the opening comes as one message, rewritten
- *  to fix what broke the voice; it ends the prober's turn. */
-const OPENING_OWED = (owed: { text: string; breaks: VoiceBreak[]; asks: boolean }): string =>
-	[
-		"Assessment recorded — the teacher plans from it. The lesson's opening was not shown to him: it breaks the voice.",
-		...owed.breaks.map((b) => `- ${fixFor(b, "teach", owed.text)}`),
-		...(owed.asks ? ["- It asks a question: the opening asks nothing, since the teacher poses its question with the plan."] : []),
-		"Send it now with send_to_user, rewritten to fix only these, and say nothing about the change: that message ends your turn.",
-	].join("\n");
-
-/** The owed opening asks nothing: its question comes with the plan. */
-const OPENING_ASKS: AgentToolResult<unknown> = {
-	content: [{ type: "text", text: "Not shown to him: the lesson's opening asks nothing, since the teacher poses its question with the plan. Send it again with send_to_user, ending on a statement." }],
+/** A message after one refused in the same reply: shown now, it would
+ *  reach him before the rewrite of what came first (round 20, M1: the
+ *  probe's feedback refused, the lesson's first step shown, and the
+ *  feedback's rewrite then landing under the step). It waits, and is owed
+ *  in turn. */
+const AFTER_REFUSED = (text: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: "Not shown to him yet: the message before it was refused, so he would read this first. Send the rewrite of that one, then this one again, in order." }],
 	isError: true,
-	details: { withheld: "voice", rules: ["opening-asks"] },
-};
+	details: { withheld: "after-refused", text },
+});
 
 /** Words after `probe_done`: the teacher opens the lesson, so the probe
- *  ends with none (its ack says so), save a lesson's owed opening. */
+ *  ends with none (its ack says so), save the rewrites it owes. */
 const AFTER_PROBE = (text: string): AgentToolResult<unknown> => ({
 	content: [{ type: "text", text: "Not shown to him: the probe has ended and the teacher opens the lesson. End your turn with no words." }],
 	isError: true,
@@ -1050,6 +992,18 @@ function reviewTopicsOf(messages: readonly LhMessage[]): string[] {
  *  ended or its plan was written: its topics, from the brief's "Opened
  *  on: …." line, and its title, his first message, which the app posted.
  *  Null for a review, a free session, or once the lesson is under way. */
+/** The verb Home's row and a topic's page open a lesson with. */
+const LESSON_VERB = /^(?:Start|Continue)\s+(?=\S)/;
+
+/** A press's label set inside a sentence, its verb capitalised after
+ *  another word ("Now Start Expectation and linearity:"), round 20, m7. */
+const ROW_LABEL = /(?<=[A-Za-z,:;]\s)(?:Start|Continue)\s+[A-Z][^\s:.,;?!]*(?:\s+[^\s:.,;?!]+){0,5}/;
+
+function rowLabel(text: string): VoiceBreak[] {
+	const label = ROW_LABEL.exec(text.replace(/\$[^$]*\$/g, " "));
+	return label ? [{ rule: "row-label", excerpt: label[0] }] : [];
+}
+
 function lessonOpenedOn(messages: readonly LhMessage[]): { topics: string[]; title: string } | null {
 	const begun = messages.some((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && (b.name === "plan_init" || b.name === PROBE_DONE_TOOL)));
 	const first = messages.find((m) => m.role === "user");
@@ -1058,7 +1012,10 @@ function lessonOpenedOn(messages: readonly LhMessage[]): { topics: string[]; tit
 		const m = messages[i]!;
 		if (m.role !== "custom" || m.customType !== "course-context" || typeof m.content !== "string") continue;
 		const opened = /^Opened on: (.+?)\. He pressed the action on its page/m.exec(m.content);
-		const title = textOf(first.content).trim();
+		// Home's row opens it with its verb ("Start Expectation and linearity"):
+		// the lesson's name is the topic's title (round 20, m7: "Now Start
+		// Expectation and linearity:").
+		const title = textOf(first.content).trim().replace(LESSON_VERB, "");
 		return opened && title ? { topics: opened[1]!.split(/,\s*/), title } : null;
 	}
 	return null;
@@ -1245,15 +1202,19 @@ export class VoiceGuard {
 	private sent = 0;
 	private duplicates = 0;
 	private probeEnded = false;
-	/** The probe's end may open the lesson (round 19, M7): only a lesson's.
-	 *  A review's or an open task's teacher opens its own. */
-	private readonly opensLesson: boolean;
-	/** The opening the guard left off probe_done, which the prober owes as
-	 *  a message once the probe has ended, and why it was left off. */
-	private openingOwed: { text: string; breaks: VoiceBreak[]; asks: boolean } | null = null;
-	/** A refused message not yet rewritten, and whether a turn-ending call
-	 *  was already held back for it (once a turn). */
-	private owed = false;
+	/** The refused messages not yet rewritten, and whether a turn-ending
+	 *  call was already held back for them (once a turn). Two refused in one
+	 *  reply owe two rewrites (round 20, M1: the probe's feedback and the
+	 *  lesson's first step, both refused, and the step's rewrite was then
+	 *  refused as words after the probe's end). Read message by message
+	 *  within a model reply, each message first taken as a rewrite of one
+	 *  owed before the reply; a call screened with no reply is its own. */
+	private owed = 0;
+	private owedBefore = 0;
+	private refusedNow = 0;
+	private rewrittenNow = 0;
+	private reply: AssistantMessage | undefined;
+	private screening: ToolCall | null = null;
 	private heldForOwed = 0;
 	/** The question kept for the owed rewrite: its call, its words, whether
 	 *  its tool ran it cleanly, and the reply it was taken out of. */
@@ -1357,15 +1318,20 @@ export class VoiceGuard {
 	private offTopic: { topics: string[]; at: number; held: boolean } | null = null;
 	/** The topic titles this turn's results named. */
 	private readonly titles: string[] = [];
-	/** The close's `day_items`: what each day it names holds. */
-	private dayItems: DayItems | null = null;
-	/** The turn is his Done for today's close, and the starts planned for
-	 *  today that the session's saves moved, which it names
-	 *  (`movedToday`); whether the turn's end was held for them. */
+	/** The turn is his Done for today's close; the lesson closed in this
+	 *  turn (`lesson_progress` with `close`); a save went through in it. */
 	private readonly closing: boolean;
-	private moved: MovedStart[];
-	private readonly today = studyDay();
-	private heldMoved = false;
+	private lessonClosed = false;
+	private savedNow = false;
+	/** The session's close receipt as the newest result or his Done for
+	 *  today gives it (close-receipt.ts), which the close names exactly,
+	 *  and whether the turn's end was held for what it left out (round 20,
+	 *  M3). */
+	private receipt: CloseReceipt | null;
+	private heldMissing = false;
+	/** Every course topic's title, read from the course maps the turn
+	 *  started with: a close names none the receipt does not hold. */
+	private courseTitles: readonly string[] = [];
 
 	constructor(
 		messages: readonly LhMessage[],
@@ -1374,11 +1340,15 @@ export class VoiceGuard {
 		private readonly review = false,
 		/** The session saves his answers to a course record (`course_save`). */
 		saves = false,
+		/** Every course topic's title, for the close (round 20, M3). */
+		titles?: () => Promise<readonly string[]>,
 	) {
 		this.input = turnInputOf(messages);
 		const opened = messages[messages.findLastIndex(opensTurn)];
 		this.closing = opened?.role === "custom" && opened.customType === "done-tonight";
-		this.moved = movedTodayOf(messages, this.today);
+		const done = opened?.role === "custom" && opened.customType === "done-tonight" ? (opened.details as unknown) : undefined;
+		this.receipt = isRecord(done) && isRecord(done.close) ? (done.close as unknown as CloseReceipt) : null;
+		void titles?.().then((t) => { this.courseTitles = t; }, () => {});
 		this.standing = standingQuestion(messages);
 		this.firstTry = review ? null : firstTryAtCheck(messages);
 		this.secondTry = review ? null : retryAtCheck(messages);
@@ -1390,7 +1360,6 @@ export class VoiceGuard {
 		this.posedSinceInput = posedSinceInput(messages);
 		this.reviewTopics = review ? reviewTopicsOf(messages) : [];
 		this.lesson = review ? null : lessonOpenedOn(messages);
-		this.opensLesson = !review && sessionTasksOf(messages).length === 0;
 		this.problemBefore = messages.some((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === PRACTICE_PROBLEM_TOOL));
 		this.openAbove = openAbove(messages);
 		this.stepsAhead = stepsNotDone(messages);
@@ -1420,7 +1389,8 @@ export class VoiceGuard {
 
 	/** Read a call as it finishes streaming. A refused message's text leaves
 	 *  the live call, so no view ever draws it. */
-	screen(call: ToolCall): void {
+	screen(call: ToolCall, reply?: AssistantMessage): void {
+		this.enter(reply);
 		if (call.name === PRACTICE_CONCLUDE_TOOL && !this.concluded) {
 			this.concluded = true;
 			this.sentAtConclude = this.sent;
@@ -1428,35 +1398,25 @@ export class VoiceGuard {
 		}
 		if (call.name === LESSON_PROGRESS_TOOL && isRecord(call.arguments) && Array.isArray(call.arguments.done)) for (const id of call.arguments.done) if (typeof id === "string") this.doneNow.add(id);
 		if (call.name === SAVE_TOOL || call.name === PRACTICE_CONCLUDE_TOOL) for (const result of savedResults(call.name, call.arguments)) this.savedVerdicts.add(result);
+		this.screening = call;
 		const refused = this.decide(call);
+		this.screening = null;
 		if (refused && call.name === SEND_TO_USER_TOOL) call.arguments = {};
-		if (!refused && call.name === PROBE_DONE_TOOL) this.screenOpening(call);
 	}
 
-	/** A lesson's opening on `probe_done` (round 19, M7) is a teaching turn
-	 *  that asks nothing, since the teacher poses its question with the plan.
-	 *  One that breaks the voice leaves the call before he sees it, and the
-	 *  probe's end asks for it rewritten as a message; any in a review or an
-	 *  open task's session just leaves, since their teacher opens them. */
-	private screenOpening(call: ToolCall): void {
-		const opening = isRecord(call.arguments) ? call.arguments.opening : undefined;
-		if (opening === undefined) return;
-		const text = typeof opening === "string" ? opening : "";
-		const breaks = this.opensLesson && text.trim() ? this.messageBreaks(text, "teach") : [];
-		const asks = sentences(text).some((s) => s.trim().endsWith("?"));
-		if (this.opensLesson && text.trim() && breaks.length === 0 && !asks) {
-			// A clean opening on a retried probe_done is the one he sees: none is owed any more.
-			this.openingOwed = null;
-			this.said.push(text);
-			this.toldNow.push(text);
-			return;
-		}
-		console.info(`[voice] probe_done's opening left out: ${!this.opensLesson ? "not a lesson" : asks ? "it asks a question" : breaks.map((b) => b.rule).join(", ") || "empty"}`);
-		const { opening: _left, ...rest } = call.arguments;
-		call.arguments = rest;
-		// A lesson's opening that broke the voice is rewritten once the probe
-		// has ended, as a message: the probe's end tells the prober what to fix.
-		if (this.opensLesson && text.trim()) this.openingOwed = { text, breaks, asks };
+	/** A call of a new model reply, or one with no reply, starts its count. */
+	private enter(reply: AssistantMessage | undefined): void {
+		if (reply && reply === this.reply) return;
+		this.owedBefore = this.owed;
+		this.refusedNow = 0;
+		this.rewrittenNow = 0;
+		this.reply = reply;
+	}
+
+	/** The messages owed now: this reply's refused ones, plus those owed
+	 *  before it that its messages have not yet rewritten. */
+	private owe(): void {
+		this.owed = this.refusedNow + Math.max(0, this.owedBefore - this.rewrittenNow - this.refusedNow);
 	}
 
 	/** Read ordinary text as its block ends: he never sees it, so it is
@@ -1477,21 +1437,22 @@ export class VoiceGuard {
 			this.noted.add(UNSAVED_NOTE);
 			return UNSAVED_NOTE;
 		}
-		if (this.owed && (this.kept?.ran || this.waited)) {
+		if (this.owed > 0 && (this.kept?.ran || this.waited)) {
 			if (this.noted.has(OWED_END_NOTE)) return undefined;
 			this.noted.add(OWED_END_NOTE);
 			return OWED_END_NOTE;
 		}
-		if (this.closing && this.sent > 0 && !this.heldMoved && !this.owed) {
-			const unnamed = this.unnamedMoves(this.toldNow.join("\n"));
-			if (unnamed.length > 0) {
-				this.heldMoved = true;
-				return MOVED_START_NOTE(unnamed);
+		const closes = this.closing || this.lessonClosed || (this.review && this.savedNow && !this.posed);
+		if (closes && this.receipt && this.sent > 0 && !this.heldMissing && this.owed === 0) {
+			const missing = closeMissing(this.toldNow, this.receipt);
+			if (missing.length > 0) {
+				this.heldMissing = true;
+				return CLOSE_MISSING_NOTE(missing, this.receipt.says);
 			}
 		}
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
-		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
+		const leftNoWayOn = this.input.work === true && shown && !this.concluded && this.owed === 0 && !this.said.some(leavesAWayOn);
 		if (this.offTopic && this.sent === this.offTopic.at && !this.noted.has(OFF_TOPIC_NOTE)) {
 			this.noted.add(OFF_TOPIC_NOTE);
 			return `Not shown to him yet: ${OFF_TOPIC_TEXT(this.offTopic.topics.join(", "), this.reviewTopics.join(", "))}.`;
@@ -1501,7 +1462,7 @@ export class VoiceGuard {
 			return VERDICT_NOTE;
 		}
 		const unrepaired = this.repairOwed && !writesAnswer(this.secondTry!, this.toldNow);
-		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.retryOwed ? RETRY_NOTE : unrepaired ? REPAIRED_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : this.nextStepOwed() ? NEXT_STEP_NOTE : undefined;
+		const note = !shown && this.owed > 0 ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.retryOwed ? RETRY_NOTE : unrepaired ? REPAIRED_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : this.nextStepOwed() ? NEXT_STEP_NOTE : undefined;
 		if (!note || this.noted.has(note)) return undefined;
 		this.noted.add(note);
 		return note;
@@ -1512,7 +1473,7 @@ export class VoiceGuard {
 	 *  which a later question in the review tries again. Never his Done for
 	 *  today, nor his work on a practice problem. */
 	private nextStepOwed(): boolean {
-		if (this.closing || this.owed || !this.input.answers || this.input.work || this.savedVerdicts.size === 0) return false;
+		if (this.closing || this.owed > 0 || !this.input.answers || this.input.work || this.savedVerdicts.size === 0) return false;
 		if (this.stepsAhead.some((step) => !this.doneNow.has(step.id))) return true;
 		return this.review && [...this.savedVerdicts].some((result) => result !== "correct");
 	}
@@ -1528,12 +1489,12 @@ export class VoiceGuard {
 				const partial = tool.name === SAVE_TOOL && savedResults(tool.name, params).includes("partial");
 				if (partial && this.toldWrong) return SAVED_AGAINST_WORDS;
 				const result = await tool.execute(toolCallId, params, signal, onUpdate);
-				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) {
-					this.probeEnded = true;
-					if (this.openingOwed) return { ...result, content: [{ type: "text", text: OPENING_OWED(this.openingOwed) }], terminate: false };
-				}
-				if (tool.name === LESSON_PROGRESS_TOOL && !result.isError) this.dayItems = dayItemsIn(result) ?? this.dayItems;
-				if (tool.name === SAVE_TOOL && !result.isError) this.moved = movedToday(result, this.today) ?? this.moved;
+				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
+				// The lesson's close reads the whole plan; a save's receipt adds to the receipt held.
+				const given = !result.isError && (tool.name === LESSON_PROGRESS_TOOL || tool.name === SAVE_TOOL || tool.name === PRACTICE_CONCLUDE_TOOL) ? receiptIn(result) : null;
+				if (given) this.receipt = tool.name === LESSON_PROGRESS_TOOL || !this.receipt ? given : withSaved(this.receipt, given);
+				if (!result.isError && tool.name === LESSON_PROGRESS_TOOL && isRecord(params) && params.close === true) this.lessonClosed = true;
+				if (!result.isError && tool.name === SAVE_TOOL) this.savedNow = true;
 				if (!result.isError) this.titles.push(...titlesIn(result));
 				if (this.saveFailed(tool.name, params, result)) this.verdictOwed = !this.toldNow.some(opensOnVerdict);
 				if (tool.name === SAVE_TOOL && result.isError && remarksUnasked(params) && !this.input.ruling) this.remarkedUnasked = true;
@@ -1559,6 +1520,8 @@ export class VoiceGuard {
 
 	private decide(call: ToolCall): AgentToolResult<unknown> | null {
 		if (this.decisions.has(call.id)) return this.decisions.get(call.id)!;
+		// A call its tool runs unscreened is a reply of its own.
+		if (this.screening !== call) this.enter(undefined);
 		const decision = this.judge(call);
 		this.decisions.set(call.id, decision);
 		return decision;
@@ -1589,32 +1552,36 @@ export class VoiceGuard {
 			if (!text) return null;
 			// A rewrite he is owed goes through, after probe_done too: it is
 			// the answer he asked for, never a closing sentence.
-			// The opening the probe's end asked for: a teaching turn that asks nothing.
-			const opening = this.probeEnded && this.openingOwed !== null;
-			if (opening && sentences(text).some((s) => s.trim().endsWith("?"))) return OPENING_ASKS;
-			const afterProbe = this.probeEnded && !this.owed && !opening;
+			const afterProbe = this.probeEnded && this.owed === 0;
 			if (this.duplicates < 2 && (afterProbe || this.said.some((s) => s.trim() === text.trim()))) {
 				this.duplicates++;
 				return afterProbe ? AFTER_PROBE(text) : DUPLICATE;
 			}
 			const answersHim = this.unanswered > 0 && !text.trim().endsWith("?");
-			if (this.lastAsked && !this.owed && !answersHim) return AFTER_ASKING(text);
+			if (this.lastAsked && this.owed === 0 && !answersHim) return AFTER_ASKING(text);
 			const ruled = this.rulings.length > 0 && this.sent === 0 && !this.heldRulingSaid && !this.rulings.some((r) => sameRuling(text, r));
 			if (ruled) {
 				this.heldRulingSaid = true;
 				return RULING_SAID(this.rulings[0]!);
 			}
-			const kind = opening ? "teach" : this.messageKind();
+			if (this.refusedNow > 0) {
+				this.refusedNow++;
+				this.owe();
+				return AFTER_REFUSED(text);
+			}
+			const kind = this.messageKind();
 			const breaks = this.held("message", this.messageBreaks(text, kind));
 			if (breaks.length > 0) {
 				this.refused.set("message", (this.refused.get("message") ?? 0) + 1);
-				this.owed = true;
+				this.refusedNow++;
+				this.owe();
 				if (breaks.some((b) => b.rule === "length") && !this.lengthDraft) this.lengthDraft = clausesOf(text);
 				return refusal("message", call.name, text, breaks, kind);
 			}
-			this.owed = false;
+			this.rewrittenNow++;
+			this.owe();
 			this.lengthDraft = null;
-			if (this.kept || this.waiting.size > 0) this.releasing = call.id;
+			if ((this.kept || this.waiting.size > 0) && this.owed === 0) this.releasing = call.id;
 			this.toldNow.push(text);
 			if (opensOnVerdict(text)) this.verdictOwed = false;
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
@@ -1623,7 +1590,6 @@ export class VoiceGuard {
 			if (text.trim().endsWith("?")) this.lastAsked = true;
 			else if (this.unanswered > 0) this.unanswered--;
 			this.sent++;
-			if (opening) this.openingOwed = null;
 			return null;
 		}
 		if (call.name === DEMO_TOOL) {
@@ -1656,12 +1622,12 @@ export class VoiceGuard {
 		// each refused message (a rewrite may be refused again), or once for
 		// ordinary text.
 		const question = (QUESTION_TOOLS as readonly string[]).includes(call.name);
-		const keeps = this.owed && question;
-		if (!this.owed && this.plain && this.sent === 0 && this.heldForOwed < 1 && this.endsTurn(call.name)) {
+		const keeps = this.owed > 0 && question;
+		if (this.owed === 0 && this.plain && this.sent === 0 && this.heldForOwed < 1 && this.endsTurn(call.name)) {
 			this.heldForOwed++;
 			return PLAIN_OWED(call.name);
 		}
-		const waits = this.owed && !question && this.endsTurn(call.name);
+		const waits = this.owed > 0 && !question && this.endsTurn(call.name);
 		if (call.name === PRACTICE_PROBLEM_TOOL && this.problemBefore && this.input.kind === "direct" && !this.input.ruling && !ASKS_FOR_PROBLEM.test(this.input.words ?? "") && !this.heldAskedOnly) {
 			this.heldAskedOnly = true;
 			return ASKED_ONLY;
@@ -1675,7 +1641,7 @@ export class VoiceGuard {
 		if (!question) return null;
 		const text = questionText(call);
 		if (!text) return null;
-		if (this.input.unsure && this.sent === 0 && !this.owed && !this.heldUnsure) {
+		if (this.input.unsure && this.sent === 0 && this.owed === 0 && !this.heldUnsure) {
 			this.heldUnsure = true;
 			return UNSURE(this.input.unsure);
 		}
@@ -1687,7 +1653,7 @@ export class VoiceGuard {
 			this.heldRetry = true;
 			return RETRY(this.firstTry!.question);
 		}
-		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text), ...this.lessonUnnamed(text)]);
+		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text), ...this.lessonUnnamed(text), ...rowLabel(text)]);
 		if (breaks.length > 0) {
 			this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 			return refusal("question", call.name, text, breaks, undefined);
@@ -1795,7 +1761,15 @@ export class VoiceGuard {
 		// a close names the day he picks up on (round 10: "Its review is
 		// planned for tomorrow" refused in a close).
 		const asksPlan = kind === "direct" && PLAN_QUESTION.test(this.input.words ?? "");
-		const out = voiceBreaks(text, kind).filter((b) => !(b.rule === "plan" && (asksPlan || (kind === "close" && PLANNED_DAY.test(b.excerpt)))));
+		// A close names exactly its receipt's topics, each with its day: a
+		// review's own close is the message after a save that names a day.
+		const closesNow = kind === "close" || this.closing || this.lessonClosed || (this.review && this.savedNow && NAMES_A_DAY.test(text));
+		const receipt = closesNow && !asksPlan ? this.receipt : null;
+		// The receipt's days are owed whatever their length, so its sentence
+		// costs the close's budget nothing (round 20, M3).
+		const owedLoad = receipt?.says ? sentenceLoad(sentences(receipt.says)) : 0;
+		const fits = (b: VoiceBreak) => b.rule === "length" && owedLoad > 0 && sentenceLoad(sentences(text)) <= SENTENCE_BUDGETS.close + owedLoad;
+		const out = voiceBreaks(text, kind).filter((b) => !(b.rule === "plan" && (asksPlan || (kind === "close" && PLANNED_DAY.test(b.excerpt)))) && !fits(b));
 		if (!out.some((b) => b.rule === "questions")) {
 			const asked = [...this.asked, ...sentences(text).filter((s) => s.trim().endsWith("?"))];
 			if (asked.length > 1) out.push({ rule: "questions", excerpt: asked.join(" ") });
@@ -1829,11 +1803,9 @@ export class VoiceGuard {
 		if (recordWord) out.push({ rule: "card-words", excerpt: recordWord });
 		const sure = kind === "close" ? narratedConfidence(text) : null;
 		if (sure) out.push({ rule: "confidence", excerpt: sure });
-		const part = this.dayItems ? partialDay(text, this.dayItems) : null;
-		if (part) out.push({ rule: "day-part", excerpt: part });
-		const unnamed = this.closing && NAMES_A_DAY.test(text) ? this.unnamedMoves(text) : [];
-		if (unnamed.length > 0) out.push({ rule: "moved-start", excerpt: unnamed.map(movedWords).join("; ") });
-		if (this.owed && this.lengthDraft && !out.some((b) => b.rule === "length")) {
+		// A review's own topics are its questions to come, never untouched.
+		if (receipt) out.push(...closeBreaks(text, receipt, this.courseTitles.filter((t) => !this.reviewTopics.includes(t))));
+		if (this.owed > 0 && this.lengthDraft && !out.some((b) => b.rule === "length")) {
 			const { words, clauses } = clausesOf(text);
 			const draft = this.lengthDraft;
 			if (clauses < draft.clauses && words > draft.words - draft.shortest) out.push({ rule: "length", excerpt: `joined: ${words} words where the draft had ${draft.words}, in fewer sentences` });
@@ -1851,11 +1823,12 @@ export class VoiceGuard {
 		// A close names a day for every topic it names (round 19, m15: "Mechanics
 		// of matrix multiplication comes back on a later day on your calendar",
 		// "you pick those up next"), and his half answer's lesson its next day.
-		const closes = kind === "close" || this.closing || this.dayItems !== null;
+		const closes = kind === "close" || this.closing || this.lessonClosed;
 		const vagueDay = closes ? sentences(text).map((s) => s.trim()).find((s) => VAGUE_DAY.test(s) && !DAY_WORDS.test(s)) : undefined;
 		if (vagueDay) out.push({ rule: "vague-day", excerpt: vagueDay });
 		const halfNoDay = closes && !unplaced ? sentences(text).map((s) => s.trim()).find((s) => /\bhalf(?:-finished)? answer\b/i.test(s) && !DAY_WORDS.test(s)) : undefined;
 		if (halfNoDay) out.push({ rule: "half-answer-day", excerpt: halfNoDay });
+		out.push(...rowLabel(text));
 		const commaTitle = titleAfterComma(text, this.titles);
 		if (commaTitle) out.push({ rule: "title-comma", excerpt: commaTitle });
 		const vague = VAGUE_MOVES.exec(text);
@@ -1882,12 +1855,6 @@ export class VoiceGuard {
 		if (boxed) out.push({ rule: "repeat", excerpt: `callout ${quoted(boxed.said)}, said above as ${quoted(boxed.before)}` });
 		const breaks = [...out, ...this.letters(text), ...this.repeats(text, true), ...this.unbuilt(text)];
 		return this.verdictOwed ? breaks.filter((b) => !GRADING_RULES.has(b.rule)) : breaks;
-	}
-
-	/** The starts moved off today that neither `text` nor an earlier
-	 *  message of this turn names with its new day. */
-	private unnamedMoves(text: string): MovedStart[] {
-		return this.moved.filter((m) => ![text, ...this.toldNow].some((t) => namesMove(t, m)));
 	}
 
 	/** The first question after a review a lesson ran first, with no word

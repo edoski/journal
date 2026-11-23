@@ -46,7 +46,7 @@ export interface SdkAgentConfig {
 	onUsage?: (usage: Usage) => void;
 	/** Reads each call as it finishes streaming, before any view sees it
 	 *  (the voice guard, voice-guard.ts). */
-	screen?: (call: ToolCall) => void;
+	screen?: (call: ToolCall, reply: AssistantMessage) => void;
 	/** Reads each reply as it ends, before the record keeps it or a view
 	 *  draws it (the voice guard poses a question it kept under the rewrite
 	 *  it waited for). */
@@ -406,7 +406,7 @@ export class SdkAgent {
 					for (const fn of held.splice(0)) fn();
 				} else {
 					if (event.type === "toolcall_end") {
-						this.config.screen?.(event.toolCall);
+						this.config.screen?.(event.toolCall, stream.message);
 						calls.set(event.toolCall.id, { call: event.toolCall, assistant: stream.message });
 					}
 					if (event.type === "text_end" && this.config.screenText?.(event.content)) {

@@ -161,7 +161,10 @@ function aliases(statuses: readonly ClaudeAccountStatus[]): Map<string, string> 
 	return new Map(statuses.filter((status) => rows.get(claudeAccountName(status))! > 1 && status.account.label !== claudeAccountName(status)).map((status) => [status.account.providerId, status.account.label]));
 }
 
-export function ClaudeConnectionRow() {
+/** `notice`: the row of its own that says lessons run on the plan; the
+ *  sign-in dialog leaves it out, since its own line says so (round 20,
+ *  m17: the dialog said it twice). */
+export function ClaudeConnectionRow({ notice = true }: { notice?: boolean } = {}) {
 	const current = useModelStatus().status?.account;
 	const [accounts, setAccounts] = useState<ClaudeAccountStatus[] | null>(null);
 	const [busy, setBusy] = useState(false);
@@ -229,6 +232,6 @@ export function ClaudeConnectionRow() {
 			{error && <p role="alert" className={connectionNoteClass("danger")}>{error}</p>}
 		</div>
 		{list.rows.map((status) => <AccountRow key={status.account.providerId} status={status} current={current} busy={busy} checking={checking} note={list.notes(status.account.providerId)} alias={alias.get(status.account.providerId)} onUse={() => void switchTo(status.account.providerId)} />)}
-		<p className={cn(CLAUDE_ROW, connectionNoteClass("muted"))} data-testid="claude-notice">{CLAUDE_NOTICE}</p>
+		{notice && <p className={cn(CLAUDE_ROW, connectionNoteClass("muted"))} data-testid="claude-notice">{CLAUDE_NOTICE}</p>}
 	</>;
 }

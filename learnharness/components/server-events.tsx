@@ -159,7 +159,22 @@ export function useNotifyHub() { return useContext(EventsContext); }
 export function ServerEventsProvider({ children, connect }: { children: ReactNode; connect?: () => NotifySource }) {
 	const hub = useMemo(() => createNotifyHub(), []);
 	useEffect(() => wireSource((connect ?? openEventsChannel)(), hub), [hub, connect]);
+	useEffect(() => {
+		const off = hub.subscribe("courses-changed", (p) => void (p.deleted && deletedHere.add(p.deleted)));
+		return () => void off();
+	}, [hub]);
 	return <EventsContext.Provider value={hub}>{children}</EventsContext.Provider>;
+}
+
+/** The courses this window heard deleted. Back serves a lesson's page as
+ *  it was before its course was deleted, so the page reads this to draw
+ *  the deleted notice from its first frame, not after a course read that
+ *  took seconds under load (round 20, m15: a live "Your answer" box for
+ *  about 3 s). */
+const deletedHere = new Set<string>();
+
+export function deletedInThisWindow(workspace: string | undefined): boolean {
+	return workspace !== undefined && deletedHere.has(workspace);
 }
 
 /** Subscribe to one event type for this component's lifetime. The callback

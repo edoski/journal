@@ -67,7 +67,8 @@ describe("one status word per row (round 10, 1 m4)", () => {
 		const course = rankCourse({ gap: "Pivots" });
 		const [row] = todayRows([course], [practice], TODAY);
 		assert.equal(rowStanding(row!)?.slip ?? null, null);
-		assert.equal(rowStanding(row!) && rowWords(rowStanding(row!)!), "Right on your own, check another day");
+		// The engine still calls it weak: the check to come, never "Right on your own" (round 20, m4).
+		assert.equal(rowStanding(row!) && rowWords(rowStanding(row!)!), "Check again another day");
 		const line = draw(course, [practice]).querySelector('[data-slot="today-line"]')!;
 		const text = line.textContent ?? "";
 		assert.doesNotMatch(text, /Slipping|Check on your own/);
