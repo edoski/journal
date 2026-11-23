@@ -93,7 +93,7 @@ export type CourseListing =
  *  written; `unavailable` means the engine itself could not run. */
 export type CourseResult =
 	| { ok: true; json: unknown }
-	| { ok: false; kind: "validation" | "io" | "unavailable"; message: string };
+	| { ok: false; kind: "validation" | "io" | "unavailable"; message: string; timedOut?: true };
 
 /** The engine's read and write verbs a lesson uses. `plan` is read for
  *  the exam run-up's figures; `days` is its horizon (one day unless set),
