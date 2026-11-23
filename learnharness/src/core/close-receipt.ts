@@ -124,21 +124,27 @@ function movesOf(saved: Record<string, unknown> | undefined, today: string, star
 }
 
 /** The receipt as the session's saves give it, with no read of the plan:
- *  each topic a save dated, on the day and by the title its newest save's
- *  receipt gives it, in the order the session first answered them, and the
- *  starts the newest receipt says moved. A topic no save dated has no day
- *  here. */
+ *  each topic a save dated, on the day its newest save's receipt gives it
+ *  and by the title a receipt gave it, in the order the session first
+ *  answered them, and the starts the newest receipt says moved. A topic no
+ *  save dated has no day here, and one no receipt titled (a save made
+ *  before receipts carried titles) is left to the closes that read the
+ *  plan, never named by its handle. */
 export function receiptOfSaves(saves: readonly SessionSave[], today: string): CloseReceipt {
-	const dated = new Map<string, { day: string; title: string }>();
+	const days = new Map<string, string>();
+	const titles = new Map<string, string>();
 	for (const { receipt: saved } of saves) {
 		for (const [handle, review] of Object.entries(isRecord(saved.reviews) ? saved.reviews : {})) {
-			if (isRecord(review) && typeof review.planned === "string") dated.set(handle, { day: review.planned, title: typeof review.title === "string" ? review.title : handle });
+			if (!isRecord(review) || typeof review.planned !== "string") continue;
+			days.set(handle, review.planned);
+			if (typeof review.title === "string") titles.set(handle, review.title);
 		}
 	}
 	const order = [...new Set(saves.flatMap((s) => [...s.topics, ...Object.keys(isRecord(s.receipt.reviews) ? s.receipt.reviews : {})]))];
 	const topics = order.flatMap((handle): CloseTopic[] => {
-		const at = dated.get(handle);
-		return at ? [{ handle, title: at.title, kind: "review", day: at.day, day_words: plannedDayWords(at.day, today) }] : [];
+		const day = days.get(handle);
+		const title = titles.get(handle);
+		return day && title ? [{ handle, title, kind: "review", day, day_words: plannedDayWords(day, today) }] : [];
 	});
 	return receipt(topics, movesOf(saves.at(-1)?.receipt, today));
 }

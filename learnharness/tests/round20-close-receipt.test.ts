@@ -160,6 +160,13 @@ describe("one close receipt for every session (round 20, M3)", () => {
 		assert.deepEqual(closeRules(await closing(receipt), receipt.says), []);
 	});
 
+	it("a save made before receipts carried titles is never named by its handle (live check, 23 Nov: \"Your eigen review\")", () => {
+		const untitled = { reviews: { eigen: { due: "2026-11-09", planned: "2026-11-09" } } };
+		assert.deepEqual(receiptOfSaves([{ topics: ["eigen"], receipt: untitled }], D8).topics, []);
+		const later = receiptOf({ eigen: ["Eigenvalues and eigenvectors", "2026-11-10"] });
+		assert.deepEqual(receiptOfSaves([{ topics: [], receipt: later }, { topics: ["eigen"], receipt: untitled }], D8).topics.map((t) => [t.title, t.day]), [["Eigenvalues and eigenvectors", "2026-11-09"]]);
+	});
+
 	it("each save's result carries the sitting's close so far, earlier turns' saves included", async () => {
 		const earlier = receiptOf({ rv: ["Random variables and distributions", "2026-11-15"] });
 		const ctx: CourseToolContext = {
