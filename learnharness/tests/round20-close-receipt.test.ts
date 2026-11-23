@@ -59,7 +59,7 @@ const receiptOf = (reviews: Record<string, [string, string]>, starts: Record<str
 	...(Object.keys(starts).length ? { starts_moved: starts } : {}),
 });
 const savedResult = (receipt: unknown): LhMessage =>
-	({ id: `r-${nextId()}`, role: "toolResult", toolCallId: `v-${nextId()}`, toolName: "course_save", content: [{ type: "text", text: JSON.stringify(receipt) }], details: null, isError: false, timestamp: 1 }) as unknown as LhMessage;
+	({ id: `r-${nextId()}`, role: "toolResult", toolCallId: `v-${nextId()}`, toolName: "course_save", content: [{ type: "text", text: JSON.stringify(receipt) }], details: null, isError: false, timestamp: Date.now() }) as unknown as LhMessage;
 
 /** A guard for a close: his Done for today carrying `receipt`, or a turn
  *  whose save returned it, with every course's titles. */

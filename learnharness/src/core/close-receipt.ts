@@ -17,7 +17,7 @@
 import type { CourseMap, CourseMapTopic } from "./contracts/course-map.ts";
 import { plannedDayWords } from "./day-words.ts";
 import { PRACTICE_CONCLUDE_TOOL, sessionPlanTopicOf, sessionTopicsOf, type LhMessage } from "./native-messages.ts";
-import { sinceLastClose } from "./session-end.ts";
+import { localDayOf, sinceLastClose, sinceStudyDay } from "./session-end.ts";
 import { reviewRecord } from "./session-opening.ts";
 
 /** How a topic comes back: its next review, its first lesson, or the rest
@@ -64,6 +64,9 @@ export interface CloseReceipt {
 export interface SessionSave {
 	topics: readonly string[];
 	receipt: Record<string, unknown>;
+	/** The day the save was made, when the session holds it; a save of the
+	 *  running turn has none, being today's. */
+	day?: string;
 }
 
 /** "Span", "Span, Rank": titles joined by commas only, since a title may
@@ -135,11 +138,13 @@ function movesOf(saved: Record<string, unknown> | undefined, today: string, star
 /** The receipt as the session's saves give it, with no read of the plan:
  *  each topic a save dated, on the day its newest save's receipt gives it
  *  and by the title a receipt gave it, in the order the session first
- *  answered them, and the starts the newest receipt says moved. A topic no
+ *  answered them, and the starts the newest receipt says moved. Only the
+ *  saves of the study day it closes count (round 21, M2). A topic no
  *  save dated has no day here, and one no receipt titled (a save made
  *  before receipts carried titles) is left to the closes that read the
  *  plan, never named by its handle. */
-export function receiptOfSaves(saves: readonly SessionSave[], today: string): CloseReceipt {
+export function receiptOfSaves(all: readonly SessionSave[], today: string): CloseReceipt {
+	const saves = all.filter((s) => s.day === undefined || s.day >= today);
 	const days = new Map<string, string>();
 	const titles = new Map<string, string>();
 	for (const { receipt: saved } of saves) {
@@ -210,21 +215,22 @@ function savedReceipt(m: LhMessage): Record<string, unknown> | null {
 }
 
 /** The saves the session made since its last close, in order. Each holds
- *  its receipt; the topics its attempts answered come from the session's
+ *  its receipt and the day it was made; the topics its attempts answered come from the session's
  *  own transcript (`sessionTopicsOf`) and are left empty here. */
 export function sessionSavesOf(messages: readonly LhMessage[]): SessionSave[] {
 	return sinceLastClose(messages).flatMap((m) => {
 		const saved = savedReceipt(m);
-		return saved ? [{ topics: [], receipt: saved }] : [];
+		return saved ? [{ topics: [], receipt: saved, day: localDayOf(m.timestamp) }] : [];
 	});
 }
 
 /** The topics a close names, by handle: the lesson's own (those a session
  *  not a review was opened on and the topic its plan teaches), then each
- *  topic it answered since its last close. A review names only what it
- *  answered; a task's other topics are not the session's. */
-export function closeTopicsOf(record: { title: string; topics?: readonly string[]; messages: readonly LhMessage[] }): string[] {
+ *  topic it answered since its last close on the study day it closes
+ *  (round 21, M2). A review names only what it answered; a task's other
+ *  topics are not the session's. */
+export function closeTopicsOf(record: { title: string; topics?: readonly string[]; messages: readonly LhMessage[] }, today: string): string[] {
 	const planned = sessionPlanTopicOf(record.messages);
 	const own = reviewRecord(record) ? [] : [...(record.topics ?? []), ...(planned ? [planned] : [])];
-	return [...new Set([...own, ...sessionTopicsOf(sinceLastClose(record.messages))])];
+	return [...new Set([...own, ...sessionTopicsOf(sinceStudyDay(record.messages, today))])];
 }

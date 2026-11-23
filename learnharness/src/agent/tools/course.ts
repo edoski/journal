@@ -431,8 +431,8 @@ export async function closeReceiptFor(
 	const mapped = await records.map(workspace);
 	if (!mapped.ok) return null;
 	const inTurn = ctx ? (turnSaves.get(ctx) ?? []) : [];
-	const saves = [...sessionSavesOf(record.messages), ...inTurn];
-	return receiptOfMap(mapped.map, [...closeTopicsOf(record), ...inTurn.flatMap((s) => s.topics)], saves, sessionTasksOf(record.messages));
+	const saves = [...sessionSavesOf(record.messages).filter((s) => s.day === undefined || s.day >= mapped.map.today), ...inTurn];
+	return receiptOfMap(mapped.map, [...closeTopicsOf(record, mapped.map.today), ...inTurn.flatMap((s) => s.topics)], saves, sessionTasksOf(record.messages));
 }
 
 async function saveRuled(ctx: CourseToolContext, changes: unknown, problem?: { id: string; seen: boolean }): Promise<CourseResult> {
