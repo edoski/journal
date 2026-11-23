@@ -323,12 +323,17 @@ describe("the sections drawn", () => {
 		for (const [name, facts] of ROWS) {
 			const document = page(facts);
 			assert.ok(document.querySelector('[data-testid="topic-action"]') === null, `${name}: no head button`);
-			const now = document.querySelector('[data-slot="pickup-now"]')!;
-			assert.equal(now.getAttribute("data-action"), facts.action.kind, name);
-			const press = now.querySelector('[data-slot="pickup-now-press"]');
-			// Nothing due today has no press (round 15, m9).
-			if (facts.action.kind === "study") assert.ok(press === null, `${name}: no press`);
-			else if ("chat" in facts.action) assert.equal(press!.getAttribute("href"), `/chat/${facts.action.chat.id}`, name);
+			const now = document.querySelector('[data-slot="pickup-now"]');
+			// Nothing to take up today draws no Now: Scheduled gives the day (round 21, m4: "Now · Nothing due today" headed
+			// Binomial's, Inclusion-exclusion's and Random variables' pages).
+			if (facts.action.kind === "study") {
+				assert.ok(now === null, `${name}: no Now, "${now?.textContent}"`);
+				assert.ok(!(document.body.textContent ?? "").includes("Nothing due today"), `${name}: no "Nothing due today"`);
+				continue;
+			}
+			assert.equal(now!.getAttribute("data-action"), facts.action.kind, name);
+			const press = now!.querySelector('[data-slot="pickup-now-press"]');
+			if ("chat" in facts.action) assert.equal(press!.getAttribute("href"), `/chat/${facts.action.chat.id}`, name);
 			else assert.equal(press!.tagName, "BUTTON", name);
 		}
 	});
@@ -418,9 +423,12 @@ describe("the history's gutter (Edo, 14 Nov 2026: Now's rule on the Now label, e
 			const doc = page(facts);
 			const column = doc.querySelector('[data-slot="pickup-section"]')!.parentElement!;
 			const label = doc.querySelector('[data-slot="pickup-divider"]')!;
-			const now = doc.querySelector('[data-slot="pickup-now"]')!;
-			const left = /(?:^|\s)before:left-(\S+)/.exec(now.getAttribute("class")!)![1]!;
-			assert.equal(x(now, column) + margin(now) + px(left), x(label, column), "the rule starts where Now's text starts");
+			// A topic with nothing to take up today draws no Now (round 21, m4).
+			const now = doc.querySelector('[data-slot="pickup-now"]');
+			if (now) {
+				const left = /(?:^|\s)before:left-(\S+)/.exec(now.getAttribute("class")!)![1]!;
+				assert.equal(x(now, column) + margin(now) + px(left), x(label, column), "the rule starts where Now's text starts");
+			}
 			for (const row of doc.querySelectorAll(ROW)) {
 				kinds.add(kindOf(row));
 				const icon = row.querySelector("svg") ?? row.firstElementChild!;
