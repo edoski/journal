@@ -92,6 +92,18 @@ describe("the close names only the study day it closes (round 21, M2)", () => {
 		assert.deepEqual(close.topics.map((t) => t.handle), ["kernel"]);
 	});
 
+	it("a save carries its study day, so a simulated day later than the machine's clock keeps its own saves", async () => {
+		process.env.LEARNING_TODAY = "2026-12-02";
+		const dated = (msgs: LhMessage[]) => msgs.map((m) => (m.role === "toolResult" ? ({ ...m, content: [{ type: "text", text: JSON.stringify({ ...JSON.parse((m.content[0] as { text: string }).text), today: "2026-12-02" }) }] } as LhMessage) : m));
+		const today = [said(Date.now(), "Continue Problem sheet 4"), ...dated(saved(Date.now(), ["homomorphism"]))];
+		const receipt = (await closeReceiptFor(records, "/la", { ...SHEET, messages: [...SHEET.messages.slice(0, 2), ...today] }))!;
+		assert.ok(receipt.topics.some((t) => t.handle === "homomorphism"), JSON.stringify(receipt.topics));
+		assert.deepEqual(sessionSavesOf(today).map((s) => s.day), ["2026-12-02"]);
+		const ctx = { course: { workspace: "/la", title: "Linear Algebra" }, records: { run: async () => ({ ok: true, json: { revision: 1, reviews: {} } }) }, arcs: false } as unknown as CourseToolContext;
+		const result = await saveCourse(ctx, { topics: { kernel: { gap: "…" } } });
+		assert.equal(result.ok && (result.json as { today?: string }).today, "2026-12-02");
+	});
+
 	it("a session that never left its day keeps every save since its last close", async () => {
 		const sameDay = { ...SHEET, messages: SHEET.messages.map((m) => ({ ...m, timestamp: at(8, 9) })) };
 		const receipt = (await closeReceiptFor(records, "/la", sameDay))!;

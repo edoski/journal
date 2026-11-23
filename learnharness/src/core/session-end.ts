@@ -335,22 +335,6 @@ export function sinceLastClose(messages: readonly LhMessage[]): readonly LhMessa
 	return messages;
 }
 
-/** The local calendar day of a moment, as the study clock names days. */
-export function localDayOf(ms: number): string {
-	const d = new Date(ms);
-	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** The session on the study day it closes: since its last close
- *  (`sinceLastClose`) and since its first message of `today`, so a session
- *  resumed on a later day closes on that day's work alone (round 21, M2:
- *  Problem sheet 4, left on 6 Nov with no close and closed on 8 Nov,
- *  named the six topics its 6 Nov save dated). Pure. */
-export function sinceStudyDay(messages: readonly LhMessage[], today: string): readonly LhMessage[] {
-	const since = sinceLastClose(messages);
-	return since.slice(since.findLastIndex((m) => typeof m.timestamp === "number" && localDayOf(m.timestamp) < today) + 1);
-}
-
 /** The topics the work open on him is asked on, as the tutor tagged it: an
  *  open practice problem's `topics`, else the `topic` of the question that
  *  waits on him or that his Done for today left (round 19, M4: Problem

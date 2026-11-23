@@ -415,7 +415,9 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 	const saves = turnSaves.get(ctx) ?? [];
 	turnSaves.set(ctx, saves);
 	saves.push({ topics: answeredTopics(changes), receipt: result.json });
-	return { ...result, json: { ...result.json, close: receiptOfSaves([...(ctx.sessionSaves?.() ?? []), ...saves], studyDay()) } };
+	// It carries its study day too, which a later day's close reads (round 21, M2).
+	const today = studyDay();
+	return { ...result, json: { ...result.json, today, close: receiptOfSaves([...(ctx.sessionSaves?.() ?? []), ...saves], today) } };
 }
 
 /** This turn's saves that went through, in order: the close of a turn that

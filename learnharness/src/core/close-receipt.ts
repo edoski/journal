@@ -17,7 +17,7 @@
 import type { CourseMap, CourseMapTopic } from "./contracts/course-map.ts";
 import { plannedDayWords } from "./day-words.ts";
 import { PRACTICE_CONCLUDE_TOOL, sessionPlanTopicOf, sessionTopicsOf, type LhMessage } from "./native-messages.ts";
-import { localDayOf, sinceLastClose, sinceStudyDay } from "./session-end.ts";
+import { sinceLastClose } from "./session-end.ts";
 import { reviewRecord } from "./session-opening.ts";
 
 /** How a topic comes back: its next review, its first lesson, or the rest
@@ -336,13 +336,37 @@ function savedReceipt(m: LhMessage): Record<string, unknown> | null {
 	}
 }
 
+/** The study day a save was made: the one its receipt carries (`today`,
+ *  `saveCourse`), else its message's local day, for a save made before
+ *  receipts carried it. */
+function saveDay(m: LhMessage, saved: Record<string, unknown>): string {
+	if (typeof saved.today === "string") return saved.today;
+	const d = new Date(m.timestamp);
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** The session on the study day it closes: since its last close and
+ *  after its last save of an earlier day, so a session resumed on a later
+ *  day closes on that day's work alone (round 21, M2: Problem sheet 4,
+ *  left on 6 Nov with no close and closed on 8 Nov, named the six topics
+ *  its 6 Nov save dated). Pure. */
+function sinceStudyDay(messages: readonly LhMessage[], today: string): readonly LhMessage[] {
+	const since = sinceLastClose(messages);
+	return since.slice(
+		since.findLastIndex((m) => {
+			const saved = savedReceipt(m);
+			return saved !== null && saveDay(m, saved) < today;
+		}) + 1,
+	);
+}
+
 /** The saves the session made since its last close, in order. Each holds
  *  its receipt and the day it was made; the topics its attempts answered come from the session's
  *  own transcript (`sessionTopicsOf`) and are left empty here. */
 export function sessionSavesOf(messages: readonly LhMessage[]): SessionSave[] {
 	return sinceLastClose(messages).flatMap((m) => {
 		const saved = savedReceipt(m);
-		return saved ? [{ topics: [], receipt: saved, day: localDayOf(m.timestamp) }] : [];
+		return saved ? [{ topics: [], receipt: saved, day: saveDay(m, saved) }] : [];
 	});
 }
 
