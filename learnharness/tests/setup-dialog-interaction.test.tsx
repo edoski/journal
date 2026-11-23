@@ -113,6 +113,13 @@ describe("setup polish interactions", () => {
 		assert.ok(document.querySelector('[data-testid="setup-key-input"]') === null, "no key field");
 	});
 
+	it("says the plan once (round 20, m17: \"Lessons run on Claude Opus 5.5 through your Claude plan.\" and \"Your lessons run on your Claude plan through Claude Code and count toward its limits.\")", async () => {
+		await mount();
+		const said = element('[data-testid="setup-dialog"]').textContent!;
+		assert.equal(said.split("Claude plan").length - 1, 1, said);
+		assert.ok(document.querySelector('[data-testid="setup-dialog"] [data-testid="claude-notice"]') === null);
+	});
+
 	it("closes itself once the account in use is signed in", async () => {
 		connected = true;
 		await mount();
