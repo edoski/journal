@@ -53,7 +53,8 @@ describe("the begun lesson's page (m36)", () => {
 		assert.equal(facts.standing?.words, LESSON_BEGUN);
 		const head = render(<HybridTopic facts={facts} busy={false} onAct={() => {}} onTask={() => {}} />).querySelector('[data-slot="page-standing"]');
 		assert.ok(head !== null, "the head's standing line is drawn");
-		assert.match(head.textContent ?? "", new RegExp(LESSON_BEGUN));
+		// The lesson left for next time speaks for the topic, as its Now does (round 20, m4).
+		assert.match(head.textContent ?? "", /Left off 9 Nov/);
 	});
 
 	it("keeps a topic a session only touched silent, since Not started would contradict it", () => {

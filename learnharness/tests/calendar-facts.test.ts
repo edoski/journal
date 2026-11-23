@@ -378,7 +378,7 @@ describe("practice left for next time on the calendar (round 20, m3)", () => {
 		{ planned: [{ date: "2026-11-09", reviews: ["odds" as TopicHandle], new: [] }] },
 	);
 	const lesson = chat({ id: "inv", title: "Invertible matrices lesson", ended: "left", topics: ["invertible"], ownTopics: ["invertible"], tasks: ["invertible-lesson"], updatedAt: `${TODAY}T11:00:00` });
-	const practice = chat({ id: "rank", title: "Rank practice", kind: "practice", phase: "practice", ended: "left", topics: ["rank"], ownTopics: ["rank"], updatedAt: `${TODAY}T12:00:00` });
+	const practice = chat({ id: "rank", title: "Rank practice", kind: "practice", ended: "left", topics: ["rank"], ownTopics: ["rank"], updatedAt: `${TODAY}T12:00:00` });
 	const entries = () => calendarEntries({ courses: [LA_LEFT], chats: [lesson, practice], scope: null });
 	const said = (day: string) => entries().filter((e) => e.day === day && e.kind !== "review").map((e) => `${e.title} · ${lookWords(e, TODAY)}`);
 

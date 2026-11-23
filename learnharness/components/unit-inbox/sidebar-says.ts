@@ -2,7 +2,7 @@ import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/s
 import { slotWords } from "@/components/study-home/needs-you";
 import { nowFor, plannedKeys, restTopics, shelfStatus } from "@/components/unit-inbox/now-inbox";
 import { askedKeys, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
-import { buildInbox, unitKey, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
+import { buildInbox, sessionFact, topicSession, unitKey, type SessionFact, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
 import { whyFact } from "@/components/unit-inbox/fact-icon";
 import { lapsedNow, overdueWords, SLIP_WORDS, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
 
@@ -40,6 +40,11 @@ export type SidebarPlace = "today" | "learning" | "known";
 export interface Said {
 	place: SidebarPlace;
 	fact: TopicFact | null;
+	/** What the session that speaks for the topic says (`topicSession`,
+	 *  `sessionFact`): "Your turn", "Left off today"; null when none does.
+	 *  Its map card and its page's head say it in place of where he
+	 *  stands, as its page's Now does (round 20, m4). */
+	now?: SessionFact | null;
 }
 
 /** A topic Today takes up says Today's reason, as the sidebar's card for
@@ -98,14 +103,20 @@ export function sidebarSays(courses: readonly StudyCourse[], chats: readonly Cha
 	for (const item of todayTop(nowFor(courses, chats, null, map.today), inbox, chats)) for (const key of askedKeys(item)) if (!today.has(key)) today.set(key, item);
 	for (const [key, item] of today) {
 		const topic = topics.get(key);
-		if (topic) said.set(topic.handle, { place: "today", fact: todayFact(item, topic, map.today) });
+		if (topic) said.set(topic.handle, { place: "today", fact: todayFact(item, topic, map.today), now: null });
 	}
 	const rest = restTopics(inbox, new Set(today.keys()));
 	const planned = plannedKeys(courses);
 	const shelve = (units: readonly Unit[], place: SidebarPlace) => {
-		for (const unit of units) if (topics.has(unit.key)) said.set(unit.topic.handle, { place, fact: shelfFact(shelfStatus(unit, map.today, planned)) });
+		for (const unit of units) if (topics.has(unit.key)) said.set(unit.topic.handle, { place, fact: shelfFact(shelfStatus(unit, map.today, planned)), now: null });
 	};
 	shelve([...rest.working, ...rest.learning], "learning");
 	shelve(rest.known, "known");
+	for (const unit of [...inbox.active, ...inbox.working, ...inbox.known]) {
+		const at = said.get(unit.topic.handle);
+		const chat = at && topics.has(unit.key) ? topicSession(unit.sessions, unit.topic.handle, chats) : null;
+		const now = chat ? sessionFact(chat, map.today) : null;
+		if (at && now) said.set(unit.topic.handle, { ...at, now });
+	}
 	return said;
 }
