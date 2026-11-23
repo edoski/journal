@@ -5,6 +5,7 @@
  *  Code's preview (an Electron browser with no LearnHarness bridge), or the
  *  Mac app (its preload's bridge, `window.lh`, there before the page runs). */
 import { createServer, type Server } from "node:http";
+import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
@@ -15,13 +16,11 @@ import puppeteer, { type Browser, type Page } from "puppeteer-core";
 import { resolveChromeExecutablePath } from "../../src/agent/subagents/headless.ts";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const main = readFileSync(`${root}electron/main.cjs`, "utf8");
-const lights = main.match(/const TRAFFIC_LIGHTS = \{ x: ([\d.]+), y: ([\d.]+) \};/);
-const lightSize = Number(main.match(/const LIGHT_SIZE = ([\d.]+);/)?.[1]);
-/** The traffic lights' centre in the Mac app, from electron/main.cjs. */
-export const LIGHTS_CENTRE = Number(lights?.[2]) + lightSize / 2;
-/** The three traffic lights' box in the Mac app, in points: 14pt lights 9pt apart (electron/main.cjs). */
-export const LIGHTS = { left: Number(lights?.[1]), top: Number(lights?.[2]), right: Number(lights?.[1]) + 3 * lightSize + 2 * 9, bottom: Number(lights?.[2]) + lightSize };
+const { TRAFFIC_LIGHTS: lights, LIGHT_SIZE: lightSize } = createRequire(import.meta.url)("../../electron/window-frame.cjs") as { TRAFFIC_LIGHTS: { x: number; y: number }; LIGHT_SIZE: number };
+/** The traffic lights' centre in the Mac app, from electron/window-frame.cjs. */
+export const LIGHTS_CENTRE = lights.y + lightSize / 2;
+/** The three traffic lights' box in the Mac app, in points: 14pt lights 9pt apart (electron/window-frame.cjs). */
+export const LIGHTS = { left: lights.x, top: lights.y, right: lights.x + 3 * lightSize + 2 * 9, bottom: lights.y + lightSize };
 
 /** T3 Code's preview: Electron's Chrome, as its user agent says. */
 const T3_PREVIEW_UA =

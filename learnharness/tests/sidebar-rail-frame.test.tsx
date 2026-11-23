@@ -44,11 +44,13 @@ const rule = (selector: string) => {
 const px = (calc: string | undefined) =>
 	[...(calc ?? "").replace(/\/ var\(--lh-zoom\)/g, "").matchAll(/([+-])?\s*([\d.]+)(px|rem)/g)].reduce((sum, [, sign, n, unit]) => sum + (sign === "-" ? -1 : 1) * Number(n) * (unit === "rem" ? 16 : 1), 0);
 
-// electron/main.cjs: the lights' corner and size, three 14pt lights 9pt
-// apart (measured in the running app), and the zoom ladder.
+// electron/window-frame.cjs: the lights' corner and size, three 14pt
+// lights 9pt apart (measured in the running app); electron/main.cjs: the
+// zoom ladder.
 const main = read("../electron/main.cjs");
-const lights = main.match(/const TRAFFIC_LIGHTS = \{ x: ([\d.]+), y: ([\d.]+) \};/);
-const lightSize = Number(main.match(/const LIGHT_SIZE = ([\d.]+);/)?.[1]);
+const frame = read("../electron/window-frame.cjs");
+const lights = frame.match(/const TRAFFIC_LIGHTS = \{ x: ([\d.]+), y: ([\d.]+) \};/);
+const lightSize = Number(frame.match(/const LIGHT_SIZE = ([\d.]+);/)?.[1]);
 const [lightsX, lightsY] = [Number(lights?.[1]), Number(lights?.[2])];
 const LIGHTS_RIGHT = lightsX + 3 * lightSize + 2 * 9;
 const LIGHTS_CENTRE = lightsY + lightSize / 2;
@@ -141,7 +143,7 @@ describe("the folded sidebar", () => {
 		assert.ok(ZOOMS.length > 1 && ZOOMS.includes(1), "main.cjs has its zoom ladder");
 		for (const zoom of ZOOMS) assert.ok(Math.abs(centre(zoom) - LIGHTS_CENTRE) < 1e-9, `level with the lights' centre (${LIGHTS_CENTRE}pt) at zoom ${zoom}, not ${centre(zoom)}`);
 		assert.ok(main.includes("additionalArguments: [`--lh-lights-centre=${TRAFFIC_LIGHTS.y + LIGHT_SIZE / 2}`]"), "main.cjs hands the renderer the lights' centre");
-		assert.ok(main.includes("trafficLightPosition: TRAFFIC_LIGHTS"), "from the same corner the lights are placed at");
+		assert.ok(frame.includes("trafficLightPosition: TRAFFIC_LIGHTS") && main.includes("...WINDOW_FRAME"), "from the same corner the lights are placed at");
 		assert.ok(read("../electron/preload.cjs").includes('lightsCentre: Number(process.argv.find((arg) => arg.startsWith("--lh-lights-centre="))'), "the preload reads it");
 		assert.ok(read("../components/sidebar.tsx").includes('setProperty("--lh-lights-centre", `${window.lh?.lightsCentre}px`)'), "the renderer publishes it");
 		const left = px(place.left);
