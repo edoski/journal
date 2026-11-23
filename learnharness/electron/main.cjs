@@ -23,6 +23,7 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, powerMonitor, session, shell } = require("electron");
 const { waitForServer } = require("./server-ready.cjs");
 const { desktopAPIHeaders } = require("./desktop-api.cjs");
+const { TRAFFIC_LIGHTS, LIGHT_SIZE, WINDOW_FRAME } = require("./window-frame.cjs");
 const { randomBytes } = require("node:crypto");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -38,10 +39,10 @@ const { PRODUCT_NAME, nameApp } = require("./product.cjs");
 // APP NAME → userData (owner, 2026-10-10; renamed Chiron 2026-11-19): the
 // menu says PRODUCT_NAME, while the Application Support dir stays exactly
 // "LearnHarness" (DATA_FOLDER) in dev AND packaged, so the rename moved no
-// data. Must run before the LH_DEV_URL suffix below — dev becomes
-// "LearnHarness-dev".
+// data; a dev shell (LH_DEV_URL) gets "LearnHarness-dev". Must run before
+// the single-instance lock below.
 // The packaged app ignores LH_USER_DATA_DIR, the launcher's test override.
-nameApp(app, app.isPackaged ? {} : process.env);
+nameApp(app, app.isPackaged ? { LH_DEV_URL: process.env.LH_DEV_URL } : process.env);
 const DATA_DIR = () => path.join(app.getPath("userData"), "data");
 
 /** The packaged standalone server (extraResources → Resources/server).
@@ -85,14 +86,6 @@ if (process.argv.includes("--browser-service")) {
 		}
 	})();
 } else {
-	// Dev shell (LH_DEV_URL) runs BESIDE the packaged app, not instead of it:
-	// its own userData so (a) the single-instance lock — checked below — doesn't
-	// silently kill it, and (b) it never reads/writes the real app's
-	// localStorage, auth.json, or logs. Must run before the lock check.
-	if (process.env.LH_DEV_URL) {
-		app.setPath("userData", `${app.getPath("userData")}-dev`);
-	}
-
 	// The whole normal boot — lock included — lives in this else: a helper is
 	// a SECOND instance of this very binary on purpose (the running app owns
 	// the lock), so it must never reach this check.
@@ -211,16 +204,6 @@ function killServer() {
 	}, 3000);
 }
 
-/** The traffic lights' top-left corner in the window, in points, and each
- *  light's drawn diameter. Whole points: AppKit draws the lights on whole
- *  points (a y of 22.5 drew them at 23). Measured in the running app on
- *  16 Nov 2026: 14pt lights 9pt apart, the first at x 16 to 30, y 23 to 37,
- *  so their centre is y + LIGHT_SIZE / 2 = 30. The lights stay physical
- *  under zoom; the renderer gets that centre (--lh-lights-centre) and
- *  centres the folded sidebar's open button on it (app/globals.css). */
-const TRAFFIC_LIGHTS = { x: 16, y: 23 };
-const LIGHT_SIZE = 14;
-
 /** Security posture (all defaults asserted explicitly; the guards are the
  *  checklist's own recommendations for localhost-app shells):
  *  - deny-by-default permission handler allowing only our loopback origin
@@ -229,15 +212,8 @@ const LIGHT_SIZE = 14;
  *    external links go to the real browser via shell.openExternal. */
 function createWindow(url) {
 	const win = new BrowserWindow({
-		width: 1440,
-		height: 900,
+		...WINDOW_FRAME,
 		title: PRODUCT_NAME,
-		// Merged chrome (owner, 2026-09-17): the system title bar is gone;
-		// the app's own header bands ARE the title bar, the traffic lights
-		// float over the sidebar's top band (TRAFFIC_LIGHTS, above).
-		// Dragging comes from the renderer's .lh-drag bands (app/globals.css).
-		titleBarStyle: "hiddenInset",
-		trafficLightPosition: TRAFFIC_LIGHTS,
 		webPreferences: {
 			contextIsolation: true,
 			sandbox: true,
@@ -246,23 +222,9 @@ function createWindow(url) {
 			// The lights' centre, for the renderer's --lh-lights-centre.
 			additionalArguments: [`--lh-lights-centre=${TRAFFIC_LIGHTS.y + LIGHT_SIZE / 2}`],
 		},
-		// Live-resize + first-paint flash (owner, 2026-09-17): during a resize
-		// the native window surface changes size before Chromium's compositor
-		// has a frame at the new size, and the gap shows the window's NATIVE
-		// background — Electron's default is white, glaring on a dark app.
-		// The app background (#141414) fills the lag instead. `show: false` +
-		// ready-to-show is the same treatment for first paint: the window
-		// appears only once the page has actually rendered.
-		backgroundColor: "#141414",
+		// The same treatment as the frame's background for first paint:
+		// the window appears only once the page has actually rendered.
 		show: false,
-		// Narrow-window behavior (owner, 2026-09-17): 640px is the floor —
-		// below it even a wrapped chrome row gets cramped and the chat header
-		// (lights gutter 92 + toggle + title) runs out of room. The sidebar
-		// auto-closes below 928 = 640 + 288 (sidebar) in the renderer
-		// (components/sidebar.tsx, SIDEBAR_AUTOCLOSE); its "lh:expand-window"
-		// IPC widens the window back to that threshold.
-		minWidth: 640,
-		minHeight: 600,
 	});
 
 	trustedAppWindows.add(win);
@@ -329,7 +291,7 @@ function createWindow(url) {
  * setZoomFactor, and broadcast to the renderer ("lh:zoom" — it publishes
  * --lh-zoom so gutter lengths can divide by it and stay PHYSICAL-
  * constant). The traffic lights themselves stay at their construction
- * position (TRAFFIC_LIGHTS — Electron 44 has NO runtime setter, only
+ * position (TRAFFIC_LIGHTS in window-frame.cjs — Electron 44 has NO runtime setter, only
  * the BrowserWindow option), which is HIG-correct anyway: native lights
  * hug the window corner while the web chrome compensates around them.
  * Vertical note: at large factors the taller bands' content centers

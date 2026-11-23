@@ -70,6 +70,8 @@ describe("the app's visible name", () => {
 		assert.equal(DATA_FOLDER, "LearnHarness");
 		nameApp(app, { LH_USER_DATA_DIR: "/tmp/fixture-user-data" });
 		assert.equal(calls.userData, "/tmp/fixture-user-data");
+		nameApp(app, { LH_DEV_URL: "http://127.0.0.1:4747" });
+		assert.equal(calls.userData, "/Users/x/Library/Application Support/LearnHarness-dev", "a dev shell keeps its own folder");
 	});
 
 	it("never says LearnHarness in anything the app shows: pages, window title, menus, notifications, errors", () => {

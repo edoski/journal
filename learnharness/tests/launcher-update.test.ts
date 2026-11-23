@@ -14,7 +14,7 @@ import { after, beforeEach, describe, it } from "node:test";
 
 const require = createRequire(import.meta.url);
 const { updateCheckout } = require("../scripts/launcher/update.cjs") as {
-	updateCheckout: (checkout: string) => { updated: boolean; skipped: string | null };
+	updateCheckout: (checkout: string) => Promise<{ updated: boolean; skipped: string | null }>;
 };
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-launcher-"));
@@ -55,18 +55,18 @@ beforeEach(() => {
 });
 
 describe("the launcher's update rule", () => {
-	it("fast-forwards a clean main to origin/main", () => {
+	it("fast-forwards a clean main to origin/main", async () => {
 		push(upstream, "learnharness/page.tsx", "new page\n");
-		const result = updateCheckout(checkout);
+		const result = await updateCheckout(checkout);
 		assert.deepEqual([result.updated, result.skipped], [true, null]);
 		assert.equal(head(checkout), head(upstream));
 	});
 
-	it("leaves a main with uncommitted changes alone, without fetching", () => {
+	it("leaves a main with uncommitted changes alone, without fetching", async () => {
 		push(upstream, "learnharness/page.tsx", "new page\n");
 		const before = head(checkout);
 		fs.writeFileSync(path.join(checkout, lockfile), "his edit\n");
-		const result = updateCheckout(checkout);
+		const result = await updateCheckout(checkout);
 		assert.equal(result.updated, false);
 		assert.match(result.skipped ?? "", /uncommitted changes/);
 		assert.equal(head(checkout), before);
@@ -74,22 +74,22 @@ describe("the launcher's update rule", () => {
 		assert.equal(fs.readFileSync(path.join(checkout, lockfile), "utf8"), "his edit\n");
 	});
 
-	it("leaves another branch alone", () => {
+	it("leaves another branch alone", async () => {
 		push(upstream, "learnharness/page.tsx", "new page\n");
 		git(checkout, "switch", "-qc", "his-work");
 		const before = head(checkout);
-		const result = updateCheckout(checkout);
+		const result = await updateCheckout(checkout);
 		assert.equal(result.updated, false);
 		assert.match(result.skipped ?? "", /on his-work, not main/);
 		assert.equal(head(checkout), before);
 		assert.equal(git(checkout, "branch", "--show-current"), "his-work");
 	});
 
-	it("leaves a main with its own commits alone", () => {
+	it("leaves a main with its own commits alone", async () => {
 		push(upstream, "learnharness/page.tsx", "new page\n");
 		commit(checkout, "learnharness/local.tsx", "local\n");
 		const before = head(checkout);
-		const result = updateCheckout(checkout);
+		const result = await updateCheckout(checkout);
 		assert.match(result.skipped ?? "", /cannot fast-forward/);
 		assert.equal(head(checkout), before);
 	});
