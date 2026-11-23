@@ -3,7 +3,7 @@ import { sessionState } from "@/components/nav/session-state";
 import { daysBetween, leftWords } from "@/components/unit-inbox/units";
 import { dayAndNearWords, distanceWords, heldExamWords, longDayWords, nextSessionWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
-import { courseMove, nextStepOf, titleList, todaySteps, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
+import { continueWords, courseMove, nextStepOf, titleList, todaySteps, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 import { needsYouNow, nowLine } from "@/components/study-home/needs-you";
 import { lessonTitle } from "@/components/study-home/agenda-rows/row-facts";
 
@@ -252,6 +252,14 @@ function openWorkStatus(course: CalendarCourse | undefined, chat: ChatListItem |
 	return step ? nowLine({ kind: "course", course, step }).slot : null;
 }
 
+/** Open work's title, Home's line's for it (`lessonTitle`): the session
+ *  holding it after its verb, else the course's step on it. Pure. */
+function taskTitle(course: CalendarCourse, chat: ChatListItem | null, task: CourseMapTask): string {
+	if (chat) return lessonTitle({ kind: "session", chat, course });
+	const step = todaySteps(course).find((s) => s.kind === "task" && s.key === task.key);
+	return step ? lessonTitle({ kind: "course", course, step }) : continueWords(task.title);
+}
+
 /** Continue on an open task: Home's move for the course's step on it. Pure. */
 function taskMove(course: CalendarCourse, chats: readonly ChatListItem[], task: CourseMapTask): CourseMove {
 	const step = todaySteps(course).find((s) => s.kind === "task" && s.key === task.key);
@@ -433,17 +441,18 @@ export function calendarEntries({
 				heldBy.set(lesson.id, task);
 				continue;
 			}
-			// One piece of work, one name: an unfinished session that holds the
-			// task names it, as Home and the sidebar do (round 8: "Eigenvalues
-			// and eigenvectors" on Home, "Eigenvalues lesson: eigenspaces and
-			// diagonalising" here).
+			// One piece of work, one name: Home's line's, the unfinished session
+			// that holds the task after its verb, else the task's (round 8:
+			// "Eigenvalues and eigenvectors" on Home, "Eigenvalues lesson:
+			// eigenspaces and diagonalising" here; round 21, m6: "Problem sheet 4"
+			// beside Home's "Continue Problem sheet 4").
 			const holder = chats.find((chat) => chat.course?.workspace === map.workspace && !chat.courseDeleted && sessionState(chat) !== "finished" && holdsTask(chat, task, holders.map((t) => t.handle)));
 			// A review he left for next time rides with its topics' next review,
 			// which opens it, never an Unfinished row of its own (round 10, 1 m7).
 			if (holder && isReviewSession(holder) && sessionState(holder) === "left") continue;
 			const move = taskMove(studied, chats, task);
 			for (const held of [holder, move.kind === "open" ? move.chat : undefined]) if (held) heldToday.add(held.id);
-			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: holder?.title ?? task.title, course, task, topic: holders[0] ?? null, move, status: openWorkStatus(studied, holder ?? null, task) });
+			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: taskTitle(studied, holder ?? null, task), course, task, topic: holders[0] ?? null, move, status: openWorkStatus(studied, holder ?? null, task) });
 		}
 		// The rest of work he left for next time today goes on the course's next study day the plan holds, as the close
 		// says it carries on (round 17, m14: only the next day's reviews showed). One entry that continues it, in the words
