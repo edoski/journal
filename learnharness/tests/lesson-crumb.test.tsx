@@ -9,13 +9,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
-import { LessonTopBar, topicCrumbShown } from "../components/lesson/lesson-top-bar.tsx";
+import { LessonTopBar, crumbEnd } from "../components/lesson/lesson-top-bar.tsx";
 
 describe("the lesson's top bar (2 m8, 3 m7)", () => {
 	const render = (node: React.ReactNode) => parseHTML(`<html><body><header>${renderToStaticMarkup(node)}</header></body></html>`).document;
 
 	it("ends on the topic as a link when the lesson is named after it", () => {
-		assert.equal(topicCrumbShown("Eigenvalues and eigenvectors", "Eigenvalues and eigenvectors"), false);
+		assert.equal(crumbEnd("Eigenvalues and eigenvectors", "Eigenvalues and eigenvectors"), null);
 		const doc = render(<LessonTopBar title={null} course="Linear Algebra" courseHref="/unit/la" topic={{ title: "Eigenvalues and eigenvectors", href: "/unit/la/eigen" }} />);
 		const topicLink = doc.querySelector('[data-slot="crumb"][data-kind="topic"]');
 		assert.equal(topicLink?.tagName, "A");

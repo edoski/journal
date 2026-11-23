@@ -7,7 +7,7 @@ import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "./helpers/app-render.tsx";
-import { LessonTopBar, topicCrumbShown } from "../components/lesson/lesson-top-bar.tsx";
+import { LessonTopBar, crumbEnd } from "../components/lesson/lesson-top-bar.tsx";
 import { LessonRoadmap } from "../components/lesson/lesson-roadmap.tsx";
 import { DoneTonightButton } from "../components/lesson/done-tonight.tsx";
 import type { RoadmapStep } from "../components/lesson/roadmap-facts.ts";
@@ -95,8 +95,8 @@ describe("the lesson's top bar", () => {
 	});
 
 	it("shows the topic crumb only when its words are not the title's", () => {
-		assert.equal(topicCrumbShown("Eigenvalues and eigenvectors", "eigenvalues and eigenvectors "), false);
-		assert.equal(topicCrumbShown("Eigenvalues and eigenvectors", "Diagonalising"), true);
+		assert.equal(crumbEnd("Eigenvalues and eigenvectors", "eigenvalues and eigenvectors "), null);
+		assert.equal(crumbEnd("Eigenvalues and eigenvectors", "Diagonalising"), "Diagonalising");
 	});
 });
 

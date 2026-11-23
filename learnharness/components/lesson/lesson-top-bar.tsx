@@ -42,12 +42,16 @@ export function LessonTopBar({
 	);
 }
 
-/** Whether the title reads differently from the topic crumb. When it reads
- *  the same, the topic crumb ends the trail, a link to the topic's page,
- *  and the title is not drawn a second time (round 8: a lesson named after
- *  its topic ended on plain text, with no way to its topic's page); F2
- *  still renames it. */
-export function topicCrumbShown(topicTitle: string, title: string): boolean {
+/** What ends the trail after the topic crumb: the title, but none when it
+ *  reads as the topic, so the topic crumb ends the trail, a link to the
+ *  topic's page, and the title is not drawn a second time (round 8: a
+ *  lesson named after its topic ended on plain text, with no way to its
+ *  topic's page), and "Review" for a review named after its topic (round
+ *  21, m9: "Real Analysis › Cardinality, countable sets and Cantor's
+ *  theorem |A| < |𝒫(A)| › Review Cardinality, countable sets and Cantor's
+ *  theorem |A| < |𝒫(A)|"). F2 still renames it, from its whole title. */
+export function crumbEnd(topicTitle: string, title: string): string | null {
 	const norm = (s: string) => s.trim().toLowerCase();
-	return norm(topicTitle) !== norm(title);
+	if (norm(topicTitle) === norm(title)) return null;
+	return norm(title) === norm(`Review ${topicTitle}`) ? "Review" : title;
 }

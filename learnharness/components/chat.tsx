@@ -74,7 +74,7 @@ import {
 } from "@/src/core";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
 import { ActiveProblemContext } from "@/components/lesson/active-problem";
-import { LessonTopBar, topicCrumbShown } from "@/components/lesson/lesson-top-bar";
+import { LessonTopBar, crumbEnd } from "@/components/lesson/lesson-top-bar";
 import { courseHref, unitHref } from "@/components/unit-inbox/unit-href";
 import { LessonRoadmap } from "@/components/lesson/lesson-roadmap";
 import { lessonRoadmapSteps, partKey, stepAnchors } from "@/components/lesson/roadmap-facts";
@@ -1630,6 +1630,8 @@ export function Chat({
 
 	// The lesson's topic crumb, a link to its page (lesson-top-bar.md).
 	const topicCrumb = course && !courseGone && place?.topic ? { title: place.topic.title, href: unitHref(course.workspace, place.topic.handle) } : undefined;
+	// The trail's last words after the topic crumb (`crumbEnd`).
+	const endWords = topicCrumb ? crumbEnd(topicCrumb.title, titleText) : titleText;
 
 	return (
 		<ChatActionsContext.Provider
@@ -1706,7 +1708,7 @@ export function Chat({
 									aria-label="Session title"
 									className="lh-no-drag -mx-1.5 h-auto w-auto min-w-[8ch] max-w-full shrink-0 bg-fill-hover px-1.5 text-headline text-inherit caret-current focus-visible:ring-0 [field-sizing:content]"
 								/>
-							) : topicCrumb && !topicCrumbShown(topicCrumb.title, titleText) ? null : (
+							) : endWords === null ? null : (
 								<Hint label="Rename session" action="rename-session" side="bottom">
 									<Button
 										variant="quiet"
@@ -1717,7 +1719,7 @@ export function Chat({
 										className="lh-no-drag -mx-1.5 block h-auto min-w-4 shrink cursor-text truncate px-1.5 text-left text-headline text-inherit hover:text-inherit"
 									>
 										{/* Its maths typeset, as every title (round 17, m5: "$\binom{n}{j}$" in the head). */}
-										<MathText>{titleText}</MathText>
+										<MathText>{endWords}</MathText>
 									</Button>
 								</Hint>
 							)
