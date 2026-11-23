@@ -85,7 +85,7 @@ export function SidebarRail({ pathname, onNewLesson, onSettings }: { pathname: s
 			<div className="lh-drag lh-rail-head relative flex w-full shrink-0 items-center justify-center">
 				<span aria-hidden data-slot="sidebar-rail-rule" className="absolute bottom-0 left-1/2 h-px w-5 -translate-x-1/2 bg-border" />
 			</div>
-			<div className="lh-drag flex w-full flex-1 flex-col items-center gap-1 pt-0.5">
+			<div className="lh-drag lh-rail-icons flex w-full flex-1 flex-col items-center gap-1 pt-0.5">
 				<RailButton icon={HouseIcon} label="Home" href="/" here={pathname === "/"} />
 				<RailButton icon={CalendarDaysIcon} label="Calendar" href="/calendar" here={pathname === "/calendar"} />
 				<RailButton icon={SearchIcon} label="Search" action="sessions-search" onClick={() => window.dispatchEvent(new Event(kbdEventForAction("sessions-search")))} />

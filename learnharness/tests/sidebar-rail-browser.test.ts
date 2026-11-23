@@ -74,6 +74,7 @@ describe("the folded rail in the Mac app", () => {
 		assert.equal((m.open.top + m.open.bottom) / 2, LIGHTS_CENTRE, "centred on the lights' centre");
 		assert.ok(m.hit, "nothing covers it");
 		assert.ok(m.afterPage, "drawn after the page: Electron resolves drag regions in page order");
+		assert.equal(m.firstIcon, HEAD + 8, `the rail's icons start 8px under the window's 52px band, clear of the lights (Edo, 23 Nov 2026: "sidebar busted in collapsed state"), at y ${m.firstIcon}`);
 	});
 });
 
