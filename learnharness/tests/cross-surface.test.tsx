@@ -415,6 +415,9 @@ async function assertContinueOpensTask(app: DemoApp, s: Survey) {
 /** The words a topic page warns with, and the ones the head and the panel say a topic is left out with. */
 const EXAM_WARNING = /not on the exam|after the exam|before the exam|too close to the exam/i;
 
+/** The exam line's words when a topic has no room before the exam (`examLineWords`). */
+const EXAM_LINE = /Not every exam topic fits before/;
+
 function assertExamWarnings(s: Survey) {
 	const problems: string[] = [];
 	for (const course of s.courses) {
@@ -427,25 +430,25 @@ function assertExamWarnings(s: Survey) {
 			if (!page) continue;
 			const leftOut = exam.leavesOut?.includes(topic.handle) ?? false;
 			const noRoom = exam.doesNotFit?.includes(topic.handle) ?? false;
-			const said = [["the course head", head], ["the exam panel", panel]].filter(([, words]) => /no room before the exam/i.test(words!) && names(words!, topic.title)).map(([where]) => where);
+			// The exam line names no topic left out (round 20, M2): a topic with no room is one the line speaks for.
+			const said = [["the course head", head], ["the exam panel", panel]].filter(([, words]) => EXAM_LINE.test(words!)).map(([where]) => where);
 			const warned = EXAM_WARNING.test(page.text);
 			if (leftOut && !warned) problems.push(`${topic.title}: the exam leaves it out, its page says nothing of the exam ("${page.note || page.scheduled || page.now}")`);
 			if (noRoom && said.length > 0 && !warned) problems.push(`${topic.title}: ${said.join(" and ")} say there is no room before the exam to start it, its page says nothing of the exam ("${page.note || page.scheduled || page.now}")`);
 			if (warned && !leftOut && !noRoom && !(exam.unreviewed ?? []).includes(topic.handle)) problems.push(`${topic.title}: its page warns of the exam ("${page.text.match(EXAM_WARNING)?.[0]}"), the plan leaves nothing of it out`);
 		}
 		// The course page says each loss in the topic page's own words, an exam topic with no room apart from one the
-		// exam leaves out, and its head names every exam topic with no room (round 15, M7: all three read "After the
-		// exam", the loss behind "Not all of it fits").
+		// exam leaves out, and its head says the exam line exactly when one has no room, the names behind its Which
+		// topics (round 15, M7: all three read "After the exam", the loss behind "Not all of it fits"; round 20, M2).
 		for (const topic of course.map.topics) {
 			const row = s.rows.get(keyOf(course.map.workspace, topic.handle));
 			if (!row || !topic.starts || topic.starts <= exam.date) continue;
 			const want = exam.leavesOut?.includes(topic.handle) ? "Not on the exam" : exam.doesNotFit?.includes(topic.handle) ? "Not before the exam" : null;
 			if (want && row !== want) problems.push(`${topic.title}: its course page row says "${row}", not "${want}"`);
 		}
-		for (const handle of exam.doesNotFit ?? []) {
-			const title = course.map.topics.find((t) => t.handle === handle)?.title ?? handle;
-			if (!names(head, title)) problems.push(`${title}: the exam has no room for it, the course head does not name it ("${head}")`);
-		}
+		const lost = (exam.doesNotFit ?? []).map((h) => course.map.topics.find((t) => t.handle === h)?.title ?? h);
+		if (lost.length > 0 && !EXAM_LINE.test(head)) problems.push(`${lost.join(", ")}: the exam has no room for them, the course head does not say so ("${head}")`);
+		if (lost.length === 0 && EXAM_LINE.test(head)) problems.push(`the course head says not every exam topic fits, and the plan fits them all ("${head}")`);
 	}
 	assert.ok(problems.length === 0, `${s.label}:\n  ${problems.join("\n  ")}`);
 }
@@ -880,9 +883,9 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 
 	it("Tue 17 Nov, two days before the Probability exam", async () => {
 		app.day("2026-11-17");
-		await holds("Tue 17 Nov", (s) => {
+		await holds("Tue 17 Nov", async (s) => {
 			assertExamLine(s);
-			if (finishedLesson) assertFinishedLesson(app, s, finishedLesson);
+			if (finishedLesson) await assertFinishedLesson(app, s, finishedLesson);
 			else assert.fail("the Tue 10 step finished the Linear maps lesson");
 		});
 	});
