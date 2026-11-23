@@ -761,7 +761,9 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 		case "half-answer-day":
 			return `His half answer is named with no day for its lesson: ${quoted(b.excerpt)}. Say when that lesson continues, copied from the close's days ("…waits in your Poisson distribution lesson, which continues tomorrow, Monday 9 November.").`;
 		case "lesson-unnamed":
-			return `His review is done, and this question opens the ${b.excerpt} lesson with no word that it has begun. Open it with one clause naming it ("Now ${b.excerpt}: …"); if it is another review's question, name that review ("Now your … review: …").`;
+			return `His review is done, and this question opens the ${b.excerpt} lesson with no word that it has begun. Name it first in a sentence of its own ("Next, ${b.excerpt}."); if it is another review's question, name that review ("Next, your … review.").`;
+		case "now-heading":
+			return `A topic's title is never a heading inside a sentence: ${quoted(b.excerpt)}. Say the move as its own sentence ("Next, ${b.excerpt.replace(/^Now\s+/, "").replace(/:$/, "")}."), as "First, your Uniform distribution review." does, then the question.`;
 		case "split-display":
 			return `Two displays joined by a lone "${b.excerpt}" leave it alone on a line between them. Write short equations inline in the sentence ("$h(1,1) = (1,0,2)$ ${b.excerpt} $h(1,-1) = (3,2,0)$"), or set both in one display.`;
 		case "nothing-above":
@@ -1012,6 +1014,16 @@ const ROW_LABEL = /(?<=[A-Za-z,:;]\s)(?:Start|Continue)\s+[A-Z][^\s:.,;?!]*(?:\s
 function rowLabel(text: string): VoiceBreak[] {
 	const label = ROW_LABEL.exec(text.replace(/\$[^$]*\$/g, " "));
 	return label ? [{ rule: "row-label", excerpt: label[0] }] : [];
+}
+
+/** "Now <title>:" opening a sentence, a title used as a heading before the
+ *  question (round 21, m13: "Now Inclusion-exclusion principle: a whole
+ *  number is chosen…"). The move between topics is its own sentence. */
+const NOW_HEADING = /(?<=^|[.!?]\s+)Now\s+(?:your\s+)?[A-Z][^:.!?\n$]{0,80}:/m;
+
+function nowHeading(text: string): VoiceBreak[] {
+	const heading = NOW_HEADING.exec(text);
+	return heading ? [{ rule: "now-heading", excerpt: heading[0] }] : [];
 }
 
 function lessonOpenedOn(messages: readonly LhMessage[]): { topics: string[]; title: string } | null {
@@ -1663,7 +1675,7 @@ export class VoiceGuard {
 			this.heldRetry = true;
 			return RETRY(this.firstTry!.question);
 		}
-		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text), ...this.lessonUnnamed(text), ...rowLabel(text)]);
+		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text), ...this.lessonUnnamed(text), ...rowLabel(text), ...nowHeading(text)]);
 		if (breaks.length > 0) {
 			this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 			return refusal("question", call.name, text, breaks, undefined);
@@ -1838,7 +1850,7 @@ export class VoiceGuard {
 		if (vagueDay) out.push({ rule: "vague-day", excerpt: vagueDay });
 		const halfNoDay = closes && !unplaced ? sentences(text).map((s) => s.trim()).find((s) => /\bhalf(?:-finished)? answer\b/i.test(s) && !DAY_WORDS.test(s)) : undefined;
 		if (halfNoDay) out.push({ rule: "half-answer-day", excerpt: halfNoDay });
-		out.push(...rowLabel(text));
+		out.push(...rowLabel(text), ...nowHeading(text));
 		const commaTitle = titleAfterComma(text, this.titles);
 		if (commaTitle) out.push({ rule: "title-comma", excerpt: commaTitle });
 		const vague = VAGUE_MOVES.exec(text);

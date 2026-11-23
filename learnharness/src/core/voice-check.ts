@@ -76,6 +76,7 @@ export type VoiceRule =
 	| "close-date-twice"
 	| "title-and"
 	| "row-label"
+	| "now-heading"
 	| "below"
 	| "pointer"
 	| "arrival"

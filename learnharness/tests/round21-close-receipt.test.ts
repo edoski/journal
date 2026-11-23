@@ -13,6 +13,7 @@ import { VoiceGuard } from "../src/agent/voice-guard.ts";
 import { tonightAppends } from "../src/core/input-events.ts";
 import { newDoneTonightMessage, withCloseReceipt } from "../src/core/native-messages.ts";
 import { rules, send } from "./helpers/round19-turns.ts";
+import { courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import type { CourseRecords } from "../src/core/ports.ts";
@@ -253,5 +254,28 @@ describe("close words: no quoted title, each day once (round 21, m12)", () => {
 		const lesson = receiptOfMap(map, ["expectation"], []);
 		assert.ok(closeRules(await closing(lesson, ["Expectation and linearity"]), 'Your "Expectation and linearity" lesson continues tomorrow, Monday 9 November.').includes("close-quoted"));
 		assert.deepEqual(closeRules(await closing(lesson, ["Expectation and linearity"]), lesson.says), []);
+	});
+});
+
+/**
+ * Round 21, m13 (1 m6): "Now <topic title>:" used as a heading inside a
+ * sentence ("Now Inclusion-exclusion principle: a whole number is chosen…",
+ * "Now Expectation and linearity: you roll a fair die…"). The guard's own
+ * note taught the form. The move between topics is its own sentence, as
+ * "First, your Uniform distribution review." already is.
+ */
+describe("the move between topics is its own sentence (round 21, m13)", () => {
+	const guard = () => new VoiceGuard([said(Date.now(), "Probability review")], undefined, true, true);
+	it("a title as a heading is refused, in a question as in a message", () => {
+		const recall = (question: string) => ({ type: "toolCall" as const, id: `q-${++n}`, name: "recall", arguments: { question, correctAnswer: "…" } });
+		assert.ok(rules(guard(), recall("Now Inclusion-exclusion principle: a whole number is chosen from 1 to 100. What is the chance it is divisible by 2 or 5?")).includes("now-heading"));
+		assert.ok(rules(guard(), send("Now Random variables and distributions: two fair dice are rolled.")).includes("now-heading"));
+		assert.ok(rules(guard(), send("Now your Binomial distribution review: three coins.")).includes("now-heading"));
+		assert.ok(!rules(guard(), recall("Next, inclusion-exclusion. A whole number is chosen from 1 to 100. What is the chance it is divisible by 2 or 5?")).includes("now-heading"));
+		assert.ok(!rules(guard(), send("Now look at the second row: it is twice the first.")).includes("now-heading"), "a sentence opening on Now and a verb is no heading");
+	});
+	it("the course prompt asks for a sentence of its own", () => {
+		assert.doesNotMatch(courseRecordPrompt("prober", { arcs: false }), /\("Now Invertible matrices: …"\)\./);
+		assert.match(courseRecordPrompt("prober", { arcs: false }), /\("Next, Invertible matrices\."\)/);
 	});
 });

@@ -26,19 +26,19 @@ describe("m20: the first question after a lesson's opening review names the less
 		const { guard, review } = invertible();
 		verdict(guard, save(review.id, "correct", ["mechanics"]));
 		assert.ok(rules(guard, recall("If $EA = I$ for a product $E$ of elementary matrices, what is $AE$, and why?")).includes("lesson-unnamed"));
-		assert.equal(verdict(guard, recall("Now Invertible matrices: if $EA = I$ for a product $E$ of elementary matrices, what is $AE$, and why?")), null);
+		assert.equal(verdict(guard, recall("Next, Invertible matrices. If $EA = I$ for a product $E$ of elementary matrices, what is $AE$, and why?")), null);
 	});
 
 	it("a question that names the lesson, or the next review, passes; so does one after a miss", () => {
 		const named = invertible();
 		verdict(named.guard, save(named.review.id, "correct", ["mechanics"]));
-		assert.equal(verdict(named.guard, recall("Now your Determinants review: what is $\\det(AB)$ when $\\det A = 2$ and $\\det B = 3$?")), null);
+		assert.equal(verdict(named.guard, recall("Next, your Determinants review. What is $\\det(AB)$ when $\\det A = 2$ and $\\det B = 3$?")), null);
 		const missed = invertible();
 		verdict(missed.guard, save(missed.review.id, "incorrect", ["mechanics"]));
 		assert.equal(verdict(missed.guard, recall("What is the $(1,2)$ entry of $AB$?")), null);
 	});
 
 	it("the course prompt says it", () => {
-		assert.match(courseRecordPrompt("prober", { arcs: false }), /the first question after it opens with one clause naming the lesson it begins/);
+		assert.match(courseRecordPrompt("prober", { arcs: false }), /the lesson it begins is named in a sentence of its own before its first question/);
 	});
 });
