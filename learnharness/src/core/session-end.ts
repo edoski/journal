@@ -274,26 +274,51 @@ export function resumedOn(messages: readonly LhMessage[], lastStudied: string, t
 	return { day: today, before: last && isQuestionRepose(last) ? last.id : null };
 }
 
+/** The questions his Done for today set aside, while that Done is his
+ *  latest input, nearest it first: each one's call input and the half
+ *  answer kept in its box (`draftKept`), if any. Pure. */
+function questionsSetAside(messages: readonly LhMessage[]): { input: unknown; draft: string | null }[] {
+	const done = doneTonightAt(messages);
+	if (done === null) return [];
+	const out: { input: unknown; draft: string | null }[] = [];
+	for (let i = done - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)) continue;
+		if (m.role !== "toolResult") break;
+		const details = m.details as { dismissed?: unknown; reason?: unknown; draft?: { text?: unknown } } | undefined;
+		if (details?.dismissed !== true || details.reason !== "tonight") continue;
+		const asked = messages.findLast((a) => a.role === "assistant" && a.content.some((b) => b.type === "toolCall" && b.id === m.toolCallId));
+		const call = asked?.role === "assistant" ? asked.content.find((b) => b.type === "toolCall" && b.id === m.toolCallId) : undefined;
+		const draft = typeof details.draft?.text === "string" && details.draft.text.trim() ? details.draft.text : null;
+		if (call?.type === "toolCall") out.push({ input: call.arguments, draft });
+	}
+	return out;
+}
+
 /** The question his Done for today set aside with a half answer in its
  *  box (`draftKept`), by its words, while that Done is his latest input;
  *  null when none did (round 19, m4: the Invertible lesson's task step
  *  said "You stopped before writing anything" over his kept half answer).
  *  Pure. */
 export function halfAnswerLeft(messages: readonly LhMessage[]): string | null {
-	const done = doneTonightAt(messages);
-	if (done === null) return null;
-	for (let i = done - 1; i >= 0; i--) {
-		const m = messages[i]!;
-		if (m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)) continue;
-		if (m.role !== "toolResult") break;
-		const details = m.details as { dismissed?: unknown; reason?: unknown; draft?: { text?: unknown } } | undefined;
-		if (details?.dismissed !== true || details.reason !== "tonight" || typeof details.draft?.text !== "string" || !details.draft.text.trim()) continue;
-		const asked = messages.findLast((a) => a.role === "assistant" && a.content.some((b) => b.type === "toolCall" && b.id === m.toolCallId));
-		const call = asked?.role === "assistant" ? asked.content.find((b) => b.type === "toolCall" && b.id === m.toolCallId) : undefined;
-		const words = call?.type === "toolCall" ? (call.arguments as { question?: unknown }).question : undefined;
-		if (typeof words === "string" && words.trim()) return words;
+	for (const { input, draft } of questionsSetAside(messages)) {
+		const words = (input as { question?: unknown } | null)?.question;
+		if (draft && typeof words === "string" && words.trim()) return words;
 	}
 	return null;
+}
+
+/** The question his Done for today left open in the session, while that
+ *  Done is his latest input: the topic the tutor tagged it with, and
+ *  whether his half answer waits in its box. Null when he left none open.
+ *  The close names it first, with the day it is asked again (round 21,
+ *  M3). Pure. */
+export function questionLeftOf(messages: readonly LhMessage[]): { topic: string | null; half: boolean } | null {
+	const left = questionsSetAside(messages);
+	const first = left.find((q) => q.draft) ?? left[0];
+	if (!first) return null;
+	const topic = (first.input as { topic?: unknown } | null)?.topic;
+	return { topic: typeof topic === "string" && topic.trim() ? topic.trim() : null, half: first.draft !== null };
 }
 
 /** The session since its last close: after its newest closing

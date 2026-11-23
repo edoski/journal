@@ -22,7 +22,9 @@ import type { AnsweredQuestion } from "../../core/native-messages.ts";
 import { studyDay, withDayWords } from "../../core/day-words.ts";
 import { DOUBT } from "../../core/voice-check.ts";
 import { closeTopicsOf, receiptOfMap, receiptOfSaves, sessionSavesOf, type CloseReceipt, type SessionSave } from "../../core/close-receipt.ts";
-import { sessionTasksOf, type LhMessage } from "../../core/native-messages.ts";
+import { sessionPlanTopicOf, sessionTasksOf, type LhMessage } from "../../core/native-messages.ts";
+import { questionLeftOf } from "../../core/session-end.ts";
+import { reviewRecord } from "../../core/session-opening.ts";
 
 /** What the course tools close over. */
 export interface CourseToolContext {
@@ -432,7 +434,10 @@ export async function closeReceiptFor(
 	if (!mapped.ok) return null;
 	const inTurn = ctx ? (turnSaves.get(ctx) ?? []) : [];
 	const saves = [...sessionSavesOf(record.messages).filter((s) => s.day === undefined || s.day >= mapped.map.today), ...inTurn];
-	return receiptOfMap(mapped.map, [...closeTopicsOf(record, mapped.map.today), ...inTurn.flatMap((s) => s.topics)], saves, sessionTasksOf(record.messages));
+	const left = questionLeftOf(record.messages);
+	const review = reviewRecord(record);
+	const own = (review ? record.topics?.[0] : (record.topics?.[0] ?? sessionPlanTopicOf(record.messages))) ?? null;
+	return receiptOfMap(mapped.map, [...closeTopicsOf(record, mapped.map.today), ...inTurn.flatMap((s) => s.topics)], saves, sessionTasksOf(record.messages), left ? { ...left, review, own } : undefined);
 }
 
 async function saveRuled(ctx: CourseToolContext, changes: unknown, problem?: { id: string; seen: boolean }): Promise<CourseResult> {

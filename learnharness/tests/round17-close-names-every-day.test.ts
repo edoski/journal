@@ -12,7 +12,7 @@ import { DONE_TONIGHT_TEXT } from "../src/core/contracts/chat.ts";
 
 test("every agent's Done for today asks for the day of each topic he answered (round 17, 2 m2)", () => {
 	for (const [agent, text] of Object.entries(DONE_TONIGHT_TEXT)) {
-		assert.match(text, /copy `close.says` as written, which names exactly the topics this session answered, each with its day/, agent);
+		assert.match(text, /copy `close.says` as written, which says first where the question he left open waits and the day he picks it up, then names exactly the topics this session answered, each with its day/, agent);
 		assert.match(text, /never "on your calendar", "next time" or "a later day"/, agent);
 		assert.match(text, /at most two sentences/, `${agent}: the close stays short`);
 	}

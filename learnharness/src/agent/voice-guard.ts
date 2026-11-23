@@ -712,6 +712,14 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			const items = b.excerpt.split(";").map((item) => item.split("|"));
 			return `A topic the close names has its day in the same sentence: ${items.map(([title, day]) => `${title} is ${day}`).join("; ")}, as \`close.says\` words it.`;
 		}
+		case "close-open-first": {
+			const [said, place, day] = b.excerpt.split("|");
+			return `The question he left open waits in ${place}, which he picks up ${day}, and this sends him to other work first: ${quoted(said!)}. Name that question first, where it waits and its day, as \`close.says\` does, and send him nowhere else.`;
+		}
+		case "close-quoted":
+			return `A title is never in quotes: ${quoted(b.excerpt)}. Name it as \`close.says\` does, after "your" ("your ${b.excerpt} lesson").`;
+		case "close-date-twice":
+			return `The close says ${b.excerpt} twice. Say each day once, with everything that falls on it, as \`close.says\` does ("your Eigenvalues and eigenvectors lesson and its review are tomorrow, Monday 9 November").`;
 		case "title-and":
 			return `"${b.excerpt}" reads as more topics than there are, since a title holds its own "and". Join titles with commas only, as \`close.says\` does.`;
 		case "row-label":
@@ -743,13 +751,13 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 		case "half-answer":
 			return `Say where his half answer waits, by the session's name, never "there": ${quoted(b.excerpt)}. Name it ("Your half answer to the kernel question waits in your Invertible matrices lesson, which continues tomorrow, Monday 9 November.").`;
 		case "title-comma":
-			return `A topic's title straight after a comma reads as a new sentence: ${quoted(b.excerpt)}. Open the sentence on it, or set it off in quotes ("Starting “${b.excerpt}” moves to …").`;
+			return `A topic's title straight after a comma reads as a new sentence: ${quoted(b.excerpt)}. Open the sentence on it, or put a word before it ("your ${b.excerpt} lesson", "you now start ${b.excerpt} on …").`;
 		case "vague-moves":
 			return `Later moves said with nothing he can act on: ${quoted(b.excerpt)}. Name each move with its new day, or leave out the ones the close is not about.`;
 		case "self-correction":
 			return `A slip corrected mid-sentence is left on his screen: ${quoted(b.excerpt)}. Write the sentence once, as it should read, with no "rather".`;
 		case "vague-day":
-			return `A topic named with no day he can act on: ${quoted(b.excerpt)}. Name its day from the close's days, copied as written, or leave the topic out.`;
+			return `What he picks up, or a topic, is named with no day he can act on: ${quoted(b.excerpt)}. Name its day from the close's days, copied as written (\`close.says\` says where his open question waits and when), or leave the topic out.`;
 		case "half-answer-day":
 			return `His half answer is named with no day for its lesson: ${quoted(b.excerpt)}. Say when that lesson continues, copied from the close's days ("…waits in your Poisson distribution lesson, which continues tomorrow, Monday 9 November.").`;
 		case "lesson-unnamed":
@@ -845,8 +853,10 @@ export function titleAfterComma(text: string, titles: readonly string[]): string
 const VAGUE_MOVES = /\b(?:later|other|more|further) (?:starts|lessons|topics|reviews)\b(?![^.?!]*\bcalendar\b)[^.?!]{0,30}\b(?:moved|move|shifted|shift|too)\b|\b(?:starts|lessons|reviews|topics) (?:after it |after that |behind it )?(?:moved|move|shift(?:ed)?) too\b/i;
 
 /** A topic's return said with no day: "on a later day", "later on your
- *  calendar", "you pick those up next" (round 19, m15). */
-const VAGUE_DAY = /\b(?:on |for )?(?:a|some) later (?:day|date)\b|\blater (?:on|in) (?:your|the) calendar\b|\b(?:another|a future) day\b|\bpick (?:it|them|those|these|that|this) up (?:next|later)\b/i;
+ *  calendar", "you pick those up next" (round 19, m15), and the open
+ *  work's: "is still waiting for you", "waits in this Probability review",
+ *  "you pick it up first", "when you come back" (round 21, M3). */
+const VAGUE_DAY = /\b(?:on |for )?(?:a|some) later (?:day|date)\b|\blater (?:on|in) (?:your|the) calendar\b|\b(?:another|a future) day\b|\bpick (?:it|them|those|these|that|this) up (?:next|later)\b|\bwait(?:s|ing) (?:for you|in)\b|\bstill (?:open|waiting)\b|\bpick(?:s|ing)? (?:\S+ )?up\b|\bcom(?:e|es|ing) back\b/i;
 
 /** Words that give a day: today, tomorrow, a weekday or a date. */
 const DAY_WORDS = /\b(?:today|tomorrow|(?:mon|tues|wednes|thurs|fri|satur|sun)day|\d{1,2} (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)\b/i;

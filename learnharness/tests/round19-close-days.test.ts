@@ -49,7 +49,7 @@ describe("m15: a close names a day for every topic it names (1 n2, 3 n4)", () =>
 	it("the close's instructions ask for every named topic's day, this sitting's topics only, and the half answer's lesson day", () => {
 		assert.match(DONE_TONIGHT_TEXT.teacher, /exactly the topics this session answered/);
 		assert.match(DONE_TONIGHT_TEXT.teacher, /never "on your calendar", "next time" or "a later day"/);
-		assert.match(DONE_TONIGHT_TEXT.teacher, /with the day that lesson continues/);
+		assert.match(DONE_TONIGHT_TEXT.teacher, /with the day `close.says` gives it/);
 		assert.match(DONE_TONIGHT_TEXT.teacher, /never that he wrote nothing/);
 	});
 });

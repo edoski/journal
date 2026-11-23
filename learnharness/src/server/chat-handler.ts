@@ -491,8 +491,8 @@ export async function handleChatInput(
 		input.type === "task" ? keptCourseMaps().then((maps) => continuedTask(maps.find((m) => m.workspace === opened.course?.workspace), opened.messages)) : null,
 		// A setup session looks first where his study material is kept.
 		sessionModeOf(record.messages, record.kind) === "setup" ? studyPlaces().catch(() => []) : undefined,
-		// His Done for today closes on the session's close receipt (round 20, M3).
-		input.type === "tonight" && opened.course ? closeReceiptFor(stores.courseRecords, opened.course.workspace, opened).catch(() => null) : null,
+		// His Done for today closes on the session's close receipt (round 20, M3), read with what it sets aside (round 21, M3).
+		input.type === "tonight" && opened.course ? Promise.resolve(opened.course.workspace).then((workspace) => closeReceiptFor(stores.courseRecords, workspace, { ...opened, messages: [...opened.messages, ...inputAppends(opened, input)] })).catch(() => null) : null,
 	]);
 	const freshRecord = stores.chatStore.getChat(chatId);
 	if (!freshRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
