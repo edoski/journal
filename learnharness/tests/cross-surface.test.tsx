@@ -365,7 +365,7 @@ async function assertContinueOpensTask(app: DemoApp, s: Survey) {
 		}
 		// The calendar.
 		for (const { entry, opens } of s.calendar) {
-			if (entry.kind === "task" && entry.task.key === task.key && entry.course.workspace === course.map.workspace) {
+			if (entry.kind === "task" && entry.task?.key === task.key && entry.course.workspace === course.map.workspace) {
 				offered = true;
 				went("the calendar", opens);
 			}
