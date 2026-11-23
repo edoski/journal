@@ -172,6 +172,30 @@ listenForCourseMaps();
 // A new lesson's opening turn settling is work he waited on (work-finished.ts).
 listenForLessonOpenings(stores.chatStore);
 
+/** Keeps a save's links with the lesson the moment the engine took it, then
+ *  announces them (`record-changed`), so the window reads the marks again
+ *  with the links in place. The engine's write announces the course
+ *  (`course-changed`) before the links are kept, and a marks read then
+ *  finds no link for the answer, the receipt reaching the transcript only
+ *  when the turn ends (round 20, M4: a mark showed 3 s after the next
+ *  question, or only after a reload). An answer in words is keyed by his
+ *  newest message (`HIS_MESSAGE`). */
+export function keepAnswerSaves(chatId: string, saidId: string | null, links: readonly { question: string; observation: string }[]): void {
+	const keyed: Record<string, string[]> = {};
+	for (const { question, observation } of links) {
+		const key = question === HIS_MESSAGE ? saidId : question;
+		if (key) keyed[key] = [...(keyed[key] ?? []), observation];
+	}
+	if (Object.keys(keyed).length === 0) return;
+	try {
+		stores.chatStore.saveAnswerSaves(chatId, keyed);
+	} catch {
+		// The lesson was deleted mid-turn: nothing to keep the links with.
+		return;
+	}
+	emit("record-changed", { chatId });
+}
+
 /** The route-facing entry: parse {chatId, input} and run one turn. */
 export async function handleChatRequest(
 	req: Request,
@@ -248,18 +272,7 @@ function turnAgent(
 	// the record's id field strips at the wire in toLlmMessages).
 	// His newest message: the one an answer in words names (HIS_MESSAGE).
 	const lastSaidId = merged.findLast((m) => m.role === "user")?.id ?? null;
-	const keepSaves = (links: { question: string; observation: string }[]) => {
-		const keyed: Record<string, string[]> = {};
-		for (const { question, observation } of links) {
-			const key = question === HIS_MESSAGE ? lastSaidId : question;
-			if (key) keyed[key] = [...(keyed[key] ?? []), observation];
-		}
-		try {
-			stores.chatStore.saveAnswerSaves(chatId, keyed);
-		} catch {
-			// The lesson was deleted mid-turn: nothing to keep the links with.
-		}
-	};
+	const keepSaves = (links: { question: string; observation: string }[]) => keepAnswerSaves(chatId, lastSaidId, links);
 	// Home rereads the session list on record-changed, so a start the save
 	// moved stays on it while the turn still runs (round 18, M4).
 	const keepMoved = (topics: string[]) => {

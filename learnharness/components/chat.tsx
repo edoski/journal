@@ -1037,7 +1037,7 @@ export function Chat({
 	// Each answer's mark, as the engine recorded it (answer-mark.tsx): read
 	// again whenever a turn settles, since a save or a re-mark may have
 	// landed. ⌘⇧M disputes the newest one.
-	const marks = useAnswerMarks(chatId, course?.workspace, busy ? null : nativeMessages.length);
+	const marks = useAnswerMarks(chatId, course?.workspace, busy ? null : `${nativeMessages.length}:${nativeMessages.at(-1)?.id ?? ""}`);
 	const [disputing, setDisputing] = useState<DisputeTarget | null>(null);
 	const canDispute = !!course && !busy;
 	const disputeMark = disputing ? marks[disputing.answerId] : undefined;

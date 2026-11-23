@@ -6,7 +6,9 @@ import { useServerEvent } from "@/components/server-events";
 import { useSerialRead } from "@/components/serial-read";
 
 /** The session's marks (`/api/chats/:id/marks`), read again each time
- *  `settled` changes (null while this window's turn runs), and each time
+ *  `settled` changes (null while this window's turn runs; the transcript's
+ *  length and newest id, so the settle sync that swaps the streamed copies
+ *  for the record's reads again even at the same length), and each time
  *  the record they come from changes: the course's (`course-changed`, a
  *  save mid-turn included) and the session's own (`turn-settled`,
  *  `record-changed`). A save that lands after this window's stream ended
@@ -15,7 +17,7 @@ import { useSerialRead } from "@/components/serial-read";
  *  when it ends (`useSerialRead`), so the burst a turn ends on never throws
  *  away the read under way, and its marks show as soon as it returns. A
  *  failed read keeps the marks it had. */
-export function useAnswerMarks(chatId: string, workspace: string | undefined, settled: number | null): Readonly<Record<string, AnswerMark>> {
+export function useAnswerMarks(chatId: string, workspace: string | undefined, settled: string | null): Readonly<Record<string, AnswerMark>> {
 	const [marks, setMarks] = useState<Readonly<Record<string, AnswerMark>>>({});
 	const session = useRef(chatId);
 	session.current = chatId;
