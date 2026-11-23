@@ -333,6 +333,15 @@ function namedQuestions(
 				`observations[${i}].text: a not-right answer's text says what went wrong, in a line he reads in his Mistakes list days later ("Took $(1,2)$ as a vector of $E_2$; it gives $2x+y=4$, not $0$"), never the question. Send it again with that text.`,
 			);
 		}
+		// An Ask on the open question before his answer may have given him its
+		// step (round 21, m15): the save says what it gave him, or why not.
+		const notHelp = typeof ruled.ask_not_help === "string" && ruled.ask_not_help.trim() !== "";
+		delete ruled.ask_not_help;
+		if (answer.askedFirst?.length && !("corrects" in rest) && !answer.showMe && !notHelp && (typeof ruled.help !== "string" || ruled.help.trim().toLowerCase() === "none")) {
+			refuse(
+				`observations[${i}].help: before answering, he asked you ${answer.askedFirst.map((a) => JSON.stringify(a)).join(" and ")} while this question was open. When your answer gave him a step of this one, help says so ("Asked why one-to-one gives onto; told it is rank-nullity"); when it did not, keep help and add ask_not_help with the reason it did not cover his answer.`,
+			);
+		}
 		if (answer.predicted === true) ruled.predicted = true;
 		else if (answer.predicted === false) delete ruled.predicted;
 		if (answer.showMe && !("corrects" in rest)) {

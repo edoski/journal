@@ -227,6 +227,10 @@ export function newAnswerResult(
 	toolName: string,
 	answer: unknown,
 	photos?: readonly Photo[],
+	/** His messages from Ask while this question was open, before he
+	 *  answered it (`asksWhileOpen`): the tutor's answers to them may be
+	 *  help (round 21, m15). */
+	askedFirst: readonly string[] = [],
 ): LhMessage & ToolResultMessage {
 	// A photo of his working rides the result as image parts after the
 	// answer, and the answer says it is there.
@@ -234,6 +238,7 @@ export function newAnswerResult(
 	// tutor saves names it (`question`), so his card shows that mark.
 	const compact = GRADED_QUESTION_TOOLS.includes(toolName) && isRealAnswer(answer) ? { question: toolCallId, ...compactAnswerForModel(answer as QuestionAnswerData) } : compactAnswerForModel(answer as QuestionAnswerData);
 	if (photos?.length) compact.photo = WORKING_PHOTO_NOTE;
+	if (askedFirst.length) compact.asked_first = [...askedFirst];
 	return {
 		id: newMessageId(),
 		role: "toolResult",
@@ -242,10 +247,34 @@ export function newAnswerResult(
 		content: [{ type: "text", text: JSON.stringify(compact) }, ...(photos ?? []).map((p) => ({ type: "image" as const, data: p.data, mimeType: p.mimeType }))],
 		// 0.87.1 narrowed ToolResultMessage.details to JsonRepresentation —
 		// our payloads are JSON-safe answer structures, so the cast is honest.
-		details: answer as ToolResultMessage["details"],
+		details: (askedFirst.length ? { ...(answer as object), askedFirst: [...askedFirst] } : answer) as ToolResultMessage["details"],
 		isError: false,
 		timestamp: Date.now(),
 	};
+}
+
+/** His messages from Ask while the question `pending` was open, before
+ *  his answer: each sent after an Ask marker, back to the question's first
+ *  pose (Ask sets it aside, and the tutor asks it again in the same words).
+ *  Round 21, m15: "why does one-to-one give onto for a square matrix? is
+ *  that rank-nullity?", answered with rank-nullity, then his answer with
+ *  exactly that step was saved "On your own". Pure. */
+export function asksWhileOpen(messages: readonly LhMessage[], pending: { tool: string; input: unknown }): string[] {
+	const key = sameQuestionKey(parseQuestionInput(pending.tool, pending.input)?.question ?? "");
+	if (!key) return [];
+	const asks: string[] = [];
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "assistant") {
+			const poses = m.content.flatMap((b) => (b.type === "toolCall" && (QUESTION_TOOLS as readonly string[]).includes(b.name) ? [sameQuestionKey(parseQuestionInput(b.name, b.arguments)?.question ?? "")] : []));
+			if (poses.some((k) => k !== key)) break;
+			continue;
+		}
+		if (m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName) && !(m.details as { dismissed?: unknown } | null)?.dismissed) break;
+		const before = messages[i - 1];
+		if (m.role === "user" && before?.role === "custom" && before.customType === "asked") asks.unshift(typeof m.content === "string" ? m.content : m.content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("\n"));
+	}
+	return asks.filter((a) => a.trim());
 }
 
 /** The probe→teach handoff wake: scaffolding, not speech — the model reads
@@ -1044,6 +1073,9 @@ export interface AnsweredQuestion {
 	asked?: string;
 	/** His answer as he wrote it, for a graded question's answer. */
 	words?: string;
+	/** What he asked from Ask while it was open, before he answered it
+	 *  (`asksWhileOpen`). */
+	askedFirst?: readonly string[];
 	/** A save that went through already recorded it, or its problem's
 	 *  conclude did. */
 	recorded: boolean;
@@ -1180,13 +1212,14 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 		} else if (m.role === "toolResult" && GRADED_QUESTION_TOOLS.includes(m.toolName) && !m.isError && isRealAnswer(m.details)) {
 			const asked = posed.get(m.toolCallId);
 			if (!asked) continue;
-			const details = m.details as { confidence?: unknown; showMe?: unknown; text?: unknown };
+			const details = m.details as { confidence?: unknown; showMe?: unknown; text?: unknown; askedFirst?: unknown };
 			// A Show me shows its answer, whatever is saved of it.
 			if (details.showMe === true) revealed.add(asked.key);
 			else answeredOn.set(asked.key, [...(answeredOn.get(asked.key) ?? []), m.toolCallId]);
 			const confidence = chosenConfidence(details.confidence) ?? null;
 			const words = typeof details.text === "string" && details.text.trim() ? { words: details.text } : {};
-			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: false, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, ...words, recorded: false });
+			const askedFirst = Array.isArray(details.askedFirst) ? details.askedFirst.filter((a): a is string => typeof a === "string") : [];
+			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: false, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, ...words, ...(askedFirst.length ? { askedFirst } : {}), recorded: false });
 		}
 	}
 	for (const asked of posed.values()) asked.seen ||= asked.shownBy.some((id) => recorded.has(id));

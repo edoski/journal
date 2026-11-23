@@ -7,11 +7,12 @@
  */
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
-import { closeReceiptFor } from "../src/agent/tools/course.ts";
+import { closeReceiptFor, saveCourse, type CourseToolContext } from "../src/agent/tools/course.ts";
 import { receiptOfMap, receiptOfSaves, sessionSavesOf, type CloseReceipt } from "../src/core/close-receipt.ts";
 import { VoiceGuard } from "../src/agent/voice-guard.ts";
-import { tonightAppends } from "../src/core/input-events.ts";
-import { newDoneTonightMessage, newUserMessage, withCloseReceipt } from "../src/core/native-messages.ts";
+import { inputAppends, tonightAppends } from "../src/core/input-events.ts";
+import { dismissedAnswer } from "../src/core/question-core.ts";
+import { answeredQuestionsOf, newDoneTonightMessage, newUserMessage, withCloseReceipt } from "../src/core/native-messages.ts";
 import { assistant, rules, send, verdict } from "./helpers/round19-turns.ts";
 import { courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
@@ -314,5 +315,64 @@ describe("Try again after a stop mid-reply (round 21, m14)", () => {
 
 	it("a fresh turn after his answer is no resumed reply", () => {
 		assert.equal(verdict(new VoiceGuard([newUserMessage("Since 1 > 0 and x > 0, multiplying gives 1/x > 0.")], undefined, false, true), send(NUDGE)), null);
+	});
+});
+
+/**
+ * Round 21, m15 (3 n2): an Ask that gave the open question's missing step
+ * left the answer "On your own". On the Invertible lesson's "FE = I; must
+ * EF = I hold too?", he typed a half answer, asked "why does one-to-one
+ * give onto for a square matrix? is that rank-nullity?", got rank-nullity,
+ * and finished with exactly that step: saved "Right · On your own ·
+ * Confident", help none. The answer now carries his Asks on that question,
+ * and its save says what the Ask gave him, or why it did not cover it.
+ */
+describe("an Ask on the open question reaches its answer's save (round 21, m15)", () => {
+	const QUESTION = "$FE = I$ for square $E$ and $F$; must $EF = I$ hold too, and why?";
+	const ASK = "why does one-to-one give onto for a square matrix? is that rank-nullity?";
+	function invertibleAsk(): { messages: LhMessage[]; id: string } {
+		const pose = { type: "toolCall" as const, id: `q-${++n}`, name: "explain", arguments: { question: QUESTION, type: "check", nodeId: "one-sided", correctAnswer: "…" } };
+		let messages: LhMessage[] = [said(Date.now(), "Invertible matrices"), assistant([pose])];
+		messages = [...messages, ...inputAppends({ messages }, { type: "answer", toolCallId: pose.id, answer: dismissedAnswer("explain", QUESTION, "asked") })];
+		messages = [...messages, ...inputAppends({ messages }, { type: "text", text: ASK, asked: true })];
+		const again = { type: "toolCall" as const, id: `q-${++n}`, name: "explain", arguments: { question: QUESTION, type: "check", nodeId: "one-sided", correctAnswer: "…" } };
+		messages = [...messages, assistant([send("Yes: rank-nullity. A square map with a zero kernel has full rank, so it is onto."), again])];
+		messages = [...messages, ...inputAppends({ messages }, { type: "answer", toolCallId: again.id, answer: { kind: "explain", text: "E is one-to-one, so by rank-nullity it is onto, so E is invertible and EF = I.", confidence: "confident", questionText: QUESTION, answers: [], answeredAt: "2026-11-08T10:00:00Z" } })];
+		return { messages, id: again.id };
+	}
+	const ctxOf = (messages: LhMessage[], sent: unknown[]): CourseToolContext => ({
+		course: { workspace: "/la", title: "Linear Algebra" },
+		records: { run: async (_w: string, req: { changes: unknown }) => { sent.push(req.changes); return { ok: true, json: { revision: 9, reviews: {} } }; } } as unknown as CourseToolContext["records"],
+		arcs: false,
+		answers: answeredQuestionsOf(messages),
+	});
+	const observation = (id: string, extra: Record<string, unknown>) => ({ observations: [{ question: id, topics: ["invertible"], text: "Showed EF = I from FE = I", result: "correct", response: "…", ...extra }] });
+
+	it("his answer's envelope lists the Ask he sent while the question was open", () => {
+		const { messages, id } = invertibleAsk();
+		const answer = messages.at(-1)!;
+		assert.ok(answer.role === "toolResult" && answer.toolCallId === id);
+		assert.deepEqual(JSON.parse((answer.content[0] as { text: string }).text).asked_first, [ASK]);
+		assert.deepEqual(answeredQuestionsOf(messages).get(id)?.askedFirst, [ASK]);
+	});
+
+	it("the save with help none is refused; with help naming the Ask, or a reason it did not cover the answer, it goes through", async () => {
+		const { messages, id } = invertibleAsk();
+		const sent: unknown[] = [];
+		const none = await saveCourse(ctxOf(messages, sent), observation(id, { help: "none" }));
+		assert.ok(!none.ok && /asked you .*rank-nullity/.test(none.message), JSON.stringify(none));
+		const helped = await saveCourse(ctxOf(messages, sent), observation(id, { help: "Asked why one-to-one gives onto; told it is rank-nullity" }));
+		assert.ok(helped.ok);
+		const reason = await saveCourse(ctxOf(messages, sent), observation(id, { help: "none", ask_not_help: "He asked about notation only" }));
+		assert.ok(reason.ok);
+		assert.ok(!JSON.stringify(sent.at(-1)).includes("ask_not_help"), "the app's field never reaches the engine");
+	});
+
+	it("an answer with no Ask before it saves as before", async () => {
+		const pose = { type: "toolCall" as const, id: `q-${++n}`, name: "explain", arguments: { question: QUESTION, type: "check", nodeId: "one-sided", correctAnswer: "…" } };
+		let messages: LhMessage[] = [said(Date.now(), "Invertible matrices"), assistant([pose])];
+		messages = [...messages, ...inputAppends({ messages }, { type: "answer", toolCallId: pose.id, answer: { kind: "explain", text: "EF = I too.", confidence: "confident", questionText: QUESTION, answers: [], answeredAt: "2026-11-08T10:00:00Z" } })];
+		assert.equal(answeredQuestionsOf(messages).get(pose.id)?.askedFirst, undefined);
+		assert.ok((await saveCourse(ctxOf(messages, []), observation(pose.id, { help: "none" }))).ok);
 	});
 });
