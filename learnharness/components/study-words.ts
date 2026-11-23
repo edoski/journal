@@ -1,4 +1,4 @@
-import { currentArc, type ArcHandle, type ArcState, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, movedWhy, type RightAnswer, type StartsWhy, type TopicHandle, type TopicMoved, type TopicSignals, type UnreadableProblem } from "@/src/core";
+import { currentArc, type ArcHandle, type ArcState, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, movedWhy, type RightAnswer, type StartsWhy, type TopicHandle, type TopicMoved, type TopicSignals, titleList, type UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -440,7 +440,7 @@ export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly
 	const first = sentence([
 		...(by(start, "no_study_day").length > 0 ? ["no study day is left before the exam"] : []),
 		...(startFull.length > 0 ? ["your pace fills every study day before the exam"] : []),
-		...(notReady.length > 0 ? [name ? `what ${listWords(notReady)} ${notReady.length === 1 ? "needs" : "need"} won’t be solid in time` : "what comes first won’t be solid in time"] : []),
+		...(notReady.length > 0 ? [name ? `what ${titleList(notReady)} ${notReady.length === 1 ? "needs" : "need"} won’t be solid in time` : "what comes first won’t be solid in time"] : []),
 	]);
 	const paceSaid = startFull.length > 0;
 	const named = names && (start.length > 0 || reasons(review) > 1);
@@ -448,10 +448,10 @@ export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly
 	const noDay = by(review, "no_study_day");
 	const late = by(review, "too_late");
 	const second = sentence([
-		...(noDay.length > 0 ? [named ? `no study day is left in the final review for ${listWords(noDay)}` : "no study day is left in the final review"] : []),
-		...(full.length > 0 ? [named ? `the final review has no room for ${listWords(full)}${paceSaid ? "" : " at your pace"}` : paceSaid ? "the final review is full too" : "your pace fills every day of the final review"] : []),
+		...(noDay.length > 0 ? [named ? `no study day is left in the final review for ${titleList(noDay)}` : "no study day is left in the final review"] : []),
+		...(full.length > 0 ? [named ? `the final review has no room for ${titleList(full)}${paceSaid ? "" : " at your pace"}` : paceSaid ? "the final review is full too" : "your pace fills every day of the final review"] : []),
 		// A topic that starts too late is always named, names or not (round 18, m7: "One starts too close…", one what?).
-		...(late.length > 0 ? [`${listWords(late)} ${startsWord(late)} too close to the exam for a review`] : []),
+		...(late.length > 0 ? [`${titleList(late)} ${startsWord(late)} too close to the exam for a review`] : []),
 	]);
 	const both = [first, second].filter((s): s is string => s !== null);
 	return both.length > 0 ? both.join(" ") : null;
@@ -486,7 +486,7 @@ function finalReviewName(exam: Pick<CourseExam, "finalReview">, today: string): 
  *  they had no day; the calendar's "No room in it for" reads under its
  *  final review). */
 export function finalReviewMissWords(titles: readonly string[], exam: Pick<CourseExam, "finalReview">, today: string): string {
-	return `${listWords(titles)} ${titles.length === 1 ? "is" : "are"} not revisited in ${finalReviewName(exam, today)}`;
+	return `${titleList(titles)} ${titles.length === 1 ? "is" : "are"} not revisited in ${finalReviewName(exam, today)}`;
 }
 
 /** His opening words in a lesson Ask the tutor starts, naming the topics. */

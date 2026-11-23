@@ -574,7 +574,7 @@ export function examLine(map: Pick<CourseMap, "topics" | "exam" | "today">): Exa
 /** The topics the plan has no room to start before the exam, named: the
  *  course head's Which topics. */
 export function misfitWords(titles: readonly string[]): string | null {
-	return titles.length > 0 ? `No room before the exam to start ${listWords(titles)}` : null;
+	return titles.length > 0 ? `No room before the exam to start ${titleList(titles)}` : null;
 }
 
 /** True when no entry falls in [start, end). */

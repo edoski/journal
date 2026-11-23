@@ -138,7 +138,8 @@ describe("calendar entries", () => {
 		assert.equal(eigen?.kind === "new" && eigen.action.kind, "start");
 		const exam = entries.find((e) => e.kind === "exam");
 		assert.deepEqual(exam?.kind === "exam" && exam.doesNotFit, ["Eigenvalues"]);
-		assert.equal(misfitWords(["Eigenvalues", "Rank"]), "No room before the exam to start Eigenvalues and Rank");
+		// Round 21, m1: titles joined by commas, since a title may hold its own "and".
+		assert.equal(misfitWords(["Eigenvalues", "Rank and the column space"]), "No room before the exam to start Eigenvalues, Rank and the column space");
 		assert.equal(misfitWords([]), null);
 		// Round 20, M2: the panel's exam line is one sentence and the topic to start with, naming at most one topic.
 		assert.equal(examLineWords({ date: "2026-11-19", daysLeft: 2 }, { title: "Expectation and linearity", day: "2026-11-17" }, "2026-11-17"), "Not every exam topic fits before Thursday. Start with Expectation and linearity.");
