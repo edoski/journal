@@ -180,10 +180,10 @@ describe("the sections' order", () => {
 		assert.deepEqual(next.map((item) => item.kind === "task" && item.key), ["sheet-5"]);
 	});
 
-	it("dates a topic not started on its planned first lesson once, under Now, with the courses that come first", () => {
+	it("dates a topic not started on its planned first lesson once, under Now, never with the courses whose new topics come first (round 21, m3)", () => {
 		const later = factsOf(topic("poisson", { title: "Poisson", level: "new", starts: "2026-11-19", startsAfter: ["Linear Algebra"] }));
 		const { now, scheduled } = pickupSections(later);
-		assert.deepEqual([now.words, now.note], ["First lesson", "Planned Thu 19 Nov, after Linear Algebra's new topics"]);
+		assert.deepEqual([now.words, now.note], ["First lesson", "Planned Thu 19 Nov"]);
 		assert.equal(scheduled, null, "Scheduled does not say it again");
 		assert.equal(page(later).querySelectorAll('[data-slot="pickup-scheduled"]').length, 0);
 		assert.equal((page(later).body.textContent ?? "").split("First lesson").length - 1, 1, "First lesson once on the page");

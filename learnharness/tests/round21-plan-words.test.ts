@@ -89,3 +89,13 @@ describe("round 21, m1: the head popover's lists of titles", () => {
 		);
 	});
 });
+
+describe("round 21, m3: a topic page's start says its day, never another course's new topics", () => {
+	it("reads \"Planned Mon 9 Nov\" for Expectation, whatever courses the engine says come first", () => {
+		const expectation = topic("expectation", "Expectation and linearity", { starts: "2026-11-09", startsAfter: ["Linear Algebra"] });
+		const map = { workspace: "/s/prob", title: "Probability", today: "2026-11-08", revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [expectation], edges: [] } as unknown as CourseMap;
+		const facts = topicFacts({ course: studied(map), topic: expectation, chats: [], read: null });
+		assert.equal(plannedWords(facts), "Planned Mon 9 Nov");
+		assert.equal(facts.starts?.waits ?? null, null);
+	});
+});

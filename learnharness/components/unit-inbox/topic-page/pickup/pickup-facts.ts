@@ -4,7 +4,7 @@ import type { ChatListItem, TopicRef } from "@/src/core";
 import { earlierSessions, trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { daysBetween, leftWords, sessionFact } from "@/components/unit-inbox/units";
 import { continueHref, pausedWords } from "@/components/nav/session-state";
-import { FIRST_LESSON, TUTOR_WRITING, leftOffWords, movedWords, overdueWords, pressWord, startsAfterWords, type PressWord } from "@/components/study-words";
+import { FIRST_LESSON, TUTOR_WRITING, leftOffWords, movedWords, overdueWords, pressWord, type PressWord } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -80,12 +80,14 @@ export interface PickupSections {
  *  since Binomial distribution is not solid yet"), and once that day is
  *  past, the topic it starts after ("Planned Fri 13 Nov · After Binomial
  *  distribution"; round 15, m2: Poisson moved 9 → 13 Nov with no word
- *  anywhere); else which courses' new topics come first when it waits
- *  behind them (`startsAfterWords`); for a topic the course leaves out,
+ *  anywhere); never which courses' new topics come first, a plan fact
+ *  that may name no start he can see (round 21, m3: "after Linear
+ *  Algebra's new topics" when the plan started none on those days), which
+ *  the tutor's brief keeps for when he asks; for a topic the course leaves out,
  *  which the plan never starts, the reason it is left out; null when the
  *  plan has no day for it. */
 export function plannedWords(facts: TopicFacts): string | null {
-	const { starts, startsAfter, excluded, moved } = facts.topic;
+	const { starts, excluded, moved } = facts.topic;
 	// The plan starts no topic the course leaves out; its reason says why (round 5: Covariance read as ordinary work).
 	// An exam topic the plan has no day for in its window says the exam's words too (round 18, M1's seed:
 	// Diagonalization read only "First lesson" while the course head said no room before the exam to start it).
@@ -96,8 +98,7 @@ export function plannedWords(facts: TopicFacts): string | null {
 	if (facts.exam) return `${day} · ${facts.exam}`;
 	if (moved) return `${day} · ${movedWords(moved, facts.today)}`;
 	if (facts.startsWhy?.kind === "after") return `${day} · ${facts.startsWhy.short}`;
-	const after = startsAfterWords(startsAfter);
-	return after ? `${day}, ${after.charAt(0).toLowerCase()}${after.slice(1)}` : day;
+	return day;
 }
 
 /** Now's words on a topic with nothing to take up today, one state in one
