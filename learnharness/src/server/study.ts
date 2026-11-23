@@ -64,10 +64,13 @@ export function ownPlanOf(all: unknown, workspace: string): unknown {
 
 /** Every listed course's map, told the lesson in progress there, and its
  *  `plan` over `days` (or the days a course asks for), read in parallel:
- *  the plan's JSON (null when it failed). A day's plan is the course's
- *  entry in the listing's own `plan --all --days 1` (round 13, N2: Home
- *  ran that plan again for every course). A course the engine could not
- *  list, or whose map could not be read, is in `failed`. */
+ *  the plan's JSON (null when it failed). Every course's plan is its entry
+ *  in one `plan --all`, over the most days any course asks for: the
+ *  listing's own `--days 1` when that is all (round 13, N2: Home ran that
+ *  plan again for every course), and one wider read otherwise, never a
+ *  read per course, so every page reads the one plan Home's rows read
+ *  (round 20, B1). A course the engine could not list, or whose map could
+ *  not be read, is in `failed`. */
 export async function readCourses(
 	days: number | ((course: CourseSummary) => number) = 1,
 ): Promise<{ available: true; read: CourseRead[]; failed: UnreadableCourse[]; all?: unknown } | { available: false; reason: string }> {
@@ -80,16 +83,13 @@ export async function readCourses(
 	const listing = await listCoursesRead();
 	if (!listing.available) return listing;
 	const all = "plan" in listing ? listing.plan : undefined;
+	const widest = Math.max(1, ...listing.courses.map((course) => (typeof days === "number" ? days : days(course))));
+	const wide = widest === 1 ? all : stores.courseRecords.list(widest).then((read) => (read.available ? read.plan : undefined));
 	const read = await Promise.all(
 		listing.courses.map(async (course): Promise<CourseRead | UnreadableCourse> => {
-			const horizon = typeof days === "number" ? days : days(course);
-			const listed = horizon === 1 ? ownPlanOf(all, course.workspace) : null;
-			const [map, plan] = await Promise.all([
-				early.get(course.workspace) ?? mapOf(course.workspace),
-				listed ? { ok: true as const, json: listed } : stores.courseRecords.run(course.workspace, { verb: "plan", days: horizon }),
-			]);
+			const [map, plan] = await Promise.all([early.get(course.workspace) ?? mapOf(course.workspace), wide]);
 			return map.ok
-				? { map: map.map, plan: plan.ok ? plan.json : null }
+				? { map: map.map, plan: ownPlanOf(plan, course.workspace) }
 				: { workspace: course.workspace, title: courseLabel(course), problem: "unreadable" };
 		}),
 	);

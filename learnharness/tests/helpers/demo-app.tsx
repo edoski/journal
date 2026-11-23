@@ -156,7 +156,13 @@ export async function openDemoApp(day = "2026-11-08") {
 	// LH_DEMO_WORLD keeps one seeded world across runs while a check is being written: it is seeded once, and
 	// what a run saves stays in it. Unset, every run seeds its own.
 	const kept = process.env.LH_DEMO_WORLD;
-	const root = kept ? path.resolve(kept) : fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "lh-demo-app-")));
+	const real = kept ? path.resolve(kept) : fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "lh-demo-app-")));
+	// The world is seeded, and so registered, through a link to its folder, as every Logbook environment on the
+	// cloud box is (`/Users/edo` links to `/home/edo`): a course read by its folder's own path then counted twice in
+	// the plan every course shares, and the calendar and the course pages showed another plan than Home's rows
+	// (round 20, B1), which a world spelled by its real path never showed.
+	const root = kept ? real : `${real}-link`;
+	if (!kept) fs.symlinkSync(real, root, "dir");
 	const world = path.join(root, "world");
 	if (!kept || !fs.existsSync(path.join(world, "sessions.json"))) {
 		fs.mkdirSync(root, { recursive: true });
@@ -658,7 +664,7 @@ export async function openDemoApp(day = "2026-11-08") {
 		},
 		async close() {
 			await unmount();
-			if (!kept) fs.rmSync(root, { recursive: true, force: true });
+			if (!kept) for (const made of [root, real]) fs.rmSync(made, { recursive: true, force: true });
 		},
 	};
 }
