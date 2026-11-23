@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { SetupDialog } from "../components/setup-dialog.tsx";
-import { CLAUDE_MODEL } from "../src/core/index.ts";
+import { CLAUDE_MODEL, type ClaudeAccountStatus } from "../src/core/index.ts";
 
 // Mount real React handlers on the real Radix layers.
 // Fetch is wholly stubbed; no settings or session writes can escape.
@@ -15,13 +15,18 @@ let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 let closed = 0;
 let connected = false;
+let accounts: ClaudeAccountStatus[] = [];
+let refreshes = 0;
 
 async function mount() {
 	closed = 0;
 	globalThis.fetch = async (input, init) => {
 		assert.equal(init?.method ?? "GET", "GET", "interaction tests must not write data");
 		const path = new URL(String(input), "http://localhost").pathname;
-		if (path === "/api/subscriptions/claude") return Response.json({ accounts: [] });
+		if (path === "/api/subscriptions/claude") {
+			if (String(input).includes("refresh=1")) refreshes++;
+			return Response.json({ accounts });
+		}
 		assert.equal(path, "/api/models");
 		return Response.json({ account: "claude-subscription", connected, contextWindow: 200000 });
 	};
@@ -81,6 +86,8 @@ afterEach(async () => {
 	host = null;
 	globalThis.fetch = originalFetch;
 	connected = false;
+	accounts = [];
+	refreshes = 0;
 });
 
 describe("setup polish interactions", () => {
@@ -142,5 +149,33 @@ describe("setup polish interactions", () => {
 	it("names Claude once: no group heading repeats the row's name (round 10, 4 minor 7)", async () => {
 		await mount();
 		assert.ok(document.querySelector('[data-testid="setup-stage-keys"] h3') === null, "no group heading");
+	});
+
+	it("opens on Refresh, and the arrows walk Refresh, each Use this account and ✕ (round 21, m16: focus sat on ✕ and no arrow left it)", async () => {
+		// The account in use is signed out; the other one is signed in, so it offers Use this account.
+		accounts = [
+			{ account: { providerId: "claude-subscription", label: "A", email: "a@example.com", auth: "token" }, connection: { state: "signed-out" }, usage: null, modelMissing: false },
+			{ account: { providerId: "claude-b", label: "B", email: "b@example.com", auth: "token" }, connection: { state: "connected", email: "b@example.com", plan: "max" }, usage: null, modelMissing: false },
+		];
+		await mount();
+		const refresh = element('[data-testid="claude-refresh"]');
+		const use = element('[data-testid="claude-use-account"]');
+		const close = element('[data-testid="setup-close"]');
+		assert.ok(document.activeElement === refresh, `opens on Refresh, not ${document.activeElement?.getAttribute("data-testid")}`);
+		await key(refresh, "ArrowDown");
+		assert.ok(document.activeElement === use, "↓ steps onto Use this account");
+		await key(use, "ArrowDown");
+		assert.ok(document.activeElement === use, "↓ on the last stop stays");
+		await key(use, "ArrowUp");
+		assert.ok(document.activeElement === refresh, "↑ steps back onto Refresh");
+		await key(refresh, "ArrowUp");
+		assert.ok(document.activeElement === close, "↑ on Refresh reaches ✕");
+		await key(close, "ArrowDown");
+		assert.ok(document.activeElement === refresh, "↓ from ✕ reaches Refresh");
+		// Enter on a focused button is its click.
+		await click(document.activeElement as HTMLElement);
+		await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+		assert.equal(refreshes, 1, "Enter on Refresh re-checks the accounts");
+		assert.equal(closed, 0, "and the dialog stays open while the account is signed out");
 	});
 });
