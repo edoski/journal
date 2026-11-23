@@ -71,8 +71,12 @@ export type VoiceRule =
 	| "close-calendar"
 	| "close-untouched"
 	| "close-day"
+	| "close-open-first"
+	| "close-quoted"
+	| "close-date-twice"
 	| "title-and"
 	| "row-label"
+	| "now-heading"
 	| "below"
 	| "pointer"
 	| "arrival"
@@ -881,7 +885,7 @@ export function echoOf(text: string, answer: string | null): string | null {
  *  answered (and the lesson's own), the task that goes on, and each start
  *  a save moved, as the close receipt gives them (close-receipt.ts). */
 export function receiptItems(receipt: CloseReceipt): { title: string; day_words: string }[] {
-	return [...receipt.topics, ...(receipt.continues ? [receipt.continues] : []), ...receipt.moved];
+	return [...(receipt.open ? [receipt.open] : []), ...receipt.topics, ...(receipt.continues ? [receipt.continues] : []), ...receipt.moved];
 }
 
 const plain = (s: string) => s.replace(/[*_"“”‘’]/g, "").replace(/\s+/g, " ").toLowerCase();
@@ -917,13 +921,23 @@ export function titlesNamed(text: string, titles: readonly string[]): string[] {
  *  close receipt gives every day (round 20, M3). */
 const CLOSE_VAGUE = /\b(?:on|in) (?:your|the|his) calendar\b|\bnext (?:time|session)\b/i;
 
+/** Words that send him back to open work: the close's open-work line
+ *  ("waits in…", "still open", "you pick it up first", round 21, M3). */
+const PICKS_UP = /\bwait(?:s|ing)\b|\bstill open\b|\bleft open\b|\bpick(?:s|ing)? (?:\S+ )?up\b|\bstart with\b/i;
+
+/** A date said in words, normalised ("9 nov"). */
+const DATE_SAID = /\b(\d{1,2}) (jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/gi;
+
 /** What a close says against its receipt (round 20, M3 and m8): a day he
  *  cannot act on ("on your calendar", "next time"), a course topic the
  *  receipt does not hold (the session never answered it), a receipt topic
  *  named in a sentence without its day, and two of its titles joined by
  *  "and", which reads as more topics than there are ("Rank and the column
- *  space and Kernel and rank-nullity"). `titles` are every course topic's
- *  title. Pure. */
+ *  space and Kernel and rank-nullity"). With a question left open, a
+ *  pick-up that names other work (round 21, M3: "You pick up with part (c)
+ *  of Problem sheet 4" over the Eigen lesson's own question); a title in
+ *  quotes, and one date said twice (m12). `titles` are every course
+ *  topic's title. Pure. */
 export function closeBreaks(text: string, receipt: CloseReceipt, titles: readonly string[]): VoiceBreak[] {
 	const out: VoiceBreak[] = [];
 	const items = receiptItems(receipt);
@@ -934,12 +948,21 @@ export function closeBreaks(text: string, receipt: CloseReceipt, titles: readonl
 	if (untouched.length > 0) out.push({ rule: "close-untouched", excerpt: untouched.join(", ") });
 	for (const sentence of sentences(text)) {
 		const named = titlesNamed(sentence, held);
-		const dayless = items.filter((i) => named.includes(i.title) && !namesDay(sentence, i.day_words));
+		// A title the receipt dates twice (the lesson his open question waits in, and its review) needs one of its days.
+		const dayless = items.filter((i) => named.includes(i.title) && !items.some((j) => j.title === i.title && namesDay(sentence, j.day_words)));
 		if (dayless.length > 0) {
 			out.push({ rule: "close-day", excerpt: dayless.map((i) => `${i.title}|${i.day_words}`).join(";") });
 			break;
 		}
 	}
+	const open = receipt.open;
+	const elsewhere = open ? sentences(text).find((s) => PICKS_UP.test(s) && titlesNamed(s, [open.title]).length === 0) : undefined;
+	if (open && elsewhere) out.push({ rule: "close-open-first", excerpt: `${elsewhere.trim()}|${open.place}|${open.day_words}` });
+	const quoted = [...held, ...titles].find((t) => t.trim().length > 2 && new RegExp(`[“"‘']\\s*${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[”"’']`, "i").test(text));
+	if (quoted) out.push({ rule: "close-quoted", excerpt: quoted });
+	const dates = [...text.matchAll(DATE_SAID)].map((m) => `${m[1]} ${m[2]!.toLowerCase()}`);
+	const twice = dates.find((d, i) => dates.indexOf(d) !== i);
+	if (twice) out.push({ rule: "close-date-twice", excerpt: twice });
 	const said = plain(text);
 	const joined = held.flatMap((a) => held.filter((b) => b !== a && said.includes(`${plain(a)} and ${plain(b)}`)).map((b) => `${a} and ${b}`))[0];
 	if (joined) out.push({ rule: "title-and", excerpt: joined });

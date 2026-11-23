@@ -22,7 +22,9 @@ import type { AnsweredQuestion } from "../../core/native-messages.ts";
 import { studyDay, withDayWords } from "../../core/day-words.ts";
 import { DOUBT } from "../../core/voice-check.ts";
 import { closeTopicsOf, receiptOfMap, receiptOfSaves, sessionSavesOf, type CloseReceipt, type SessionSave } from "../../core/close-receipt.ts";
-import { sessionTasksOf, type LhMessage } from "../../core/native-messages.ts";
+import { sessionPlanTopicOf, sessionTasksOf, type LhMessage } from "../../core/native-messages.ts";
+import { questionLeftOf } from "../../core/session-end.ts";
+import { reviewRecord } from "../../core/session-opening.ts";
 
 /** What the course tools close over. */
 export interface CourseToolContext {
@@ -331,6 +333,15 @@ function namedQuestions(
 				`observations[${i}].text: a not-right answer's text says what went wrong, in a line he reads in his Mistakes list days later ("Took $(1,2)$ as a vector of $E_2$; it gives $2x+y=4$, not $0$"), never the question. Send it again with that text.`,
 			);
 		}
+		// An Ask on the open question before his answer may have given him its
+		// step (round 21, m15): the save says what it gave him, or why not.
+		const notHelp = typeof ruled.ask_not_help === "string" && ruled.ask_not_help.trim() !== "";
+		delete ruled.ask_not_help;
+		if (answer.askedFirst?.length && !("corrects" in rest) && !answer.showMe && !notHelp && (typeof ruled.help !== "string" || ruled.help.trim().toLowerCase() === "none")) {
+			refuse(
+				`observations[${i}].help: before answering, he asked you ${answer.askedFirst.map((a) => JSON.stringify(a)).join(" and ")} while this question was open. When your answer gave him a step of this one, help says so ("Asked why one-to-one gives onto; told it is rank-nullity"); when it did not, keep help and add ask_not_help with the reason it did not cover his answer.`,
+			);
+		}
 		if (answer.predicted === true) ruled.predicted = true;
 		else if (answer.predicted === false) delete ruled.predicted;
 		if (answer.showMe && !("corrects" in rest)) {
@@ -404,7 +415,9 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 	const saves = turnSaves.get(ctx) ?? [];
 	turnSaves.set(ctx, saves);
 	saves.push({ topics: answeredTopics(changes), receipt: result.json });
-	return { ...result, json: { ...result.json, close: receiptOfSaves([...(ctx.sessionSaves?.() ?? []), ...saves], studyDay()) } };
+	// It carries its study day too, which a later day's close reads (round 21, M2).
+	const today = studyDay();
+	return { ...result, json: { ...result.json, today, close: receiptOfSaves([...(ctx.sessionSaves?.() ?? []), ...saves], today) } };
 }
 
 /** This turn's saves that went through, in order: the close of a turn that
@@ -431,8 +444,11 @@ export async function closeReceiptFor(
 	const mapped = await records.map(workspace);
 	if (!mapped.ok) return null;
 	const inTurn = ctx ? (turnSaves.get(ctx) ?? []) : [];
-	const saves = [...sessionSavesOf(record.messages), ...inTurn];
-	return receiptOfMap(mapped.map, [...closeTopicsOf(record), ...inTurn.flatMap((s) => s.topics)], saves, sessionTasksOf(record.messages));
+	const saves = [...sessionSavesOf(record.messages).filter((s) => s.day === undefined || s.day >= mapped.map.today), ...inTurn];
+	const left = questionLeftOf(record.messages);
+	const review = reviewRecord(record);
+	const own = (review ? record.topics?.[0] : (record.topics?.[0] ?? sessionPlanTopicOf(record.messages))) ?? null;
+	return receiptOfMap(mapped.map, [...closeTopicsOf(record, mapped.map.today), ...inTurn.flatMap((s) => s.topics)], saves, sessionTasksOf(record.messages), left ? { ...left, review, own } : undefined);
 }
 
 async function saveRuled(ctx: CourseToolContext, changes: unknown, problem?: { id: string; seen: boolean }): Promise<CourseResult> {

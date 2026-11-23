@@ -51,10 +51,32 @@ export interface CloseWork {
 	day_words: string;
 }
 
+/** The question the session leaves open (his Done for today set it
+ *  aside), where it waits and the day it is asked again: the day its
+ *  lesson continues, its topic's next review, or its task's next study day
+ *  (round 21, M3: "The kernel question is still waiting for you", with no
+ *  day, and "You pick up with part (c) of Problem sheet 4" over the Eigen
+ *  lesson's own open question). */
+export interface CloseOpen {
+	/** The title the close names it by: its topic's, or its task's. */
+	title: string;
+	/** Where it waits, in the close's words: "your Poisson distribution
+	 *  lesson", "your Kernel and rank-nullity review", "Problem sheet 4". */
+	place: string;
+	in: "lesson" | "review" | "task";
+	/** His half answer waits in its box. */
+	half: boolean;
+	day: string;
+	day_words: string;
+	/** Its topic, when it waits in that topic's lesson or review. */
+	handle?: string;
+}
+
 export interface CloseReceipt {
 	topics: CloseTopic[];
 	moved: CloseMove[];
 	continues?: CloseWork;
+	open?: CloseOpen;
 	/** The sentence the close copies for its days; empty when it has none. */
 	says: string;
 }
@@ -64,6 +86,9 @@ export interface CloseReceipt {
 export interface SessionSave {
 	topics: readonly string[];
 	receipt: Record<string, unknown>;
+	/** The day the save was made, when the session holds it; a save of the
+	 *  running turn has none, being today's. */
+	day?: string;
 }
 
 /** "Span", "Span, Rank": titles joined by commas only, since a title may
@@ -79,36 +104,103 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is
 
 const KIND_ORDER: Readonly<Record<CloseKind, number>> = { continues: 0, review: 1, start: 2 };
 
-/** The receipt's sentence: one clause per day and kind, soonest first,
- *  then the moved starts. */
-function saysOf(topics: readonly CloseTopic[], moved: readonly CloseMove[], continues: CloseWork | undefined): string {
-	const groups = new Map<string, CloseTopic[]>();
-	for (const topic of [...topics].sort((a, b) => a.day.localeCompare(b.day) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind])) {
-		const key = `${topic.day} ${topic.kind}`;
-		groups.set(key, [...(groups.get(key) ?? []), topic]);
+/** "a", "a and b", "a, b and c". */
+function and(parts: readonly string[]): string {
+	return parts.length < 3 ? parts.join(" and ") : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)!}`;
+}
+
+/** What falls on one day: its topics by kind, and the task that goes on. */
+interface Day {
+	day: string;
+	words: string;
+	topics: CloseTopic[];
+	task?: CloseWork;
+}
+
+/** The day's topics of one kind, as a subject: "your Rank, Kernel reviews". */
+function subjectOf(kind: CloseKind, topics: readonly CloseTopic[]): string {
+	const list = titleList(topics.map((t) => t.title));
+	const s = topics.length > 1 ? "s" : "";
+	return kind === "review" ? `your ${list} review${s}` : kind === "continues" ? `your ${list} lesson${s}` : `your first ${list} lesson${s}`;
+}
+
+/** What a day holds, as subjects in the receipt's order (lessons, reviews,
+ *  starts, then the task), a review of the one lesson that goes on that
+ *  day said as its review, leaving out `own` (what the open question's
+ *  clause already names). */
+function subjectsOf(day: Day, own?: CloseOpen): string[] {
+	const lessons = day.topics.filter((t) => t.kind === "continues" && !(own?.in === "lesson" && t.handle === own.handle));
+	const lessonOf = own?.in === "lesson" ? own.handle : lessons.length === 1 ? lessons[0]!.handle : undefined;
+	const reviews = day.topics.filter((t) => t.kind === "review" && !(own?.in === "review" && t.handle === own.handle));
+	const its = reviews.some((t) => t.handle === lessonOf);
+	const others = reviews.filter((t) => t.handle !== lessonOf);
+	const starts = day.topics.filter((t) => t.kind === "start");
+	return [
+		...(lessons.length ? [subjectOf("continues", lessons)] : []),
+		...(its ? ["its review"] : []),
+		...(others.length ? [subjectOf("review", others)] : []),
+		...(starts.length ? [subjectOf("start", starts)] : []),
+		...(day.task && own?.in !== "task" ? [day.task.title] : []),
+	];
+}
+
+/** A day's clause, its day said once (round 21, m12: "…continues
+ *  tomorrow, Monday 9 November. Your Eigenvalues and eigenvectors review
+ *  comes back tomorrow, Monday 9 November"). One kind keeps its own verb;
+ *  several share the day ("your Eigenvalues and eigenvectors lesson and
+ *  its review are tomorrow, Monday 9 November"). */
+function dayClause(day: Day): string {
+	const when = on(day.words);
+	const kinds = new Set(day.topics.map((t) => t.kind));
+	if (!day.task && kinds.size === 1) {
+		const { kind } = day.topics[0]!;
+		const many = day.topics.length > 1;
+		if (kind === "start") return `you start ${titleList(day.topics.map((t) => t.title))} ${when}`;
+		if (kind === "continues") return `${subjectOf(kind, day.topics)} continue${many ? "" : "s"} ${when}`;
+		return day.words === "today" ? `${subjectOf(kind, day.topics)} ${many ? "are" : "is"} still due today` : `${subjectOf(kind, day.topics)} come${many ? "" : "s"} back ${when}`;
 	}
-	const clauses = [...groups.values()].map((group) => {
-		const { kind, day_words: words } = group[0]!;
-		const list = titleList(group.map((t) => t.title));
-		const many = group.length > 1;
-		if (kind === "review") return words === "today" ? `your ${list} review${many ? "s are" : " is"} still due today` : `your ${list} review${many ? "s come" : " comes"} back ${on(words)}`;
-		if (kind === "continues") return `your ${list} lesson${many ? "s continue" : " continues"} ${on(words)}`;
-		return `you start ${list} ${on(words)}`;
-	});
-	if (continues) clauses.push(`${continues.title} continues ${on(continues.day_words)}`);
+	if (day.topics.length === 0 && day.task) return `${day.task.title} continues ${when}`;
+	return `${and(subjectsOf(day))} are ${when}`;
+}
+
+/** The open question's clause, with whatever else falls on its day
+ *  ("Your half answer waits in your Eigenvalues and eigenvectors lesson,
+ *  which continues tomorrow, Monday 9 November, with its review"). */
+function openClause(open: CloseOpen, day: Day | undefined): string {
+	const what = open.half ? "your half answer" : "the question you left open";
+	const rest = day ? subjectsOf(day, open) : [];
+	return `${what} waits in ${open.place}, which ${open.in === "review" ? "comes back" : "continues"} ${on(open.day_words)}${rest.length ? `, with ${and(rest)}` : ""}`;
+}
+
+/** The receipt's sentence: the question he left open first, with its day,
+ *  then one clause per day, soonest first, each day said once, then the
+ *  moved starts. No title is quoted (round 21, m12). */
+function saysOf(topics: readonly CloseTopic[], moved: readonly CloseMove[], continues: CloseWork | undefined, open: CloseOpen | undefined): string {
+	const days = new Map<string, Day>();
+	const dayOf = (day: string, words: string) => days.get(day) ?? days.set(day, { day, words, topics: [] }).get(day)!;
+	// A review his open question waits in is dated by that question's clause.
+	const dated = topics.filter((t) => !(open?.in === "review" && t.handle === open.handle));
+	for (const topic of dated.sort((a, b) => a.day.localeCompare(b.day) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind])) dayOf(topic.day, topic.day_words).topics.push(topic);
+	if (continues) dayOf(continues.day, continues.day_words).task = continues;
+	const sorted = [...days.values()].sort((a, b) => a.day.localeCompare(b.day));
+	const clauses = new Map<string, string>();
+	if (open) clauses.set(open.day, openClause(open, days.get(open.day)));
+	for (const day of sorted) if (day.day !== open?.day) clauses.set(day.day, dayClause(day));
+	// A start moved onto a day already said joins that day's clause.
 	for (const move of moved) {
-		const waits = move.waits_on?.length ? `, since it waits on ${titleList(move.waits_on)}` : "";
-		clauses.push(`“${move.title}” now starts ${on(move.day_words)}${move.past_exam ? ", after the exam" : ""}${waits}`);
+		const why = `${move.past_exam ? ", after the exam" : ""}${move.waits_on?.length ? `, since it waits on ${titleList(move.waits_on)}` : ""}`;
+		const said = clauses.get(move.day);
+		clauses.set(move.day, said ? `${said}, and you now start ${move.title} that day${why}` : `you now start ${move.title} ${on(move.day_words)}${why}`);
 	}
-	if (clauses.length === 0) return "";
-	const sentence = clauses.join("; ");
+	if (clauses.size === 0) return "";
+	const sentence = [...clauses.values()].join("; ");
 	return `${sentence[0]!.toUpperCase()}${sentence.slice(1)}.`;
 }
 
-function receipt(topics: CloseTopic[], moved: CloseMove[], continues?: CloseWork): CloseReceipt {
+function receipt(topics: CloseTopic[], moved: CloseMove[], continues?: CloseWork, open?: CloseOpen): CloseReceipt {
 	const named = new Set(topics.map((t) => t.handle));
 	const own = moved.filter((m) => !named.has(m.handle));
-	return { topics, moved: own, ...(continues ? { continues } : {}), says: saysOf(topics, own, continues) };
+	return { topics, moved: own, ...(continues ? { continues } : {}), ...(open ? { open } : {}), says: saysOf(topics, own, continues, open) };
 }
 
 /** A receipt a save gave, added to the one the session held (his Done for
@@ -117,7 +209,7 @@ function receipt(topics: CloseTopic[], moved: CloseMove[], continues?: CloseWork
 export function withSaved(held: CloseReceipt, saved: CloseReceipt): CloseReceipt {
 	const dated = new Set([...saved.topics, ...saved.moved].map((t) => t.handle));
 	const moved = [...saved.moved, ...held.moved.filter((m) => !dated.has(m.handle))];
-	return receipt([...held.topics.filter((t) => !dated.has(t.handle)), ...saved.topics], moved, saved.continues ?? held.continues);
+	return receipt([...held.topics.filter((t) => !dated.has(t.handle)), ...saved.topics], moved, saved.continues ?? held.continues, saved.open ?? held.open);
 }
 
 /** The starts a receipt says his study today moved (`starts_moved`). */
@@ -135,11 +227,13 @@ function movesOf(saved: Record<string, unknown> | undefined, today: string, star
 /** The receipt as the session's saves give it, with no read of the plan:
  *  each topic a save dated, on the day its newest save's receipt gives it
  *  and by the title a receipt gave it, in the order the session first
- *  answered them, and the starts the newest receipt says moved. A topic no
+ *  answered them, and the starts the newest receipt says moved. Only the
+ *  saves of the study day it closes count (round 21, M2). A topic no
  *  save dated has no day here, and one no receipt titled (a save made
  *  before receipts carried titles) is left to the closes that read the
  *  plan, never named by its handle. */
-export function receiptOfSaves(saves: readonly SessionSave[], today: string): CloseReceipt {
+export function receiptOfSaves(all: readonly SessionSave[], today: string): CloseReceipt {
+	const saves = all.filter((s) => s.day === undefined || s.day >= today);
 	const days = new Map<string, string>();
 	const titles = new Map<string, string>();
 	for (const { receipt: saved } of saves) {
@@ -171,15 +265,48 @@ function mapDay(topic: CourseMapTopic, today: string): { kind: CloseKind; day: s
 /** The course's next study day the plan holds after today, which open
  *  work he left goes on (as the calendar carries it). */
 function nextStudyDay(map: CourseMap): string | null {
-	const days = map.topics.flatMap((t) => (t.excluded ? [] : [t.review?.kind === "scheduled" ? t.review.date : null, t.starts ?? null])).filter((d): d is string => d !== null && d > map.today);
+	const days = map.topics.flatMap((t) => (t.excluded ? [] : [t.review?.kind === "scheduled" ? t.review.date : null, t.starts ?? null, t.starts && t.startsWhy?.kind === "begun" ? (t.startsWhy.then ?? null) : null])).filter((d): d is string => d !== null && d > map.today);
 	return days.sort()[0] ?? null;
+}
+
+/** The question his Done for today left open, as the session holds it:
+ *  its topic (null when the tutor tagged none), whether his half answer
+ *  waits in its box, whether the session is his review, and the topic the
+ *  session teaches or reviews first. */
+export interface LeftQuestion {
+	topic: string | null;
+	half: boolean;
+	review: boolean;
+	own: string | null;
+}
+
+/** Where the open question waits and the day it is asked again: a review's
+ *  on its topic's next review, or the course's next study day while that
+ *  review is still due (a review he left stacks on his next study day); a
+ *  lesson's on the day its lesson continues; a task's with the task. */
+function openOf(map: CourseMap, byHandle: ReadonlyMap<string, CourseMapTopic>, topics: readonly CloseTopic[], task: CloseWork | undefined, left: LeftQuestion | undefined): CloseOpen | undefined {
+	if (!left) return undefined;
+	const next = nextStudyDay(map);
+	const at = (where: Omit<CloseOpen, "half" | "day" | "day_words">, day: string | null): CloseOpen | undefined => (day ? { ...where, half: left.half, day, day_words: plannedDayWords(day, map.today) } : undefined);
+	const handle = left.topic && byHandle.has(left.topic) ? left.topic : left.own;
+	const topic = handle ? byHandle.get(handle) : undefined;
+	if (left.review) {
+		if (!topic) return undefined;
+		const scheduled = topic.review?.kind === "scheduled" && topic.review.date > map.today ? topic.review.date : null;
+		return at({ title: topic.title, place: `your ${topic.title} review`, in: "review", handle: topic.handle }, scheduled ?? next);
+	}
+	const lesson = topics.find((t) => t.kind === "continues");
+	if (lesson) return at({ title: lesson.title, place: `your ${lesson.title} lesson`, in: "lesson", handle: lesson.handle }, lesson.day);
+	if (task) return at({ title: task.title, place: task.title, in: "task" }, task.day);
+	return topic ? at({ title: topic.title, place: `your ${topic.title} lesson`, in: "lesson", handle: topic.handle }, next) : undefined;
 }
 
 /** The receipt as the plan holds it after the session's saves: each of
  *  `handles` the map lists, with its day, the starts the newest receipt
- *  says moved, on the map's day, and the first open task the session
- *  holds, on the course's next study day, when no lesson of it continues. */
-export function receiptOfMap(map: CourseMap, handles: readonly string[], saves: readonly SessionSave[], tasks: readonly string[] = []): CloseReceipt {
+ *  says moved, on the map's day, the first open task the session holds,
+ *  on the course's next study day, when no lesson of it continues, and the
+ *  question his Done for today left open (`left`), with its day. */
+export function receiptOfMap(map: CourseMap, handles: readonly string[], saves: readonly SessionSave[], tasks: readonly string[] = [], left?: LeftQuestion): CloseReceipt {
 	const byHandle = new Map(map.topics.map((t) => [t.handle as string, t]));
 	const topics = [...new Set(handles)].flatMap((handle): CloseTopic[] => {
 		const topic = byHandle.get(handle);
@@ -189,7 +316,7 @@ export function receiptOfMap(map: CourseMap, handles: readonly string[], saves: 
 	const task = map.tasks.find((t) => tasks.includes(t.key));
 	const next = task && !topics.some((t) => t.kind === "continues") ? nextStudyDay(map) : null;
 	const continues = task && next ? { title: task.title, day: next, day_words: plannedDayWords(next, map.today) } : undefined;
-	return receipt(topics, movesOf(saves.at(-1)?.receipt, map.today, (handle) => byHandle.get(handle)?.starts), continues);
+	return receipt(topics, movesOf(saves.at(-1)?.receipt, map.today, (handle) => byHandle.get(handle)?.starts), continues, openOf(map, byHandle, topics, continues, left));
 }
 
 const CONCLUDE_RECORD = "Course record: ";
@@ -209,22 +336,47 @@ function savedReceipt(m: LhMessage): Record<string, unknown> | null {
 	}
 }
 
+/** The study day a save was made: the one its receipt carries (`today`,
+ *  `saveCourse`), else its message's local day, for a save made before
+ *  receipts carried it. */
+function saveDay(m: LhMessage, saved: Record<string, unknown>): string {
+	if (typeof saved.today === "string") return saved.today;
+	const d = new Date(m.timestamp);
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** The session on the study day it closes: since its last close and
+ *  after its last save of an earlier day, so a session resumed on a later
+ *  day closes on that day's work alone (round 21, M2: Problem sheet 4,
+ *  left on 6 Nov with no close and closed on 8 Nov, named the six topics
+ *  its 6 Nov save dated). Pure. */
+function sinceStudyDay(messages: readonly LhMessage[], today: string): readonly LhMessage[] {
+	const since = sinceLastClose(messages);
+	return since.slice(
+		since.findLastIndex((m) => {
+			const saved = savedReceipt(m);
+			return saved !== null && saveDay(m, saved) < today;
+		}) + 1,
+	);
+}
+
 /** The saves the session made since its last close, in order. Each holds
- *  its receipt; the topics its attempts answered come from the session's
+ *  its receipt and the day it was made; the topics its attempts answered come from the session's
  *  own transcript (`sessionTopicsOf`) and are left empty here. */
 export function sessionSavesOf(messages: readonly LhMessage[]): SessionSave[] {
 	return sinceLastClose(messages).flatMap((m) => {
 		const saved = savedReceipt(m);
-		return saved ? [{ topics: [], receipt: saved }] : [];
+		return saved ? [{ topics: [], receipt: saved, day: saveDay(m, saved) }] : [];
 	});
 }
 
 /** The topics a close names, by handle: the lesson's own (those a session
  *  not a review was opened on and the topic its plan teaches), then each
- *  topic it answered since its last close. A review names only what it
- *  answered; a task's other topics are not the session's. */
-export function closeTopicsOf(record: { title: string; topics?: readonly string[]; messages: readonly LhMessage[] }): string[] {
+ *  topic it answered since its last close on the study day it closes
+ *  (round 21, M2). A review names only what it answered; a task's other
+ *  topics are not the session's. */
+export function closeTopicsOf(record: { title: string; topics?: readonly string[]; messages: readonly LhMessage[] }, today: string): string[] {
 	const planned = sessionPlanTopicOf(record.messages);
 	const own = reviewRecord(record) ? [] : [...(record.topics ?? []), ...(planned ? [planned] : [])];
-	return [...new Set([...own, ...sessionTopicsOf(sinceLastClose(record.messages))])];
+	return [...new Set([...own, ...sessionTopicsOf(sinceStudyDay(record.messages, today))])];
 }

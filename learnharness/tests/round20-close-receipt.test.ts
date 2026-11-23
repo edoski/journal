@@ -59,7 +59,7 @@ const receiptOf = (reviews: Record<string, [string, string]>, starts: Record<str
 	...(Object.keys(starts).length ? { starts_moved: starts } : {}),
 });
 const savedResult = (receipt: unknown): LhMessage =>
-	({ id: `r-${nextId()}`, role: "toolResult", toolCallId: `v-${nextId()}`, toolName: "course_save", content: [{ type: "text", text: JSON.stringify(receipt) }], details: null, isError: false, timestamp: 1 }) as unknown as LhMessage;
+	({ id: `r-${nextId()}`, role: "toolResult", toolCallId: `v-${nextId()}`, toolName: "course_save", content: [{ type: "text", text: JSON.stringify(receipt) }], details: null, isError: false, timestamp: Date.now() }) as unknown as LhMessage;
 
 /** A guard for a close: his Done for today carrying `receipt`, or a turn
  *  whose save returned it, with every course's titles. */
@@ -128,7 +128,7 @@ describe("one close receipt for every session (round 20, M3)", () => {
 		const receipt = receiptOfSaves(saves, D8);
 		assert.deepEqual(receipt.topics.map((t) => t.title), ["Random variables and distributions", "Conditional probability"]);
 		assert.deepEqual(receipt.moved.map((m) => [m.title, m.day_words]), [["Geometric distribution", "Thursday 12 November"], ["Negative binomial distribution", "Sunday 15 November"]]);
-		assert.match(receipt.says, /“Geometric distribution” now starts on Thursday 12 November, since it waits on Random variables and distributions/);
+		assert.match(receipt.says, /Your Conditional probability review comes back on Thursday 12 November, and you now start Geometric distribution that day, since it waits on Random variables and distributions/);
 		const guard = await closing(receipt, { review: true, done: false });
 		assert.deepEqual(closeRules(guard, "Conditional probability comes back on Thursday 12 November, moved from Wednesday 11 November after your answers today."), []);
 		const held = guard.beforeEnd() ?? "";
@@ -140,10 +140,11 @@ describe("one close receipt for every session (round 20, M3)", () => {
 	it("lens 2's sheet close: the task's next day and Homomorphisms' day, never \"next time\" or \"on your calendar\"", async () => {
 		const receipt = receiptOfMap(LA_8, ["homs"], [], ["sheet-4"]);
 		assert.deepEqual(receipt.continues, { title: "Problem sheet 4", day: "2026-11-09", day_words: "tomorrow, Monday 9 November" });
-		assert.equal(receipt.says, "Your Homomorphisms (linear maps) review comes back on Wednesday 11 November; Problem sheet 4 continues tomorrow, Monday 9 November.");
+		assert.equal(receipt.says, "Problem sheet 4 continues tomorrow, Monday 9 November; your Homomorphisms (linear maps) review comes back on Wednesday 11 November.");
 		assert.ok(closeRules(await closing(receipt), "Part (e) of sheet 4 is waiting for you next time, and the other topics from today have their review days on your calendar.").includes("close-calendar"));
+		assert.ok(rules(await closing(receipt), send("Part (e) of the sheet waits for you.")).includes("vague-day"), "the open work's day (round 21, M3)");
 		const guard = await closing(receipt);
-		assert.deepEqual(closeRules(guard, "Part (e) of the sheet waits for you."), []);
+		assert.deepEqual(closeRules(guard, "Part (e) of the sheet waits for you tomorrow, Monday 9 November."), []);
 		assert.match(guard.beforeEnd() ?? "", /Homomorphisms \(linear maps\) \(Wednesday 11 November\), Problem sheet 4 \(tomorrow, Monday 9 November\)/);
 	});
 

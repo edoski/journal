@@ -71,7 +71,7 @@ describe("the round-6 slips are rewritten before he sees them", () => {
 	});
 
 	it("a 3-sentence close after Done for today", () => {
-		const close = "You stopped today with the Poisson formula derived. Next time you pick up the Poisson lesson at its open check. Your Poisson review comes back on Saturday 14 November.";
+		const close = "You stopped today with the Poisson formula derived. Tomorrow you pick up the Poisson lesson at its open check. Your Poisson review comes back on Saturday 14 November.";
 		assert.deepEqual(rules(new VoiceGuard([newUserMessage("Poisson"), assistant([send("A step.")]), newDoneTonightMessage("teacher") as LhMessage]), send(close)), ["length"]);
 	});
 
@@ -137,7 +137,7 @@ describe("turns within the voice pass untouched", () => {
 			send("That's not right. \"No row is a multiple of another\" only rules out dependence between pairs, and here $R_3 = R_1 + R_2$. Row reducing gives two pivots, so the rank is $2$, and $A$ is not invertible."),
 		],
 		["a lesson's first step", [newUserMessage("Poisson")], send("Split the hour into $n$ slots, each holding an email with probability $4/n$. The count of emails is then binomial, whatever $n$ is.")],
-		["a two-sentence close", [newUserMessage("Rank"), assistant([send("A step.")]), newDoneTonightMessage("practice") as LhMessage], send("Next time you pick up with part (c) of sheet 4. Your rank review comes back on Friday 13 November.")],
+		["a two-sentence close", [newUserMessage("Rank"), assistant([send("A step.")]), newDoneTonightMessage("practice") as LhMessage], send("Tomorrow you pick up with part (c) of sheet 4. Your rank review comes back on Friday 13 November.")],
 		[
 			"a planned day, in answer to his question about the plan",
 			[newUserMessage("Poisson"), assistant([send("A step.")]), newUserMessage("And how many overdue reviews do I have in each of my courses right now?")],
@@ -315,8 +315,8 @@ describe("a real turn on the Agent SDK", () => {
 	}
 
 	it("he sees only the rewrite: the tutor reads what to fix and sends again in the same turn", async () => {
-		const close = "You stopped today with the Poisson formula derived. Next time you pick up the Poisson lesson at its open check. Your Poisson review comes back on Saturday 14 November.";
-		const rewrite = "Next time you pick up the Poisson lesson at its open check. Your Poisson review comes back on Saturday 14 November.";
+		const close = "You stopped today with the Poisson formula derived. Tomorrow you pick up the Poisson lesson at its open check. Your Poisson review comes back on Saturday 14 November.";
+		const rewrite = "Tomorrow you pick up the Poisson lesson at its open check. Your Poisson review comes back on Saturday 14 November.";
 		let told = "";
 		const { engine, faux } = scripted([
 			fauxAssistantMessage([fauxToolCall(SEND_TO_USER_TOOL, { message: close }, { id: "close-1" })], { stopReason: "toolUse" }),

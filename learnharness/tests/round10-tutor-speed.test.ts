@@ -162,7 +162,7 @@ describe("a point made once still lets news through (round 10)", () => {
 	it("a second Done for today names what he picks up and its day again, as a close must", () => {
 		const first = "Your eigenvalue review is tomorrow, Monday 9 November. You pick up at the open question on the last step of the eigenvalue lesson.";
 		const turn = [newUserMessage("Eigenvalues"), assistant([send(first)]), newUserMessage("ok I am back"), assistant([send("A step.")]), newDoneTonightMessage("teacher") as LhMessage];
-		assert.deepEqual(rules(new VoiceGuard(turn), send("Your eigenvalue review is tomorrow, Monday 9 November. After that you pick up the open question at the last step of the eigenvalue lesson.")), []);
+		assert.deepEqual(rules(new VoiceGuard(turn), send("Your eigenvalue review is tomorrow, Monday 9 November. After that, tomorrow too, you pick up the open question at the last step of the eigenvalue lesson.")), []);
 	});
 
 	it("a ruling on a second dispute is its own news (practice, the guessed quiz)", async () => {
@@ -218,7 +218,7 @@ describe("a compaction inside the turn names its wait (round 10, robustness mino
 describe("a close names the day he picks up on (round 10)", () => {
 	it("\"Its review is planned for tomorrow\" in a Done for today close is shown, and still refused as a reason in a lesson", () => {
 		const close = new VoiceGuard([newUserMessage("Linear maps"), assistant([send("A step.")]), newDoneTonightMessage("teacher") as LhMessage]);
-		assert.deepEqual(rules(close, send("Next time you pick up Linear maps and their matrices at the open question about the columns of a matrix. Its review is planned for tomorrow, Tuesday 10 November.")), []);
+		assert.deepEqual(rules(close, send("Tomorrow you pick up Linear maps and their matrices at the open question about the columns of a matrix. Its review is planned for tomorrow, Tuesday 10 November.")), []);
 		assert.ok(rules(new VoiceGuard([newUserMessage("Linear maps")]), send("The kernel is planned for tomorrow, so first a check on columns.")).includes("plan"));
 	});
 });

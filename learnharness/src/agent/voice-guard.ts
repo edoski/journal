@@ -712,6 +712,14 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			const items = b.excerpt.split(";").map((item) => item.split("|"));
 			return `A topic the close names has its day in the same sentence: ${items.map(([title, day]) => `${title} is ${day}`).join("; ")}, as \`close.says\` words it.`;
 		}
+		case "close-open-first": {
+			const [said, place, day] = b.excerpt.split("|");
+			return `The question he left open waits in ${place}, which he picks up ${day}, and this sends him to other work first: ${quoted(said!)}. Name that question first, where it waits and its day, as \`close.says\` does, and send him nowhere else.`;
+		}
+		case "close-quoted":
+			return `A title is never in quotes: ${quoted(b.excerpt)}. Name it as \`close.says\` does, after "your" ("your ${b.excerpt} lesson").`;
+		case "close-date-twice":
+			return `The close says ${b.excerpt} twice. Say each day once, with everything that falls on it, as \`close.says\` does ("your Eigenvalues and eigenvectors lesson and its review are tomorrow, Monday 9 November").`;
 		case "title-and":
 			return `"${b.excerpt}" reads as more topics than there are, since a title holds its own "and". Join titles with commas only, as \`close.says\` does.`;
 		case "row-label":
@@ -743,17 +751,19 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 		case "half-answer":
 			return `Say where his half answer waits, by the session's name, never "there": ${quoted(b.excerpt)}. Name it ("Your half answer to the kernel question waits in your Invertible matrices lesson, which continues tomorrow, Monday 9 November.").`;
 		case "title-comma":
-			return `A topic's title straight after a comma reads as a new sentence: ${quoted(b.excerpt)}. Open the sentence on it, or set it off in quotes ("Starting “${b.excerpt}” moves to …").`;
+			return `A topic's title straight after a comma reads as a new sentence: ${quoted(b.excerpt)}. Open the sentence on it, or put a word before it ("your ${b.excerpt} lesson", "you now start ${b.excerpt} on …").`;
 		case "vague-moves":
 			return `Later moves said with nothing he can act on: ${quoted(b.excerpt)}. Name each move with its new day, or leave out the ones the close is not about.`;
 		case "self-correction":
 			return `A slip corrected mid-sentence is left on his screen: ${quoted(b.excerpt)}. Write the sentence once, as it should read, with no "rather".`;
 		case "vague-day":
-			return `A topic named with no day he can act on: ${quoted(b.excerpt)}. Name its day from the close's days, copied as written, or leave the topic out.`;
+			return `What he picks up, or a topic, is named with no day he can act on: ${quoted(b.excerpt)}. Name its day from the close's days, copied as written (\`close.says\` says where his open question waits and when), or leave the topic out.`;
 		case "half-answer-day":
 			return `His half answer is named with no day for its lesson: ${quoted(b.excerpt)}. Say when that lesson continues, copied from the close's days ("…waits in your Poisson distribution lesson, which continues tomorrow, Monday 9 November.").`;
 		case "lesson-unnamed":
-			return `His review is done, and this question opens the ${b.excerpt} lesson with no word that it has begun. Open it with one clause naming it ("Now ${b.excerpt}: …"); if it is another review's question, name that review ("Now your … review: …").`;
+			return `His review is done, and this question opens the ${b.excerpt} lesson with no word that it has begun. Name it first in a sentence of its own ("Next, ${b.excerpt}."); if it is another review's question, name that review ("Next, your … review.").`;
+		case "now-heading":
+			return `A topic's title is never a heading inside a sentence: ${quoted(b.excerpt)}. Say the move as its own sentence ("Next, ${b.excerpt.replace(/^Now\s+/, "").replace(/:$/, "")}."), as "First, your Uniform distribution review." does, then the question.`;
 		case "split-display":
 			return `Two displays joined by a lone "${b.excerpt}" leave it alone on a line between them. Write short equations inline in the sentence ("$h(1,1) = (1,0,2)$ ${b.excerpt} $h(1,-1) = (3,2,0)$"), or set both in one display.`;
 		case "nothing-above":
@@ -845,8 +855,10 @@ export function titleAfterComma(text: string, titles: readonly string[]): string
 const VAGUE_MOVES = /\b(?:later|other|more|further) (?:starts|lessons|topics|reviews)\b(?![^.?!]*\bcalendar\b)[^.?!]{0,30}\b(?:moved|move|shifted|shift|too)\b|\b(?:starts|lessons|reviews|topics) (?:after it |after that |behind it )?(?:moved|move|shift(?:ed)?) too\b/i;
 
 /** A topic's return said with no day: "on a later day", "later on your
- *  calendar", "you pick those up next" (round 19, m15). */
-const VAGUE_DAY = /\b(?:on |for )?(?:a|some) later (?:day|date)\b|\blater (?:on|in) (?:your|the) calendar\b|\b(?:another|a future) day\b|\bpick (?:it|them|those|these|that|this) up (?:next|later)\b/i;
+ *  calendar", "you pick those up next" (round 19, m15), and the open
+ *  work's: "is still waiting for you", "waits in this Probability review",
+ *  "you pick it up first", "when you come back" (round 21, M3). */
+const VAGUE_DAY = /\b(?:on |for )?(?:a|some) later (?:day|date)\b|\blater (?:on|in) (?:your|the) calendar\b|\b(?:another|a future) day\b|\bpick (?:it|them|those|these|that|this) up (?:next|later)\b|\bwait(?:s|ing) (?:for you|in)\b|\bstill (?:open|waiting)\b|\bpick(?:s|ing)? (?:\S+ )?up\b|\bcom(?:e|es|ing) back\b/i;
 
 /** Words that give a day: today, tomorrow, a weekday or a date. */
 const DAY_WORDS = /\b(?:today|tomorrow|(?:mon|tues|wednes|thurs|fri|satur|sun)day|\d{1,2} (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)\b/i;
@@ -883,6 +895,35 @@ const AFTER_ASKING = (text: string): AgentToolResult<unknown> => ({
 	isError: true,
 	details: { withheld: "after-asking", text },
 });
+
+/** A message in a turn that resumes a reply he stopped after it already
+ *  ended on his move (round 21, m14: Try again after a stopped nudge said
+ *  its last sentence again, then a hint he never asked for). */
+const AFTER_STOP = (said: string, text: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not shown to him: he stopped your reply after it had already ended on his move (${quoted(said)}), and Try again only finishes what was cut. Send nothing more; end your turn with no words.` }],
+	isError: true,
+	details: { withheld: "after-stop", text },
+});
+
+/** The tutor's messages in the reply this turn resumes: what it sent him
+ *  after his latest input, when a stop or a restart cut that reply and Try
+ *  again runs the rest. Empty for a fresh turn, and for the teacher's
+ *  opening after the probe. */
+function resumedSays(messages: readonly LhMessage[]): string[] {
+	const at = messages.findLastIndex(opensTurn);
+	const after = messages.slice(at + 1);
+	// The teacher's opening after the probe ended is a turn of its own.
+	if (at < 0 || after.some((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === PROBE_DONE_TOOL))) return [];
+	const failed = failedOutputCallIds(messages);
+	return after.flatMap((m) => (m.role !== "assistant" ? [] : m.content.flatMap((b) => {
+		const text = b.type === "toolCall" && b.name === SEND_TO_USER_TOOL && !failed.has(b.id) ? sendToUserText(b) : undefined;
+		return text ? [text] : [];
+	})));
+}
+
+/** Whether a message ends on his move: a question, an instruction he can
+ *  act on, or his next move named ("Your next move is proving…"). */
+const endsOnHisMove = (text: string): boolean => leavesAWayOn(text) || /\byour (?:next )?(?:move|step|turn)\b/i.test(sentences(text).at(-1) ?? "");
 
 const DUPLICATE: AgentToolResult<unknown> = {
 	content: [{ type: "text", text: "Not shown again: he already has this message from this turn. Send nothing more of it." }],
@@ -1002,6 +1043,16 @@ const ROW_LABEL = /(?<=[A-Za-z,:;]\s)(?:Start|Continue)\s+[A-Z][^\s:.,;?!]*(?:\s
 function rowLabel(text: string): VoiceBreak[] {
 	const label = ROW_LABEL.exec(text.replace(/\$[^$]*\$/g, " "));
 	return label ? [{ rule: "row-label", excerpt: label[0] }] : [];
+}
+
+/** "Now <title>:" opening a sentence, a title used as a heading before the
+ *  question (round 21, m13: "Now Inclusion-exclusion principle: a whole
+ *  number is chosen…"). The move between topics is its own sentence. */
+const NOW_HEADING = /(?<=^|[.!?]\s+)Now\s+(?:your\s+)?[A-Z][^:.!?\n$]{0,80}:/m;
+
+function nowHeading(text: string): VoiceBreak[] {
+	const heading = NOW_HEADING.exec(text);
+	return heading ? [{ rule: "now-heading", excerpt: heading[0] }] : [];
 }
 
 function lessonOpenedOn(messages: readonly LhMessage[]): { topics: string[]; title: string } | null {
@@ -1292,6 +1343,9 @@ export class VoiceGuard {
 	/** A message shown this turn ended on a question: it stays the turn's
 	 *  last ask. */
 	private lastAsked = false;
+	/** The last message of a reply he stopped once it had ended on his
+	 *  move, which this turn resumes: it adds no words (round 21, m14). */
+	private readonly stoppedOnMove: string | null;
 	/** His messages this turn read mid-reply that no message ending on a
 	 *  statement has followed yet: each lets one message answer it, after
 	 *  the question too (round 14, 4 major 1: "also, does the ratio test
@@ -1344,6 +1398,8 @@ export class VoiceGuard {
 		titles?: () => Promise<readonly string[]>,
 	) {
 		this.input = turnInputOf(messages);
+		const resumed = resumedSays(messages).at(-1);
+		this.stoppedOnMove = resumed && endsOnHisMove(resumed) ? (sentences(resumed).at(-1)?.trim() ?? resumed) : null;
 		const opened = messages[messages.findLastIndex(opensTurn)];
 		this.closing = opened?.role === "custom" && opened.customType === "done-tonight";
 		const done = opened?.role === "custom" && opened.customType === "done-tonight" ? (opened.details as unknown) : undefined;
@@ -1559,6 +1615,7 @@ export class VoiceGuard {
 			}
 			const answersHim = this.unanswered > 0 && !text.trim().endsWith("?");
 			if (this.lastAsked && this.owed === 0 && !answersHim) return AFTER_ASKING(text);
+			if (this.stoppedOnMove && this.sent === 0 && this.owed === 0 && !answersHim) return AFTER_STOP(this.stoppedOnMove, text);
 			const ruled = this.rulings.length > 0 && this.sent === 0 && !this.heldRulingSaid && !this.rulings.some((r) => sameRuling(text, r));
 			if (ruled) {
 				this.heldRulingSaid = true;
@@ -1653,7 +1710,7 @@ export class VoiceGuard {
 			this.heldRetry = true;
 			return RETRY(this.firstTry!.question);
 		}
-		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text), ...this.lessonUnnamed(text), ...rowLabel(text)]);
+		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text), ...this.lessonUnnamed(text), ...rowLabel(text), ...nowHeading(text)]);
 		if (breaks.length > 0) {
 			this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 			return refusal("question", call.name, text, breaks, undefined);
@@ -1828,7 +1885,7 @@ export class VoiceGuard {
 		if (vagueDay) out.push({ rule: "vague-day", excerpt: vagueDay });
 		const halfNoDay = closes && !unplaced ? sentences(text).map((s) => s.trim()).find((s) => /\bhalf(?:-finished)? answer\b/i.test(s) && !DAY_WORDS.test(s)) : undefined;
 		if (halfNoDay) out.push({ rule: "half-answer-day", excerpt: halfNoDay });
-		out.push(...rowLabel(text));
+		out.push(...rowLabel(text), ...nowHeading(text));
 		const commaTitle = titleAfterComma(text, this.titles);
 		if (commaTitle) out.push({ rule: "title-comma", excerpt: commaTitle });
 		const vague = VAGUE_MOVES.exec(text);

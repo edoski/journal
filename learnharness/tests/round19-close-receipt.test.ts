@@ -26,9 +26,9 @@ import { newDoneTonightMessage, newUserMessage, type LhMessage } from "../src/co
 const USAGE = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 let n = 0;
 const assistant = (content: unknown[], stopReason: "stop" | "toolUse" = "toolUse") =>
-	({ id: `a${++n}`, role: "assistant", content, api: "faux", provider: "test", model: "test", usage: USAGE, stopReason, timestamp: n }) as unknown as LhMessage;
+	({ id: `a${++n}`, role: "assistant", content, api: "faux", provider: "test", model: "test", usage: USAGE, stopReason, timestamp: Date.now() + n }) as unknown as LhMessage;
 const result = (toolCallId: string, toolName: string, details: unknown) =>
-	({ id: `r${++n}`, role: "toolResult", toolCallId, toolName, content: [{ type: "text", text: "ok" }], details, isError: false, timestamp: n }) as unknown as LhMessage;
+	({ id: `r${++n}`, role: "toolResult", toolCallId, toolName, content: [{ type: "text", text: "ok" }], details, isError: false, timestamp: Date.now() + n }) as unknown as LhMessage;
 const call = (id: string, name: string, args: unknown) => ({ type: "toolCall", id, name, arguments: args });
 const text = (t: string) => ({ type: "text", text: t });
 
