@@ -146,12 +146,15 @@ class Weekday:
 @dataclass(frozen=True)
 class Capacity:
     """His estimated week, Monday first, and the study days behind it, less
-    the days he sits an exam (``off``)."""
+    the days he sits an exam (``off``); and the Journal's days off
+    (``rests``), which may hold reviews but start no new topic (Edo, 23 Nov
+    2026: a first lesson is the heaviest study)."""
 
     weekdays: tuple[Weekday, ...]
     study_weekdays: frozenset[int]
     evidence: float
     off: frozenset[date] = field(default=frozenset())
+    rests: frozenset[date] = field(default=frozenset())
     rooms: dict[tuple[date, str], int] = field(
         default_factory=dict, compare=False, hash=False, repr=False
     )
@@ -161,6 +164,21 @@ class Capacity:
         """Whether he studies on this day: on his study weekdays, as his
         recent weeks show, but not on a day he sits an exam."""
         return day.weekday() in self.study_weekdays and day not in self.off
+
+    def starts(self, day: date) -> bool:
+        """Whether the plan starts new topics on this day: a day he studies
+        that the Journal does not rest."""
+        return self.studies(day) and day not in self.rests
+
+    def rested(self, days: Iterable[date]) -> Capacity:
+        """The same week, starting no new topic on the Journal's ``days`` off
+        too (``rests``), once per read of the plan (``memo``)."""
+        rests = self.rests | frozenset(days)
+        if rests == self.rests:
+            return self
+        return memo.once(
+            "rested", (self, rests), lambda: replace(self, rests=rests, rooms={})
+        )
 
     def resting(self, days: Iterable[date]) -> Capacity:
         """The same week, holding nothing on ``days`` too: one week per read
@@ -221,13 +239,30 @@ class Capacity:
 
 
 def _room(week: Capacity, day: date, kind: str) -> int:
+    """A day's whole items of ``kind`` (``whole``). A day that starts no new
+    topic (``Capacity.starts``) gives its new topics' rate to the next day
+    that does, so a start the Journal's day off would have taken goes to the
+    next study day, and every other day keeps the starts it had."""
+
     def rate(other: date) -> float:
         if not week.studies(other):
             return 0.0
         limit: Limit = getattr(week.on(other), kind)
         return limit.value
 
-    return whole(day, rate)
+    if kind != "new" or not week.rests:
+        return whole(day, rate)
+
+    def carried(other: date) -> float:
+        if not week.starts(other):
+            return 0.0
+        total, before = rate(other), other - timedelta(days=1)
+        while not week.starts(before) and (other - before).days <= len(week.weekdays):
+            total += rate(before)
+            before -= timedelta(days=1)
+        return total
+
+    return whole(day, carried)
 
 
 def whole(day: date, rate: Callable[[date], float]) -> int:

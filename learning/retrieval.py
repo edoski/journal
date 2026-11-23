@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Collection, Iterable, Iterator, Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 import re
 from typing import Any
@@ -29,6 +29,7 @@ from learning import (
     told,
 )
 from learning.workspace import Workspace
+from sync.study.context import journal_summary, journal_vault
 
 EVIDENCE_BYTES = 6144
 KNOWLEDGE_BYTES = 3072
@@ -1305,12 +1306,41 @@ def daily(readable: Mapping[str, dict[str, Any]], today: date) -> agenda.Replay:
     replay reads each day's final review as that day did, so it is given
     each course as stored (``progress.begun``). It begins from the plan as
     the last day he studied ended, kept by that day's last read, and keeps
-    today's for tomorrow (``learning.told``)."""
+    today's for tomorrow (``learning.told``). No new topic starts on the
+    Journal's days off (``journal_rests``)."""
     stored = {name: progress.begun(record, today) for name, record in readable.items()}
     ended = told.load(stored, today, agenda.MAX_DAYS)
-    replayed = agenda.replay(stored, today, agenda.MAX_DAYS, ended=ended)
+    replayed = agenda.replay(
+        stored, today, agenda.MAX_DAYS, ended=ended, rests=journal_rests(today)
+    )
     told.keep(stored, today, agenda.MAX_DAYS, replayed)
     return replayed
+
+
+def journal_rests(today: date) -> frozenset[date]:
+    """The Journal's days off (its ``PROTOCOL.md`` schedule, read through
+    ``journal_summary``) from a year before ``today`` through the year the
+    plan reaches: the days the plan may review on but starts no new topic
+    (Edo, 23 Nov 2026). None while the Journal has no schedule or it cannot
+    be read."""
+    first = today - timedelta(days=agenda.MAX_DAYS)
+    last = today + timedelta(days=agenda.MAX_DAYS)
+    rests: set[date] = set()
+    day = first
+    while day <= last:
+        horizon = min(agenda.MAX_DAYS, (last - day).days + 1)
+        try:
+            summary = journal_summary(
+                journal_vault(), days=1, today=day, horizon=horizon
+            )
+        except (ValueError, OSError):
+            return frozenset()
+        upcoming = summary.get("upcoming_schedule")
+        for scheduled in upcoming if isinstance(upcoming, list) else ():
+            if scheduled["is_off_day"]:
+                rests.add(date.fromisoformat(scheduled["date"]))
+        day += timedelta(days=horizon)
+    return frozenset(rests)
 
 
 def when(workspace: Workspace, record: dict[str, Any], today: date) -> agenda.When:
@@ -1413,6 +1443,9 @@ def moved(
     began = replayed.began.when(name, today, True)
     mine = agenda.touched(record, today)
     left = replayed.left.get(name, set())
+    # A start he was told for a Journal day off moves off it by the plan's
+    # rule, not his study (``journal_rests``): no cause of his to name.
+    rests = journal_rests(today) if replayed.afresh else frozenset()
 
     def told_on(when: agenda.When, kind: str, key: str) -> date | None:
         return (when.reviews if kind == "review" else when.starts).get(key)
@@ -1478,6 +1511,8 @@ def moved(
                 # took the room a day left: nothing he left moved it, so it
                 # has no cause to name (round 17, 1 m1: "moved from Sunday 15
                 # November because yesterday's plan was not finished").
+                continue
+            elif kind == "starts" and before in rests:
                 continue
             elif replayed.afresh:
                 why = {
