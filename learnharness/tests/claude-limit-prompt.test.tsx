@@ -59,7 +59,8 @@ test("the prompt offers the account with the most left, then moves every agent t
 	await mount(() => { writesAtRetry = calls.filter((c) => c.method === "PUT").length; retryFailedResponse((input) => { sent.push(input); }, draft); });
 	assert(calls.some((c) => c.path === "/api/subscriptions/claude"), "the choice comes from the cached reading, which probes stale accounts");
 	const button = byTestid("claude-limit-continue");
-	assert.equal(button?.textContent, "Continue on Spare (70% left)");
+	assert.equal(button?.textContent, "Continue on Spare", "no count on it (round 20, m14)");
+	assert.equal(byTestid("claude-limit-out")?.textContent, `Main is out until ${claudeResetLabel(RESET)}.`, "the account and its reset, in the app's words");
 	await act(async () => { button!.click(); await new Promise((r) => setTimeout(r, 0)); });
 
 	const puts = calls.filter((c) => c.method === "PUT");

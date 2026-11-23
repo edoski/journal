@@ -7,9 +7,13 @@ import { chooseClaudeAccount, claudeResetLabel, readClaudeAccounts } from "@/com
 
 type Prompt = { state: "checking" } | { state: "ready"; statuses: ClaudeAccountStatus[] } | { state: "failed" };
 
-/** Shown under a turn that stopped at a Claude account's plan limit. Never
- * switches by itself: the learner clicks, and every agent moves to that
- * account. */
+/** The line for a turn that stopped at a Claude account's plan limit, in
+ * the app's words and Settings' time format: "F is out until Tuesday
+ * 04:00.", then the account to go on with (round 20, m14: the raw
+ * "Your Claude plan's usage limit is reached. It resets at Tue 4:00 AM.
+ * See https://claude.ai/settings/usage." stood in red, and the button
+ * read "Continue on E (84% left)"). Never switches by itself: the
+ * learner clicks, and every agent moves to that account. */
 export function ClaudeLimitPrompt({ failure, onContinue }: {
 	failure: { provider: string };
 	onContinue: () => void;
@@ -40,17 +44,24 @@ export function ClaudeLimitPrompt({ failure, onContinue }: {
 	}
 
 	if (prompt.state === "checking") return <span className="text-body text-muted-foreground" data-testid="claude-limit-checking">Checking your other Claude accounts…</span>;
-	if (prompt.state === "failed") return null;
+	if (prompt.state === "failed") {
+		return <span className="flex flex-wrap items-center gap-2">
+			<span className="text-body text-danger" data-testid="claude-limit-out">This Claude account is out for now.</span>
+			<Button variant="quiet" size="row" className="text-foreground" data-testid="claude-limit-retry" onClick={onContinue}>Try again</Button>
+		</span>;
+	}
 	const next = nextClaudeAccount(failure.provider, prompt.statuses);
 	if (!next) {
 		const reset = soonestClaudeReset(prompt.statuses);
 		return <span className="text-body text-muted-foreground" data-testid="claude-limit-none">All Claude accounts are at their limit{reset ? ` · the first resets ${claudeResetLabel(reset)}` : ""}</span>;
 	}
-	const left = next.usage ? ` (${next.usage.percentLeft}% left)` : "";
+	const out = prompt.statuses.find((status) => status.account.providerId === failure.provider);
+	const until = out?.usage?.resetsAt ? ` until ${claudeResetLabel(out.usage.resetsAt)}` : " for now";
 
 	return <span className="flex flex-wrap items-center gap-2">
+		<span className="text-body text-muted-foreground" data-testid="claude-limit-out">{out ? out.account.label : "This Claude account"} is out{until}.</span>
 		<Button variant="quiet" size="row" className="text-foreground" data-testid="claude-limit-continue" disabled={busy} onClick={() => void continueOn(next.account.providerId)}>
-			Continue on {next.account.label}{left}
+			Continue on {next.account.label}
 		</Button>
 		{error && <span role="alert" className="text-body text-danger">{error}</span>}
 	</span>;

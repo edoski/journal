@@ -256,6 +256,22 @@ export function leftOpenOf(messages: ReadonlyArray<{ parts: readonly QuestionPar
 	return null;
 }
 
+/** The question he set aside to ask the tutor something, while it is the
+ *  newest question the lesson holds: its call and words. Null when the
+ *  newest question was answered, or none was set aside. Pure. */
+export function askedAsideOf(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): { toolCallId: string; question: string } | null {
+	for (let mi = messages.length - 1; mi >= 0; mi--) {
+		const parts = messages[mi]!.parts;
+		for (let pi = parts.length - 1; pi >= 0; pi--) {
+			const part = parts[pi]!;
+			if (!asked(part)) continue;
+			const question = (part.input as { question?: unknown } | undefined)?.question;
+			return part.toolCallId && leftOpen(part.output) === "asked" && typeof question === "string" ? { toolCallId: part.toolCallId, question } : null;
+		}
+	}
+	return null;
+}
+
 /** The question calls that ask again the question he just pressed Hint on
  *  or set aside to ask the tutor something, in its words or reworded (the same
  *  identity `reaskedFrom` and the carry read). The tutor asks it again after

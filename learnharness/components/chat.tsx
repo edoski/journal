@@ -95,7 +95,7 @@ import { showsWorking } from "@/components/lesson/working-sign";
 import { boxAfterClose, boxLine, forgetRescue, keepRescue, overtakenDraft, rescuedBox, typedAfterSend, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendKeepingWords } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS, shortDay } from "@/components/study-words";
-import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, leftDraftAt, leftDraftOf, takeCarry, takeKeptPhotos, takeLessonBoxes } from "@/components/lesson/kept-drafts";
+import { carriedFor, carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, leftDraftAt, leftDraftOf, takeCarry, takeKeptPhotos, takeLessonBoxes } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine, doneTonightGone, focusAfterDone } from "@/components/lesson/done-tonight";
@@ -105,7 +105,7 @@ import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
 import { ProseAnswerProvider, useProseAnswer } from "@/components/lesson/prose/prose-answer";
 import { ProseQuestion } from "@/components/lesson/prose/prose-question";
-import { askedAgain, leftAskedBelow, leftOpenOf, reaskedFrom, spokenAbove } from "@/components/lesson/prose/prose-question-data";
+import { askedAgain, askedAsideOf, leftAskedBelow, leftOpenOf, reaskedFrom, spokenAbove } from "@/components/lesson/prose/prose-question-data";
 import { DisputeBubble, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 import { focusWhereHeTypes } from "@/components/ui/overlay";
@@ -1000,6 +1000,17 @@ export function Chat({
 	// before the reply began) says so, with Try again (turn-cut.ts).
 	const replyCut = status === "ready" && !busy && !error ? replyCutOf(nativeMessages) : null;
 	const sendAllowed = !pending && !activeProblem;
+	// The reply to his side question never came (a failure, a cut, the
+	// plan's limit): the answer he had written for the question he set
+	// aside waits in the carry for its re-ask, and the lesson shows it
+	// meanwhile, so it never seems lost (round 20, m14).
+	const askedAside = useMemo(() => (pending ? null : askedAsideOf(messages)), [messages, pending]);
+	const replyOwed = !busy && (replyCut !== null || (error !== null && !continuing));
+	const [askedDraft, setAskedDraft] = useState<string | null>(null);
+	useEffect(() => {
+		const carry = replyOwed && askedAside && carryScope ? carriedFor(carryScope, askedAside.question, askedAside.toolCallId) : undefined;
+		setAskedDraft(carry ? carriedForm(carry, true)?.text.trim() || null : null);
+	}, [replyOwed, askedAside?.toolCallId, carryScope]);
 	// The date divider of a session picked up on a later day: before the
 	// left question asked again, else before the first message this view adds.
 	const [openedWith] = useState(() => new Set(initialMessages.map((m) => m.id)));
@@ -1981,11 +1992,14 @@ export function Chat({
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && appBack === error && <p role="status" data-testid="app-back" className="text-body text-muted-foreground">{LESSON_WORDS.appBack}</p>}
-							{error && !continuing && appBack !== error && (
-								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} kept={refusedWords} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
-									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
-								</TurnError>
-							)}
+							{error && !continuing && appBack !== error && (claudeLimit ? (
+								<div role="alert" data-testid="turn-error" data-kind="limit" className="flex flex-wrap items-center gap-1 text-body">
+									<ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />
+								</div>
+							) : (
+								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} kept={refusedWords} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")} />
+							))}
+							{askedDraft && <p data-testid="asked-draft-kept" className="text-body text-muted-foreground">{LESSON_WORDS.askedDraftKept(askedDraft)}</p>}
 						</div>
 
 						{/* The dock's reserved tail (DockOverlay reports its height):
