@@ -449,7 +449,9 @@ export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly
 	const late = by(review, "too_late");
 	const second = sentence([
 		...(noDay.length > 0 ? [named ? `no study day is left in the final review for ${titleList(noDay)}` : "no study day is left in the final review"] : []),
-		...(full.length > 0 ? [named ? `the final review has no room for ${titleList(full)}${paceSaid ? "" : " at your pace"}` : paceSaid ? "the final review is full too" : "your pace fills every day of the final review"] : []),
+		// The final review's pace alone is a plan fact he can do nothing with: said only beside the exam's own pace
+		// (round 21, m2: "Your pace fills every day of the final review." under one topic left out).
+		...(full.length > 0 && (named || paceSaid) ? [named ? `the final review has no room for ${titleList(full)}${paceSaid ? "" : " at your pace"}` : "the final review is full too"] : []),
 		// A topic that starts too late is always named, names or not (round 18, m7: "One starts too close…", one what?).
 		...(late.length > 0 ? [`${titleList(late)} ${startsWord(late)} too close to the exam for a review`] : []),
 	]);
@@ -524,10 +526,12 @@ export function examLineWords(exam: Pick<CourseExam, "date" | "daysLeft">, start
 }
 
 /** The exam line when every topic starts in time but the final review
- *  leaves taught topics out, the names in the head's Which topics (round
- *  20, M2: Linear Algebra's head named 11 to 17 topics). Pure. */
-export function finalReviewLineWords(exam: Pick<CourseExam, "date" | "daysLeft">): string {
-	return `Your final review before ${examDayWords(exam)} leaves some topics out.`;
+ *  leaves taught topics out (`missed`): the one it leaves out by name,
+ *  else the names in the head's Which topics (round 20, M2: Linear
+ *  Algebra's head named 11 to 17 topics; round 21, m2: "leaves some
+ *  topics out" for one). Pure. */
+export function finalReviewLineWords(exam: Pick<CourseExam, "date" | "daysLeft">, missed: readonly string[]): string {
+	return `Your final review before ${examDayWords(exam)} leaves ${missed.length === 1 ? `out ${missed[0]}` : "some topics out"}.`;
 }
 
 /** Why a topic the exam ahead leaves out (`exam.leavesOut`) starts when

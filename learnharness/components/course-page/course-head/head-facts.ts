@@ -13,12 +13,22 @@ export function namesWords(names: readonly string[]): string {
 	return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
+/** The taught topics the exam's final review has no room for: the ones
+ *  he can do something about. One not started yet is left out of the
+ *  head, whose topic page says it misses the final review (round 21, m2:
+ *  "leaves some topics out" for Diagonalization alone, which starts 25 Nov
+ *  with nothing to review). Pure. */
+export function finalReviewMisses(map: Pick<CourseMap, "exam" | "topics">): CourseMapTopic[] {
+	return (map.exam?.unreviewed ?? []).flatMap((handle) => map.topics.find((t) => t.handle === handle && t.introduced != null && t.excluded === undefined) ?? []);
+}
+
 /** What the exam's plan leaves out, as the engine's `map` says it: the
  *  topics it has no room to start before the exam (`doesNotFit`), the
  *  ones its final review has no room for (`unreviewed`: taught, or started
  *  too late for a review), and the engine's reasons for each list, each
- *  once, in topic order (`why`). `ways` is what he can take up today:
- *  first the start the exam line names (`examLine`,
+ *  once, in topic order (`why`); nothing while it leaves out only topics
+ *  not started from the final review (`finalReviewMisses`). `ways` is what
+ *  he can take up today: first the start the exam line names (`examLine`,
  *  round 21, M1: the popover offered "Review Uniform distribution today"
  *  under "Start with Expectation and linearity."), then the rest in the
  *  order Home and the tutor take it: today's plan for the course,
@@ -42,6 +52,7 @@ export interface ExamGaps {
 export function examGaps(map: Pick<CourseMap, "exam" | "topics" | "edges" | "today">): ExamGaps | null {
 	const { exam } = map;
 	if (!exam || exam.daysLeft < 0) return null;
+	if ((exam.doesNotFit ?? []).length === 0 && finalReviewMisses(map).length === 0) return null;
 	const topicsOf = (handles: readonly TopicHandle[] = []) =>
 		handles.flatMap((handle) => {
 			const topic = map.topics.find((t) => t.handle === handle);

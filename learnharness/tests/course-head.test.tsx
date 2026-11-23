@@ -151,16 +151,20 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.equal(one.querySelector("[data-slot=exam-gaps-why]")?.textContent, "Your pace fills every study day before the exam.");
 		assert.deepEqual([...one.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.which, "Start Variance today", EXAM_GAP_WORDS.ask], "the exam line names no topic left out, so Which topics does, and the press names its topic (round 20, M2)");
 		const review = gapLine(gapped([], ["binomial"], { binomial: "full" }))!;
-		assert.equal(review.querySelector("[data-slot=exam-gaps-why]")?.textContent, "Your pace fills every day of the final review.");
-		assert.deepEqual([...review.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.which, "Review Binomial today", EXAM_GAP_WORDS.ask], "Which topics names Binomial (round 20, M2)");
-		const late = gapLine(gapped([], ["poisson"], { poisson: "too_late" }))!;
+		// Round 21, m2: no "Your pace fills every day of the final review.", and the head's line names Binomial, so
+		// Which topics has nothing more.
+		assert.ok(review.querySelector("[data-slot=exam-gaps-why]") === null, `no why: "${review.textContent}"`);
+		assert.deepEqual([...review.querySelectorAll("button")].map((b) => b.textContent), ["Review Binomial today", EXAM_GAP_WORDS.ask]);
+		// Round 21, m2: a final review that leaves out only topics not started says nothing on the head; their pages do.
+		assert.ok(gapLine(gapped([], ["poisson"], { poisson: "too_late" })) === null, "no gaps line");
+		const late = gapLine(gapped([], ["poisson", "binomial"], { poisson: "too_late", binomial: "full" }))!;
 		assert.equal(late.querySelector("[data-slot=exam-gaps-why]")?.textContent, "Poisson starts too close to the exam for a review.", "a topic that starts too late is named, never a bare One (round 18, m7)");
-		assert.deepEqual([...late.querySelectorAll("button")].map((b) => b.textContent), ["Start Poisson today", EXAM_GAP_WORDS.ask], "a topic never taught is started, never reviewed; the why names it, so no Which topics");
+		assert.deepEqual([...late.querySelectorAll("button")].map((b) => b.textContent), ["Review Binomial today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask], "the why names Poisson and the head's line Binomial, so no Which topics");
 		const both = gapLine(gapped(["variance", "geometric"], ["binomial"], { variance: "not_ready", geometric: "not_ready", binomial: "full" }))!;
 		assert.equal(
 			both.querySelector("[data-slot=exam-gaps-why]")?.textContent,
-			"What comes first won’t be solid in time. Your pace fills every day of the final review.",
-			"the engine's reason for each, each said once, in two sentences",
+			"What comes first won’t be solid in time.",
+			"the engine's reason for each, each said once, never the final review's pace alone (round 21, m2)",
 		);
 		assert.doesNotMatch(both.textContent ?? "", /\d/, "no counts");
 	});
@@ -253,7 +257,7 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 			assert.ok(!said.includes(head) && !head.includes(said.replace(/\.$/, "")), `no sentence of the head's line: "${said}"`);
 		}
 		// With the why naming every topic, there is nothing behind Which topics, and no press for it.
-		const named = gapped([], ["hyper"], { hyper: "too_late" });
+		const named = gapped([], ["hyper", "binomial"], { hyper: "too_late", binomial: "full" });
 		const bare = gapLine({ ...named, map: { ...named.map, topics: [...named.map.topics, topic("hyper", { title: "Hypergeometric distribution" })] } })!;
 		assert.ok(bare.querySelector("[data-slot=exam-gaps-which-press]") === null, "no Which topics with nothing more to show");
 	});
