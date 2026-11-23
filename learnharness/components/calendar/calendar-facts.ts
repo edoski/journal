@@ -1,4 +1,4 @@
-import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
+import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween, leftWords } from "@/components/unit-inbox/units";
 import { dayAndNearWords, distanceWords, heldExamWords, longDayWords, nextSessionWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
@@ -37,6 +37,8 @@ export type CalendarEntry =
 			road: readonly RoadWeek[];
 			finalReview: string | null;
 			doesNotFit: readonly string[];
+			/** The first topic the plan still starts before the exam, while some do not fit (`firstExamStart`). */
+			firstStart: string | null;
 			unreviewed: readonly ExamGapTopic[];
 			allStarted: boolean;
 			next: NextMove | null;
@@ -381,7 +383,7 @@ export function calendarEntries({
 				const reason = reasons[h];
 				return reason ? { title: titleOf(h), reason } : { title: titleOf(h) };
 			});
-			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, nextSession: nextSessionWords(map.exam), road, finalReview, doesNotFit: doesNotFit.map(titleOf), unreviewed, allStarted, next });
+			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, nextSession: nextSessionWords(map.exam), road, finalReview, doesNotFit: doesNotFit.map(titleOf), firstStart: firstExamStart(map)?.title ?? null, unreviewed, allStarted, next });
 		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, chats) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) => {
@@ -535,7 +537,21 @@ function listWords(items: readonly string[]): string {
 	return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-/** The topics the plan has no room to start before the exam, named. */
+/** The first topic the exam's plan still starts before the exam, the one
+ *  the exam line says to start with (`examLineWords`): of the topics not
+ *  started that the exam examines and that fit, the earliest the plan
+ *  starts, in path order on one day, so on the exam eve it is the start
+ *  Home's Today offers (round 20, M2). Null with none. Pure. */
+export function firstExamStart(map: Pick<CourseMap, "topics" | "exam">): CourseMapTopic | null {
+	const { exam } = map;
+	if (!exam) return null;
+	const out = new Set<string>([...(exam.doesNotFit ?? []), ...(exam.leavesOut ?? [])]);
+	const fits = map.topics.filter((t) => t.level === "new" && t.starts !== undefined && t.starts < exam.date && !out.has(t.handle));
+	return fits.sort((a, b) => a.starts!.localeCompare(b.starts!))[0] ?? null;
+}
+
+/** The topics the plan has no room to start before the exam, named: the
+ *  course head's Which topics. */
 export function misfitWords(titles: readonly string[]): string | null {
 	return titles.length > 0 ? `No room before the exam to start ${listWords(titles)}` : null;
 }

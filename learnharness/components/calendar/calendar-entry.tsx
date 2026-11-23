@@ -9,9 +9,10 @@ import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import type { Fact } from "@/components/unit-inbox/fact-icon";
 import { FactIcon, StatusMark } from "@/components/unit-inbox/status-mark";
-import { dayAndNearWords, distanceWords, finalReviewWords, longDayWords, lookOf, lookWords, LOOKS, misfitWords, roadLines, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
-import { finalReviewGapWords, pressWord } from "@/components/study-words";
+import { dayAndNearWords, distanceWords, finalReviewWords, longDayWords, lookOf, lookWords, LOOKS, roadLines, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
+import { examLineWords, FINAL_REVIEW_GAP_WORDS, pressWord } from "@/components/study-words";
 import { planDay } from "@/components/study-home/study-facts";
+import { daysBetween } from "@/components/unit-inbox/units";
 import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
 import { cn } from "@/lib/utils";
@@ -142,8 +143,7 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 	if (entry.kind === "exam") {
 		lines.push(dayAndNearWords(entry.day, longDayWords(entry.day), today));
 		if (entry.nextSession) lines.push(entry.nextSession);
-		const misfit = misfitWords(entry.doesNotFit);
-		if (misfit) lines.push(misfit);
+		if (entry.doesNotFit.length > 0) lines.push(examLineWords({ date: entry.day, daysLeft: daysBetween(today, entry.day) }, entry.firstStart));
 		if (entry.allStarted) lines.push("Every topic started");
 	} else if (entry.kind === "review") {
 		if (entry.overdue) lines.push(`Was due ${longDayWords(entry.dueOn ?? entry.day)}`);
@@ -185,7 +185,7 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
  *  then the final review. Nothing when the plan gives neither. */
 function Road({ entry, today }: { entry: Extract<CalendarEntry, { kind: "exam" }>; today: string }) {
 	const finalReview = finalReviewWords(entry.finalReview, today);
-	const unreviewed = finalReviewGapWords(entry.unreviewed);
+	const unreviewed = entry.unreviewed.length > 0 ? [FINAL_REVIEW_GAP_WORDS] : [];
 	if (entry.road.length === 0 && !finalReview) return null;
 	return (
 		<div data-slot="exam-road" className="flex flex-col gap-1.5 border-t border-border pt-3">

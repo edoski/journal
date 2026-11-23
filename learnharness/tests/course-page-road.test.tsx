@@ -163,8 +163,8 @@ describe("the readiness fact", () => {
 		const view = viewOf(course());
 		const short = examReady(readiness(part({ arc: a("eigen"), wontFit: [h("diag")] })), view.course.map, view.arcs, []);
 		const fact = render(<ReadyFact view={view} ready={short} />).querySelector('[data-slot="course-ready-fact"]')!;
-		const diag = view.course.map.topics.find((t) => t.handle === "diag")!.title;
-		assert.equal(text(fact), `No room before the exam to start ${diag}`);
+		// Round 20, M2: one sentence and the first topic the plan still starts, never the names of those that don't.
+		assert.equal(text(fact), "Not every exam topic fits before 3 Dec. Start with Kernel.");
 		assert.match(fact.className, /text-warning/);
 	});
 });

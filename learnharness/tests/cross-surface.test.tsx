@@ -80,6 +80,8 @@ interface Survey {
 	/** Each course page's Needs you: its rows' topics and words. */
 	needsYou: Map<string, Array<{ handle: string; text: string }>>;
 	briefs: Map<string, string>;
+	/** Home's exam line under its heading, if it draws one. */
+	misfit: string | null;
 }
 
 const keyOf = (workspace: string, handle: string) => `${workspace}#${handle}`;
@@ -111,6 +113,8 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 
 	await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 || !!document.querySelector('[data-slot="day-heading"]') });
 	// Where each line and card goes, read where it is drawn.
+	const misfitLine = document.querySelector('[data-slot="today-exam-misfit"]');
+	const misfit = misfitLine ? text(misfitLine) : null;
 	const home: Survey["home"] = [];
 	for (const line of app.homeLines()) home.push({ ...line, opens: await app.lookAt(line.el) });
 	const sidebar: Survey["sidebar"] = [];
@@ -176,7 +180,7 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 			if (brief) briefs.set(course.map.workspace, brief.text);
 		}),
 	);
-	return { label, today, courses, chats, home, sidebar, calendar, pages, heads, rows, needsYou, briefs };
+	return { label, today, courses, chats, home, sidebar, calendar, pages, heads, rows, needsYou, briefs, misfit };
 }
 
 // ─── 1. one day per topic ──────────────────────────────────────────────────
@@ -307,6 +311,32 @@ function openTasks(app: DemoApp, s: Survey): Array<{ course: CalendarCourse; tas
 }
 
 /** Whether a link opens a session's chat, however it asks the chat to open. */
+/**
+ * Round 20, M2 (1 N2, 2 A2): on the exam eve Home, the course head and the
+ * calendar's exam panel named 8 to 17 topics in an amber block and said
+ * nothing he could do. The exam line, wherever it is drawn, is one sentence
+ * that names at most the first topic he can still start, and when the plan
+ * starts that topic today Home's Today starts it.
+ */
+function assertExamLine(s: Survey): void {
+	const LINE = /Not every exam topic fits before [^.]+\.(?: Start with (.+?)\.)?/;
+	const failures: string[] = [];
+	const said: Array<[string, string]> = [...(s.misfit ? [["Home", s.misfit] as [string, string]] : []), ...[...s.heads].map(([ws, head]) => [`${short(ws)}'s head`, head] as [string, string])];
+	for (const [where, words] of said) {
+		if (/No room before the exam to start|full at your pace/.test(words)) failures.push(`${where} names the topics left out: "${words}"`);
+		const first = words.match(LINE)?.[1];
+		if (!first) continue;
+		const topic = s.courses.flatMap((c) => c.map.topics).find((t) => t.title === first);
+		if (topic?.starts === s.today && !s.home.some((l) => l.title.startsWith("Start ") && l.title.includes(first))) {
+			failures.push(`${where} says to start with ${first}, planned today, which Home's Today does not start: ${s.home.map((l) => l.title).join(" | ")}`);
+		}
+	}
+	for (const { entry, detail } of s.calendar.filter((d) => d.entry.kind === "exam")) {
+		if (/No room before the exam to start|No room in it for/.test(detail)) failures.push(`the calendar's ${entry.title} names the topics left out: "${detail}"`);
+	}
+	assert.ok(failures.length === 0, `${s.label}: ${failures.join("\n")}`);
+}
+
 const opensChat = (href: string | null | undefined, id: string) => href?.split("?")[0] === `/chat/${id}`;
 
 async function assertContinueOpensTask(app: DemoApp, s: Survey) {
@@ -850,7 +880,11 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 
 	it("Tue 17 Nov, two days before the Probability exam", async () => {
 		app.day("2026-11-17");
-		await holds("Tue 17 Nov", (s) => (finishedLesson ? assertFinishedLesson(app, s, finishedLesson) : assert.fail("the Tue 10 step finished the Linear maps lesson")));
+		await holds("Tue 17 Nov", (s) => {
+			assertExamLine(s);
+			if (finishedLesson) assertFinishedLesson(app, s, finishedLesson);
+			else assert.fail("the Tue 10 step finished the Linear maps lesson");
+		});
 	});
 
 	it("Tue 17 Nov, Ask the tutor from the Probability head, two review answers, then Done for today (round 16, M3: 1 M2)", async () => {

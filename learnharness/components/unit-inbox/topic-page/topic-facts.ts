@@ -210,7 +210,7 @@ export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
  *  19, m2). */
 /** What the exam ahead means for the topic: it leaves it out, or its plan
  *  has no room to start or review it; null otherwise. */
-const examWords = (topic: CourseMapTopic, map: CourseMap) => leftOutWords(topic, map.exam) ?? examGapTopicWords(topic, map.exam, map.today);
+const examWords = (topic: CourseMapTopic, map: CourseMap) => leftOutWords(topic, map.exam) ?? examGapTopicWords(topic, map.exam);
 
 /** `TopicFacts.startsWhy`: the exam first, since a topic it leaves out, or
  *  has no room for, waits for the exam whatever else it waits on. */

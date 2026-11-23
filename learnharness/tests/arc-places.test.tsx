@@ -200,13 +200,13 @@ describe("the topic page", () => {
 		const full = { ...LINALG.map, exam: { date: "2026-11-19", daysLeft: 11, doesNotFit: h("diag"), reasons: { diag: "full" as const } }, topics: LINALG.map.topics.map((t) => (t.handle === "diag" ? geometric : t)) };
 		const fullFacts = topicFacts({ course: { ...LINALG, map: full }, topic: geometric, chats: [], read: null });
 		const doc = render(<SectionsPane facts={fullFacts} busy={false} onAct={() => {}} onTask={() => {}} shown={null} onShow={() => {}} />);
-		assert.equal(doc.querySelector('[data-slot="pickup-now-note"]')?.textContent, "Planned Sat 28 Nov · Not before the exam, every study day is full at your pace");
+		assert.equal(doc.querySelector('[data-slot="pickup-now-note"]')?.textContent, "Planned Sat 28 Nov · Not before the exam");
 		assert.ok(doc.querySelector('[data-slot="pickup-now"] [data-slot="topic-starts-why"]') === null, "still no reason line under Now (round 12, 3 n9)");
 		// Diagonalization: no room before the exam, and no day in the plan's window at all (round 18, M1's seed).
 		const unplanned = { ...geometric, starts: undefined, startsWhy: undefined };
 		const none = { ...full, topics: full.topics.map((t) => (t.handle === "diag" ? unplanned : t)) };
 		const noneFacts = topicFacts({ course: { ...LINALG, map: none }, topic: unplanned, chats: [], read: null });
-		assert.equal(pickupSections(noneFacts).now.note, "Not before the exam, every study day is full at your pace");
+		assert.equal(pickupSections(noneFacts).now.note, "Not before the exam", "never full at your pace (round 20, M2)");
 	});
 });
 
