@@ -49,12 +49,18 @@ export const RIGHT_WORDS: Record<RightAnswer, string> = {
  *  own drops "check another day" once that day has come, beside the review
  *  due (round 8). `attempted` with no right answer since keeps its pie's
  *  words. A weak topic he could do on his own says how he answered it
- *  since its miss: right on his own, or with help when help repaired it.
+ *  since its miss: with help when help repaired it. A topic the engine
+ *  calls weak never reads right on his own: the engine's check is still
+ *  to come, "Check again another day", or "Check on your own" once its
+ *  review is due (round 20, m4).
  *  A topic that slips says `SLIPPING_WORDS` instead (`standingOf`). Pure. */
-export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review" | "signals" | "tasks">>): string {
+export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review" | "signals" | "tasks" | "weak">>): string {
 	if (lessonBegun(topic)) return LESSON_BEGUN;
 	const learning = topic.level === "assisted" || topic.level === "attempted";
-	const unaided = () => (topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS.unaided);
+	// Right on his own on a topic the engine calls weak is the engine's check still to come, never "Right on your own":
+	// it stays weak until a later day's answer on his own, and its weakness holds back what needs it (round 20, m4:
+	// Binomial read "Right on your own, check another day" while the engine held it weak and held Poisson back).
+	const unaided = () => (topic.weak ? (topic.review?.kind === "due" ? SLIP_WORDS.check : SLIP_WORDS.repaired) : topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS.unaided);
 	if (learning && topic.right) return topic.right === "unaided" ? unaided() : RIGHT_WORDS[topic.right];
 	// No right answer since his newest wrong one, on a topic still being learned.
 	if (topic.level === "assisted") return WRONG_LAST_WORDS;

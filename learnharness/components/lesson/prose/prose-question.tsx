@@ -36,7 +36,7 @@ export function YourTurn({ above = false }: { above?: boolean }) {
  *  its reply is the one guarded voice he reads (round 8: the unguarded
  *  card stated a false fact, opened above a stop marker before any reply,
  *  and named the same thing as practice's "Model solution"). */
-export function ProseQuestion({ tool, toolCallId, input, output, photos, open, stepAnchor, repeat = false, afterHint = false, askedBelow = false, spoken = false }: {
+export function ProseQuestion({ tool, toolCallId, input, output, photos, open, history = false, stepAnchor, repeat = false, afterHint = false, askedBelow = false, spoken = false }: {
 	tool: string;
 	toolCallId: string;
 	input: unknown;
@@ -45,6 +45,10 @@ export function ProseQuestion({ tool, toolCallId, input, output, photos, open, s
 	photos?: readonly Photo[];
 	/** This is the question waiting for him. */
 	open: boolean;
+	/** The session is history (its course was deleted): its open question
+	 *  stays as the tutor asked it, waiting on nobody, with no "Your turn"
+	 *  (round 20, m5). */
+	history?: boolean;
 	/** The plan step this question first taught, when the roadmap opens
 	 *  the transcript here (roadmap-facts.ts). */
 	stepAnchor?: string;
@@ -61,7 +65,7 @@ export function ProseQuestion({ tool, toolCallId, input, output, photos, open, s
 }) {
 	const spec = proseQuestionSpec(tool, toolCallId, input);
 	if (!spec) return null;
-	if (open) return <OpenQuestion spec={spec} stepAnchor={stepAnchor} repeat={repeat} afterHint={afterHint} spoken={spoken} />;
+	if (open) return <OpenQuestion spec={spec} stepAnchor={stepAnchor} repeat={repeat} afterHint={afterHint} spoken={spoken} history={history} />;
 	if (!output) return null;
 	return <AnsweredQuestion spec={spec} toolCallId={toolCallId} input={input} output={output} photos={photos} stepAnchor={stepAnchor} repeat={repeat || spoken} askedBelow={askedBelow} />;
 }
@@ -83,12 +87,13 @@ export function QuestionWords({ spec, compact = false }: { spec: ProseQuestionSp
  *  which may end in a question of its own (round 12, 3 D11), and "Your
  *  turn" alone stood over nothing (round 19, m21). The tutor's offer to go
  *  on asks nothing of him, so it has no "Your turn" (round 19, m21). */
-function OpenQuestion({ spec, stepAnchor, repeat, afterHint, spoken }: { spec: ProseQuestionSpec; stepAnchor?: string; repeat: boolean; afterHint: boolean; spoken: boolean }) {
-	const answer = useProseAnswerContext();
+function OpenQuestion({ spec, stepAnchor, repeat, afterHint, spoken, history }: { spec: ProseQuestionSpec; stepAnchor?: string; repeat: boolean; afterHint: boolean; spoken: boolean; history: boolean }) {
+	const context = useProseAnswerContext();
+	const answer = history ? null : context;
 	const selected = answer?.selection.selected ?? new Set<number>();
 	return (
-		<div data-testid="prose-question" data-slot="prose-question" data-open="" data-repeat={repeat ? "" : undefined} data-step-anchor={stepAnchor} className="mt-2">
-			{!spec.offer && <YourTurn above={repeat && !afterHint && !spoken && spec.mode === "text"} />}
+		<div data-testid="prose-question" data-slot="prose-question" data-open={history ? undefined : ""} data-repeat={repeat ? "" : undefined} data-step-anchor={stepAnchor} className="mt-2">
+			{!spec.offer && !history && <YourTurn above={repeat && !afterHint && !spoken && spec.mode === "text"} />}
 			{(!repeat || afterHint) && !spoken && <QuestionWords spec={spec} />}
 			{spec.mode !== "text" && (
 				<ChoiceRows

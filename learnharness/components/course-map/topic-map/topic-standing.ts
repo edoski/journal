@@ -62,24 +62,28 @@ export function slipBeside(topic: CourseMapTopic, titleOf: (handle: TopicHandle)
 	return slipsNow(topic) || topic.signals.mistake ? slipMark(topic.signals, titleOf) : null;
 }
 
-/** What a card can say under its title in place of where he stands: a
- *  fact about the topic that needs him. When a review comes back, when he
- *  last studied it and where he is never take the line, nor does where a
- *  session on it stands: a card is the topic's, as Builds on shows it
- *  (round 15, m8: "Basis and dimension · Your turn" on Diagonalization's
- *  map, "On your own" under its Builds on). */
-export type CardFact = Exclude<TopicFact, { kind: "back" | "studied" | "here" | "your-turn" | "working" | "stopped" | "task" }>;
+/** What a card can say in its header in place of where he stands: what
+ *  the topic's own open session says (`Said.now`: "Your turn", "Left off
+ *  today"; round 20, m4: mid-lesson, the card of the topic being taught
+ *  read "Not right last time"), else a fact about the topic that needs
+ *  him. When a review comes back, when he last studied it and where he is
+ *  never take the line, nor does the sidebar's fact for a session or a
+ *  task: only the topic's own open session speaks for it, so no session
+ *  long moved past and no task's day reads on a card (round 15, m8). */
+export type CardFact = Exclude<TopicFact, { kind: "back" | "studied" | "here" }>;
 
 const NOT_ON_A_CARD: ReadonlySet<TopicFact["kind"]> = new Set(["back", "studied", "here", "your-turn", "working", "stopped", "task"]);
 
 /**
- * The one line a card says under its title (spec: topic-map.md, Node):
- * the sidebar's fact for the topic (`sidebarSays`) when it is the topic's
- * own and needs him (a slip, a review due, a start planned), else null,
- * and the card says where he stands. One source, so a card says what the
- * sidebar's row and the course page's row say of the topic. Pure.
+ * The one line a card says in its header (spec: topic-map.md, Node): the
+ * topic's own open session's status (`Said.now`), else the sidebar's fact
+ * for the topic (`sidebarSays`) when it is the topic's own and needs him
+ * (a slip, a review due, a start planned), else null, and the card says
+ * where he stands. One source, so a card says what the sidebar's row, the
+ * course page's row and the topic's page say of the topic. Pure.
  */
 export function cardLine(said: Said | undefined): CardFact | null {
+	if (said?.now) return said.now;
 	const fact = said?.fact ?? null;
 	return fact && !NOT_ON_A_CARD.has(fact.kind) ? (fact as CardFact) : null;
 }

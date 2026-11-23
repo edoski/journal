@@ -153,7 +153,7 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 	} else if (entry.kind === "new") {
 		lines.push(entry.day === today ? "Planned for today" : `Planned for ${dayAndNearWords(entry.day, longDayWords(entry.day), today)}`);
 		if (entry.waits) lines.push(entry.waits);
-	} else if (entry.task.step) {
+	} else if (entry.task?.step) {
 		lines.push(`Left at: ${entry.task.step}`);
 	}
 	return (

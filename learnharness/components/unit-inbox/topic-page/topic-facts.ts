@@ -1,8 +1,8 @@
 import { isReviewSession, markHow, namedArc, topicOpening, type ArcHandle, type NamedArc, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, lessonBegun, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyShort, startsWhyTells, startsWhyWords, studiedDaysWords, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
-import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
-import { daysBetween, mapsOn, shelfOf, taskSessions, topicSessions, worksOn } from "@/components/unit-inbox/units";
+import { closedReview, continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
+import { daysBetween, mapsOn, shelfOf, taskSessions, topicSession, topicSessions, worksOn, type SessionFact } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { continueWords } from "@/components/study-home/study-facts";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
@@ -33,14 +33,6 @@ export type Press = { open: ChatListItem } | { opening: string; from?: string };
 export function pressOf(move: ContinueMove | null, opening: string): Press {
 	if (move?.kind === "open") return { open: move.chat };
 	return move ? { opening, from: move.from.id } : { opening };
-}
-
-/** A review he closed with Done for today on an open question: it rides
- *  with the topic's next review rather than leading the page as a session
- *  to resume (round 10, 1 m7: Eigen's page read "Now · Resume · Left off
- *  today" on the review that had just dated the next one). Pure. */
-export function closedReview(chat: ChatListItem): boolean {
-	return isReviewSession(chat) && sessionState(chat) === "left";
 }
 
 /** Continue on a task or a topic, as the page's action. */
@@ -116,6 +108,12 @@ export interface TopicFacts {
 	 *  not started that has a session, where "Not started" would contradict
 	 *  the lesson. */
 	standing: Standing | null;
+	/** What the topic's own open session says (`Said.now`), which the head
+	 *  says in place of the standing's words, as its map card does: a
+	 *  lesson in progress reads "Your turn" or "Left off today", never its
+	 *  last answer's mark (round 20, m4). Null when no session on it is
+	 *  open. */
+	now: SessionFact | null;
 	/** What the head says beside the pie; empty when the line is silent. */
 	marks: readonly HeadMark[];
 	/** The engine's diagnosed mistake, else the last attempt of a topic it
@@ -250,7 +248,7 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
  */
 export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): TopicAction {
 	const sessions = topicSessions(chats, map.workspace, topic.handle).filter((chat) => worksOn(chat, topic.handle));
-	const active = resumableSession(sessions.filter((chat) => !closedReview(chat)), chats);
+	const active = topicSession(sessions, topic.handle, chats);
 	if (active) return { kind: sessionState(active) === "working" ? "open" : "resume", chat: active };
 	if (topic.review?.kind === "due") {
 		const left = sessions.find(closedReview);
@@ -414,6 +412,7 @@ export function topicFacts({
 		topic,
 		today: map.today,
 		standing: silent ? null : standingOf(topic),
+		now: said.get(topic.handle)?.now ?? null,
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
 		mistake: mistakeOf(topic, attempts),
 		// A topic the exam leaves out stays left out once he starts it: its review says so (the demo world's

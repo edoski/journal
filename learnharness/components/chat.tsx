@@ -1892,6 +1892,7 @@ export function Chat({
 																output={part.state === "output-available" ? (part.output as QuestionAnswerData) : undefined}
 																photos={part.photos as Photo[] | undefined}
 																open={pending?.toolCallId === part.toolCallId && part.state !== "output-available"}
+																history={courseGone}
 																stepAnchor={stepAnchor}
 																repeat={reasked.has(part.toolCallId!)}
 																afterHint={reaskedAfterHint.has(part.toolCallId!)}
@@ -1910,7 +1911,7 @@ export function Chat({
 														// A problem is the tutor's words, its end a mark and a
 														// disclosure (prose-practice.tsx).
 														if (part.type === "tool-problem") {
-															return <ProseProblem key={pi} input={part.input} active={part.toolCallId === activeProblemCallId} />;
+															return <ProseProblem key={pi} input={part.input} active={!courseGone && part.toolCallId === activeProblemCallId} />;
 														}
 														if (part.type === "tool-conclude") {
 															if (doneMarks.moved.has(partKey(mi, pi))) return null;

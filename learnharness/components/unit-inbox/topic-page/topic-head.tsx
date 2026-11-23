@@ -3,7 +3,7 @@ import { MathText } from "@/components/ui/math-text";
 import { PageFact, PageHead } from "@/components/page-frame/page-frame";
 import { arcHref, courseHref } from "@/components/unit-inbox/unit-href";
 import type { HeadMark, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
-import type { Fact } from "@/components/unit-inbox/fact-icon";
+import { factInk, type Fact } from "@/components/unit-inbox/fact-icon";
 import { FactIcon } from "@/components/unit-inbox/status-mark";
 import { Crumbs, type Crumb } from "@/components/nav/crumbs";
 
@@ -36,7 +36,7 @@ function placeOf({ course, arc }: TopicFacts): Crumb[] {
  * history's Now, so the head has no button.
  */
 export function TopicHead({ facts, children }: { facts: TopicFacts; children?: React.ReactNode }) {
-	const { standing, marks, mistake } = facts;
+	const { standing, now, marks, mistake } = facts;
 	return (
 		<PageHead
 			compact
@@ -44,11 +44,19 @@ export function TopicHead({ facts, children }: { facts: TopicFacts; children?: R
 			standing={
 				<>
 					<Crumbs crumbs={placeOf(facts)} className="h-5" />
-					{standing && (
-						<PageFact icon={<TopicGlyph standing={standing} />} data-kind="standing">
+					{now ? (
+						// The topic's own open session speaks for it, as its map card does (round 20, m4).
+						<PageFact icon={<FactIcon fact={{ kind: now.kind }} className="size-4" />} data-kind="standing" data-session={now.kind} className={factInk(now.kind)}>
 							{PAUSE}
-							{standing.words}
+							{now.words}
 						</PageFact>
+					) : (
+						standing && (
+							<PageFact icon={<TopicGlyph standing={standing} />} data-kind="standing">
+								{PAUSE}
+								{standing.words}
+							</PageFact>
+						)
 					)}
 					{marks.map((mark) => (
 						<PageFact key={mark.kind} icon={<FactIcon fact={markFact(mark)} className="size-4" />} data-kind={mark.kind}>

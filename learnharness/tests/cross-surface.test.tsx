@@ -32,7 +32,10 @@
  * 9. a topic's page resumes a session only when the session's own record
  *    did work on the topic: a press opened it there, it saved an answer or
  *    a task on it, or its plan teaches it, never because his question named
- *    the topic (round 16, M3: 1 M2; M4: 3 N1).
+ *    the topic (round 16, M3: 1 M2; M4: 3 N1);
+ * 10. a topic whose page resumes a session of its own says that session's
+ *    status in its head and on Home's map card, and a topic with none says
+ *    no session's status there (round 20, m4: 3 n5).
  *
  * It seeds its own copy of the world each run (about a minute) and reads
  * the real engine, so it runs where the seed and the engine are installed.
@@ -64,6 +67,8 @@ interface TopicPage {
 	scheduledOn: string | undefined;
 	text: string;
 	opens: string | null;
+	/** The head's standing fact: where he stands, or its open session's status. */
+	head: string;
 }
 
 interface Survey {
@@ -72,6 +77,8 @@ interface Survey {
 	courses: readonly CalendarCourse[];
 	chats: readonly ChatListItem[];
 	home: Array<HomeLine & { opens: string | null }>;
+	/** Home's map cards, by the topic page each opens: the words in each card's header. */
+	cards: Map<string, string>;
 	sidebar: Array<SidebarCard & { opens: string | null }>;
 	calendar: Awaited<ReturnType<DemoApp["calendar"]>>["drawn"];
 	pages: Map<string, TopicPage>;
@@ -117,6 +124,11 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 	const misfit = misfitLine ? text(misfitLine) : null;
 	const home: Survey["home"] = [];
 	for (const line of app.homeLines()) home.push({ ...line, opens: await app.lookAt(line.el) });
+	const cards: Survey["cards"] = new Map();
+	for (const card of document.querySelectorAll('[data-slot="home-map-course"] a[data-slot="course-map-node"]')) {
+		// The status slot's pause for a screen reader (", ") is not its words.
+		cards.set(card.getAttribute("href") ?? "", text(card.querySelector('[data-slot="topic-need"], [data-slot="topic-standing"]')).replace(/^,\s*/, ""));
+	}
 	const sidebar: Survey["sidebar"] = [];
 	for (const card of app.sidebarCards()) {
 		// A Sessions row is itself the press that opens its session (since the shelves went, 16 Nov 2026).
@@ -142,6 +154,8 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 				scheduledOn: scheduledDay(page.querySelector('[data-slot="pickup-scheduled"]'), today),
 				text: `${text(page.querySelector('[data-slot="page-head"]'))} ${text(page.querySelector('[data-slot="topic-panes"]'))}`,
 				opens: press ? await app.lookAt(press) : null,
+				// The screen reader's pause before the fact (". ") is not its words.
+				head: text(page.querySelector('[data-slot="page-head"] [data-kind="standing"]')).replace(/^\.\s*/, ""),
 			});
 		},
 	);
@@ -180,7 +194,7 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 			if (brief) briefs.set(course.map.workspace, brief.text);
 		}),
 	);
-	return { label, today, courses, chats, home, sidebar, calendar, pages, heads, rows, needsYou, briefs, misfit };
+	return { label, today, courses, chats, home, cards, sidebar, calendar, pages, heads, rows, needsYou, briefs, misfit };
 }
 
 // ─── 1. one day per topic ──────────────────────────────────────────────────
@@ -395,7 +409,7 @@ async function assertContinueOpensTask(app: DemoApp, s: Survey) {
 		}
 		// The calendar.
 		for (const { entry, opens } of s.calendar) {
-			if (entry.kind === "task" && entry.task.key === task.key && entry.course.workspace === course.map.workspace) {
+			if (entry.kind === "task" && entry.task?.key === task.key && entry.course.workspace === course.map.workspace) {
 				offered = true;
 				went("the calendar", opens);
 			}
@@ -506,6 +520,32 @@ async function assertOneStatusEverywhere(s: Survey) {
 		}
 	}
 	assert.ok(problems.length === 0, `${s.label}: one session, two statuses or two lines:\n  ${problems.join("\n  ")}`);
+}
+
+// ─── 10. a topic with an open session says its status ──────────────────────
+
+/** Round 20, m4 (3 n5, 2 A1): mid-lesson, Home's map card for the topic being taught read "Not right last time", and
+ *  its head read its last mark. A topic whose page resumes a session of its own (Now's Resume or Open) says that
+ *  session's status, as Now does, in its head and on Home's map card; a topic with none never says a session's
+ *  status there. */
+async function assertSessionStatusOnTopic(s: Survey) {
+	const { unitHref } = await import("../components/unit-inbox/unit-href.ts");
+	const status = /^(Your turn|Tutor writing|Left off |Stopped by you|Try again|Reply cut off)/;
+	const problems: string[] = [];
+	for (const course of s.courses) {
+		for (const topic of course.map.topics) {
+			const page = s.pages.get(keyOf(course.map.workspace, topic.handle));
+			if (!page) continue;
+			const resumes = page.press === "Resume" || page.press === "Open";
+			const card = s.cards.get(unitHref(course.map.workspace, topic.handle));
+			const said: Array<[string, string]> = [["its head", page.head], ...(card !== undefined ? ([["Home's map card", card]] as Array<[string, string]>) : [])];
+			for (const [where, words] of said) {
+				if (resumes && words !== page.note) problems.push(`${topic.title}: Now resumes its session ("${page.note}"), ${where} says "${words}"`);
+				if (!resumes && status.test(words)) problems.push(`${topic.title}: no session of its own to resume (Now "${page.now} · ${page.press}"), ${where} says "${words}"`);
+			}
+		}
+	}
+	assert.ok(problems.length === 0, `${s.label}: a topic's open session:\n  ${problems.join("\n  ")}`);
 }
 
 // ─── 7. Needs you is what Today asks ───────────────────────────────────────
@@ -668,7 +708,7 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 	async function holds(label: string, also: (s: Survey) => Promise<void> | void = () => {}) {
 		const s = await survey(app, label);
 		const failures: string[] = [];
-		for (const check of [() => assertOneDay(s), () => assertOneStatus(s), () => assertExamWarnings(s), () => assertNeedsYouOnToday(s), () => assertOneStatusEverywhere(s), () => also(s), () => assertContinueOpensTask(app, s), () => assertFiledByWork(app, s)]) {
+		for (const check of [() => assertOneDay(s), () => assertOneStatus(s), () => assertExamWarnings(s), () => assertNeedsYouOnToday(s), () => assertOneStatusEverywhere(s), () => assertSessionStatusOnTopic(s), () => also(s), () => assertContinueOpensTask(app, s), () => assertFiledByWork(app, s)]) {
 			try {
 				await check();
 			} catch (err) {

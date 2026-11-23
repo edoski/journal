@@ -64,7 +64,9 @@ export type CalendarEntry =
 			day: string;
 			title: string;
 			course: CourseRef;
-			task: CourseMapTask;
+			/** The open task, or null for a session left for next time
+			 *  that holds none (practice on its topics). */
+			task: CourseMapTask | null;
 			topic: CourseMapTopic | null;
 			/** Continue, as Home's line for the task takes it (`courseMove`):
 			 *  the session that holds it, else a new one (round 13, N6: it
@@ -438,21 +440,25 @@ export function calendarEntries({
 			if (holder && isReviewSession(holder) && sessionState(holder) === "left") continue;
 			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: holder?.title ?? task.title, course, task, topic: holders[0] ?? null, move: taskMove(studied, chats, task), status: openWorkStatus(studied, holder ?? null, task) });
 		}
-		// The rest of a lesson he left for next time today goes on the course's next study day the plan holds, as the
-		// close says it carries on (round 17, m14: only the next day's reviews showed). One entry that continues it, in
-		// the words of Home's row for it, its title and its status (round 18, m12: "Invertible matrices lesson ·
-		// Unfinished" here, "Continue Invertible matrices lesson · Left off today" on Home). It is the one entry of the left
-		// work, and it says the day it was left as that day reads from its own, "Left off 10 Nov", never "Left off today"
-		// on a later day; today's entry is what he did (round 19, m6: "Stirling's formula lesson · Left off today" on Tue 10
-		// and "Continue Stirling's formula lesson · Left off today" on Wed 11).
+		// The rest of work he left for next time today goes on the course's next study day the plan holds, as the close
+		// says it carries on (round 17, m14: only the next day's reviews showed). One entry that continues it, in the words
+		// of Home's row for it, its title and its status (round 18, m12: "Invertible matrices lesson · Unfinished" here,
+		// "Continue Invertible matrices lesson · Left off today" on Home). It is the one entry of the left work, and it
+		// says the day it was left as that day reads from its own, "Left off 10 Nov", never "Left off today" on a later
+		// day; today's entry is what he did (round 19, m6). Every session the session state reads as left is such work,
+		// practice as a lesson; a review rides with its topics' next review (round 20, m3: Rank practice, whose close said
+		// it continues Monday, was missing from Mon 9, and read "Left off today" on Sun 8 beside the lessons' "Lesson").
+		// Work whose topic the plan starts on a later day is that start.
 		const next = planned.find((day) => day.date > today)?.date;
-		for (const task of next ? map.tasks : []) {
-			const holders = taskTopics(task, map).map((t) => t.handle);
-			const lesson = ofToday(map.workspace).find((chat) => sessionType(chat) === "lesson" && sessionState(chat) === "left" && holdsTask(chat, task, holders));
-			if (!lesson || planned.some((day) => day.date > today && day.new.some((h) => holders.includes(h)))) continue;
-			carried.add(lesson.id);
-			const title = lessonTitle({ kind: "session", chat: lesson, course: studied });
-			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}@${next}`, day: next!, title, course, task, topic: taskTopics(task, map)[0] ?? null, move: { kind: "open", chat: lesson }, status: leftWords(lesson, next!) });
+		for (const chat of next ? ofToday(map.workspace) : []) {
+			if (sessionState(chat) !== "left" || sessionType(chat) === "review") continue;
+			const task = map.tasks.find((t) => holdsTask(chat, t, taskTopics(t, map).map((h) => h.handle))) ?? null;
+			const holders = task ? taskTopics(task, map).map((t) => t.handle) : (chat.ownTopics ?? []);
+			if (planned.some((day) => day.date > today && day.new.some((h) => holders.includes(h)))) continue;
+			carried.add(chat.id);
+			const title = lessonTitle({ kind: "session", chat, course: studied });
+			const id = task ? `task:${map.workspace}#${task.key}@${next}` : `left:${chat.id}@${next}`;
+			entries.push({ kind: "task", id, day: next!, title, course, task, topic: task ? (taskTopics(task, map)[0] ?? null) : sessionTopic(chat, courses), move: { kind: "open", chat }, status: leftWords(chat, next!) });
 		}
 	}
 	for (const chat of chats) {
