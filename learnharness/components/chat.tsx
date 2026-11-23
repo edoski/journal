@@ -90,7 +90,7 @@ import { SectionBreak } from "@/components/lesson/section-break";
 import { TaskContinueLine } from "@/components/lesson/task-continue-line";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
-import { ScrollCueButton } from "@/components/lesson/scroll-cue";
+import { replyKey, ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
 import { boxAfterClose, boxLine, forgetRescue, keepRescue, overtakenDraft, rescuedBox, typedAfterSend, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendKeepingWords } from "@/components/lesson/sent-draft";
@@ -2023,6 +2023,7 @@ export function Chat({
 					focusEpoch={focusEpoch}
 					overtakenLine={boxLine(overtaken, proseOpen !== null, messageHidden && proseAnswer.mode === "answer" && !busy)}
 					replyAnchorRef={replyAnchorRef}
+					reply={replyKey(messages)}
 					onJumpToLatest={jumpToLatest}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
 					setupCta={
@@ -2171,6 +2172,7 @@ function DockOverlay({
 	focusEpoch,
 	overtakenLine,
 	replyAnchorRef,
+	reply,
 	onJumpToLatest,
 	setupCta,
 	queuedSteers,
@@ -2194,6 +2196,8 @@ function DockOverlay({
 	/** Where the reply to his latest action starts (reading-position.ts);
 	 *  the cue lets go of it once he reads to the end. */
 	replyAnchorRef: React.MutableRefObject<ReplyAnchor>;
+	/** The tutor's newest reply as it stands (scroll-cue.ts `replyKey`). */
+	reply: string;
 	onJumpToLatest: () => void;
 	/** The queued-steer indicator's lines (composer steering, 2026-10-03):
 	 *  already filtered by visibleQueuedSteers, only undrained steers. */
@@ -2266,7 +2270,7 @@ function DockOverlay({
 						    and a wrapper's larger rounded clip cut its corners. */}
 						{composer}
 					</div>
-					<ScrollCueButton anchorRef={replyAnchorRef} onJump={onJumpToLatest} className="bottom-full mb-2" />
+					<ScrollCueButton anchorRef={replyAnchorRef} reply={reply} onJump={onJumpToLatest} className="bottom-full mb-2" />
 				</div>
 			</div>
 		</div>

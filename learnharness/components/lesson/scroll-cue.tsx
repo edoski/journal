@@ -21,15 +21,18 @@ const UP_KEYS = new Set(["ArrowUp", "PageUp", "Home"]);
  * scrolls up. A scroll the layout causes (the dock shrinking back to the
  * composer clamps the position) is not his, so it never stops the follow.
  *
- * The cue: "New reply" while any of the tutor's reply sits below what he
- * can see, a plain down arrow while he is above the bottom with nothing
- * new, nothing at the bottom. Pressing it, or ⌘↓, goes to the newest line.
+ * The cue: "New reply" while any of the tutor's reply that came since he
+ * last read to the end sits below what he can see, a plain down arrow while
+ * he is above the bottom with nothing new, nothing at the bottom. Pressing it, or ⌘↓, goes to the newest line.
  *
  * Read on scroll, on the transcript's resizes and on his input, never on a
  * timer.
  */
-export function ScrollCueButton({ anchorRef, onJump, className }: {
+export function ScrollCueButton({ anchorRef, reply, onJump, className }: {
 	anchorRef: MutableRefObject<ReplyAnchor>;
+	/** The tutor's newest reply as it stands (`replyKey`): it changes only
+	 *  when a reply comes or grows. */
+	reply: string;
 	onJump: () => void;
 	className?: string;
 }) {
@@ -37,6 +40,10 @@ export function ScrollCueButton({ anchorRef, onJump, className }: {
 	const [cue, setCue] = useState<ScrollCue>(null);
 	const cueRef = useRef(cue);
 	cueRef.current = cue;
+	// The reply as he last read to the end of the lesson.
+	const replyRef = useRef(reply);
+	replyRef.current = reply;
+	const readReplyRef = useRef(reply);
 
 	useEffect(() => {
 		const el = scrollRef.current;
@@ -53,8 +60,9 @@ export function ScrollCueButton({ anchorRef, onJump, className }: {
 		const update = () => {
 			const g = geometry();
 			seen = seenThrough(g, seen);
+			if (scrollCueOf(g, seen) !== "new-reply") readReplyRef.current = replyRef.current;
 			if (readPastAnchor(g, replyStart(anchorRef.current, el))) anchorRef.current = null;
-			setCue(scrollCueOf(g, seen));
+			setCue(scrollCueOf(g, seen, replyRef.current !== readReplyRef.current));
 		};
 		const follow = () => {
 			const start = replyStart(anchorRef.current, el);
@@ -112,4 +120,12 @@ export function ScrollCueButton({ anchorRef, onJump, className }: {
 			<ArrowDownIcon className="size-4" />
 		</Button>
 	);
+}
+
+/** The tutor's newest reply as the cue reads it: its message and how much
+ *  of it there is. Pure. */
+export function replyKey(messages: ReadonlyArray<{ id: string; role: string; parts: ReadonlyArray<{ type: string; text?: string }> }>): string {
+	const reply = messages.findLast((m) => m.role === "assistant");
+	if (!reply) return "";
+	return `${reply.id}:${reply.parts.length}:${reply.parts.reduce((n, p) => n + (p.text?.length ?? 0), 0)}`;
 }
