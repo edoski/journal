@@ -17,7 +17,7 @@ const SMALL = `text-muted-foreground ${SMALL_SIZE}`;
 
 /** The quiet mark that ends the tutor's message when it hands him the turn,
  *  over the question's words or choices; never over nothing. A question
- *  asked again after his side question has its words above, so its mark
+ *  asked again after a hint or his side question has its words above, so its mark
  *  says where they are (round 8: after a direct answer the open question
  *  had no mark at all). */
 export function YourTurn({ above = false }: { above?: boolean }) {
@@ -36,7 +36,7 @@ export function YourTurn({ above = false }: { above?: boolean }) {
  *  its reply is the one guarded voice he reads (round 8: the unguarded
  *  card stated a false fact, opened above a stop marker before any reply,
  *  and named the same thing as practice's "Model solution"). */
-export function ProseQuestion({ tool, toolCallId, input, output, photos, open, stepAnchor, repeat = false, afterHint = false, askedBelow = false, spoken = false }: {
+export function ProseQuestion({ tool, toolCallId, input, output, photos, open, stepAnchor, repeat = false, askedBelow = false, spoken = false }: {
 	tool: string;
 	toolCallId: string;
 	input: unknown;
@@ -48,11 +48,9 @@ export function ProseQuestion({ tool, toolCallId, input, output, photos, open, s
 	/** The plan step this question first taught, when the roadmap opens
 	 *  the transcript here (roadmap-facts.ts). */
 	stepAnchor?: string;
-	/** It asks again, word for word, the question he pressed Hint on or
-	 *  asked about (`askedAgain`): its words are drawn above already. */
+	/** It asks again the question he pressed Hint on or asked about
+	 *  (`askedAgain`): its words are drawn above already. */
 	repeat?: boolean;
-	/** The re-ask follows a hint (`askedAfterHint`). */
-	afterHint?: boolean;
 	/** Set aside with Done for today and asked again further down
 	 *  (`leftAskedBelow`): its words are drawn there. */
 	askedBelow?: boolean;
@@ -61,7 +59,7 @@ export function ProseQuestion({ tool, toolCallId, input, output, photos, open, s
 }) {
 	const spec = proseQuestionSpec(tool, toolCallId, input);
 	if (!spec) return null;
-	if (open) return <OpenQuestion spec={spec} stepAnchor={stepAnchor} repeat={repeat} afterHint={afterHint} spoken={spoken} />;
+	if (open) return <OpenQuestion spec={spec} stepAnchor={stepAnchor} repeat={repeat} spoken={spoken} />;
 	if (!output) return null;
 	return <AnsweredQuestion spec={spec} toolCallId={toolCallId} input={input} output={output} photos={photos} stepAnchor={stepAnchor} repeat={repeat || spoken} askedBelow={askedBelow} />;
 }
@@ -78,18 +76,19 @@ export function QuestionWords({ spec, compact = false }: { spec: ProseQuestionSp
 	);
 }
 
-/** An open question ends the message. After a hint the question asked
- *  again is drawn again under "Your turn": "above" would name the hint,
- *  which may end in a question of its own (round 12, 3 D11), and "Your
- *  turn" alone stood over nothing (round 19, m21). The tutor's offer to go
- *  on asks nothing of him, so it has no "Your turn" (round 19, m21). */
-function OpenQuestion({ spec, stepAnchor, repeat, afterHint, spoken }: { spec: ProseQuestionSpec; stepAnchor?: string; repeat: boolean; afterHint: boolean; spoken: boolean }) {
+/** An open question ends the message. Asked again after a hint or his
+ *  side question, its words are drawn above already, so it reads "Your
+ *  turn, on the question above" (round 20, m9: after a hint the question
+ *  was posted again word for word under its first posting; a hint is a
+ *  statement, so "above" names the question). The tutor's offer to go on
+ *  asks nothing of him, so it has no "Your turn" (round 19, m21). */
+function OpenQuestion({ spec, stepAnchor, repeat, spoken }: { spec: ProseQuestionSpec; stepAnchor?: string; repeat: boolean; spoken: boolean }) {
 	const answer = useProseAnswerContext();
 	const selected = answer?.selection.selected ?? new Set<number>();
 	return (
 		<div data-testid="prose-question" data-slot="prose-question" data-open="" data-repeat={repeat ? "" : undefined} data-step-anchor={stepAnchor} className="mt-2">
-			{!spec.offer && <YourTurn above={repeat && !afterHint && !spoken && spec.mode === "text"} />}
-			{(!repeat || afterHint) && !spoken && <QuestionWords spec={spec} />}
+			{!spec.offer && <YourTurn above={repeat && !spoken && spec.mode === "text"} />}
+			{!repeat && !spoken && <QuestionWords spec={spec} />}
 			{spec.mode !== "text" && (
 				<ChoiceRows
 					options={spec.data.options}
