@@ -116,11 +116,12 @@ def _days(
     """The daily plan: each day that proposes something, why each of its new
     topics comes then (``agenda.Why``), what no longer fits before the exam,
     the taught topics its final review has no room for, and why each of
-    those is left out (``agenda.Reason``)."""
+    those is left out (``agenda.Reason``). Only ``days`` follows the read's
+    window: the rest is the plan's whatever the window (round 20, B1)."""
     exam = progress.exam_plan(record)
     proposed = [day for day in planned[:days] if day["reviews"] or day["new"]]
     late, unreviewed, why = when.does_not_fit, when.unreviewed, when.why
-    if not proposed and not late and not unreviewed:
+    if not proposed and not late and not unreviewed and not exam:
         return None
     return compact(
         {

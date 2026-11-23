@@ -14,7 +14,7 @@ import pytest
 
 from learning import agenda, capacity, planning, progress, records, retrieval
 from learning.__main__ import main
-from learning.workspace import initialize, resolve
+from learning.workspace import initialize, registry_path, resolve
 
 WORLD = json.loads(
     (Path(__file__).parent / "golden" / "demo-world.json").read_text(encoding="utf-8")
@@ -184,6 +184,263 @@ def test_every_verb_gives_each_topic_the_plan_s_day(
             last,
         ) == {key: when for key, when in planned.items() if key[:2] == (name, "new")}
         assert resume["course"]["exam"]["final_review"] == exam["final_review"]
+
+
+HORIZONS = (1, 30, 42)
+
+
+def spelled_through_a_link(
+    root: Path,
+    checkpoint: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> dict[str, Path]:
+    """The world with the registry spelling each course through a link to
+    its folder, as a seed or a moved home writes it: each course's folder
+    as the registry and the app name it."""
+    World(root / "real", checkpoint, monkeypatch, capsys)
+    (root / "alias").symlink_to(root / "real", target_is_directory=True)
+    spelled = {name: root / "alias" / name for name in COURSES}
+    registry = json.loads(registry_path().read_text(encoding="utf-8"))
+    registry["workspaces"] = {str(folder): {} for folder in spelled.values()}
+    registry_path().write_text(json.dumps(registry), encoding="utf-8")
+    return spelled
+
+
+def reader(
+    day: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> Any:
+    def read(*args: str, stdin: str = "") -> dict[str, Any]:
+        monkeypatch.setenv("LEARNING_TODAY", day)
+        monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
+        assert main(list(args)) == 0
+        found = json.loads(capsys.readouterr().out)
+        if "courses" not in found:
+            return dict(found)
+        return {Path(c["workspace"]).name: c for c in found["courses"]}
+
+    return read
+
+
+def window(course: dict[str, Any], today: str, days: int) -> dict[str, Any]:
+    """A course's plan as a read of ``days`` days shows it: each day's items
+    within the window, and what the plan holds whatever its window."""
+    last = (date.fromisoformat(today) + timedelta(days=days - 1)).isoformat()
+    plan = course.get("plan") or {}
+    return {
+        "days": [day for day in plan.get("days", []) if day["date"] <= last],
+        **{
+            key: plan.get(key)
+            for key in ("does_not_fit", "unreviewed", "final_review_days")
+        },
+        "due": course.get("due"),
+        "runup": course.get("runup"),
+    }
+
+
+@pytest.mark.parametrize(
+    ("checkpoint", "day"),
+    [
+        ("seed", "2026-11-08"),
+        ("lesson-review", "2026-11-09"),
+        ("day-done", "2026-11-10"),
+        ("day-after", "2026-11-17"),
+    ],
+)
+def test_a_course_s_plan_is_its_entry_in_every_course_s_plan(
+    checkpoint: str,
+    day: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """One plan, whoever reads it and however far ahead (round 20, B1): each
+    course's ``plan --days N`` is its entry in ``plan --all --days M`` over
+    the days both show. The registry spells the courses through a link to
+    their folders, as a seed or a moved home writes them, and the app asks
+    each course's plan by the registry's spelling: the read took the
+    folder's own spelling for another course, counted the course twice in
+    the plan every course shares, and the calendar, the course heads and
+    the topic pages showed about 170 days Home's rows did not."""
+    spelled = spelled_through_a_link(tmp_path, checkpoint, monkeypatch, capsys)
+    read = reader(day, monkeypatch, capsys)
+    every = {m: read("plan", "--all", "--days", str(m)) for m in HORIZONS}
+    for n in HORIZONS:
+        for name, folder in spelled.items():
+            (own,) = read("--workspace", str(folder), "plan", "--days", str(n)).values()
+            assert own["workspace"] == str(folder), name
+            for m in HORIZONS:
+                shared = min(n, m)
+                assert window(own, day, shared) == window(
+                    every[m][name], day, shared
+                ), (name, n, m)
+
+
+REVIEW = [
+    {
+        "topics": ["binomial"],
+        "text": "At least 2 heads in 8 tosses: wrote 8 x 0.3^2 x 0.7^6",
+        "help": "none",
+        "result": "partial",
+        "sure": "guess",
+    },
+    {
+        "topics": ["bayes"],
+        "text": "A test's false positives by Bayes, after a hint",
+        "help": "Hint",
+        "result": "correct",
+    },
+    {
+        "topics": ["bayes"],
+        "text": "Posterior of a rare disease: 14/24 instead of 15/24",
+        "help": "none",
+        "result": "partial",
+        "sure": "confident",
+    },
+    {
+        "topics": ["binomial"],
+        "text": "At least 3 of 5 free throws",
+        "help": "none",
+        "result": "correct",
+    },
+]
+STUDY_DAY = [
+    {
+        "observations": [
+            {
+                "topics": ["rank"],
+                "text": "Rank from pivots",
+                "help": "A nudge",
+                "result": "correct",
+                "sure": "guess",
+            },
+            {
+                "topics": ["rank", "kernel"],
+                "text": "Set the rank to 3",
+                "help": "Shown",
+                "result": "incorrect",
+                "gave_up": True,
+            },
+            {
+                "topics": ["rank"],
+                "text": "Column space of C",
+                "help": "none",
+                "result": "correct",
+                "sure": "confident",
+            },
+            {
+                "topics": ["kernel"],
+                "text": "dim im h = 4",
+                "help": "none",
+                "result": "incorrect",
+                "sure": "confident",
+            },
+            {
+                "topics": ["kernel"],
+                "text": "Solved X + X^T = 0",
+                "help": "A nudge",
+                "result": "correct",
+            },
+        ],
+        "topics": {"kernel": {"gap": "You assume a map is injective unchecked"}},
+    },
+    {
+        "observations": [
+            {
+                "topics": ["eigen"],
+                "text": "Eigenvectors of a stretch",
+                "help": "none",
+                "result": "incorrect",
+                "predicted": True,
+            },
+            {
+                "topics": ["eigen"],
+                "text": "Eigenvalues of C",
+                "help": "none",
+                "result": "correct",
+            },
+            {
+                "topics": ["matmul"],
+                "text": "A 2x2 product",
+                "help": "none",
+                "result": "correct",
+            },
+            {
+                "topics": ["eigen"],
+                "text": "Eigenspace of 3",
+                "help": "none",
+                "result": "correct",
+                "sure": "confident",
+            },
+            {
+                "topics": ["eigen"],
+                "text": "Swapped D's diagonal alone",
+                "help": "none",
+                "result": "partial",
+            },
+        ],
+        "topics": {"eigen": {"gap": "You swap D's entries without P's columns"}},
+    },
+    {
+        "observations": [
+            {
+                "topics": ["linear-maps"],
+                "text": "A linear map",
+                "help": "none",
+                "result": "correct",
+            },
+            {
+                "topics": ["kernel"],
+                "text": "dim ker A = 2",
+                "help": "none",
+                "result": "correct",
+                "sure": "confident",
+            },
+            {
+                "topics": ["kernel"],
+                "text": "A basis of ker A",
+                "help": "none",
+                "result": "correct",
+            },
+        ]
+    },
+]
+
+
+def test_a_review_and_a_good_day_keep_every_exam_topic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 20, lens 2's A1 and A2, replayed on 8 Nov on this world's
+    topics: a Probability review with two partly right answers, then Rank
+    practice, the Eigen lesson and Problem sheet 4. Each course's own plan, read as the app asks it, read
+    three Probability exam topics past the exam and Linear Algebra's final
+    review leaving out 17 topics, the three with that day's mistakes among
+    them; both were the plan that counted the course twice (B1). Every
+    exam topic still fits, and no topic with an open mistake is left out
+    of its final review."""
+    spelled = spelled_through_a_link(tmp_path, "seed", monkeypatch, capsys)
+    read = reader("2026-11-08", monkeypatch, capsys)
+    probability, algebra = spelled["probability"], spelled["linear-algebra"]
+    read(
+        "--workspace",
+        str(probability),
+        "save",
+        stdin=json.dumps({"observations": REVIEW}),
+    )
+    for patch in STUDY_DAY:
+        read("--workspace", str(algebra), "save", stdin=json.dumps(patch))
+    every = read("plan", "--all", "--days", "42")
+    for name, folder in spelled.items():
+        (own,) = read("--workspace", str(folder), "plan", "--days", "42").values()
+        mistakes = {
+            item["topic"]
+            for item in read("--workspace", str(folder), "standing").get("mistakes", [])
+        }
+        for plan in (own.get("plan") or {}, every[name].get("plan") or {}):
+            assert not plan.get("does_not_fit"), name
+            assert not mistakes & set(plan.get("unreviewed", [])), name
 
 
 def finish(
