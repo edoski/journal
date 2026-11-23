@@ -11,7 +11,7 @@ import type { CalendarCourse } from "../src/core/contracts/calendar.ts";
 import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { doesNotFitOf, finalReviewOf, planDays, plannedOf, scheduleOf } from "../src/server/calendar.ts";
-import { finalReviewGapWords } from "../components/study-words.ts";
+import { examLineWords, FINAL_REVIEW_GAP_WORDS } from "../components/study-words.ts";
 import { courseMove, todaySteps } from "../components/study-home/study-facts.ts";
 import { calendarEntries, distanceWords, dueDay, finalReviewWords, lookOf, lookWords, misfitWords, moreWords, quietBetween, roadLines, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
 
@@ -140,6 +140,10 @@ describe("calendar entries", () => {
 		assert.deepEqual(exam?.kind === "exam" && exam.doesNotFit, ["Eigenvalues"]);
 		assert.equal(misfitWords(["Eigenvalues", "Rank"]), "No room before the exam to start Eigenvalues and Rank");
 		assert.equal(misfitWords([]), null);
+		// Round 20, M2: the panel's exam line is one sentence and the topic to start with, naming at most one topic.
+		assert.equal(examLineWords({ date: "2026-11-19", daysLeft: 2 }, "Expectation and linearity"), "Not every exam topic fits before Thursday. Start with Expectation and linearity.");
+		assert.equal(examLineWords({ date: "2026-12-03", daysLeft: 25 }, null), "Not every exam topic fits before 3 Dec.");
+		assert.equal(examLineWords({ date: "2026-11-19", daysLeft: 1 }, null), "Not every exam topic fits before tomorrow’s exam.");
 	});
 
 	it("says why a review waits on the day the plan holds it to, naming the exams it waits for, and only there", () => {
@@ -538,12 +542,8 @@ describe("the plan's reasons and gaps in the calendar", () => {
 		const entries = calendarEntries({ courses: [COURSE], chats: [], scope: null });
 		const exam = entries.find((e) => e.kind === "exam");
 		assert.deepEqual(exam?.kind === "exam" && exam.unreviewed, [{ title: "Kernel" }]);
-		assert.deepEqual(finalReviewGapWords([{ title: "Kernel" }, { title: "Rank", reason: "full" }]), ["No room in it for Kernel and Rank"]);
-		assert.deepEqual(
-			finalReviewGapWords([{ title: "Binomial", reason: "full" }, { title: "Poisson", reason: "too_late" }, { title: "Geometric", reason: "no_study_day" }]),
-			["No room in it for Binomial", "Poisson starts too close to the exam for a review", "No study day left in it for Geometric"],
-			"round 9 (1 D8): the calendar says why as the head does, never \"No room\" for a topic that starts too close",
-		);
+		// Round 20, M2: one sentence under the final review, never a list of names ("No room in it for…").
+		assert.equal(FINAL_REVIEW_GAP_WORDS, "Not every topic is revisited in it");
 		const fresh = entries.find((e) => e.kind === "new");
 		assert.equal(fresh?.kind === "new" && fresh.waits, "After Probability's new topics");
 	});

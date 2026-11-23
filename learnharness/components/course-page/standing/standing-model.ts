@@ -1,9 +1,9 @@
 import { TOPIC_LEVELS, namedArc, type ChatListItem, type CourseMap, type CourseMapTopic, type CourseReadiness, type CourseStanding, type MistakeAnswer, type NamedArc, type OpenMistake, type ReadinessPart, type StudyCourse, type TopicHandle } from "@/src/core";
-import { misfitWords } from "@/components/calendar/calendar-facts";
+import { firstExamStart } from "@/components/calendar/calendar-facts";
 import { topicPress } from "@/components/unit-inbox/start-unit";
 import type { SessionCreation } from "@/components/start-session";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { finalReviewMissWords, MARK_WORDS, notReadyHeading, notReadyWords, READY_WORDS, shortDay, slipMark, type SlipKey } from "@/components/study-words";
+import { examLineWords, finalReviewLineWords, MARK_WORDS, notReadyHeading, notReadyWords, READY_WORDS, shortDay, slipMark, type SlipKey } from "@/components/study-words";
 import { namesWords } from "@/components/course-page/course-head/head-facts";
 import type { CourseArcSection } from "@/components/course-page/course-model";
 
@@ -61,11 +61,11 @@ export function leastReadyFirst(handles: readonly TopicHandle[], map: Pick<Cours
 }
 
 export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topics" | "exam" | "today">, arcs: readonly CourseArcSection[] | null, mistakes: readonly OpenMistake[]): ExamReady {
-	const titleOf = (handle: string) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 	const wontFit = readiness.parts.flatMap((p) => p.wontFit);
-	if (wontFit.length > 0) return { kind: "short", words: misfitWords(wontFit.map(titleOf))! };
+	// The exam line, one sentence and the topic to start with, the names in Which topics (round 20, M2).
+	if (wontFit.length > 0 && map.exam) return { kind: "short", words: examLineWords(map.exam, firstExamStart(map)?.title ?? null) };
 	// Never "ready" while the final review leaves a taught topic out (the engine's `map`).
-	if (map.exam?.unreviewed?.length) return { kind: "short", words: finalReviewMissWords(map.exam.unreviewed.map(titleOf), map.exam, map.today) };
+	if (map.exam?.unreviewed?.length) return { kind: "short", words: finalReviewLineWords(map.exam) };
 	const notReady = readiness.parts.filter((p) => partState(p) === "notYet");
 	if (notReady.length === 0) return { kind: "ready", words: READY_WORDS.ready };
 	if (arcs) return { kind: "notYet", words: READY_WORDS.notYet, rest: null };

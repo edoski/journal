@@ -569,8 +569,8 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 		forgotten: courseRecordForgotten,
 		// A deleted course stays registered with its record gone: it has no map.
 		registered: () => registered(path.join(supportOf(engine.env ?? process.env), "workspaces.json")).filter((w) => fs.existsSync(path.join(w, ".study", "course.json"))),
-		async list() {
-			const result = await shared(null, ["plan", "--all", "--days", "1"], "plan", journal(1));
+		async list(days = 1) {
+			const result = await shared(null, ["plan", "--all", "--days", String(days)], "plan", journal(days));
 			if (!result.ok) return { available: false, reason: result.message };
 			const entries = (result.json as { courses?: unknown }).courses;
 			const read = (Array.isArray(entries) ? entries : []).map(entryOf);

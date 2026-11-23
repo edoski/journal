@@ -80,6 +80,8 @@ interface Survey {
 	/** Each course page's Needs you: its rows' topics and words. */
 	needsYou: Map<string, Array<{ handle: string; text: string }>>;
 	briefs: Map<string, string>;
+	/** Home's exam line under its heading, if it draws one. */
+	misfit: string | null;
 }
 
 const keyOf = (workspace: string, handle: string) => `${workspace}#${handle}`;
@@ -111,6 +113,8 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 
 	await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 || !!document.querySelector('[data-slot="day-heading"]') });
 	// Where each line and card goes, read where it is drawn.
+	const misfitLine = document.querySelector('[data-slot="today-exam-misfit"]');
+	const misfit = misfitLine ? text(misfitLine) : null;
 	const home: Survey["home"] = [];
 	for (const line of app.homeLines()) home.push({ ...line, opens: await app.lookAt(line.el) });
 	const sidebar: Survey["sidebar"] = [];
@@ -176,7 +180,7 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 			if (brief) briefs.set(course.map.workspace, brief.text);
 		}),
 	);
-	return { label, today, courses, chats, home, sidebar, calendar, pages, heads, rows, needsYou, briefs };
+	return { label, today, courses, chats, home, sidebar, calendar, pages, heads, rows, needsYou, briefs, misfit };
 }
 
 // ─── 1. one day per topic ──────────────────────────────────────────────────
@@ -307,6 +311,32 @@ function openTasks(app: DemoApp, s: Survey): Array<{ course: CalendarCourse; tas
 }
 
 /** Whether a link opens a session's chat, however it asks the chat to open. */
+/**
+ * Round 20, M2 (1 N2, 2 A2): on the exam eve Home, the course head and the
+ * calendar's exam panel named 8 to 17 topics in an amber block and said
+ * nothing he could do. The exam line, wherever it is drawn, is one sentence
+ * that names at most the first topic he can still start, and when the plan
+ * starts that topic today Home's Today starts it.
+ */
+function assertExamLine(s: Survey): void {
+	const LINE = /Not every exam topic fits before [^.]+\.(?: Start with (.+?)\.)?/;
+	const failures: string[] = [];
+	const said: Array<[string, string]> = [...(s.misfit ? [["Home", s.misfit] as [string, string]] : []), ...[...s.heads].map(([ws, head]) => [`${short(ws)}'s head`, head] as [string, string])];
+	for (const [where, words] of said) {
+		if (/No room before the exam to start|full at your pace/.test(words)) failures.push(`${where} names the topics left out: "${words}"`);
+		const first = words.match(LINE)?.[1];
+		if (!first) continue;
+		const topic = s.courses.flatMap((c) => c.map.topics).find((t) => t.title === first);
+		if (topic?.starts === s.today && !s.home.some((l) => l.title.startsWith("Start ") && l.title.includes(first))) {
+			failures.push(`${where} says to start with ${first}, planned today, which Home's Today does not start: ${s.home.map((l) => l.title).join(" | ")}`);
+		}
+	}
+	for (const { entry, detail } of s.calendar.filter((d) => d.entry.kind === "exam")) {
+		if (/No room before the exam to start|No room in it for/.test(detail)) failures.push(`the calendar's ${entry.title} names the topics left out: "${detail}"`);
+	}
+	assert.ok(failures.length === 0, `${s.label}: ${failures.join("\n")}`);
+}
+
 const opensChat = (href: string | null | undefined, id: string) => href?.split("?")[0] === `/chat/${id}`;
 
 async function assertContinueOpensTask(app: DemoApp, s: Survey) {
@@ -385,6 +415,9 @@ async function assertContinueOpensTask(app: DemoApp, s: Survey) {
 /** The words a topic page warns with, and the ones the head and the panel say a topic is left out with. */
 const EXAM_WARNING = /not on the exam|after the exam|before the exam|too close to the exam/i;
 
+/** The exam line's words when a topic has no room before the exam (`examLineWords`). */
+const EXAM_LINE = /Not every exam topic fits before/;
+
 function assertExamWarnings(s: Survey) {
 	const problems: string[] = [];
 	for (const course of s.courses) {
@@ -397,25 +430,25 @@ function assertExamWarnings(s: Survey) {
 			if (!page) continue;
 			const leftOut = exam.leavesOut?.includes(topic.handle) ?? false;
 			const noRoom = exam.doesNotFit?.includes(topic.handle) ?? false;
-			const said = [["the course head", head], ["the exam panel", panel]].filter(([, words]) => /no room before the exam/i.test(words!) && names(words!, topic.title)).map(([where]) => where);
+			// The exam line names no topic left out (round 20, M2): a topic with no room is one the line speaks for.
+			const said = [["the course head", head], ["the exam panel", panel]].filter(([, words]) => EXAM_LINE.test(words!)).map(([where]) => where);
 			const warned = EXAM_WARNING.test(page.text);
 			if (leftOut && !warned) problems.push(`${topic.title}: the exam leaves it out, its page says nothing of the exam ("${page.note || page.scheduled || page.now}")`);
 			if (noRoom && said.length > 0 && !warned) problems.push(`${topic.title}: ${said.join(" and ")} say there is no room before the exam to start it, its page says nothing of the exam ("${page.note || page.scheduled || page.now}")`);
 			if (warned && !leftOut && !noRoom && !(exam.unreviewed ?? []).includes(topic.handle)) problems.push(`${topic.title}: its page warns of the exam ("${page.text.match(EXAM_WARNING)?.[0]}"), the plan leaves nothing of it out`);
 		}
 		// The course page says each loss in the topic page's own words, an exam topic with no room apart from one the
-		// exam leaves out, and its head names every exam topic with no room (round 15, M7: all three read "After the
-		// exam", the loss behind "Not all of it fits").
+		// exam leaves out, and its head says the exam line exactly when one has no room, the names behind its Which
+		// topics (round 15, M7: all three read "After the exam", the loss behind "Not all of it fits"; round 20, M2).
 		for (const topic of course.map.topics) {
 			const row = s.rows.get(keyOf(course.map.workspace, topic.handle));
 			if (!row || !topic.starts || topic.starts <= exam.date) continue;
 			const want = exam.leavesOut?.includes(topic.handle) ? "Not on the exam" : exam.doesNotFit?.includes(topic.handle) ? "Not before the exam" : null;
 			if (want && row !== want) problems.push(`${topic.title}: its course page row says "${row}", not "${want}"`);
 		}
-		for (const handle of exam.doesNotFit ?? []) {
-			const title = course.map.topics.find((t) => t.handle === handle)?.title ?? handle;
-			if (!names(head, title)) problems.push(`${title}: the exam has no room for it, the course head does not name it ("${head}")`);
-		}
+		const lost = (exam.doesNotFit ?? []).map((h) => course.map.topics.find((t) => t.handle === h)?.title ?? h);
+		if (lost.length > 0 && !EXAM_LINE.test(head)) problems.push(`${lost.join(", ")}: the exam has no room for them, the course head does not say so ("${head}")`);
+		if (lost.length === 0 && EXAM_LINE.test(head)) problems.push(`the course head says not every exam topic fits, and the plan fits them all ("${head}")`);
 	}
 	assert.ok(problems.length === 0, `${s.label}:\n  ${problems.join("\n  ")}`);
 }
@@ -850,7 +883,11 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 
 	it("Tue 17 Nov, two days before the Probability exam", async () => {
 		app.day("2026-11-17");
-		await holds("Tue 17 Nov", (s) => (finishedLesson ? assertFinishedLesson(app, s, finishedLesson) : assert.fail("the Tue 10 step finished the Linear maps lesson")));
+		await holds("Tue 17 Nov", async (s) => {
+			assertExamLine(s);
+			if (finishedLesson) await assertFinishedLesson(app, s, finishedLesson);
+			else assert.fail("the Tue 10 step finished the Linear maps lesson");
+		});
 	});
 
 	it("Tue 17 Nov, Ask the tutor from the Probability head, two review answers, then Done for today (round 16, M3: 1 M2)", async () => {

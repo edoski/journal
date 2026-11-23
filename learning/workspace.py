@@ -264,6 +264,23 @@ def _linked(start: Path) -> Workspace | None:
     )
 
 
+def _spelled(directory: Path) -> Path:
+    """The workspace at ``directory`` as the registry spells it, one name in
+    every read: a registry written through a link (a seed, a moved home)
+    names the folder another way than its resolved path, and a course read
+    by that path joined the plan every course shares a second time (round
+    20, B1: each course's plan moved about 170 days from its entry in
+    ``plan --all``)."""
+    return next(
+        (
+            Path(listed)
+            for listed in sorted(_read_registry())
+            if Path(listed) != directory and Path(listed).resolve() == directory
+        ),
+        directory,
+    )
+
+
 def resolve(directory: str | Path | None = None) -> Workspace:
     """Explicit selection is exact; discovery selects the nearest marker, then a link."""
     explicit = directory
@@ -277,7 +294,7 @@ def resolve(directory: str | Path | None = None) -> Workspace:
     candidates = [start] if explicit is not None else [start, *start.parents]
     marked = next((candidate for candidate in candidates if _marked(candidate)), None)
     if marked is not None:
-        workspace: Workspace | None = _load(marked)
+        workspace: Workspace | None = _load(_spelled(marked))
     else:
         workspace = None if explicit is not None else _linked(start)
     if workspace is None:

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, disputeStampWords, distanceWords, heldWords, lapsedNow, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, leftOffWords, studiedDaysWords, agoWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyShort, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
+import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, disputeStampWords, distanceWords, heldExamWords, heldWords, lapsedNow, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, leftOffWords, studiedDaysWords, agoWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyShort, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
 import { ARC_STATES, type ArcHandle } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import { courseMapOf } from "../src/store/course-records.ts";
@@ -156,6 +156,11 @@ describe("why a review waits", () => {
 	const behind = { kind: "scheduled", date: "2026-11-20", held: { exam: "Probability", since: "2026-11-13" } } as const;
 	it("names the course whose final review came first, never its own exam as 'your exams'", () => {
 		assert.equal(heldWords(behind), "Waits for your Probability exam");
+	});
+	it("names only another course's exam, never the topic's own (round 20, m2: \"Waits for your Probability exam\" on a Probability topic)", () => {
+		assert.equal(heldExamWords(behind, "Linear Algebra"), "Waits for your Probability exam");
+		assert.equal(heldExamWords(behind, "Probability"), null);
+		assert.equal(heldExamWords(late, "Linear Algebra"), null, "earlier days full is said nowhere on a page");
 	});
 	it("says the earlier days are full when no final review took them", () => {
 		assert.equal(heldWords(late), "Earlier days are full");

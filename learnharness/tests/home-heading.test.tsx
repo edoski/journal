@@ -38,14 +38,15 @@ describe("Home's heading (1 §2, 4 §2)", () => {
 	});
 
 	// Round 17, M2 (1 M2): two days before the exam nine of its topics fell after it, and Home read only "What
-	// are we studying for Thursday's Probability exam?". Under the question it names them, by name and never by count,
-	// as the course head does, with the one act that helps: Ask the tutor.
-	it("names, under the exam's question, the topics with no room before it, with Ask the tutor", () => {
-		const exam = { course: "Probability", date: "2026-11-19", daysLeft: 2, workspace: "/s/prob", wontFit: ["Poisson distribution", "Geometric distribution", "Variance"] };
+	// are we studying for Thursday's Probability exam?". Under the question it says so, never by count, with what he
+	// can do: the first topic he can still start, and Ask the tutor (round 20, M2: then an 11-name list).
+	it("says, under the exam's question, that not every topic fits and which to start with, with Ask the tutor", () => {
+		const exam = { course: "Probability", date: "2026-11-19", daysLeft: 2, workspace: "/s/prob", wontFit: ["Poisson distribution", "Geometric distribution", "Variance"], firstStart: "Expectation and linearity" };
 		const page = render(<Today rows={[]} done={[]} exam={exam} busy={false} onContinue={() => {}} />);
 		const line = page.querySelector("[data-slot=today-exam-misfit]");
 		assert.ok(line, "the line under the heading");
-		assert.match(line.textContent ?? "", /^No room before the exam to start Poisson distribution, Geometric distribution and Variance/);
+		assert.match(line.textContent ?? "", /^Not every exam topic fits before Thursday\. Start with Expectation and linearity\./);
+		assert.doesNotMatch(line.textContent ?? "", /Poisson|Geometric|Variance/, "the names are behind Ask the tutor and the head's Which topics");
 		assert.doesNotMatch(line.textContent ?? "", /\d/, "no count");
 		assert.equal(line.querySelector("button")?.textContent, "Ask the tutor");
 		const fits = render(<Today rows={[]} done={[]} exam={{ ...exam, wontFit: [] }} busy={false} onContinue={() => {}} />);

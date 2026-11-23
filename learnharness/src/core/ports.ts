@@ -181,9 +181,10 @@ export interface ArcPassLedgers {
  */
 export interface CourseRecords {
 	/** Every registered course, for the chooser, and those it could not read;
-	 *  `plan` is the engine's `plan --all --days 1` output they came from,
-	 *  each course's entry the one its own `plan` gives. */
-	list(): Promise<
+	 *  `plan` is the engine's `plan --all --days N` output they came from
+	 *  (`days`, one unless given), each course's entry the one its own
+	 *  `plan` gives. */
+	list(days?: number): Promise<
 		{ available: true; courses: CourseSummary[]; unreadable: UnreadableCourse[]; plan?: unknown } | Extract<CourseListing, { available: false }>
 	>;
 	/** Run one verb against one course workspace. */

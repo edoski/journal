@@ -109,10 +109,10 @@ describe("the exam's run-up", () => {
 		assert.ok(links.every((a) => /^\/unit\//.test(a.getAttribute("href") ?? "")), "each opens its topic's page");
 	});
 
-	it("names the topics with no room before the exam, in the warning ink", async () => {
+	it("says not every exam topic fits, in one sentence in the warning ink (round 20, M2)", async () => {
 		const ready = examReady(readiness({ notYet: [h("basis")], wontFit: [h("eigen")] }), course.map, null, []);
 		const line = (await opened(ready)).querySelector("[data-slot=course-exam-ready]")!;
-		assert.equal(line.textContent, "No room before the exam to start Eigen");
+		assert.equal(line.textContent, "Not every exam topic fits before 3 Dec.");
 		assert.match(line.getAttribute("class") ?? "", /text-warning/);
 	});
 

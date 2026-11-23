@@ -263,12 +263,14 @@ export function heldWords(review: CourseMapTopic["review"]): string | null {
 }
 
 /** Why a review waits, as a page or the calendar says it: only when
- *  another course's exam took its day (`HELD_WORDS.exam`). That earlier
- *  days are full explains a gap from memory's day, a day he was never told,
- *  so a row says nothing of it (round 11: "Earlier days are full" under
- *  a review read as noise). */
-export function heldExamWords(review: CourseMapTopic["review"]): string | null {
-	return review?.kind === "scheduled" && review.held?.exam ? HELD_WORDS.exam(review.held.exam) : null;
+ *  another course's exam took its day (`HELD_WORDS.exam`), never the
+ *  topic's own `course` (round 20, m2: "Waits for your Probability exam" on
+ *  a Probability topic). That earlier days are full explains a gap from
+ *  memory's day, a day he was never told, so a row says nothing of it
+ *  (round 11: "Earlier days are full" under a review read as noise). */
+export function heldExamWords(review: CourseMapTopic["review"], course: string): string | null {
+	const exam = review?.kind === "scheduled" ? review.held?.exam : null;
+	return exam && exam !== course ? HELD_WORDS.exam(exam) : null;
 }
 
 /** A day he was told that moved, from when ("Moved from 10 Nov after
@@ -365,8 +367,6 @@ export const EXAM_GAP_WORDS = {
 	/** "Or another"'s groups: the plan's own for today, then the topics it leaves out (round 17, m6). */
 	planned: "Planned today",
 	leftOut: "Left out before the exam",
-	start: "Start it today",
-	review: "Review it today",
 	/** The menu of the other topics he can take up today, beside the pick. */
 	another: "Or another",
 	/** Where that menu folds every way but the pick, which it marks (round 18, m6: 17 options with none marked). */
@@ -458,23 +458,10 @@ export function examGapPickWords(verb: "start" | "review" | "continue", title: s
 	return `${pressWord(verb)} ${title} today`;
 }
 
-/** The taught topics the final review leaves out, a line per reason,
- *  under the calendar's "Final review" line: "No room in it for Kernel",
- *  "Poisson starts too close to the exam for a review", "No study day left
- *  in it for Geometric". Each reason in the head's words (`examGapWhyWords`),
- *  so the two never disagree (round 9: "No room in it for Poisson" beside
- *  the head's "starts too close to the exam"). Pure. */
-export function finalReviewGapWords(topics: readonly ExamGapTopic[]): string[] {
-	const by = (reason: ExamGapReason) => topics.filter((t) => t.reason === reason).map((t) => t.title);
-	// "No room in it" is the plain fact: a topic with no reason, or with days full at his pace.
-	const full = topics.filter((t) => t.reason === undefined || t.reason === "full").map((t) => t.title);
-	const [late, noDay] = [by("too_late"), by("no_study_day")];
-	return [
-		...(full.length > 0 ? [`No room in it for ${listWords(full)}`] : []),
-		...(late.length > 0 ? [`${listWords(late)} ${startsWord(late)} too close to the exam for a review`] : []),
-		...(noDay.length > 0 ? [`No study day left in it for ${listWords(noDay)}`] : []),
-	];
-}
+/** Under the calendar's "Final review" line when it leaves taught topics
+ *  out: one sentence, the names in the course head's Which topics (round
+ *  20, M2: a 10-name "No room in it for…" block on the exam eve). */
+export const FINAL_REVIEW_GAP_WORDS = "Not every topic is revisited in it";
 
 /** The final review as he can place it: "the final review from 13 Nov"
  *  while it is still ahead, so a topic it has no room for reads as
@@ -501,6 +488,33 @@ export function examGapAsk(titles: readonly string[]): string {
 	return `My exam plan has no room for ${listWords(titles)}. How can I still fit ${titles.length === 1 ? "it" : "them"} in before the exam?`;
 }
 
+const EXAM_WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "UTC" });
+
+/** The exam a line points at: "today’s exam", "tomorrow’s exam",
+ *  "Thursday" within the week, else its day, "3 Dec". Pure. */
+function examDayWords(exam: Pick<CourseExam, "date" | "daysLeft">): string {
+	if (exam.daysLeft === 0) return "today’s exam";
+	if (exam.daysLeft === 1) return "tomorrow’s exam";
+	return exam.daysLeft < 7 ? EXAM_WEEKDAY.format(new Date(`${exam.date}T00:00:00Z`)) : shortDay(exam.date);
+}
+
+/** The exam line, one sentence wherever the exam's plan cannot start
+ *  every topic before it (Home, the course head, the calendar's exam
+ *  panel), and what he can do: start the first topic the plan still
+ *  starts before it (`first`). The names are one press away, in the
+ *  head's Which topics (round 20, M2: an 11-name amber block on all three
+ *  on the exam eve, saying nothing he could do). Pure. */
+export function examLineWords(exam: Pick<CourseExam, "date" | "daysLeft">, first: string | null): string {
+	return `Not every exam topic fits before ${examDayWords(exam)}.${first ? ` Start with ${first}.` : ""}`;
+}
+
+/** The exam line when every topic starts in time but the final review
+ *  leaves taught topics out, the names in the head's Which topics (round
+ *  20, M2: Linear Algebra's head named 11 to 17 topics). Pure. */
+export function finalReviewLineWords(exam: Pick<CourseExam, "date" | "daysLeft">): string {
+	return `Your final review before ${examDayWords(exam)} leaves some topics out.`;
+}
+
 /** Why a topic the exam ahead leaves out (`exam.leavesOut`) starts when
  *  it does: "Not on the exam; after it" when the plan starts it after the
  *  exam, "Not on the exam" when it starts before, since nothing the exam
@@ -520,30 +534,16 @@ export function leftOutWords(topic: Pick<CourseMapTopic, "handle" | "starts">, e
  *  "After the exam"). */
 export const ARC_ROW_EXAM_WORDS = { noRoom: "Not before the exam", leftOut: "Not on the exam" } as const;
 
-/** What the exam's plan means for a topic it leaves out (`examGaps`), on
- *  the topic's own page, in the engine's reason (`exam.reasons`). A
- *  review's words follow the final review's name (`finalReviewName`). */
-export const EXAM_GAP_TOPIC_WORDS: {
-	start: Readonly<Record<ExamGapReason | "none", string>>;
-	review: Readonly<Record<ExamGapReason | "none", string>>;
-} = {
-	start: {
-		none: ARC_ROW_EXAM_WORDS.noRoom,
-		no_study_day: "Not before the exam, no study day is left",
-		not_ready: "Not before the exam, what it needs won’t be solid in time",
-		full: "Not before the exam, every study day is full at your pace",
-		too_late: ARC_ROW_EXAM_WORDS.noRoom,
-	},
-	// The final review has no slot for it, whatever reviews come before
-	// it: "No review before the exam" read false beside "Review Wed 11 Nov"
-	// (round 9, 2 M1). The words match `finalReviewMissWords`.
-	review: {
-		none: "",
-		no_study_day: ", no study day is left in it",
-		not_ready: "",
-		full: ", full at your pace",
-		too_late: "", // the start, not the room: TOO_LATE_FOR_A_REVIEW
-	},
+/** What the exam's plan means for a topic it has no room to start before
+ *  the exam (`examGaps`), on the topic's own page, in the engine's reason
+ *  (`exam.reasons`); never "full at your pace", which he cannot act on
+ *  (round 20, M2). */
+export const EXAM_GAP_TOPIC_WORDS: Readonly<Record<ExamGapReason | "none", string>> = {
+	none: ARC_ROW_EXAM_WORDS.noRoom,
+	no_study_day: "Not before the exam, no study day is left",
+	not_ready: "Not before the exam, what it needs won’t be solid in time",
+	full: ARC_ROW_EXAM_WORDS.noRoom,
+	too_late: ARC_ROW_EXAM_WORDS.noRoom,
 };
 
 /** A start whose first review would fall on the exam day or after. */
@@ -551,19 +551,19 @@ export const TOO_LATE_FOR_A_REVIEW = "Too close to the exam for a review before 
 
 /** The words for `topic` when the exam ahead has no room to start it
  *  (`doesNotFit`) or to review it (`unreviewed`); null otherwise. Pure. */
-export function examGapTopicWords(topic: Pick<CourseMapTopic, "handle">, exam: Pick<CourseExam, "daysLeft" | "doesNotFit" | "unreviewed" | "reasons" | "finalReview"> | null, today: string): string | null {
+export function examGapTopicWords(topic: Pick<CourseMapTopic, "handle">, exam: Pick<CourseExam, "date" | "daysLeft" | "doesNotFit" | "unreviewed" | "reasons"> | null): string | null {
 	if (!exam || exam.daysLeft < 0) return null;
 	const reason = exam.reasons?.[topic.handle] ?? "none";
-	if (exam.doesNotFit?.includes(topic.handle)) return EXAM_GAP_TOPIC_WORDS.start[reason];
+	if (exam.doesNotFit?.includes(topic.handle)) return EXAM_GAP_TOPIC_WORDS[reason];
 	// A start too near the exam has its review fall on it or after: the final
 	// review has room, his start comes too late for it (round 17, 3 m4: "Planned
 	// Wed 18 Nov · No room in the final review from 15 Nov, it starts too close
 	// to the exam" read as if it were not planned).
 	// One planned before the final review is reviewed then, and only the
-	// final review leaves it out: "Not revisited in the final review from 27
-	// Nov, full at your pace" says what happens (round 18, m1: "Planned Wed
-	// 25 Nov · No room in the final review from 27 Nov at your pace").
-	if (exam.unreviewed?.includes(topic.handle)) return reason === "too_late" ? TOO_LATE_FOR_A_REVIEW : `Not revisited in ${finalReviewName(exam, today)}${EXAM_GAP_TOPIC_WORDS.review[reason]}`;
+	// final review leaves it out: what happens to him, "Not in your final
+	// review before the 3 Dec exam" (round 18, m1; round 20, M2: "Not
+	// revisited in the final review from 28 Nov, full at your pace").
+	if (exam.unreviewed?.includes(topic.handle)) return reason === "too_late" ? TOO_LATE_FOR_A_REVIEW : `Not in your final review before the ${shortDay(exam.date)} exam`;
 	return null;
 }
 

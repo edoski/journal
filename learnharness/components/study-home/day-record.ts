@@ -1,6 +1,7 @@
 import { courseLabel, type ChatListItem, type StudyCourse } from "@/src/core";
 import { localDay } from "@/components/day-change";
 import { pastSessionWords } from "@/components/study-words";
+import { firstExamStart } from "@/components/calendar/calendar-facts";
 
 /**
  * What he studied today, from the session records (spec: today.md, "A day
@@ -70,6 +71,8 @@ export interface NearExam {
 	 *  gave each a start before the exam as his last study day ended (the
 	 *  engine's `fell_past`, or `moved`'s `from`). */
 	fellToday?: readonly string[];
+	/** The first topic its plan still starts before the exam (`firstExamStart`). */
+	firstStart?: string;
 }
 
 const WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "UTC" });
@@ -97,7 +100,8 @@ export function homeExams(courses: readonly StudyCourse[]): NearExam[] {
 		// M1: a review pace that fell moved five with no cause his study gave, and Home said nothing), or that a
 		// move his study caused put past it.
 		const fell = misfits.filter((t) => fellPast.includes(t.handle) || (t.moved !== undefined && t.moved.from < date));
-		return [{ course: map.title, date, daysLeft, workspace: map.workspace, wontFit: misfits.map((t) => t.title), fellToday: fell.map((t) => t.title) }];
+		const first = firstExamStart(map);
+		return [{ course: map.title, date, daysLeft, workspace: map.workspace, wontFit: misfits.map((t) => t.title), fellToday: fell.map((t) => t.title), ...(first ? { firstStart: first.title } : {}) }];
 	});
 }
 

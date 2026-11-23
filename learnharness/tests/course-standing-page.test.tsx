@@ -133,25 +133,25 @@ describe("exam readiness, from the engine's sorting", () => {
 
 	it("names what has no room first, and says ready when every part is solid", () => {
 		const { map } = course(false);
-		assert.deepEqual(examReady(readiness(part({ notYet: [h("rank")], wontFit: [h("kernel")] })), map, null, []), { kind: "short", words: "No room before the exam to start Kernel" });
+		assert.deepEqual(examReady(readiness(part({ notYet: [h("rank")], wontFit: [h("kernel")] })), map, null, []), { kind: "short", words: "Not every exam topic fits before 30 Nov." });
 		assert.deepEqual(examReady(readiness(part({ solid: [h("span")] })), map, null, []), { kind: "ready", words: "Ready for the exam" });
 	});
 
 	it("never says ready while the final review leaves a taught topic out", () => {
 		const { map } = course(false);
 		const left = { ...map, exam: { date: "2026-11-19", daysLeft: 11, unreviewed: [h("rank")] } };
-		assert.deepEqual(examReady(readiness(part({ solid: [h("span"), h("rank")] })), left, null, []), { kind: "short", words: "Rank is not revisited in the final review" });
-		assert.deepEqual(examReady(readiness(part({ wontFit: [h("kernel")] })), left, null, []), { kind: "short", words: "No room before the exam to start Kernel" }, "what has no room to start first");
+		assert.deepEqual(examReady(readiness(part({ solid: [h("span"), h("rank")] })), left, null, []), { kind: "short", words: "Your final review before 19 Nov leaves some topics out." });
+		assert.deepEqual(examReady(readiness(part({ wontFit: [h("kernel")] })), left, null, []), { kind: "short", words: "Not every exam topic fits before 19 Nov." }, "what has no room to start first");
 	});
 
-	it("names the final review's first day, so a review before it never reads as a contradiction (round 11 integration: \"No room in the final review for Binomial\" beside \"Review Binomial today\")", () => {
+	it("names the final review, so a review before it never reads as a contradiction, and no topic (round 11 integration: \"No room in the final review for Binomial\" beside \"Review Binomial today\"; round 20, M2)", () => {
 		const { map } = course(false);
 		const rank = map.topics.find((t) => t.handle === h("rank"))!;
 		const reviewedToday = { ...map, topics: map.topics.map((t) => (t === rank ? { ...t, review: { kind: "scheduled" as const, date: map.today } } : t)) };
 		const ahead = { ...reviewedToday, exam: { date: "2026-11-19", daysLeft: 11, finalReview: "2026-11-13", unreviewed: [h("rank")], reasons: { rank: "full" as const } } };
-		assert.deepEqual(examReady(readiness(part({ solid: [h("span"), h("rank")] })), ahead, null, []), { kind: "short", words: "Rank is not revisited in the final review from 13 Nov" });
+		assert.deepEqual(examReady(readiness(part({ solid: [h("span"), h("rank")] })), ahead, null, []), { kind: "short", words: "Your final review before 19 Nov leaves some topics out." });
 		const begun = { ...ahead, exam: { ...ahead.exam, finalReview: map.today } };
-		assert.deepEqual(examReady(readiness(part({ solid: [h("span"), h("rank")] })), begun, null, []), { kind: "short", words: "Rank is not revisited in the final review" }, "a final review already under way needs no day");
+		assert.deepEqual(examReady(readiness(part({ solid: [h("span"), h("rank")] })), begun, null, []), { kind: "short", words: "Your final review before 19 Nov leaves some topics out." }, "the same words once the final review is under way");
 	});
 
 });

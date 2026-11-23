@@ -146,16 +146,16 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 
 	const gapLine = (c: StudyCourse) => render(<ExamGapLine course={c} chats={[]} />).querySelector('[data-slot="course-exam-gaps"]');
 
-	it("says why in the readiness fact's answer, names what that line does not, and offers a way in: start or review it today, or ask the tutor", () => {
+	it("says why in the readiness fact's answer, names the topics behind Which topics, and offers a way in: start or review it today, or ask the tutor (round 20, M2)", () => {
 		const one = gapLine(gapped(["variance"], [], { variance: "full" }))!;
 		assert.equal(one.querySelector("[data-slot=exam-gaps-why]")?.textContent, "Your pace fills every study day before the exam.");
-		assert.deepEqual([...one.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.start, EXAM_GAP_WORDS.ask], "the head's line names Variance, so no Which topics (round 18, m7)");
+		assert.deepEqual([...one.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.which, "Start Variance today", EXAM_GAP_WORDS.ask], "the exam line names no topic left out, so Which topics does, and the press names its topic (round 20, M2)");
 		const review = gapLine(gapped([], ["binomial"], { binomial: "full" }))!;
 		assert.equal(review.querySelector("[data-slot=exam-gaps-why]")?.textContent, "Your pace fills every day of the final review.");
-		assert.deepEqual([...review.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.review, EXAM_GAP_WORDS.ask], "the head's line names Binomial, so no Which topics (round 18, m7)");
+		assert.deepEqual([...review.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.which, "Review Binomial today", EXAM_GAP_WORDS.ask], "Which topics names Binomial (round 20, M2)");
 		const late = gapLine(gapped([], ["poisson"], { poisson: "too_late" }))!;
 		assert.equal(late.querySelector("[data-slot=exam-gaps-why]")?.textContent, "Poisson starts too close to the exam for a review.", "a topic that starts too late is named, never a bare One (round 18, m7)");
-		assert.deepEqual([...late.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.start, EXAM_GAP_WORDS.ask], "a topic never taught is started, never reviewed; the line names it, so no Which topics");
+		assert.deepEqual([...late.querySelectorAll("button")].map((b) => b.textContent), ["Start Poisson today", EXAM_GAP_WORDS.ask], "a topic never taught is started, never reviewed; the why names it, so no Which topics");
 		const both = gapLine(gapped(["variance", "geometric"], ["binomial"], { variance: "not_ready", geometric: "not_ready", binomial: "full" }))!;
 		assert.equal(
 			both.querySelector("[data-slot=exam-gaps-why]")?.textContent,
@@ -178,7 +178,7 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		const c = gapped(["inner", "projection"], [], { inner: "full", projection: "full" });
 		const map = { ...c.map, topics: [...c.map.topics, topic("inner", { title: "Inner products" }), topic("projection", { title: "Orthogonal projection" })], edges: needs };
 		const line = gapLine({ ...c, map })!;
-		assert.deepEqual([...line.querySelectorAll("button")].map((b) => b.textContent), ["Start Inner products today", EXAM_GAP_WORDS.ask]);
+		assert.deepEqual([...line.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.which, "Start Inner products today", EXAM_GAP_WORDS.ask]);
 	});
 
 	it("says the round-8 gap in two sentences, your pace once, naming no topic, which Which topics lists (round 8: five sentences; round 17, m6)", () => {
@@ -219,7 +219,7 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.deepEqual([...line.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.which, "Review Binomial today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask]);
 		const needsPoisson = [{ kind: "needs" as const, topic: h("variance"), prerequisite: h("poisson") }];
 		const alone = gapLine({ ...c, map: { ...map, topics: [topics[0]!, topics[1]!, topics[3]!], exam: { ...map.exam!, doesNotFit: [h("variance")], unreviewed: [] }, edges: needsPoisson } })!;
-		assert.deepEqual([...alone.querySelectorAll("button")].map((b) => b.textContent), ["Review Binomial today", EXAM_GAP_WORDS.ask], "today's one item named, never \"Review it today\" for a topic the line does not name");
+		assert.deepEqual([...alone.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.which, "Review Binomial today", EXAM_GAP_WORDS.ask], "today's one item named, never \"Review it today\" for a topic the line does not name");
 	});
 
 	it("offers only what he can do today: review what is taught, start what has its prerequisites taught, nothing for the rest (round 7: Review Poisson, Start Variance before Expectation)", () => {
@@ -229,7 +229,7 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		const ways = examGaps(map)!.ways.map((w) => `${w.starts ? "Start" : "Review"} ${w.topic.handle}`);
 		assert.deepEqual(ways, ["Review binomial", "Start geometric", "Start expectation", "Start poisson"]);
 		const stuck = gapLine({ ...c, map: { ...map, exam: { ...map.exam!, doesNotFit: [h("variance")], unreviewed: [] } } })!;
-		assert.deepEqual([...stuck.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.ask], "named, with only the tutor to ask");
+		assert.deepEqual([...stuck.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.which, EXAM_GAP_WORDS.ask], "named behind Which topics, with only the tutor to ask");
 	});
 
 	/**
@@ -238,23 +238,23 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 	 * repeated the head's line word for word under it. The late topic is
 	 * named, and Which topics lists only what the head's line does not.
 	 */
-	it("names the topic that starts too late, and Which topics holds only what the head's line does not (round 18, m7)", () => {
+	it("names the topic that starts too late, and Which topics holds what the exam line and the why do not (round 18, m7; round 20, M2)", () => {
 		const c = gapped(["martingales", "sums"], ["hyper", "binomial"], { martingales: "full", sums: "full", hyper: "too_late", binomial: "full" });
 		const map = { ...c.map, topics: [...c.map.topics, topic("martingales"), topic("sums", { title: "Variance of sums" }), topic("hyper", { title: "Hypergeometric distribution" })] };
 		const eve = { ...c, map };
-		const head = "No room before the exam to start Martingales and Variance of sums";
+		const head = "Not every exam topic fits before 19 Nov.";
 		const line = gapLine(eve)!;
 		const why = line.querySelector("[data-slot=exam-gaps-why]")?.textContent ?? "";
 		assert.match(why, /Hypergeometric distribution starts too close to the exam for a review/);
 		const which = examGapWhich(eve, examGaps(map)!);
-		assert.deepEqual(which, ["Binomial is not revisited in the final review from 14 Nov"], "only the topic neither the head's line nor the why names");
+		assert.deepEqual(which, ["No room before the exam to start Martingales and Variance of sums", "Binomial is not revisited in the final review from 14 Nov"], "the names the exam line leaves out, but the late topic the why names");
 		for (const said of [why, ...which]) {
 			assert.doesNotMatch(said, /\bOne\b|\bone starts\b|\bsome start\b/i, `no topic left unnamed: "${said}"`);
 			assert.ok(!said.includes(head) && !head.includes(said.replace(/\.$/, "")), `no sentence of the head's line: "${said}"`);
 		}
-		// With the head's line and the why naming every topic, there is nothing behind Which topics, and no press for it.
-		const named = gapped(["martingales"], ["hyper"], { martingales: "full", hyper: "too_late" });
-		const bare = gapLine({ ...named, map: { ...named.map, topics: [...named.map.topics, topic("martingales"), topic("hyper", { title: "Hypergeometric distribution" })] } })!;
+		// With the why naming every topic, there is nothing behind Which topics, and no press for it.
+		const named = gapped([], ["hyper"], { hyper: "too_late" });
+		const bare = gapLine({ ...named, map: { ...named.map, topics: [...named.map.topics, topic("hyper", { title: "Hypergeometric distribution" })] } })!;
 		assert.ok(bare.querySelector("[data-slot=exam-gaps-which-press]") === null, "no Which topics with nothing more to show");
 	});
 
@@ -302,7 +302,7 @@ describe("a topic he began, on the exam's ways in (round 12, 1 D5: Start Poisson
 		assert.equal(press.resume?.id ?? "a new chat", "chat_poisson");
 		assert.equal(press.continues, true);
 		const line = render(<ExamGapLine course={c} chats={[lesson]} />).querySelector("[data-slot=course-exam-gaps]")!;
-		assert.deepEqual([...line.querySelectorAll("button")].map((b) => b.textContent), ["Continue Poisson today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask]);
+		assert.deepEqual([...line.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.which, "Continue Poisson today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask]);
 		assert.equal(topicPress(topics[2]!, c.map, [lesson]).resume, null, "a topic he never began still starts");
 	});
 });
