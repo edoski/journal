@@ -6,7 +6,7 @@
  * field of the mark is the engine's.
  */
 
-import { answerMarksOf, correctorsToRead, markLinks } from "../core/answer-marks.ts";
+import { answerMarksOf, correctorsToRead, markLinks, savedAttemptsOf } from "../core/answer-marks.ts";
 import type { AnswerMarksResponse } from "../core/contracts/marks.ts";
 import { stores } from "./stores.ts";
 import { isTurnRunning } from "./turn-liveness.ts";
@@ -39,13 +39,18 @@ async function shown(workspace: string, handles: readonly string[]): Promise<Rec
 /** GET /api/chats/:id/marks's answer. A session with no course has no
  *  marks. A record the engine cannot read is a failed read (503), never
  *  "no marks", so the window keeps the marks it drew (round 17, m23: with
- *  `course.json` unreadable every earlier mark vanished from the lesson). */
+ *  `course.json` unreadable every earlier mark vanished from the lesson).
+ *  The failed read carries the marks the session's own saves sent
+ *  (`savedAttemptsOf`), for the answers a window opened since has no mark
+ *  for (round 20, M4). */
 export async function answerMarks(chatId: string): Promise<{ status: 200 | 404 | 503; body: AnswerMarksResponse }> {
 	try {
 		return await readMarks(chatId);
 	} catch (error) {
-		if (error instanceof RecordUnread) return { status: 503, body: { ok: false, error: "The course's record can't be read" } };
-		throw error;
+		if (!(error instanceof RecordUnread)) throw error;
+		const chat = stores.chatStore.getChat(chatId);
+		const marks = chat ? answerMarksOf(markLinks(chat, { running: isTurnRunning(chatId) }), savedAttemptsOf(chat.messages)) : {};
+		return { status: 503, body: { ok: false, error: "The course's record can't be read", marks } };
 	}
 }
 

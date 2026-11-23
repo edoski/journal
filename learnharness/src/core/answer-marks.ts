@@ -15,7 +15,8 @@
  * returned and follows `corrected_by` to the ones that stand.
  */
 
-import { answeredQuestionsOf, HIS_MESSAGE, savedQuestionsOf, type LhMessage } from "./native-messages.ts";
+import { answeredQuestionsOf, finalSubmissionOf, HIS_MESSAGE, saveChanges, savedQuestionsOf, type LhMessage } from "./native-messages.ts";
+import { practiceObservations, type PracticeConclusion } from "./practice-attempts.ts";
 import type { AnswerSaves } from "./contracts/chat.ts";
 import type { AnswerMark, MarkGrade, MarkRow } from "./contracts/marks.ts";
 import { chosenSure, isMarkResult, markHow } from "./contracts/marks.ts";
@@ -135,6 +136,87 @@ export function savedOf(messages: readonly LhMessage[], kept?: AnswerSaves): Set
 		}
 	}
 	return saved;
+}
+
+/** The engine's grade of an attempt (learning/progress.py `grade`): solid
+ *  when right, unaided, certain and no guess; missed when wrong; helped
+ *  otherwise. Read only where the engine cannot be: `savedAttemptsOf`. */
+function engineGrade(o: Record<string, unknown>): MarkGrade {
+	if (o.result === "incorrect") return "missed";
+	const unaided = o.kind === "exam" || o.help === "none";
+	return o.result === "correct" && unaided && !("uncertain" in o) && o.sure !== "guess" ? "solid" : "helped";
+}
+
+/** A value the tool boundary may have sent as JSON text, parsed. */
+function parsed(value: unknown): unknown {
+	if (typeof value !== "string") return value;
+	try {
+		return JSON.parse(value);
+	} catch {
+		return null;
+	}
+}
+
+function listOf(value: unknown): unknown[] {
+	const list = parsed(value);
+	return Array.isArray(list) ? list : [];
+}
+
+function objectOf(value: unknown): Record<string, unknown> | null {
+	const object = parsed(value);
+	return object && typeof object === "object" && !Array.isArray(object) ? (object as Record<string, unknown>) : null;
+}
+
+/** The attempts this session's own saves sent, by the id each receipt gave
+ *  them, as `show` returns them: a lesson save's observations, and a
+ *  concluded problem's first try and final answer (practice-attempts.ts
+ *  `practiceObservations`), lined up with its receipt from the newest. A
+ *  re-mark names the attempt it corrects (`corrected_by`). The marks of a
+ *  lesson opened while its course's record can't be read come from here
+ *  (round 20, M4: a practice lesson opened after its record became
+ *  unreadable showed its answers unmarked). Pure. */
+export function savedAttemptsOf(messages: readonly LhMessage[]): Record<string, Record<string, unknown>> {
+	const calls = new Map<string, { name: string; args: unknown }>();
+	const attempts: Record<string, Record<string, unknown>> = {};
+	let pose: { id: string; statement: string; topics: string[] } | null = null;
+	const keep = (ids: readonly string[], sent: readonly unknown[]) => {
+		const from = sent.length - ids.length;
+		ids.forEach((id, i) => {
+			const o = objectOf(sent[from + i]);
+			if (o) attempts[id] = { kind: "attempt", ...o };
+		});
+	};
+	for (const [at, message] of messages.entries()) {
+		if (message.role === "assistant") {
+			for (const block of message.content) {
+				if (block.type !== "toolCall") continue;
+				calls.set(block.id, { name: block.name, args: block.arguments });
+				if (block.name !== "problem") continue;
+				const args = objectOf(block.arguments);
+				pose = { id: block.id, statement: typeof args?.statement === "string" ? args.statement : "", topics: ids(listOf(args?.topics)) };
+			}
+		} else if (message.role === "toolResult" && !message.isError) {
+			const call = calls.get(message.toolCallId);
+			if (message.toolName === "course_save") {
+				const listed = saveChanges(objectOf(call?.args) ?? {})?.observations;
+				keep(savedIds(textOf(message.content)), Array.isArray(listed) ? listed : []);
+			} else if (message.toolName === "conclude" && pose) {
+				const receipt = CONCLUDE_RECEIPT.exec(textOf(message.content));
+				const conclusion = objectOf(call?.args) as PracticeConclusion | null;
+				if (!receipt || !conclusion || conclusion.result === undefined) continue;
+				const final = finalSubmissionOf(messages.slice(0, at), pose.id);
+				keep(savedIds(receipt[1]!), practiceObservations(pose, conclusion, final?.kind === "work" ? final.confidence : undefined));
+			}
+		}
+	}
+	for (const [id, o] of Object.entries(attempts)) {
+		o.grade = engineGrade(o);
+		for (const target of ids(o.corrects)) {
+			const corrected = attempts[target];
+			if (corrected) corrected.corrected_by = [...ids(corrected.corrected_by), id];
+		}
+	}
+	return attempts;
 }
 
 /** What a re-mark in this session may correct: every attempt a dispute of
