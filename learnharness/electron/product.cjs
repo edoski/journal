@@ -11,10 +11,16 @@ const PRODUCT_NAME = "Chiron";
 const DATA_FOLDER = "LearnHarness";
 
 /** Names the app and pins its userData folder, before anything reads it.
- *  LH_USER_DATA_DIR overrides the folder (the launcher's tests). */
+ *  LH_USER_DATA_DIR overrides the folder (the launcher's tests). A dev shell
+ *  (LH_DEV_URL) runs beside the packaged app in the folder's "-dev" twin, so
+ *  it neither loses the single-instance lock to it nor shares its
+ *  localStorage, auth.json or logs. Chromium reads the folder once, when
+ *  Electron is ready: the launcher names the app before that, the shell
+ *  again at its load, and both land on the same folder. */
 function nameApp(app, env) {
 	app.setName(PRODUCT_NAME);
-	app.setPath("userData", env.LH_USER_DATA_DIR ? path.resolve(env.LH_USER_DATA_DIR) : path.join(app.getPath("appData"), DATA_FOLDER));
+	const folder = env.LH_USER_DATA_DIR ? path.resolve(env.LH_USER_DATA_DIR) : path.join(app.getPath("appData"), DATA_FOLDER);
+	app.setPath("userData", env.LH_DEV_URL ? `${folder}-dev` : folder);
 }
 
 module.exports = { PRODUCT_NAME, DATA_FOLDER, nameApp };

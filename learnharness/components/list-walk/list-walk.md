@@ -20,3 +20,4 @@ The page names its stops top to bottom (`stops`, read at each key) and wires two
 | Home | Today's lines, the lessons Also today folds in included (`data-line`) | the map: the shown course's card that takes focus (You are here), a `region` |
 | Course page | each arc's or group's header, an arc's Check it, the rows of the open one (`walkStops`) | Now's row (`course-action`), which takes focus when the page arrives with focus nowhere (`c` on Home, a link; round 15, 4 free) |
 | Topic page | each row's press in the sections, Now's first: Builds on, Next, Earlier, Show the rest | the head's trail, its last link |
+| Sign-in dialog (`../setup-dialog.tsx`) | Refresh, then each account's Use this account; it opens on Refresh (round 21, m16) | ✕. Esc closes the dialog rather than only leaving the walk |

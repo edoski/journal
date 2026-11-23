@@ -15,7 +15,7 @@
  *   light gutter) can divide by it.
  *
  *   window.lh.lightsCentre — the traffic lights' centre from the window's
- *   top, in points (TRAFFIC_LIGHTS in electron/main.cjs, passed as
+ *   top, in points (TRAFFIC_LIGHTS in electron/window-frame.cjs, passed as
  *   --lh-lights-centre); the renderer publishes it as --lh-lights-centre.
  *
  *   window.lh.pickFolder() — the system folder picker for Context's Link a
