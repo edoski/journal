@@ -83,7 +83,7 @@ import { lessonRoadmapSteps, partKey, stepAnchors } from "@/components/lesson/ro
 import { scrollSessionTarget } from "@/components/session-navigation";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
-import { isCourseDeletedRefusal, isSignedOutLine, parseProviderKeyRefusal, refusalWatch, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
+import { isCourseDeletedRefusal, isSignedOutLine, parseProviderKeyRefusal, refusalWatch, turnErrorText, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
 import { pausePlaceholder, practicePause } from "@/components/lesson/practice-pause";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
@@ -888,6 +888,8 @@ export function Chat({
 	// or what stays in the box until a send is accepted): only then does the
 	// line say they are still in the box (round 11, 4 minor 3).
 	const [refusedWords, setRefusedWords] = useState(false);
+	// The offline failure the app's return answered (useServerResync below).
+	const [appBack, setAppBack] = useState<typeof error>(null);
 	useEffect(() => {
 		if (!error) return;
 		if (!parseProviderKeyRefusal(error.message)) return; // a real error keeps the honest banner
@@ -1395,6 +1397,10 @@ export function Chat({
 		// cut never settles, so the dropped stream's line would stand
 		// forever. Ask the record what is true now.
 		if (statusRef.current === "error" && droppedError(errorRef.current)) void healDroppedStreamRef.current();
+		// A send that could not reach the app: the app answers again, so the
+		// line says he can send now (round 20, m12: "Couldn't reach the app"
+		// stood 30 s and more after the restart).
+		else if (statusRef.current === "error" && errorRef.current && turnErrorText(errorRef.current.message).kind === "offline") setAppBack(errorRef.current);
 	});
 	useEffect(
 		() => () => {
@@ -1974,7 +1980,8 @@ export function Chat({
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
-							{error && !continuing && (
+							{error && appBack === error && <p role="status" data-testid="app-back" className="text-body text-muted-foreground">{LESSON_WORDS.appBack}</p>}
+							{error && !continuing && appBack !== error && (
 								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} kept={refusedWords} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>

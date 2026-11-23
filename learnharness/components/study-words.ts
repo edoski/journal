@@ -707,6 +707,8 @@ export const LESSON_WORDS = {
 	couldntReply: "The tutor couldn't reply.",
 	/** A turn refused for a signed-out Claude, once Claude reads signed in (round 19, m27). */
 	signedInAgain: "Signed in again. Press Enter to send.",
+	/** A send that could not reach the app, once the app answers again (round 20, m12). */
+	appBack: "The app is back. Press Enter to send.",
 	youStoppedReply: "You stopped the tutor before it replied.",
 	youStoppedMidReply: "You stopped the tutor mid-reply.",
 	tryAgain: "Try again",
