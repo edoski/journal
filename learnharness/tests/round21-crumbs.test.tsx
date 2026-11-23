@@ -5,6 +5,10 @@
  *     |A| < |𝒫(A)| › Review Cardinality, countable sets and Cantor's theorem
  *     |A| < |𝒫(A)|". A one-topic review named after its topic ends on
  *     "Review".
+ *   - m10 (4 minor 5): with Real Analysis's record at 000, a fresh open of
+ *     Sequence limit proofs read "Real Analysis › Sequence limit proofs",
+ *     its topic gone. The place falls back to the course's last map the
+ *     server read.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -50,6 +54,10 @@ const { ServerEventsProvider } = await import("../components/server-events.tsx")
 type NotifySource = import("../components/server-events.tsx").NotifySource;
 const quietSource: NotifySource = { close() {}, onOpen() {}, onEvent() {} };
 const { newUserMessage } = await import("../src/core/index.ts");
+const { stores } = await import("../src/server/stores.ts");
+const { lessonPlace } = await import("../src/server/lesson-place.ts");
+type CourseRecords = import("../src/core/ports.ts").CourseRecords;
+type CourseMap = import("../src/core/contracts/course-map.ts").CourseMap;
 type LessonPlace = import("../src/core/lesson-place.ts").LessonPlace;
 
 const RA = { workspace: "/s/ra", title: "Real Analysis" };
@@ -78,5 +86,31 @@ describe("a one-topic review's crumb ends on Review (round 21, m9; 2 n4)", () =>
 	it("any other title still ends the trail, and one named as its topic is not drawn twice", () => {
 		assert.deepEqual(trail("Cantor practice", place), ["Real Analysis", CANTOR, "Cantor practice"]);
 		assert.deepEqual(trail(CANTOR, place), ["Real Analysis", CANTOR]);
+	});
+});
+
+describe("a fresh open with the course record unreadable keeps the topic (round 21, m10; 4 minor 5)", () => {
+	const SEQUENCES = { handle: "sequences", title: "Sequences and the limit of a sequence" };
+	let readable = true;
+	const records: CourseRecords = {
+		list: async () => ({ available: true, courses: [], unreadable: [] }),
+		map: async (workspace) =>
+			readable
+				? { ok: true, map: { workspace, title: RA.title, today: "2026-11-08", revision: 1, exam: null, current: "sequences", currentArc: null, focus: null, tasks: [], topics: [SEQUENCES], edges: [], arcs: [] } as unknown as CourseMap }
+				: { ok: false, kind: "io", message: "Permission denied" },
+		run: async () => ({ ok: false, kind: "io", message: "unused" }),
+		create: async () => ({ ok: false, kind: "io", message: "unused" }),
+	};
+	stores.courseRecords = records;
+	const chat = { course: RA, topics: ["sequences"], messages: [], title: "Sequence limit proofs" };
+
+	it("Real Analysis › Sequences and the limit of a sequence › Sequence limit proofs, before and after the record goes 000", async () => {
+		readable = true;
+		const before = (await lessonPlace(chat))!;
+		assert.deepEqual(before.topic, SEQUENCES);
+		readable = false;
+		const after = await lessonPlace(chat);
+		assert.deepEqual(after?.topic, SEQUENCES, "a fresh open keeps the topic");
+		assert.deepEqual(trail("Sequence limit proofs", after!), ["Real Analysis", SEQUENCES.title, "Sequence limit proofs"]);
 	});
 });
