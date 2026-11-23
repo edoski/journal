@@ -194,9 +194,9 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			...(opts.course ? Object.values(courseTools(opts.course)) : []),
 			...(opts.tools === undefined ? [withArgumentHeal(sendToUserTool)] : []),
 		].map(spoken).map((tool) => closing.wrap(tool)),
-		screen: (call) => {
+		screen: (call, reply) => {
 			closing.screen(call);
-			if (lesson) voice.screen(call);
+			if (lesson) voice.screen(call, reply);
 		},
 		settle: (message) => voice.settle(message),
 		heard: () => voice.heard(),

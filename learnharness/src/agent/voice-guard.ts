@@ -890,6 +890,17 @@ const DUPLICATE: AgentToolResult<unknown> = {
 	details: { withheld: "duplicate" },
 };
 
+/** A message after one refused in the same reply: shown now, it would
+ *  reach him before the rewrite of what came first (round 20, M1: the
+ *  probe's feedback refused, the lesson's first step shown, and the
+ *  feedback's rewrite then landing under the step). It waits, and is owed
+ *  in turn. */
+const AFTER_REFUSED = (text: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: "Not shown to him yet: the message before it was refused, so he would read this first. Send the rewrite of that one, then this one again, in order." }],
+	isError: true,
+	details: { withheld: "after-refused", text },
+});
+
 /** Words after `probe_done`: the teacher opens the lesson, so the probe
  *  ends with none (its ack says so), save the rewrites it owes. */
 const AFTER_PROBE = (text: string): AgentToolResult<unknown> => ({
@@ -1191,9 +1202,19 @@ export class VoiceGuard {
 	private sent = 0;
 	private duplicates = 0;
 	private probeEnded = false;
-	/** A refused message not yet rewritten, and whether a turn-ending call
-	 *  was already held back for it (once a turn). */
-	private owed = false;
+	/** The refused messages not yet rewritten, and whether a turn-ending
+	 *  call was already held back for them (once a turn). Two refused in one
+	 *  reply owe two rewrites (round 20, M1: the probe's feedback and the
+	 *  lesson's first step, both refused, and the step's rewrite was then
+	 *  refused as words after the probe's end). Read message by message
+	 *  within a model reply, each message first taken as a rewrite of one
+	 *  owed before the reply; a call screened with no reply is its own. */
+	private owed = 0;
+	private owedBefore = 0;
+	private refusedNow = 0;
+	private rewrittenNow = 0;
+	private reply: AssistantMessage | undefined;
+	private screening: ToolCall | null = null;
 	private heldForOwed = 0;
 	/** The question kept for the owed rewrite: its call, its words, whether
 	 *  its tool ran it cleanly, and the reply it was taken out of. */
@@ -1368,7 +1389,8 @@ export class VoiceGuard {
 
 	/** Read a call as it finishes streaming. A refused message's text leaves
 	 *  the live call, so no view ever draws it. */
-	screen(call: ToolCall): void {
+	screen(call: ToolCall, reply?: AssistantMessage): void {
+		this.enter(reply);
 		if (call.name === PRACTICE_CONCLUDE_TOOL && !this.concluded) {
 			this.concluded = true;
 			this.sentAtConclude = this.sent;
@@ -1376,8 +1398,25 @@ export class VoiceGuard {
 		}
 		if (call.name === LESSON_PROGRESS_TOOL && isRecord(call.arguments) && Array.isArray(call.arguments.done)) for (const id of call.arguments.done) if (typeof id === "string") this.doneNow.add(id);
 		if (call.name === SAVE_TOOL || call.name === PRACTICE_CONCLUDE_TOOL) for (const result of savedResults(call.name, call.arguments)) this.savedVerdicts.add(result);
+		this.screening = call;
 		const refused = this.decide(call);
+		this.screening = null;
 		if (refused && call.name === SEND_TO_USER_TOOL) call.arguments = {};
+	}
+
+	/** A call of a new model reply, or one with no reply, starts its count. */
+	private enter(reply: AssistantMessage | undefined): void {
+		if (reply && reply === this.reply) return;
+		this.owedBefore = this.owed;
+		this.refusedNow = 0;
+		this.rewrittenNow = 0;
+		this.reply = reply;
+	}
+
+	/** The messages owed now: this reply's refused ones, plus those owed
+	 *  before it that its messages have not yet rewritten. */
+	private owe(): void {
+		this.owed = this.refusedNow + Math.max(0, this.owedBefore - this.rewrittenNow - this.refusedNow);
 	}
 
 	/** Read ordinary text as its block ends: he never sees it, so it is
@@ -1398,13 +1437,13 @@ export class VoiceGuard {
 			this.noted.add(UNSAVED_NOTE);
 			return UNSAVED_NOTE;
 		}
-		if (this.owed && (this.kept?.ran || this.waited)) {
+		if (this.owed > 0 && (this.kept?.ran || this.waited)) {
 			if (this.noted.has(OWED_END_NOTE)) return undefined;
 			this.noted.add(OWED_END_NOTE);
 			return OWED_END_NOTE;
 		}
 		const closes = this.closing || this.lessonClosed || (this.review && this.savedNow && !this.posed);
-		if (closes && this.receipt && this.sent > 0 && !this.heldMissing && !this.owed) {
+		if (closes && this.receipt && this.sent > 0 && !this.heldMissing && this.owed === 0) {
 			const missing = closeMissing(this.toldNow, this.receipt);
 			if (missing.length > 0) {
 				this.heldMissing = true;
@@ -1413,7 +1452,7 @@ export class VoiceGuard {
 		}
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
-		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
+		const leftNoWayOn = this.input.work === true && shown && !this.concluded && this.owed === 0 && !this.said.some(leavesAWayOn);
 		if (this.offTopic && this.sent === this.offTopic.at && !this.noted.has(OFF_TOPIC_NOTE)) {
 			this.noted.add(OFF_TOPIC_NOTE);
 			return `Not shown to him yet: ${OFF_TOPIC_TEXT(this.offTopic.topics.join(", "), this.reviewTopics.join(", "))}.`;
@@ -1423,7 +1462,7 @@ export class VoiceGuard {
 			return VERDICT_NOTE;
 		}
 		const unrepaired = this.repairOwed && !writesAnswer(this.secondTry!, this.toldNow);
-		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.retryOwed ? RETRY_NOTE : unrepaired ? REPAIRED_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : this.nextStepOwed() ? NEXT_STEP_NOTE : undefined;
+		const note = !shown && this.owed > 0 ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.retryOwed ? RETRY_NOTE : unrepaired ? REPAIRED_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : this.nextStepOwed() ? NEXT_STEP_NOTE : undefined;
 		if (!note || this.noted.has(note)) return undefined;
 		this.noted.add(note);
 		return note;
@@ -1434,7 +1473,7 @@ export class VoiceGuard {
 	 *  which a later question in the review tries again. Never his Done for
 	 *  today, nor his work on a practice problem. */
 	private nextStepOwed(): boolean {
-		if (this.closing || this.owed || !this.input.answers || this.input.work || this.savedVerdicts.size === 0) return false;
+		if (this.closing || this.owed > 0 || !this.input.answers || this.input.work || this.savedVerdicts.size === 0) return false;
 		if (this.stepsAhead.some((step) => !this.doneNow.has(step.id))) return true;
 		return this.review && [...this.savedVerdicts].some((result) => result !== "correct");
 	}
@@ -1479,6 +1518,8 @@ export class VoiceGuard {
 
 	private decide(call: ToolCall): AgentToolResult<unknown> | null {
 		if (this.decisions.has(call.id)) return this.decisions.get(call.id)!;
+		// A call its tool runs unscreened is a reply of its own.
+		if (this.screening !== call) this.enter(undefined);
 		const decision = this.judge(call);
 		this.decisions.set(call.id, decision);
 		return decision;
@@ -1509,29 +1550,36 @@ export class VoiceGuard {
 			if (!text) return null;
 			// A rewrite he is owed goes through, after probe_done too: it is
 			// the answer he asked for, never a closing sentence.
-			const afterProbe = this.probeEnded && !this.owed;
+			const afterProbe = this.probeEnded && this.owed === 0;
 			if (this.duplicates < 2 && (afterProbe || this.said.some((s) => s.trim() === text.trim()))) {
 				this.duplicates++;
 				return afterProbe ? AFTER_PROBE(text) : DUPLICATE;
 			}
 			const answersHim = this.unanswered > 0 && !text.trim().endsWith("?");
-			if (this.lastAsked && !this.owed && !answersHim) return AFTER_ASKING(text);
+			if (this.lastAsked && this.owed === 0 && !answersHim) return AFTER_ASKING(text);
 			const ruled = this.rulings.length > 0 && this.sent === 0 && !this.heldRulingSaid && !this.rulings.some((r) => sameRuling(text, r));
 			if (ruled) {
 				this.heldRulingSaid = true;
 				return RULING_SAID(this.rulings[0]!);
 			}
+			if (this.refusedNow > 0) {
+				this.refusedNow++;
+				this.owe();
+				return AFTER_REFUSED(text);
+			}
 			const kind = this.messageKind();
 			const breaks = this.held("message", this.messageBreaks(text, kind));
 			if (breaks.length > 0) {
 				this.refused.set("message", (this.refused.get("message") ?? 0) + 1);
-				this.owed = true;
+				this.refusedNow++;
+				this.owe();
 				if (breaks.some((b) => b.rule === "length") && !this.lengthDraft) this.lengthDraft = clausesOf(text);
 				return refusal("message", call.name, text, breaks, kind);
 			}
-			this.owed = false;
+			this.rewrittenNow++;
+			this.owe();
 			this.lengthDraft = null;
-			if (this.kept || this.waiting.size > 0) this.releasing = call.id;
+			if ((this.kept || this.waiting.size > 0) && this.owed === 0) this.releasing = call.id;
 			this.toldNow.push(text);
 			if (opensOnVerdict(text)) this.verdictOwed = false;
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
@@ -1572,12 +1620,12 @@ export class VoiceGuard {
 		// each refused message (a rewrite may be refused again), or once for
 		// ordinary text.
 		const question = (QUESTION_TOOLS as readonly string[]).includes(call.name);
-		const keeps = this.owed && question;
-		if (!this.owed && this.plain && this.sent === 0 && this.heldForOwed < 1 && this.endsTurn(call.name)) {
+		const keeps = this.owed > 0 && question;
+		if (this.owed === 0 && this.plain && this.sent === 0 && this.heldForOwed < 1 && this.endsTurn(call.name)) {
 			this.heldForOwed++;
 			return PLAIN_OWED(call.name);
 		}
-		const waits = this.owed && !question && this.endsTurn(call.name);
+		const waits = this.owed > 0 && !question && this.endsTurn(call.name);
 		if (call.name === PRACTICE_PROBLEM_TOOL && this.problemBefore && this.input.kind === "direct" && !this.input.ruling && !ASKS_FOR_PROBLEM.test(this.input.words ?? "") && !this.heldAskedOnly) {
 			this.heldAskedOnly = true;
 			return ASKED_ONLY;
@@ -1591,7 +1639,7 @@ export class VoiceGuard {
 		if (!question) return null;
 		const text = questionText(call);
 		if (!text) return null;
-		if (this.input.unsure && this.sent === 0 && !this.owed && !this.heldUnsure) {
+		if (this.input.unsure && this.sent === 0 && this.owed === 0 && !this.heldUnsure) {
 			this.heldUnsure = true;
 			return UNSURE(this.input.unsure);
 		}
@@ -1754,7 +1802,7 @@ export class VoiceGuard {
 		const sure = kind === "close" ? narratedConfidence(text) : null;
 		if (sure) out.push({ rule: "confidence", excerpt: sure });
 		if (receipt) out.push(...closeBreaks(text, receipt, this.courseTitles));
-		if (this.owed && this.lengthDraft && !out.some((b) => b.rule === "length")) {
+		if (this.owed > 0 && this.lengthDraft && !out.some((b) => b.rule === "length")) {
 			const { words, clauses } = clausesOf(text);
 			const draft = this.lengthDraft;
 			if (clauses < draft.clauses && words > draft.words - draft.shortest) out.push({ rule: "length", excerpt: `joined: ${words} words where the draft had ${draft.words}, in fewer sentences` });
