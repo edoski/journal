@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
 	// AGENTS.md is committed and edited by hand; Next's dev server would rewrite it on every start.
 	agentRules: false,
 	// The dev badge's default corner is bottom-left, over the folded rail's
-	// Settings; Edo runs the Mac app on `next dev` (the launcher).
+	// Settings, in `npm run dev` and `npm run desktop:dev`.
 	devIndicators: { position: "bottom-right" },
 	// Desktop target (Electron wrapper, 2026-09-17): standalone output = a
 	// self-contained .next/standalone/server.js the Electron shell spawns

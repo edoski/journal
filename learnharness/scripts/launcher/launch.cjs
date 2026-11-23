@@ -3,8 +3,10 @@
 //   1. open a window in the app's frame at once, saying Opening or Updating;
 //   2. update the checkout by the rule in update.cjs, then reinstall the
 //      packages when package-lock.json changed;
-//   3. start `next dev` on PORT, as `npm run desktop:dev` does, so pages,
-//      server routes and the engine reload live;
+//   3. build the production server (`next build`, then scripts/build-server.mjs,
+//      as `desktop:dist` does) when the app's source differs from the last
+//      build's, and start it on PORT: React's production build, every route
+//      compiled ahead (23 Nov 2026: on `next dev` the app was slow to use);
 //   4. load the app's own Electron shell (electron/main.cjs) against it; its
 //      window takes the Updating window's place once it shows.
 // Every step runs asynchronously in Electron's main process, so the Mac never
@@ -31,7 +33,7 @@ const { WINDOW_FRAME } = require(windowFrame);
 const PORT = Number(process.env.LH_LAUNCH_PORT) || 4747;
 const LOG_DIR = process.env.LH_LAUNCH_LOGS || path.join(os.homedir(), "Library", "Logs", DATA_FOLDER);
 
-/** Stops this launch's next dev; set once it starts. */
+/** Stops this launch's server; set once it starts. */
 let stopServer = () => {};
 
 /** Starts the launch and returns at once; the promise settles when the shell
@@ -47,8 +49,9 @@ function launch({ checkout, bundle }) {
 	};
 	log(`launch: ${checkout}${bundle ? ` from ${bundle}` : ""}`);
 	const url = `http://127.0.0.1:${PORT}`;
-	// The shell runs against this next dev, and the dev userData folder
-	// follows from it: both are named before Electron is ready.
+	// The shell runs against this launch's server (LH_DEV_URL: a server the
+	// shell does not start), and its "-dev" userData folder follows from it:
+	// both are named before Electron is ready.
 	process.env.LH_DEV_URL = url;
 	nameApp(app, process.env);
 	const waiting = updatingWindow();
@@ -71,19 +74,20 @@ async function start({ checkout, bundle, appDir, url, log, notify, notices, wait
 	if (bundle && (await reinstallStaleBundle({ appDir, checkout, bundle, name, env, log }))) return;
 	if (bundle) removeRenamedBundles(bundle, name, log);
 
-	const pidFile = path.join(LOG_DIR, `next-dev-${PORT}.pid`);
+	const pidFile = path.join(LOG_DIR, `server-${PORT}.pid`);
 	await stopStaleServer(pidFile, appDir, log);
 	if (await portTaken(PORT)) throw new Error(`port ${PORT} is in use by another program, so ${PRODUCT_NAME} can't start its server`);
+	await buildIfStale(appDir, env, log, waiting);
 	// The packaged app's capability, so no other program or web page can
 	// call the API: the shell sends it on the window's requests.
 	const secret = randomBytes(32).toString("hex");
-	const server = startServer({ appDir, env: { ...env, LH_DESKTOP_API_SECRET: secret }, pidFile, log });
+	const server = startServer({ appDir, checkout, env: { ...env, LH_DESKTOP_API_SECRET: secret }, pidFile, log });
 	const ready = waitForServer(server, url, { timeoutMs: 120_000 });
 	ready.then(
 		() => log(`server up: ${url}`),
 		(error) => fail(`${error.message}. See ${LOG_DIR}`, log, notices),
 	);
-	server.on("error", (error) => fail(`next dev did not start: ${error.message}`, log, notices));
+	server.on("error", (error) => fail(`the server did not start: ${error.message}`, log, notices));
 
 	await app.whenReady();
 	// The shell opens its window at once; its page requests wait here
@@ -134,9 +138,9 @@ function updatingWindow() {
 
 /** Runs a command to its end without blocking the main process; resolves
  *  with its stdout, or `null` when it could not run or failed. */
-function capture(command, args, { env, timeout = 15_000 } = {}) {
+function capture(command, args, { cwd, env, timeout = 15_000 } = {}) {
 	return new Promise((resolve) => {
-		const child = spawn(command, args, { env, stdio: ["ignore", "pipe", "ignore"], timeout });
+		const child = spawn(command, args, { cwd, env, stdio: ["ignore", "pipe", "ignore"], timeout });
 		let out = "";
 		child.stdout.on("data", (chunk) => (out += chunk));
 		// 'close' always comes, after 'exit' or after a failed spawn's 'error'.
@@ -205,19 +209,76 @@ async function reinstallStaleBundle({ appDir, checkout, bundle, name, env, log }
 	return true;
 }
 
-function startServer({ appDir, env, pidFile, log }) {
-	const next = path.join(appDir, "node_modules", "next", "dist", "bin", "next");
-	const out = fs.openSync(path.join(LOG_DIR, `next-dev-${PORT}.log`), "w");
-	// Its own process group, so quitting stops next dev and its workers together.
-	const server = spawn("node", [next, "dev", "--port", String(PORT), "--hostname", "127.0.0.1"], {
-		cwd: appDir,
-		env,
+/** The app's source as git would commit it, tracked edits and new files
+ *  included and ignored ones (node_modules, .next, data) left out: the tree
+ *  `git write-tree` names for learnharness/ in a scratch copy of the index.
+ *  Null when git can't say. */
+async function sourceKey(appDir, env) {
+	const git = (args, index) => capture("git", args, { cwd: appDir, env: index ? { ...env, GIT_INDEX_FILE: index } : env, timeout: 60_000 });
+	const real = (await git(["rev-parse", "--path-format=absolute", "--git-path", "index"]))?.trim();
+	if (!real) return null;
+	const index = path.join(os.tmpdir(), `lh-launch-index-${process.pid}`);
+	try {
+		if (fs.existsSync(real)) fs.copyFileSync(real, index);
+		if ((await git(["add", "--all", "--", "."], index)) === null) return null;
+		return (await git(["write-tree", `--prefix=${path.basename(appDir)}/`], index))?.trim() || null;
+	} finally {
+		fs.rmSync(index, { force: true });
+	}
+}
+
+/** Builds the production server when the app's source differs from the
+ *  last finished build's: the first launch, an update that changed the
+ *  app, or his own edits. A launch with nothing changed starts the last
+ *  build straight away; a build that fails leaves no stamp, so the next
+ *  launch builds again. */
+async function buildIfStale(appDir, env, log, waiting) {
+	const stamp = path.join(appDir, ".next", "lh-launcher-build");
+	const built = fs.existsSync(path.join(appDir, ".next", "standalone", "server.js"));
+	const key = await sourceKey(appDir, env);
+	if (key === null) log("git could not name the app's source; building only when no build exists");
+	if (built && (key === null || (fs.existsSync(stamp) && fs.readFileSync(stamp, "utf8") === key))) return;
+	waiting.say(`Updating ${PRODUCT_NAME}…`);
+	fs.rmSync(stamp, { force: true });
+	fs.rmSync(path.join(appDir, ".next", "standalone"), { recursive: true, force: true });
+	// next build points the committed next-env.d.ts at the build's types
+	// (next dev at its own): put it back, or the checkout reads as changed,
+	// the next update is skipped and every launch builds again.
+	const nextEnv = path.join(appDir, "next-env.d.ts");
+	const kept = fs.existsSync(nextEnv) ? fs.readFileSync(nextEnv) : null;
+	try {
+		await run("node", ["node_modules/next/dist/bin/next", "build"], appDir, env, log);
+		await run("node", ["scripts/build-server.mjs"], appDir, env, log);
+	} finally {
+		if (kept) fs.writeFileSync(nextEnv, kept);
+	}
+	if (key) fs.writeFileSync(stamp, key);
+}
+
+/** The standalone server `next build` made, as the packaged app runs it
+ *  (electron/main.cjs), on his data: its root is .next/standalone, so the
+ *  checkout's data/ and engine are named, unless the environment names
+ *  others (LH_DATA_DIR, LH_LEARNING_ENGINE). */
+function startServer({ appDir, checkout, env, pidFile, log }) {
+	const standalone = path.join(appDir, ".next", "standalone");
+	const out = fs.openSync(path.join(LOG_DIR, `server-${PORT}.log`), "w");
+	// Its own process group, so quitting stops the server and its workers together.
+	const server = spawn("node", [path.join(standalone, "server.js")], {
+		cwd: standalone,
+		env: {
+			...env,
+			NODE_ENV: "production",
+			PORT: String(PORT),
+			HOSTNAME: "127.0.0.1",
+			LH_DATA_DIR: env.LH_DATA_DIR || path.join(appDir, "data"),
+			LH_LEARNING_ENGINE: env.LH_LEARNING_ENGINE || checkout,
+		},
 		detached: true,
 		stdio: ["ignore", "pipe", out],
 	});
 	server.stdout.on("data", (chunk) => fs.writeSync(out, chunk));
 	if (server.pid) fs.writeFileSync(pidFile, String(server.pid));
-	log(`next dev pid ${server.pid} on port ${PORT}`);
+	log(`server pid ${server.pid} on port ${PORT}`);
 	stopServer = () => {
 		try {
 			process.kill(-server.pid, "SIGTERM");
@@ -231,20 +292,20 @@ function startServer({ appDir, env, pidFile, log }) {
 	return server;
 }
 
-/** A launch that crashed leaves its next dev behind: stop it when the pid
- *  file still names our own next dev. */
+/** A launch that crashed leaves its server behind: stop it when the pid
+ *  file still names this checkout's server. */
 async function stopStaleServer(pidFile, appDir, log) {
 	const pid = Number(fs.existsSync(pidFile) && fs.readFileSync(pidFile, "utf8"));
 	fs.rmSync(pidFile, { force: true });
 	if (!pid) return;
 	const command = (await capture("/bin/ps", ["-o", "command=", "-p", String(pid)])) ?? "";
-	if (!command.includes(path.join(appDir, "node_modules", "next"))) return;
+	if (!command.includes(path.join(appDir, ".next", "standalone", "server.js"))) return;
 	const group = ((await capture("/bin/ps", ["-A", "-o", "pid=,pgid="])) ?? "")
 		.split("\n")
 		.map((row) => row.trim().split(/\s+/).map(Number))
 		.filter(([, pgid]) => pgid === pid)
 		.map(([member]) => member);
-	log(`stopping the next dev a previous launch left: ${pid}`);
+	log(`stopping the server a previous launch left: ${pid}`);
 	try {
 		process.kill(-pid, "SIGKILL");
 	} catch {
