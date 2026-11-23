@@ -29,7 +29,7 @@ import { forwardDockWheel, useDockReserve } from "@/components/dock-height";
 import { QueuedSteersBody, type QueuedSteerLine } from "@/components/queued-steers";
 import { useFieldCycle } from "@/components/field-cycle";
 import { JobsContext } from "@/components/jobs-context";
-import { useServerEvent, useServerResync } from "@/components/server-events";
+import { deletedInThisWindow, useServerEvent, useServerResync } from "@/components/server-events";
 import { useSessionBusy } from "@/components/lesson/session-busy";
 import {
 	firstSourceTextParts,
@@ -83,19 +83,19 @@ import { lessonRoadmapSteps, partKey, stepAnchors } from "@/components/lesson/ro
 import { scrollSessionTarget } from "@/components/session-navigation";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
-import { isCourseDeletedRefusal, isSignedOutLine, parseProviderKeyRefusal, refusalWatch, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
+import { isCourseDeletedRefusal, isSignedOutLine, parseProviderKeyRefusal, refusalWatch, turnErrorText, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
 import { pausePlaceholder, practicePause } from "@/components/lesson/practice-pause";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
 import { TaskContinueLine } from "@/components/lesson/task-continue-line";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
-import { ScrollCueButton } from "@/components/lesson/scroll-cue";
+import { replyKey, ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
 import { boxAfterClose, boxLine, forgetRescue, keepRescue, overtakenDraft, rescuedBox, typedAfterSend, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendKeepingWords } from "@/components/lesson/sent-draft";
-import { LESSON_WORDS } from "@/components/study-words";
-import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, leftDraftAt, leftDraftOf, takeCarry, takeKeptPhotos, takeLessonBoxes } from "@/components/lesson/kept-drafts";
+import { LESSON_WORDS, shortDay } from "@/components/study-words";
+import { carriedFor, carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, leftDraftAt, leftDraftOf, takeCarry, takeKeptPhotos, takeLessonBoxes } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine, doneTonightGone, focusAfterDone } from "@/components/lesson/done-tonight";
@@ -105,7 +105,7 @@ import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
 import { ProseAnswerProvider, useProseAnswer } from "@/components/lesson/prose/prose-answer";
 import { ProseQuestion } from "@/components/lesson/prose/prose-question";
-import { askedAfterHint, askedAgain, leftAskedBelow, leftOpenOf, reaskedFrom, spokenAbove } from "@/components/lesson/prose/prose-question-data";
+import { askedAgain, askedAsideOf, leftAskedBelow, leftOpenOf, reaskedFrom, spokenAbove } from "@/components/lesson/prose/prose-question-data";
 import { DisputeBubble, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 import { focusWhereHeTypes } from "@/components/ui/overlay";
@@ -188,6 +188,7 @@ export function Chat({
 	appOpening = false,
 	course,
 	place,
+	resumed,
 	initiallyCourseDeleted = false,
 	continueTask = false,
 }: {
@@ -199,6 +200,10 @@ export function Chat({
 	/** Where the lesson sits in its course (its topic and arc), read once
 	 *  when the page opened; absent when the course map could not say. */
 	place?: LessonPlace;
+	/** Opened on a later study day than he last studied it (`resumedOn`):
+	 *  the day, and the message the date divider stands before, null for
+	 *  whatever comes next. */
+	resumed?: { day: string; before: string | null };
 	/** The course was deleted: the lesson is history, with no box to write in. */
 	initiallyCourseDeleted?: boolean;
 	initialMessages: LhMessage[];
@@ -234,12 +239,15 @@ export function Chat({
 	// (core/view.ts projectView); sends are ONE explicit input event each
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
+	// Continue on the task it holds owes a turn the moment the page opens:
+	// the turn it sends once mounted (below).
+	const startsOnOpen = continueTask && !initiallyInFlight && taskTurnOwed(initialMessages);
 	const { messages, nativeMessages, hasConfirmedConversation, compacting, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, stopReply, clearError, outlivedFailure, recoverDroppedStream, resumeStream, setReattachSettled } =
 		// Continue on a task starts its turn as the page opens: the last
 		// turn's failure is not this one's, so the line never shows it
 		// (round 18, m25: "The tutor stopped before replying. Try again"
 		// flashed as Continue opened, until the turn's start cleared it).
-		useChatSession({ chatId, initialMessages, initialError: continueTask && !initiallyInFlight && taskTurnOwed(initialMessages) ? undefined : initialError, initiallyInFlight });
+		useChatSession({ chatId, initialMessages, initialError: startsOnOpen ? undefined : initialError, initiallyInFlight });
 
 	// The question is the tutor's words and the one composer answers it
 	// (components/lesson/prose/prose.md). Esc while something is open turns
@@ -321,7 +329,7 @@ export function Chat({
 	// turn it sets up itself and his stop. The lesson's line, Stop and box
 	// all follow it, so a handoff between agents never looks finished.
 	const attachIfRunningRef = useRef<() => void>(() => {});
-	const { busy, serverTurnRef, stopAskedRef, askStop, stopSpent, noTurnRunning } = useSessionBusy({
+	const { busy: sessionBusy, serverTurnRef, stopAskedRef, askStop, stopSpent, noTurnRunning } = useSessionBusy({
 		chatId,
 		status,
 		attached: turnInFlight,
@@ -329,6 +337,13 @@ export function Chat({
 		attachIfRunning: () => attachIfRunningRef.current(),
 		dropped: status === "error" && droppedError(error),
 	});
+	// The owed Continue turn is busy from the first frame, the page the
+	// server drew included, until its send has run: the line and the box
+	// show the turn starting, never the last turn's failure, while the page
+	// waits to mount (round 20, m10: "The tutor stopped before replying"
+	// and "Press Enter to try again" for 2 to 7 s after Continue).
+	const [continuing, setContinuing] = useState(startsOnOpen);
+	const busy = sessionBusy || continuing;
 
 	// Session title: click-to-rename (owner, 2026-09-17). Clicking the header
 	// title opens edit mode with everything selected — typing replaces, arrows
@@ -451,7 +466,7 @@ export function Chat({
 	// The lesson was deleted elsewhere (chats-changed `deleted`).
 	const [gone, setGone] = useState(false);
 	// Its course was deleted: the lesson stays readable as history.
-	const [courseGone, setCourseGone] = useState(initiallyCourseDeleted);
+	const [courseGone, setCourseGone] = useState(() => initiallyCourseDeleted || deletedInThisWindow(course?.workspace));
 	// Bumped when something that held focus goes away (a rename ends, a
 	// confirm closes): the dock puts focus back where he types (focus-home.ts).
 	const [focusEpoch, setFocusEpoch] = useState(0);
@@ -542,7 +557,7 @@ export function Chat({
 		if (!continueTask || continuedTask.current) return;
 		continuedTask.current = true;
 		window.history.replaceState(window.history.state, "", `/chat/${chatId}`);
-		if (!turnInFlight && taskTurnOwed(initialMessages)) void send({ type: "task", task: place?.task ?? null });
+		if (startsOnOpen) void send({ type: "task", task: place?.task ?? null }).finally(() => setContinuing(false));
 		// mount-only by design, as the continuation above
 	}, []);
 
@@ -873,6 +888,8 @@ export function Chat({
 	// or what stays in the box until a send is accepted): only then does the
 	// line say they are still in the box (round 11, 4 minor 3).
 	const [refusedWords, setRefusedWords] = useState(false);
+	// The offline failure the app's return answered (useServerResync below).
+	const [appBack, setAppBack] = useState<typeof error>(null);
 	useEffect(() => {
 		if (!error) return;
 		if (!parseProviderKeyRefusal(error.message)) return; // a real error keeps the honest banner
@@ -983,6 +1000,21 @@ export function Chat({
 	// before the reply began) says so, with Try again (turn-cut.ts).
 	const replyCut = status === "ready" && !busy && !error ? replyCutOf(nativeMessages) : null;
 	const sendAllowed = !pending && !activeProblem;
+	// The reply to his side question never came (a failure, a cut, the
+	// plan's limit): the answer he had written for the question he set
+	// aside waits in the carry for its re-ask, and the lesson shows it
+	// meanwhile, so it never seems lost (round 20, m14).
+	const askedAside = useMemo(() => (pending ? null : askedAsideOf(messages)), [messages, pending]);
+	const replyOwed = !busy && (replyCut !== null || (error !== null && !continuing));
+	const [askedDraft, setAskedDraft] = useState<string | null>(null);
+	useEffect(() => {
+		const carry = replyOwed && askedAside && carryScope ? carriedFor(carryScope, askedAside.question, askedAside.toolCallId) : undefined;
+		setAskedDraft(carry ? carriedForm(carry, true)?.text.trim() || null : null);
+	}, [replyOwed, askedAside?.toolCallId, carryScope]);
+	// The date divider of a session picked up on a later day: before the
+	// left question asked again, else before the first message this view adds.
+	const [openedWith] = useState(() => new Set(initialMessages.map((m) => m.id)));
+	const resumedBefore = resumed ? (resumed.before ?? messages.find((m) => !openedWith.has(m.id))?.id ?? null) : null;
 	// Try again's key (round 3): Enter on the empty composer, from the field
 	// or anywhere outside one, runs the same retry as the button.
 	// A question or problem still open owns Enter (its own resend).
@@ -1037,7 +1069,7 @@ export function Chat({
 	// Each answer's mark, as the engine recorded it (answer-mark.tsx): read
 	// again whenever a turn settles, since a save or a re-mark may have
 	// landed. ⌘⇧M disputes the newest one.
-	const marks = useAnswerMarks(chatId, course?.workspace, busy ? null : nativeMessages.length);
+	const marks = useAnswerMarks(chatId, course?.workspace, busy ? null : `${nativeMessages.length}:${nativeMessages.at(-1)?.id ?? ""}`);
 	const [disputing, setDisputing] = useState<DisputeTarget | null>(null);
 	const canDispute = !!course && !busy;
 	const disputeMark = disputing ? marks[disputing.answerId] : undefined;
@@ -1180,7 +1212,6 @@ export function Chat({
 	// drawn above its line, beside the answer (marks-before-done.ts).
 	const doneMarks = useMemo(() => marksBeforeDone(messages), [messages]);
 	const reasked = useMemo(() => askedAgain(messages), [messages]);
-	const reaskedAfterHint = useMemo(() => askedAfterHint(messages), [messages]);
 	const leftBelow = useMemo(() => leftAskedBelow(messages), [messages]);
 	const spoken = useMemo(() => spokenAbove(messages), [messages]);
 	const openingAt = useMemo(() => appOpeningAt(messages, appOpening), [messages, appOpening]);
@@ -1377,6 +1408,10 @@ export function Chat({
 		// cut never settles, so the dropped stream's line would stand
 		// forever. Ask the record what is true now.
 		if (statusRef.current === "error" && droppedError(errorRef.current)) void healDroppedStreamRef.current();
+		// A send that could not reach the app: the app answers again, so the
+		// line says he can send now (round 20, m12: "Couldn't reach the app"
+		// stood 30 s and more after the restart).
+		else if (statusRef.current === "error" && errorRef.current && turnErrorText(errorRef.current.message).kind === "offline") setAppBack(errorRef.current);
 	});
 	useEffect(
 		() => () => {
@@ -1752,7 +1787,8 @@ export function Chat({
 								/>
 							)}
 
-							{messages.map((m, mi) =>
+							{messages.map((m, mi) => [
+								m.id === resumedBefore && <SectionBreak key={`resumed-${m.id}`} testId="resumed-day" label={shortDay(resumed!.day)} />,
 								m.role === "user" && isSubagentSteer(m) ? (
 									// Sub-agent delivery (wake-pipeline steer): NO message bubble — the
 									// artifact card sits in the transcript column directly, full width
@@ -1895,7 +1931,6 @@ export function Chat({
 																history={courseGone}
 																stepAnchor={stepAnchor}
 																repeat={reasked.has(part.toolCallId!)}
-																afterHint={reaskedAfterHint.has(part.toolCallId!)}
 																askedBelow={leftBelow.has(part.toolCallId!)}
 																spoken={spoken.has(part.toolCallId!)}
 															/>
@@ -1932,7 +1967,7 @@ export function Chat({
 									</Message>
 									)}
 								</Fragment>
-							))}
+							)])}
 
 							{/* THE placeholder, ACTION-gated (owner, optimistic round
 							    3, 2026-10-02): spinner + shimmered Thinking… from the
@@ -1957,11 +1992,15 @@ export function Chat({
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
-							{error && (
-								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} kept={refusedWords} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
-									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
-								</TurnError>
-							)}
+							{error && appBack === error && <p role="status" data-testid="app-back" className="text-body text-muted-foreground">{LESSON_WORDS.appBack}</p>}
+							{error && !continuing && appBack !== error && (claudeLimit ? (
+								<div role="alert" data-testid="turn-error" data-kind="limit" className="flex flex-wrap items-center gap-1 text-body">
+									<ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />
+								</div>
+							) : (
+								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} kept={refusedWords} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")} />
+							))}
+							{askedDraft && <p data-testid="asked-draft-kept" className="text-body text-muted-foreground">{LESSON_WORDS.askedDraftKept(askedDraft)}</p>}
 						</div>
 
 						{/* The dock's reserved tail (DockOverlay reports its height):
@@ -1985,6 +2024,7 @@ export function Chat({
 					focusEpoch={focusEpoch}
 					overtakenLine={boxLine(overtaken, proseOpen !== null, messageHidden && proseAnswer.mode === "answer" && !busy)}
 					replyAnchorRef={replyAnchorRef}
+					reply={replyKey(messages)}
 					onJumpToLatest={jumpToLatest}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
 					setupCta={
@@ -2133,6 +2173,7 @@ function DockOverlay({
 	focusEpoch,
 	overtakenLine,
 	replyAnchorRef,
+	reply,
 	onJumpToLatest,
 	setupCta,
 	queuedSteers,
@@ -2156,6 +2197,8 @@ function DockOverlay({
 	/** Where the reply to his latest action starts (reading-position.ts);
 	 *  the cue lets go of it once he reads to the end. */
 	replyAnchorRef: React.MutableRefObject<ReplyAnchor>;
+	/** The tutor's newest reply as it stands (scroll-cue.ts `replyKey`). */
+	reply: string;
 	onJumpToLatest: () => void;
 	/** The queued-steer indicator's lines (composer steering, 2026-10-03):
 	 *  already filtered by visibleQueuedSteers, only undrained steers. */
@@ -2228,7 +2271,7 @@ function DockOverlay({
 						    and a wrapper's larger rounded clip cut its corners. */}
 						{composer}
 					</div>
-					<ScrollCueButton anchorRef={replyAnchorRef} onJump={onJumpToLatest} className="bottom-full mb-2" />
+					<ScrollCueButton anchorRef={replyAnchorRef} reply={reply} onJump={onJumpToLatest} className="bottom-full mb-2" />
 				</div>
 			</div>
 		</div>

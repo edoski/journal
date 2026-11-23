@@ -257,6 +257,23 @@ export function leftQuestionRepose(messages: readonly LhMessage[]): LhMessage[] 
 	return calls.length > 0 ? [newQuestionRepose(calls)] : [];
 }
 
+/** Where a session he comes back to on a later study day picks up, for
+ *  the transcript's date divider (round 20, m11: on 17 Nov, Continue
+ *  Stirling opened on the 10 Nov close "continues tomorrow, Wednesday 11
+ *  November" right above "Your turn", with no word that days had passed).
+ *  `lastStudied` is the session's last activity on the study clock, ISO (its
+ *  `updatedAt`, which the app's re-pose of a left question never moves).
+ *  The left question asked again on opening when it ends the transcript
+ *  (`{ before: its id }`), else whatever comes next (`{ before: null }`);
+ *  null when he last studied it today. Pure. */
+export function resumedOn(messages: readonly LhMessage[], lastStudied: string, today: string): { day: string; before: string | null } | null {
+	const at = new Date(lastStudied);
+	const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
+	if (Number.isNaN(at.getTime()) || day >= today) return null;
+	const last = messages.findLast((m) => !(m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)));
+	return { day: today, before: last && isQuestionRepose(last) ? last.id : null };
+}
+
 /** The question his Done for today set aside with a half answer in its
  *  box (`draftKept`), by its words, while that Done is his latest input;
  *  null when none did (round 19, m4: the Invertible lesson's task step

@@ -36,6 +36,7 @@ import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai"
 import type { LhMarkerMessage, LhMessage } from "./native-messages.ts";
 import {
 	failedOutputCallIds,
+	isQuestionRepose,
 	modelSolutionForConclude,
 	opensTurn,
 	PRACTICE_CONCLUDE_TOOL,
@@ -407,7 +408,10 @@ export function projectView(record: readonly LhMessage[], live?: LiveTurnState):
 					continue;
 				}
 			}
-			const group = lastAssistant();
+			// The app's re-pose of his left questions opens its own run: it is
+			// asked on the day he comes back, under that day's divider
+			// (session-end.ts `resumedOn`).
+			const group = isQuestionRepose(m) ? undefined : lastAssistant();
 			if (group) {
 				// Same group: the step separator renders between the steps.
 				group.parts.push({ type: "step-start" }, ...parts);

@@ -713,6 +713,12 @@ export const LESSON_WORDS = {
 	couldntReply: "The tutor couldn't reply.",
 	/** A turn refused for a signed-out Claude, once Claude reads signed in (round 19, m27). */
 	signedInAgain: "Signed in again. Press Enter to send.",
+	/** His answer so far on the question he set aside to ask something, while
+	 *  the reply to his ask never came (round 20, m14: the box dropped to
+	 *  "Ask the tutor anything…" and his draft seemed gone). */
+	askedDraftKept: (draft: string) => `Your answer so far stays with the question above: “${draft}”`,
+	/** A send that could not reach the app, once the app answers again (round 20, m12). */
+	appBack: "The app is back. Press Enter to send.",
 	youStoppedReply: "You stopped the tutor before it replied.",
 	youStoppedMidReply: "You stopped the tutor mid-reply.",
 	tryAgain: "Try again",

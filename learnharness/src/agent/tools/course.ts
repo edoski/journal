@@ -452,7 +452,7 @@ async function saveRuled(ctx: CourseToolContext, changes: unknown, problem?: { i
 		const question = named.questions[i];
 		return question ? answers.get(question)?.seenBefore === true : problem?.seen === true;
 	});
-	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: { ...patch, observations: asideOf(ctx, ruled.observations) } });
+	const result = await savedOnce(ctx, { ...patch, observations: asideOf(ctx, ruled.observations) });
 	if (result.ok) for (const key of problem ? [problem.id] : named.questions) if (key) saved.add(key);
 	// A problem's attempts are kept under its conclude, so its card shows while
 	// the turn still runs (round 15, 2 D2: First try / Then came only after a
@@ -463,6 +463,16 @@ async function saveRuled(ctx: CourseToolContext, changes: unknown, problem?: { i
 	const receipt = result.json as Record<string, unknown>;
 	const notes = Array.isArray(receipt.notes) ? receipt.notes : [];
 	return { ...result, json: { ...receipt, notes: [...notes, note] } };
+}
+
+/** One save of his answers. A save that timed out may have landed with no
+ *  receipt, and the receipt is what links each answer to its mark: it is
+ *  sent again once, identical, which the engine takes as the save it
+ *  already holds and answers with its ids (round 20, M4: "save did not
+ *  finish in time", o134 written, and no mark even after a reload). */
+async function savedOnce(ctx: CourseToolContext, changes: Record<string, unknown>): Promise<CourseResult> {
+	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes });
+	return !result.ok && result.timedOut ? ctx.records.run(ctx.course.workspace, { verb: "save", changes }) : result;
 }
 
 /** The registered tool names (the transcript card registry and the prompt

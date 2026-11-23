@@ -136,6 +136,7 @@ function toResult(exit: Exit, verbName: string): CourseResult {
 			ok: false,
 			kind: "io",
 			message: `${verbName} did not finish in time; a write may have completed, and repeating the identical save is safe`,
+			timedOut: true,
 		};
 	}
 	if (exit.code === 0) {

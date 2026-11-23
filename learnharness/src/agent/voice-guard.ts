@@ -628,7 +628,7 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 		case "pointer":
 			return `His open question is the last thing he reads, right above this message, so a pointer to it tells him nothing: ${quoted(b.excerpt)}. Leave it out, and send nothing when nothing else is left to say.`;
 		case "arrival":
-			return `His answer's card already shows it came and how it was marked: ${quoted(b.excerpt)}. Leave the line out; when he asked whether it went through, the mark under his answer says so.`;
+			return `His answer's card already shows it came and how it was marked: ${quoted(b.excerpt)}. Leave the line out, unless he asked whether it went through: then answer him in one sentence on the answer itself, as "It is saved, marked right with help.", from its save's receipt.`;
 		case "own-words":
 			return `Never talk about your own earlier words: ${quoted(b.excerpt)}. When what you said earlier changes what he should do, say what is true as itself ("This problem is the first of the set."); otherwise leave it out.`;
 		case "mark-case":
