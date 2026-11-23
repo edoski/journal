@@ -106,7 +106,7 @@ describe("calendar entries", () => {
 		assert.deepEqual(summary(entries), [
 			"2026-11-08 overdue Span",
 			"2026-11-08 review Basis",
-			"2026-11-08 task Problem sheet 4",
+			"2026-11-08 task Continue Problem sheet 4",
 			"2026-11-09 new Eigenvalues",
 			"2026-11-09 review Bayes' rule",
 			"2026-11-13 review Vectors",
@@ -268,7 +268,7 @@ describe("calendar entries", () => {
 		assert.deepEqual(summary(entries), [
 			"2026-11-02 lesson Total probability, last week",
 			"2026-11-08 overdue Law of total probability",
-			"2026-11-08 task Problem sheet 2",
+			"2026-11-08 task Continue Problem sheet 2",
 			"2026-11-08 lesson Total probability and Bayes",
 		]);
 	});
@@ -283,7 +283,7 @@ describe("calendar entries", () => {
 		const entries = calendarEntries({ courses: [LA_TODAY], chats: [lesson], scope: null });
 		assert.deepEqual(summary(entries), ["2026-11-08 task Eigenvalues and eigenvectors"]);
 		const done = calendarEntries({ courses: [LA_TODAY], chats: [{ ...lesson, ended: "closed" }], scope: null });
-		assert.deepEqual(summary(done), ["2026-11-08 task Eigenvalues lesson: eigenspaces and diagonalisation", "2026-11-08 lesson Eigenvalues and eigenvectors"], "a finished lesson that only touched the topic leaves the task its own entry");
+		assert.deepEqual(summary(done), ["2026-11-08 task Continue Eigenvalues lesson: eigenspaces and diagonalisation", "2026-11-08 lesson Eigenvalues and eigenvectors"], "a finished lesson that only touched the topic leaves the task its own entry");
 		const yesterday = calendarEntries({ courses: [LA_TODAY], chats: [{ ...lesson, updatedAt: "2026-11-07T09:00:00" }], scope: null });
 		assert.equal(yesterday.filter((e) => e.day === TODAY).length, 1, "an older session stays on its own day; today keeps the task");
 	});

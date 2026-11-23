@@ -4,8 +4,8 @@
  * matrix itself came only with the tutor's turn, 64 to 80 s later, once it
  * had found and read the sheet. The engine's map now says where each task's
  * text is in his material, the server reads the part from the sheet, and
- * the Continue line draws it the moment he presses; the turn's input carries
- * the same text, so the tutor reads no file to find it.
+ * the Continue line draws it the moment he presses; the marker carries the
+ * same text to the tutor, so it reads no file to find it.
  */
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -45,7 +45,7 @@ const { Chat } = await import("../components/chat.tsx");
 const { ServerEventsProvider } = await import("../components/server-events.tsx");
 type NotifySource = import("../components/server-events.tsx").NotifySource;
 const quietSource: NotifySource = { close() {}, onOpen() {}, onEvent() {} };
-const { continuedTaskOf, inputAppends, newUserMessage, parseChatInput } = await import("../src/core/index.ts");
+const { continuedTaskOf, newUserMessage, taskContinueAppends } = await import("../src/core/index.ts");
 const { courseMapOf } = await import("../src/store/course-records.ts");
 const { continuedTask, passageAt } = await import("../src/server/task-passage.ts");
 type LhMessage = import("../src/core/index.ts").LhMessage;
@@ -156,19 +156,20 @@ describe("Continue on a task shows the part's text from his material at once (ro
 
 	it("Continue on sheet 4 puts the part's matrix in the transcript before any model output", async () => {
 		const task = await continuedTask(sheetCourse(), SHEET_SESSION);
-		stubFetch(SHEET_SESSION);
+		const record = [...SHEET_SESSION, ...taskContinueAppends({ messages: SHEET_SESSION }, task!)];
+		stubFetch(record);
 		host = document.createElement("div");
 		document.body.append(host);
 		root = createRoot(host);
 		await act(async () =>
 			root!.render(
 				<ServerEventsProvider connect={() => quietSource}>
-					<Chat chatId={CHAT} title="Problem sheet 4" initialMessages={SHEET_SESSION} course={{ workspace: "la", title: "Linear Algebra" }} place={{ topic: { handle: "kernel", title: "Kernel" }, arc: null, task }} continueTask />
+					<Chat chatId={CHAT} title="Problem sheet 4" initialMessages={record} course={{ workspace: "la", title: "Linear Algebra" }} place={{ topic: { handle: "kernel", title: "Kernel" }, arc: null, task }} />
 				</ServerEventsProvider>,
 			),
 		);
 		await settle();
-		assert.equal(posted.length, 1, "the press asks for the task's turn, whose POST is held");
+		assert.equal(posted.length, 0, "no turn runs until he writes (round 21, m7)");
 		const words = lineWords(host) ?? "";
 		assert.match(words, /rows \$\(1, 2, 0, 1, 3\)\$, \$\(0, 1, 1, 2, 1\)\$ and \$\(1, 3, 1, 3, 5\)\$/, "the matrix is on screen");
 		assert.match(words, /Part \(c\)/);
@@ -177,12 +178,11 @@ describe("Continue on a task shows the part's text from his material at once (ro
 
 	it("the turn's input carries the same text, and the record keeps it for a reload", () => {
 		const task = { title: "Problem sheet 4: rank and nullity", step: STEP, passage: PART };
-		const marker = inputAppends({ messages: SHEET_SESSION }, { type: "task", task }).at(-1)!;
+		const marker = taskContinueAppends({ messages: SHEET_SESSION }, task).at(-1)!;
 		assert.ok(marker.role === "custom" && marker.customType === "task-continue");
 		assert.ok(typeof marker.content === "string" && marker.content.includes(PART), "the tutor reads the part's text in its input");
 		assert.equal((marker.details as { passage?: string }).passage, PART);
-		const plain = inputAppends({ messages: SHEET_SESSION }, { type: "task", task: { title: task.title, step: STEP } }).at(-1)!;
+		const plain = taskContinueAppends({ messages: SHEET_SESSION }, { title: task.title, step: STEP }).at(-1)!;
 		assert.ok(plain.role === "custom" && typeof plain.content === "string" && !plain.content.includes("read no file"), "with no passage the input is as before");
-		assert.deepEqual(parseChatInput({ type: "task", task }), { type: "task" }, "a client's text never reaches the server's marker");
 	});
 });

@@ -42,10 +42,10 @@ describe("MathText", () => {
 
 	it("keeps a formula and the letters touching it on one line, as one word", () => {
 		const html = renderToStaticMarkup(<MathText>{"Nondeterministic finite automata (NFA) with $\\varepsilon$-moves"}</MathText>);
-		const word = html.match(/<span data-slot="math-word" class="whitespace-nowrap">(.*?)<\/span>-moves<\/span>/);
+		const word = html.match(/<span data-slot="math-word" data-joined="" class="whitespace-nowrap">(.*?)<\/span>-moves<\/span>/);
 		assert.ok(word, "ε and -moves share one unbreakable word");
 		assert.match(html, /^<span data-slot="math-run">Nondeterministic finite automata \(NFA\) with <span data-slot="math-word"/, "the words before it still wrap, in the label's one run of text (round 17, M3)");
-		assert.match(renderToStaticMarkup(<MathText>{"Kernel of $A$, then rank"}</MathText>), /<span data-slot="math-word" class="whitespace-nowrap"><span data-slot="math-text".*?<\/span>,<\/span> then rank<\/span>$/);
+		assert.match(renderToStaticMarkup(<MathText>{"Kernel of $A$, then rank"}</MathText>), /<span data-slot="math-word" data-joined="" class="whitespace-nowrap"><span data-slot="math-text".*?<\/span>,<\/span> then rank<\/span>$/);
 	});
 
 	it("keeps a lone symbol and its hyphenated word together in plain titles", () => {

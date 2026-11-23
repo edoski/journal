@@ -7,14 +7,15 @@
  * only the tasks it patched) with the seed's fabd4d1 made Continue open
  * the sheet's own chat, where rounds 11 and 12 had started a new session
  * whose opening ran the turn. Continue on a session holding an open task,
- * with nothing in it waiting on him, now asks for the task's turn as it
- * opens; opening it to read asks for nothing.
+ * with nothing in it waiting on him, now shows the task's step as it
+ * opens, and the tutor takes it up with his first message (round 21, m7);
+ * opening it to read asks for nothing.
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { continueHref } from "../components/nav/session-state.ts";
 import { courseMove } from "../components/study-home/study-facts.ts";
-import { inputAppends, parseChatInput, taskTurnOwed } from "../src/core/input-events.ts";
+import { taskContinueAppends } from "../src/core/input-events.ts";
 import { nativeInputCause, newUserMessage, sessionTasksOf, type LhMessage } from "../src/core/native-messages.ts";
 import { closedTonight } from "../src/core/session-end.ts";
 import { projectView } from "../src/core/view.ts";
@@ -40,7 +41,7 @@ const SHEET: CourseMapTask = { key: "sheet-4", title: "Problem sheet 4: rank and
 describe("Continue on a task takes it up (2 M1)", () => {
 	const sheet = chat({ id: "chat_demo_la_1106_1945", title: "Problem sheet 4", ownTopics: ["kernel"], topics: ["kernel"], createdAt: "2026-11-06T19:45:00.000Z", updatedAt: "2026-11-06T20:30:00.000Z", tasks: sessionTasksOf(SHEET_SESSION) });
 
-	it("Home's Continue Problem sheet 4 goes to the sheet's chat asking for the task's turn", () => {
+	it("Home's Continue Problem sheet 4 goes to the sheet's chat asking for the task's step", () => {
 		const course: StudyCourse = { map: map({ today: "2026-11-08", topics: [topic("kernel", "Kernel", { tasks: [SHEET.key] })], tasks: [SHEET], focus: SHEET.key }), unready: null, due: [], newToday: [], lastActiveDaysAgo: 0 };
 		const move = courseMove(course, [sheet], { kind: "task", key: SHEET.key, title: SHEET.title, topics: ["kernel"] } as never);
 		assert.equal(move.kind, "open");
@@ -54,28 +55,25 @@ describe("Continue on a task takes it up (2 M1)", () => {
 		assert.equal(continueHref({ ...sheet, tasks: [] }), `/chat/${sheet.id}`);
 	});
 
-	it("the task's input carries on at the task's step, as his own move, and draws no bubble", () => {
-		assert.ok(taskTurnOwed(SHEET_SESSION), "the finished sheet chat owes the task's turn");
-		const input = parseChatInput({ type: "task" });
-		const appends = inputAppends({ messages: SHEET_SESSION }, input);
+	it("Continue shows the task's step and asks the tutor nothing until he writes, never his bubble", () => {
+		const appends = taskContinueAppends({ messages: SHEET_SESSION }, { title: SHEET.title, step: SHEET.step });
 		const marker = appends.at(-1)!;
 		assert.equal(marker.role === "custom" ? marker.customType : marker.role, "task-continue");
 		const words = marker.role === "custom" ? marker.content : "";
 		assert.match(words, /`sheet-4`/);
 		assert.match(words, /never a lesson on the topic from its basics/);
-		assert.match(words, /ask me for it in one plain line and end your turn/);
 		const record = [...SHEET_SESSION, ...appends];
-		assert.equal(nativeInputCause(marker as never, SHEET_SESSION as never), "learner", "it starts the turn as his press");
-		assert.equal(closedTonight(record), false);
+		assert.equal(nativeInputCause(marker as never, SHEET_SESSION as never), "neutral", "no turn of its own (round 21, m7)");
+		assert.equal(closedTonight(record), closedTonight(SHEET_SESSION));
 		const view = projectView(record).at(-1)!;
 		assert.ok(view.role === "user" && view.parts.every((p) => p.type === "data-task-continue"), "a seam, never his bubble");
 	});
 
-	it("is refused with a question open or no task held", () => {
+	it("shows nothing with a question open or no task held", () => {
 		const posed: LhMessage[] = [...SHEET_SESSION, { id: "q", role: "assistant", content: [{ type: "toolCall", id: "q1", name: "recall", arguments: { question: "What is dim ker A?", correctAnswer: "2" } }], ...STAMPS, timestamp: 99 } as unknown as LhMessage];
-		assert.equal(taskTurnOwed(posed), false);
-		assert.throws(() => inputAppends({ messages: posed }, { type: "task" }));
-		assert.throws(() => inputAppends({ messages: [newUserMessage("Kernel")] }, { type: "task" }));
+		const task = { title: SHEET.title, step: SHEET.step };
+		assert.deepEqual(taskContinueAppends({ messages: posed }, task), []);
+		assert.deepEqual(taskContinueAppends({ messages: [newUserMessage("Kernel")] }, task), []);
 	});
 
 	it("every agent reads that a task he goes on with is never a lesson from its basics", () => {

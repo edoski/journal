@@ -37,7 +37,6 @@ import { applyParkedDismissal } from "./dismissal-park.ts";
 import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn } from "./turn-runs.ts";
 import { askPrestart, claimPrestart, prestart } from "./prestart.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
-import { continuedTask } from "./task-passage.ts";
 import { activeProblemOf, answeredQuestionsOf, danglingQuestionOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, sessionModeOf, withCloseReceipt, withProbeFeedback, type LhMessage } from "../core/native-messages.ts";
 import { sessionSavesOf } from "../core/close-receipt.ts";
 import { closeReceiptFor } from "../agent/tools/course.ts";
@@ -481,14 +480,10 @@ export async function handleChatInput(
 	const learnerInput = input.type !== "steers" && input.type !== "retry" && input.type !== "retry-question" && input.type !== "continue";
 	// A mode handoff starts the other agent, whose brief differs.
 	const handoffWake = input.type === "steers" && input.steers.some((s) => s.role === "custom" && s.customType === "mode-handoff");
-	// Continue on a task: its title, step and the part's text from his
-	// material, as the engine's map names them, drawn the moment he presses
-	// (round 17, M8; round 18, M6).
 	const opened = record;
-	const [courseBrief, courseArcs, task, places, closeReceipt] = await Promise.all([
+	const [courseBrief, courseArcs, places, closeReceipt] = await Promise.all([
 		learnerInput || handoffWake ? fetchCourseBrief(record) : null,
 		fetchCourseArcs(record),
-		input.type === "task" ? keptCourseMaps().then((maps) => continuedTask(maps.find((m) => m.workspace === opened.course?.workspace), opened.messages)) : null,
 		// A setup session looks first where his study material is kept.
 		sessionModeOf(record.messages, record.kind) === "setup" ? studyPlaces().catch(() => []) : undefined,
 		// His Done for today closes on the session's close receipt (round 20, M3).
@@ -531,7 +526,7 @@ export async function handleChatInput(
 		appends =
 			input.type === "steers"
 				? input.steers.filter((s) => !steerDelivered(record.messages, s.id)).map((s) => withProbeFeedback(s, record.messages))
-				: inputAppends(record, input.type === "task" ? { type: "task", task } : input).map((m) => withCloseReceipt(m, closeReceipt));
+				: inputAppends(record, input).map((m) => withCloseReceipt(m, closeReceipt));
 	} catch (err) {
 		if (err instanceof ChatInputError) {
 			return Response.json({ error: err.message }, { status: 400 });

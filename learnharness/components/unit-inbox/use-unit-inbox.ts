@@ -48,8 +48,10 @@ function useStudyCourses(): StudyRead | null | "unavailable" {
 			const listing = await fetch("/api/study", { cache: "no-store" })
 				.then((res) => res.json() as Promise<StudyListing>)
 				.catch(() => null);
-			if (listing?.available) setCourses({ courses: listing.courses, failed: listing.failed });
-			else {
+			// A read an event overtook answers nothing: the next one does (a delete mid-read put its course back).
+			if (listing?.available) {
+				if (!again.current) setCourses({ courses: listing.courses, failed: listing.failed });
+			} else {
 				setCourses((prev) => (prev === null ? "unavailable" : prev));
 				if (!retried) again.current = retried = true;
 			}
@@ -58,7 +60,12 @@ function useStudyCourses(): StudyRead | null | "unavailable" {
 	}, []);
 	useEffect(() => void read(), [read]);
 	useServerEvent("course-changed", () => void read());
-	useServerEvent("courses-changed", () => void read());
+	// A deleted course leaves at once, on the event that flips its open lesson, not after the read (round 21, m8:
+	// its card read "Your turn" in both windows for at least 2.4 s).
+	useServerEvent("courses-changed", ({ deleted }) => {
+		if (deleted) setCourses((prev) => (prev && prev !== "unavailable" ? { ...prev, courses: prev.courses.filter((c) => c.map.workspace !== deleted) } : prev));
+		void read();
+	});
 	useServerResync(() => void read());
 	useDayChange(() => void read());
 	return courses;

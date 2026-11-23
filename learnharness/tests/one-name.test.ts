@@ -29,6 +29,7 @@ describe("one piece of work, one name (1 D9)", () => {
 			finalReview: null,
 		};
 		const task = calendarEntries({ courses: [course], chats: [LEFT], scope: null }).find((e) => e.kind === "task");
-		assert.equal(task?.title, "Eigenvalues and eigenvectors");
+		// Home's line's title, its verb included (round 21, m6: "Problem sheet 4" beside Home's "Continue Problem sheet 4").
+		assert.equal(task?.title, "Continue Eigenvalues and eigenvectors");
 	});
 });

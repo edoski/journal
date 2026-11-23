@@ -64,7 +64,6 @@ import {
 	toolQuestionKind,
 	closedTonight,
 	doneTonightAtEnd,
-	firstProblemTopicsOf,
 	sessionEndOf,
 	replyCutOf,
 	latestMarkedAnswer,
@@ -72,11 +71,10 @@ import {
 	COMPACTING_LINE,
 	streamingToolActivity,
 	workingLine,
-	taskTurnOwed,
 } from "@/src/core";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
 import { ActiveProblemContext } from "@/components/lesson/active-problem";
-import { LessonTopBar, topicCrumbShown } from "@/components/lesson/lesson-top-bar";
+import { LessonTopBar, crumbEnd } from "@/components/lesson/lesson-top-bar";
 import { courseHref, unitHref } from "@/components/unit-inbox/unit-href";
 import { LessonRoadmap } from "@/components/lesson/lesson-roadmap";
 import { lessonRoadmapSteps, partKey, stepAnchors } from "@/components/lesson/roadmap-facts";
@@ -190,7 +188,6 @@ export function Chat({
 	place,
 	resumed,
 	initiallyCourseDeleted = false,
-	continueTask = false,
 }: {
 	chatId: string;
 	title: string;
@@ -219,10 +216,6 @@ export function Chat({
 	 *  opening, not his words, and draws no bubble (`appOpeningAt`). */
 	appOpening?: boolean;
 	initialPrompt?: string;
-	/** Opened by Continue on an open task it holds (`continueHref`): with
-	 *  nothing in it waiting on him, the tutor carries on at the task's
-	 *  step at once (round 13, 2 M1). */
-	continueTask?: boolean;
 	/** A teacher turn is running server-side but attached to no client
 	 * (navigated away mid-turn, returned while in flight). */
 	initiallyInFlight?: boolean;
@@ -239,15 +232,8 @@ export function Chat({
 	// (core/view.ts projectView); sends are ONE explicit input event each
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
-	// Continue on the task it holds owes a turn the moment the page opens:
-	// the turn it sends once mounted (below).
-	const startsOnOpen = continueTask && !initiallyInFlight && taskTurnOwed(initialMessages);
 	const { messages, nativeMessages, hasConfirmedConversation, compacting, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, stopReply, clearError, outlivedFailure, recoverDroppedStream, resumeStream, setReattachSettled } =
-		// Continue on a task starts its turn as the page opens: the last
-		// turn's failure is not this one's, so the line never shows it
-		// (round 18, m25: "The tutor stopped before replying. Try again"
-		// flashed as Continue opened, until the turn's start cleared it).
-		useChatSession({ chatId, initialMessages, initialError: startsOnOpen ? undefined : initialError, initiallyInFlight });
+		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
 
 	// The question is the tutor's words and the one composer answers it
 	// (components/lesson/prose/prose.md). Esc while something is open turns
@@ -337,13 +323,7 @@ export function Chat({
 		attachIfRunning: () => attachIfRunningRef.current(),
 		dropped: status === "error" && droppedError(error),
 	});
-	// The owed Continue turn is busy from the first frame, the page the
-	// server drew included, until its send has run: the line and the box
-	// show the turn starting, never the last turn's failure, while the page
-	// waits to mount (round 20, m10: "The tutor stopped before replying"
-	// and "Press Enter to try again" for 2 to 7 s after Continue).
-	const [continuing, setContinuing] = useState(startsOnOpen);
-	const busy = sessionBusy || continuing;
+	const busy = sessionBusy;
 
 	// Session title: click-to-rename (owner, 2026-09-17). Clicking the header
 	// title opens edit mode with everything selected — typing replaces, arrows
@@ -548,17 +528,6 @@ export function Chat({
 		mountContinuation.current = true;
 		if (!turnInFlight) continueIfOwed(initialMessages);
 		// mount-only by design (turnInFlight read at initial value)
-	}, []);
-	// Continue on the task this session holds: the link's ask is spent
-	// once, so a reload never asks again (round 13, 2 M1: Continue Problem
-	// sheet 4 opened the finished chat with an empty box and no turn).
-	const continuedTask = useRef(false);
-	useEffect(() => {
-		if (!continueTask || continuedTask.current) return;
-		continuedTask.current = true;
-		window.history.replaceState(window.history.state, "", `/chat/${chatId}`);
-		if (startsOnOpen) void send({ type: "task", task: place?.task ?? null }).finally(() => setContinuing(false));
-		// mount-only by design, as the continuation above
 	}, []);
 
 	const pending = findPendingToolCall(messages, pendingQuestionOf(nativeMessages));
@@ -1005,7 +974,7 @@ export function Chat({
 	// aside waits in the carry for its re-ask, and the lesson shows it
 	// meanwhile, so it never seems lost (round 20, m14).
 	const askedAside = useMemo(() => (pending ? null : askedAsideOf(messages)), [messages, pending]);
-	const replyOwed = !busy && (replyCut !== null || (error !== null && !continuing));
+	const replyOwed = !busy && (replyCut !== null || error !== null);
 	const [askedDraft, setAskedDraft] = useState<string | null>(null);
 	useEffect(() => {
 		const carry = replyOwed && askedAside && carryScope ? carriedFor(carryScope, askedAside.question, askedAside.toolCallId) : undefined;
@@ -1205,8 +1174,7 @@ export function Chat({
 	// was first taught, for the top bar's roadmap (lesson-roadmap.md).
 	const planTree = useMemo(() => latestTree(messages), [messages]);
 	// The tutor ended the session (a review that closed itself): nothing waits, so nothing to stop (round 14, m32).
-	const ownTopics = useMemo(() => (topics.length > 0 ? topics : mode === "practice" ? firstProblemTopicsOf(nativeMessages) : []), [topics, mode, nativeMessages]);
-	const sessionFinished = useMemo(() => !busy && sessionEndOf(nativeMessages, planTree ?? undefined, startedIn, ownTopics) === "closed", [busy, nativeMessages, planTree, startedIn, ownTopics]);
+	const sessionFinished = useMemo(() => !busy && sessionEndOf(nativeMessages, planTree ?? undefined, startedIn) === "closed", [busy, nativeMessages, planTree, startedIn]);
 	const anchors = useMemo(() => (planTree ? stepAnchors(messages, new Set(planTree.nodes.map((n) => n.id))) : new Map<string, string>()), [planTree, messages]);
 	// A problem's close that marks his answer from before Done for today is
 	// drawn above its line, beside the answer (marks-before-done.ts).
@@ -1662,6 +1630,8 @@ export function Chat({
 
 	// The lesson's topic crumb, a link to its page (lesson-top-bar.md).
 	const topicCrumb = course && !courseGone && place?.topic ? { title: place.topic.title, href: unitHref(course.workspace, place.topic.handle) } : undefined;
+	// The trail's last words after the topic crumb (`crumbEnd`).
+	const endWords = topicCrumb ? crumbEnd(topicCrumb.title, titleText) : titleText;
 
 	return (
 		<ChatActionsContext.Provider
@@ -1738,7 +1708,7 @@ export function Chat({
 									aria-label="Session title"
 									className="lh-no-drag -mx-1.5 h-auto w-auto min-w-[8ch] max-w-full shrink-0 bg-fill-hover px-1.5 text-headline text-inherit caret-current focus-visible:ring-0 [field-sizing:content]"
 								/>
-							) : topicCrumb && !topicCrumbShown(topicCrumb.title, titleText) ? null : (
+							) : endWords === null ? null : (
 								<Hint label="Rename session" action="rename-session" side="bottom">
 									<Button
 										variant="quiet"
@@ -1749,7 +1719,7 @@ export function Chat({
 										className="lh-no-drag -mx-1.5 block h-auto min-w-4 shrink cursor-text truncate px-1.5 text-left text-headline text-inherit hover:text-inherit"
 									>
 										{/* Its maths typeset, as every title (round 17, m5: "$\binom{n}{j}$" in the head). */}
-										<MathText>{titleText}</MathText>
+										<MathText>{endWords}</MathText>
 									</Button>
 								</Hint>
 							)
@@ -1993,7 +1963,7 @@ export function Chat({
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && appBack === error && <p role="status" data-testid="app-back" className="text-body text-muted-foreground">{LESSON_WORDS.appBack}</p>}
-							{error && !continuing && appBack !== error && (claudeLimit ? (
+							{error && appBack !== error && (claudeLimit ? (
 								<div role="alert" data-testid="turn-error" data-kind="limit" className="flex flex-wrap items-center gap-1 text-body">
 									<ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />
 								</div>

@@ -58,7 +58,7 @@ describe("a session between practice problems (m7, m8)", () => {
 		const ruled = record.messages.findLastIndex((m) => m.role === "custom" && m.customType === "dispute");
 		for (const end of [ruled, record.messages.length]) {
 			const messages = record.messages.slice(0, end);
-			const summary = chat("chat_demo_rank", { kind: "practice", topics: record.topics, ended: sessionEndOf(messages, undefined, "practice", record.topics), pendingQuestion: danglingQuestionOf(messages) !== null, pendingProblem: activeProblemOf(messages) !== null });
+			const summary = chat("chat_demo_rank", { kind: "practice", topics: record.topics, ended: sessionEndOf(messages, undefined, "practice"), pendingQuestion: danglingQuestionOf(messages) !== null, pendingProblem: activeProblemOf(messages) !== null });
 			assert.notEqual(sessionState(summary), "your-turn", end === ruled ? "before the dispute" : "after its ruling");
 		}
 	});

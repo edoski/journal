@@ -3,10 +3,12 @@
  * that topic's arc, `lessonPlaceOf`), for the top bar's links
  * (components/lesson/lesson-roadmap.md). One engine `map` call when the
  * page opens, bounded so a slow engine never holds the lesson: past the
- * bound, or on any failure, the bar opens without the topic and arc.
+ * bound the bar opens without the topic and arc; a record that can't be
+ * read places it on the course's last map read here (round 21, m10).
  */
 
 import type { ChatRecord } from "../core/contracts/chat.ts";
+import type { CourseMap } from "../core/contracts/course-map.ts";
 import { lessonTopics } from "../core/course-map-build.ts";
 import { lessonPlaceOf, type LessonPlace } from "../core/lesson-place.ts";
 import { sessionTopicsOf } from "../core/native-messages.ts";
@@ -16,6 +18,12 @@ import { continuedTask } from "./task-passage.ts";
 
 /** How long the page waits for the course map before it opens without it. */
 export const LESSON_PLACE_WAIT_MS = 1500;
+
+/** Each course's newest map this server read, by workspace: the place of a
+ *  lesson whose course record can no longer be read, so a fresh open keeps
+ *  its topic in the crumb (round 21, m10, 4 minor 5: with Real Analysis's
+ *  record at 000 the crumb read "Real Analysis > Sequence limit proofs"). */
+const lastMaps = new Map<string, CourseMap>();
 
 /** The lesson's candidate topics, as the session list reads them: the
  *  lesson its plan took up (round 16, M4: a review asked for Poisson is
@@ -46,7 +54,11 @@ export async function lessonPlace(chat: Pick<ChatRecord, "course" | "topics" | "
 	const here = lessonTopics(stores.chatStore.listChats(), workspace)[0] ?? null;
 	const placeIn = async (told: string | null): Promise<LessonPlace | null> => {
 		const result = await stores.courseRecords.map(workspace, told);
-		if (!result.ok) return null;
+		if (!result.ok) {
+			const last = lastMaps.get(workspace);
+			return last ? { ...lessonPlaceOf(last, topics), task: null } : null;
+		}
+		lastMaps.set(workspace, result.map);
 		const place = { ...lessonPlaceOf(result.map, topics), task: await continuedTask(result.map, chat.messages) };
 		const fromCurrent = place.topic !== null && !result.map.topics.find((t) => t.handle === place.topic!.handle)?.arc && result.map.current === place.topic.handle;
 		return told !== null && fromCurrent ? placeIn(null) : place;

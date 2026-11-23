@@ -6,8 +6,8 @@
  * is no question to ask again as Resume does; the part lives in the task's
  * record, as its step. Continue now draws the task's title and that step
  * the moment he presses, from the map the page read, and the record's
- * marker keeps them for a reload; the tutor's turn writes the part out
- * behind them, its input unchanged.
+ * marker keeps them for a reload. Since round 21 (m7) the chat page
+ * writes them as it opens and no turn runs until he writes.
  */
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -44,7 +44,7 @@ const { Chat } = await import("../components/chat.tsx");
 const { ServerEventsProvider } = await import("../components/server-events.tsx");
 type NotifySource = import("../components/server-events.tsx").NotifySource;
 const quietSource: NotifySource = { close() {}, onOpen() {}, onEvent() {} };
-const { continuedTaskOf, inputAppends, newUserMessage, parseChatInput, projectView } = await import("../src/core/index.ts");
+const { continuedTaskOf, newUserMessage, projectView, taskContinueAppends } = await import("../src/core/index.ts");
 type LhMessage = import("../src/core/index.ts").LhMessage;
 type CourseMapTask = import("../src/core/index.ts").CourseMapTask;
 
@@ -96,7 +96,7 @@ afterEach(async () => {
 	globalThis.fetch = originalFetch;
 });
 
-async function mount(messages: LhMessage[], continueTask: boolean) {
+async function mount(messages: LhMessage[]) {
 	stubFetch(messages);
 	host = document.createElement("div");
 	document.body.append(host);
@@ -104,7 +104,7 @@ async function mount(messages: LhMessage[], continueTask: boolean) {
 	await act(async () =>
 		root!.render(
 			<ServerEventsProvider connect={() => quietSource}>
-				<Chat chatId={CHAT} title="Problem sheet 4" initialMessages={messages} course={{ workspace: "la", title: "Linear Algebra" }} place={{ topic: { handle: "kernel", title: "Kernel and rank-nullity" }, arc: null, task: continuedTaskOf({ tasks: [SHEET] }, messages) }} continueTask={continueTask} />
+				<Chat chatId={CHAT} title="Problem sheet 4" initialMessages={messages} course={{ workspace: "la", title: "Linear Algebra" }} place={{ topic: { handle: "kernel", title: "Kernel and rank-nullity" }, arc: null, task: continuedTaskOf({ tasks: [SHEET] }, messages) }} />
 			</ServerEventsProvider>,
 		),
 	);
@@ -129,37 +129,25 @@ describe("Continue on a task shows the part he left at once (round 17, M8: 2 D1)
 	});
 
 	it("Continue on sheet 4 puts Part (c) on screen before any model output", async () => {
-		const page = await mount(SHEET_SESSION, true);
-		assert.equal(posted.length, 1, "the press asks for the task's turn");
-		assert.equal((posted[0] as { input?: { type?: string } }).input?.type, "task");
+		const page = await mount([...SHEET_SESSION, ...taskContinueAppends({ messages: SHEET_SESSION }, TASK)]);
+		assert.equal(posted.length, 0, "no turn runs until he writes (round 21, m7)");
 		const words = lineWords(page);
-		assert.ok(words !== null, "the Continue line is drawn while the turn's POST is still unanswered");
+		assert.ok(words !== null, "the Continue line is drawn as the chat opens");
 		assert.match(words, /Problem sheet 4: rank and nullity/);
 		assert.match(words, /Part \(c\): show \$\\dim \\ker A = 2\$/);
 		assert.equal(page.querySelectorAll('[data-testid="task-continue-line"]').length, 1);
 	});
 
 	it("the record's marker keeps the task's title and step, so a reload draws the same line", async () => {
-		const appends = inputAppends({ messages: SHEET_SESSION }, { type: "task", task: TASK });
+		const appends = taskContinueAppends({ messages: SHEET_SESSION }, TASK);
 		const marker = appends.at(-1)!;
 		assert.ok(marker.role === "custom" && marker.customType === "task-continue");
 		assert.deepEqual(marker.details, { tasks: ["sheet-4"], ...TASK });
 		const view = projectView([...SHEET_SESSION, ...appends]).at(-1)!;
 		assert.ok(view.role === "user" && view.parts.every((p) => p.type === "data-task-continue"), "never his bubble");
-		const page = await mount([...SHEET_SESSION, ...appends], false);
+		const page = await mount([...SHEET_SESSION, ...appends]);
 		assert.equal(posted.length, 0, "opening it to read asks for nothing");
 		assert.match(lineWords(page) ?? "", /Part \(c\)/);
 	});
 
-	it("the model's input is the same with the task's record or without it", () => {
-		const content = (task?: typeof TASK) => {
-			const marker = inputAppends({ messages: SHEET_SESSION }, { type: "task", task }).at(-1)!;
-			return marker.role === "custom" ? marker.content : null;
-		};
-		assert.equal(content(TASK), content());
-	});
-
-	it("a client's task record never reaches the server's marker", () => {
-		assert.deepEqual(parseChatInput({ type: "task", task: { title: "Anything", step: "Part (z)" } }), { type: "task" });
-	});
 });
