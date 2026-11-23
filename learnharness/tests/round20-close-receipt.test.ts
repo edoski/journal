@@ -1,5 +1,5 @@
 /**
- * Round 20, M3 (1 m2, 2 n4, 3 n2, 4 minor 7) and m8 (2 n6): one
+ * Round 20, M3 (1 m2, 2 n4, 3 n2, 4 minor 7), m8 (2 n6) and m7 (1 m4): one
  * close receipt for every session kind.
  *
  * Each kind of session composed its close its own way, from the plan
@@ -11,7 +11,8 @@
  * Now every close reads one receipt (the topics this session answered,
  * each with its day; the task that goes on; each start a save moved), and
  * the voice guard holds the close to it. Two titles joined by "and" read
- * as four topics (m8).
+ * as four topics (m8), and a lesson moved from a review opened on Home's
+ * row label, "Now Start Expectation and linearity:" (m7).
  */
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -23,7 +24,7 @@ import { DONE_TONIGHT_TEXT, NEXT_PROBLEM_TEXT } from "../src/core/contracts/chat
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import { newDoneTonightMessage, newUserMessage, withCloseReceipt, type LhMessage } from "../src/core/native-messages.ts";
 import { saveCourse, type CourseToolContext } from "../src/agent/tools/course.ts";
-import { nextId, rules, send } from "./helpers/round19-turns.ts";
+import { brief, nextId, recall, rules, send } from "./helpers/round19-turns.ts";
 
 const D8 = "2026-11-08";
 
@@ -179,5 +180,21 @@ describe("one close receipt for every session (round 20, M3)", () => {
 		assert.deepEqual(marker.details.close, receipt);
 		for (const [agent, text] of Object.entries(DONE_TONIGHT_TEXT)) assert.match(text, /copy `close\.says` as written/, agent);
 		assert.match(NEXT_PROBLEM_TEXT, /`close\.says` copied as written, and no other topic/);
+	});
+});
+
+describe("m7: a lesson is named by its topic's title, never Home's row label (1 m4)", () => {
+	const opened = (): LhMessage[] => [newUserMessage("Start Expectation and linearity"), brief("Opened on: expectation. He pressed the action on its page, and the app posted his first message.")];
+
+	it("the lesson's name drops the row's verb", () => {
+		const guard = new VoiceGuard(opened(), undefined, false, true);
+		assert.equal((guard as unknown as { lesson: { title: string } }).lesson.title, "Expectation and linearity");
+	});
+
+	it("\"Now Start Expectation and linearity:\" is refused, in a question as in a message", () => {
+		const question = "Now Start Expectation and linearity: a die is rolled and $X$ is the number shown. What is $E[X]$, and why?";
+		assert.ok(rules(new VoiceGuard(opened(), undefined, false, true), recall(question)).includes("row-label"));
+		assert.ok(rules(new VoiceGuard(opened(), undefined, false, true), send("Now Start Expectation and linearity: the mean of a random variable.")).includes("row-label"));
+		assert.ok(!rules(new VoiceGuard(opened(), undefined, false, true), send("Start with the definition of the mean.")).includes("row-label"), "a sentence may open on the verb");
 	});
 });

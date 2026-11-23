@@ -714,6 +714,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 		}
 		case "title-and":
 			return `"${b.excerpt}" reads as more topics than there are, since a title holds its own "and". Join titles with commas only, as \`close.says\` does.`;
+		case "row-label":
+			return `${quoted(b.excerpt)} is the press that opened the lesson, never its name. Name the topic by its title.`;
 		case "card": {
 			const [card, said] = [b.excerpt.slice(0, b.excerpt.indexOf("|")), b.excerpt.slice(b.excerpt.indexOf("|") + 1)];
 			return `His answer card already says "${card}" above your reply, and your opening says it again: ${quoted(said)}. Open on where it broke, the fact itself, never on the verdict, and never soften it.`;
@@ -997,6 +999,18 @@ function reviewTopicsOf(messages: readonly LhMessage[]): string[] {
  *  ended or its plan was written: its topics, from the brief's "Opened
  *  on: …." line, and its title, his first message, which the app posted.
  *  Null for a review, a free session, or once the lesson is under way. */
+/** The verb Home's row and a topic's page open a lesson with. */
+const LESSON_VERB = /^(?:Start|Continue)\s+(?=\S)/;
+
+/** A press's label set inside a sentence, its verb capitalised after
+ *  another word ("Now Start Expectation and linearity:"), round 20, m7. */
+const ROW_LABEL = /(?<=[A-Za-z,:;]\s)(?:Start|Continue)\s+[A-Z][^\s:.,;?!]*(?:\s+[^\s:.,;?!]+){0,5}/;
+
+function rowLabel(text: string): VoiceBreak[] {
+	const label = ROW_LABEL.exec(text.replace(/\$[^$]*\$/g, " "));
+	return label ? [{ rule: "row-label", excerpt: label[0] }] : [];
+}
+
 function lessonOpenedOn(messages: readonly LhMessage[]): { topics: string[]; title: string } | null {
 	const begun = messages.some((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && (b.name === "plan_init" || b.name === PROBE_DONE_TOOL)));
 	const first = messages.find((m) => m.role === "user");
@@ -1005,7 +1019,10 @@ function lessonOpenedOn(messages: readonly LhMessage[]): { topics: string[]; tit
 		const m = messages[i]!;
 		if (m.role !== "custom" || m.customType !== "course-context" || typeof m.content !== "string") continue;
 		const opened = /^Opened on: (.+?)\. He pressed the action on its page/m.exec(m.content);
-		const title = textOf(first.content).trim();
+		// Home's row opens it with its verb ("Start Expectation and linearity"):
+		// the lesson's name is the topic's title (round 20, m7: "Now Start
+		// Expectation and linearity:").
+		const title = textOf(first.content).trim().replace(LESSON_VERB, "");
 		return opened && title ? { topics: opened[1]!.split(/,\s*/), title } : null;
 	}
 	return null;
@@ -1645,7 +1662,7 @@ export class VoiceGuard {
 			this.heldRetry = true;
 			return RETRY(this.firstTry!.question);
 		}
-		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text), ...this.lessonUnnamed(text)]);
+		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text), ...this.lessonUnnamed(text), ...rowLabel(text)]);
 		if (breaks.length > 0) {
 			this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 			return refusal("question", call.name, text, breaks, undefined);
@@ -1819,6 +1836,7 @@ export class VoiceGuard {
 		if (vagueDay) out.push({ rule: "vague-day", excerpt: vagueDay });
 		const halfNoDay = closes && !unplaced ? sentences(text).map((s) => s.trim()).find((s) => /\bhalf(?:-finished)? answer\b/i.test(s) && !DAY_WORDS.test(s)) : undefined;
 		if (halfNoDay) out.push({ rule: "half-answer-day", excerpt: halfNoDay });
+		out.push(...rowLabel(text));
 		const commaTitle = titleAfterComma(text, this.titles);
 		if (commaTitle) out.push({ rule: "title-comma", excerpt: commaTitle });
 		const vague = VAGUE_MOVES.exec(text);

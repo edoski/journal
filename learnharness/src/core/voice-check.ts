@@ -72,6 +72,7 @@ export type VoiceRule =
 	| "close-untouched"
 	| "close-day"
 	| "title-and"
+	| "row-label"
 	| "below"
 	| "pointer"
 	| "arrival"
