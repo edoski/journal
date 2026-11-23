@@ -234,12 +234,15 @@ export function Chat({
 	// (core/view.ts projectView); sends are ONE explicit input event each
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
+	// Continue on the task it holds owes a turn the moment the page opens:
+	// the turn it sends once mounted (below).
+	const startsOnOpen = continueTask && !initiallyInFlight && taskTurnOwed(initialMessages);
 	const { messages, nativeMessages, hasConfirmedConversation, compacting, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, stopReply, clearError, outlivedFailure, recoverDroppedStream, resumeStream, setReattachSettled } =
 		// Continue on a task starts its turn as the page opens: the last
 		// turn's failure is not this one's, so the line never shows it
 		// (round 18, m25: "The tutor stopped before replying. Try again"
 		// flashed as Continue opened, until the turn's start cleared it).
-		useChatSession({ chatId, initialMessages, initialError: continueTask && !initiallyInFlight && taskTurnOwed(initialMessages) ? undefined : initialError, initiallyInFlight });
+		useChatSession({ chatId, initialMessages, initialError: startsOnOpen ? undefined : initialError, initiallyInFlight });
 
 	// The question is the tutor's words and the one composer answers it
 	// (components/lesson/prose/prose.md). Esc while something is open turns
@@ -321,7 +324,7 @@ export function Chat({
 	// turn it sets up itself and his stop. The lesson's line, Stop and box
 	// all follow it, so a handoff between agents never looks finished.
 	const attachIfRunningRef = useRef<() => void>(() => {});
-	const { busy, serverTurnRef, stopAskedRef, askStop, stopSpent, noTurnRunning } = useSessionBusy({
+	const { busy: sessionBusy, serverTurnRef, stopAskedRef, askStop, stopSpent, noTurnRunning } = useSessionBusy({
 		chatId,
 		status,
 		attached: turnInFlight,
@@ -329,6 +332,13 @@ export function Chat({
 		attachIfRunning: () => attachIfRunningRef.current(),
 		dropped: status === "error" && droppedError(error),
 	});
+	// The owed Continue turn is busy from the first frame, the page the
+	// server drew included, until its send has run: the line and the box
+	// show the turn starting, never the last turn's failure, while the page
+	// waits to mount (round 20, m10: "The tutor stopped before replying"
+	// and "Press Enter to try again" for 2 to 7 s after Continue).
+	const [continuing, setContinuing] = useState(startsOnOpen);
+	const busy = sessionBusy || continuing;
 
 	// Session title: click-to-rename (owner, 2026-09-17). Clicking the header
 	// title opens edit mode with everything selected — typing replaces, arrows
@@ -542,7 +552,7 @@ export function Chat({
 		if (!continueTask || continuedTask.current) return;
 		continuedTask.current = true;
 		window.history.replaceState(window.history.state, "", `/chat/${chatId}`);
-		if (!turnInFlight && taskTurnOwed(initialMessages)) void send({ type: "task", task: place?.task ?? null });
+		if (startsOnOpen) void send({ type: "task", task: place?.task ?? null }).finally(() => setContinuing(false));
 		// mount-only by design, as the continuation above
 	}, []);
 
@@ -1954,7 +1964,7 @@ export function Chat({
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
-							{error && (
+							{error && !continuing && (
 								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} kept={refusedWords} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
