@@ -6,10 +6,10 @@
  * to 60…", printed in full under "Your turn", and the box stayed empty,
  * even after a reload: the words waited in the carry for a re-ask whose
  * words differ. Lens 3 saw the question posted again word for word right
- * under its first posting. After a hint the next question of its kind on
- * its step is the question asked again, whatever its words: it reads
- * "Your turn, on the question above", with no second posting, and takes
- * his words back into its box.
+ * under its first posting. The re-ask now reads the question past the
+ * review's "Now <topic>:" lead-in, so it is known as the question asked
+ * again: it reads "Your turn, on the question above", with no second
+ * posting, and takes his words back into its box.
  */
 import React from "react";
 import assert from "node:assert/strict";
@@ -47,7 +47,7 @@ const transcript = [
 ];
 
 describe("the question asked again after a Hint", () => {
-	it("is known as the hinted question, though its words differ", () => {
+	it("is known as the hinted question, its words read past the topic lead-in", () => {
 		assert.deepEqual([...askedAgain(transcript)], ["q2"]);
 		assert.equal(reaskedFrom(transcript, "q2"), "q1");
 	});

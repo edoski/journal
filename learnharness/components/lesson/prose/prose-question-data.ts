@@ -157,7 +157,7 @@ export function reaskedFrom(messages: ReadonlyArray<{ parts: readonly QuestionPa
 			if (!asked(part)) continue;
 			if (part.toolCallId === toolCallId) {
 				const left = previous ? leftOpen(previous.output) : null;
-				if (previous?.toolCallId && left) return asksAgainAfter(left, previous, part) ? previous.toolCallId : null;
+				if (previous?.toolCallId && left) return asksAgain(previous, part) ? previous.toolCallId : null;
 				const same = lastOfKind.get(questionKindOf(part));
 				return same?.toolCallId && leftForToday(same.output) && asksAgain(same, part) ? same.toolCallId : null;
 			}
@@ -198,18 +198,6 @@ function asksAgain(left: QuestionPart, next: QuestionPart): boolean {
 	return questionKindOf(left) === questionKindOf(next) && sameStep(left, next) && (sameQuestionWords(left, next) || (sameType(left, next) && sameCommittedAnswer(left, next)));
 }
 
-/** Whether `next` asks again the question left open before it. After a
- *  hint the tutor asks the same question again, since a hint is a
- *  statement and never an answer, so the next question of its kind on its
- *  step is that question, whatever its words (round 20, m9: "Now
- *  Inclusion-exclusion principle: how many integers…" came back as "How
- *  many integers…", printed in full, and his words never came back into
- *  the box). After a side question the tutor may ask a new one, so only
- *  the same question counts (`asksAgain`). */
-function asksAgainAfter(left: LeftOpen, previous: QuestionPart, next: QuestionPart): boolean {
-	return left === "hint" ? questionKindOf(previous) === questionKindOf(next) && sameStep(previous, next) : asksAgain(previous, next);
-}
-
 function sameCommittedAnswer(a: QuestionPart, b: QuestionPart): boolean {
 	const answer = (part: QuestionPart) => (part.input as { correctAnswer?: unknown } | undefined)?.correctAnswer;
 	const x = answer(a);
@@ -222,11 +210,21 @@ function sameType(a: QuestionPart, b: QuestionPart): boolean {
 	return type(a) === type(b);
 }
 
+/** The tutor's announcement of the topic a review moves to ("Now
+ *  Inclusion-exclusion principle: "), which leads its first question and
+ *  is no part of it: asked again after a hint, the question drops it
+ *  (round 20, m9: "How many integers from 1 to 60…" printed in full under
+ *  its first posting, and his words never came back into the box). */
+const TOPIC_LEAD = /^\s*now\s[^:?\n]+:\s*/i;
+
 function sameQuestionWords(a: QuestionPart, b: QuestionPart): boolean {
 	const words = (part: QuestionPart) => (part.input as { question?: unknown } | undefined)?.question;
 	const x = words(a);
 	const y = words(b);
-	return typeof x === "string" && typeof y === "string" && sameQuestionKey(x) === sameQuestionKey(y);
+	if (typeof x !== "string" || typeof y !== "string") return false;
+	if (sameQuestionKey(x) === sameQuestionKey(y)) return true;
+	const key = wordsKey(x.replace(TOPIC_LEAD, ""));
+	return key !== "" && key === wordsKey(y.replace(TOPIC_LEAD, ""));
 }
 
 /** Whether `next` asks again, in the same words, a question he answered:
@@ -348,7 +346,7 @@ function reasks(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): Ar
 		for (const part of message.parts) {
 			if (!asked(part)) continue;
 			const left = previous ? leftOpen(previous.output) : null;
-			if (previous && part.toolCallId && ((left !== null && asksAgainAfter(left, previous, part)) || sameWords(previous, part))) out.push({ id: part.toolCallId, after: left });
+			if (previous && part.toolCallId && ((left !== null && asksAgain(previous, part)) || sameWords(previous, part))) out.push({ id: part.toolCallId, after: left });
 			previous = part;
 		}
 	}
