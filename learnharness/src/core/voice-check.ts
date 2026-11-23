@@ -16,6 +16,8 @@
  * and his answer handed back to him.
  */
 
+import type { CloseReceipt } from "./close-receipt.ts";
+
 /** The kinds of turn the voice budgets (### How long each kind of turn is). */
 export type TurnKind = "teach" | "right" | "wrong" | "hint" | "direct" | "close";
 
@@ -66,8 +68,10 @@ export type VoiceRule =
 	| "reason-twice"
 	| "card-words"
 	| "unbuilt"
-	| "day-part"
-	| "moved-start"
+	| "close-calendar"
+	| "close-untouched"
+	| "close-day"
+	| "title-and"
 	| "below"
 	| "pointer"
 	| "arrival"
@@ -872,23 +876,77 @@ export function echoOf(text: string, answer: string | null): string | null {
 	return maths.some((m) => said.includes(m)) ? raw : null;
 }
 
-/** A day the close names with part of what it holds: the close lists one
- *  of the day's items that is not the lesson's own (`own`, titles) and
- *  leaves out another, so he would plan that day on half of it (round 14,
- *  m4: Wed 11's close named the Matrix multiplication review and Linear
- *  maps, and left out the Determinants review). `days` is the close
- *  result's `day_items`, each day with the lesson's own topics' titles. The excerpt names the day and what it left out. */
-export function partialDay(text: string, days: Readonly<Record<string, { day_words: string; items: readonly string[]; lesson: readonly string[] }>>): string | null {
-	const said = text.toLowerCase();
-	for (const { day_words: words, items, lesson } of Object.values(days)) {
-		const mine = lesson.map((t) => t.toLowerCase());
-		const long = (words.split(", ").find((w) => /\d/.test(w)) ?? words).toLowerCase();
-		const named = said.includes(long) || (words.startsWith("tomorrow") && /\btomorrow\b/.test(said));
-		if (!named) continue;
-		const titles = items.map((item) => item.replace(/ (?:review|starts|lesson continues)$/, ""));
-		const listed = titles.filter((t) => said.includes(t.toLowerCase()));
-		const missing = items.filter((_, i) => !said.includes(titles[i]!.toLowerCase()));
-		if (missing.length > 0 && listed.some((t) => !mine.includes(t.toLowerCase()))) return `${words}: ${missing.join(", ")}`;
+/** The days a close owes, by what it names: each topic the session
+ *  answered (and the lesson's own), the task that goes on, and each start
+ *  a save moved, as the close receipt gives them (close-receipt.ts). */
+export function receiptItems(receipt: CloseReceipt): { title: string; day_words: string }[] {
+	return [...receipt.topics, ...(receipt.continues ? [receipt.continues] : []), ...receipt.moved];
+}
+
+const plain = (s: string) => s.replace(/[*_"“”‘’]/g, "").replace(/\s+/g, " ").toLowerCase();
+
+/** Whether `said` names a day given in words ("tomorrow, Monday 9
+ *  November", "Thursday 12 November", "today"): its date ("12 November",
+ *  "12 Nov"), or "tomorrow" or "today" when the day is that. */
+export function namesDay(said: string, words: string): boolean {
+	const text = plain(said);
+	if (words === "today") return /\btoday\b/.test(text);
+	if (/^tomorrow\b/.test(words) && /\btomorrow\b/.test(text)) return true;
+	const date = /(\d{1,2}) ([a-z]{3})[a-z]*/i.exec(words);
+	return date !== null && new RegExp(`\\b${date[1]} ${date[2]!.toLowerCase()}`).test(text);
+}
+
+/** The topic titles `text` names, longest first, a title inside a longer
+ *  one named only as that one ("Matrix multiplication" within "Mechanics
+ *  of matrix multiplication"). */
+export function titlesNamed(text: string, titles: readonly string[]): string[] {
+	let rest = plain(text);
+	const named: string[] = [];
+	for (const title of [...new Set(titles)].filter((t) => t.trim().length > 2).sort((a, b) => b.length - a.length)) {
+		const key = plain(title).trim();
+		const re = new RegExp(`(?<![a-z0-9])${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9])`, "g");
+		if (!re.test(rest)) continue;
+		named.push(title);
+		rest = rest.replace(re, " ");
 	}
-	return null;
+	return named;
+}
+
+/** "On your calendar", "next time": a day he cannot act on, where the
+ *  close receipt gives every day (round 20, M3). */
+const CLOSE_VAGUE = /\b(?:on|in) (?:your|the|his) calendar\b|\bnext (?:time|session)\b/i;
+
+/** What a close says against its receipt (round 20, M3 and m8): a day he
+ *  cannot act on ("on your calendar", "next time"), a course topic the
+ *  receipt does not hold (the session never answered it), a receipt topic
+ *  named in a sentence without its day, and two of its titles joined by
+ *  "and", which reads as more topics than there are ("Rank and the column
+ *  space and Kernel and rank-nullity"). `titles` are every course topic's
+ *  title. Pure. */
+export function closeBreaks(text: string, receipt: CloseReceipt, titles: readonly string[]): VoiceBreak[] {
+	const out: VoiceBreak[] = [];
+	const items = receiptItems(receipt);
+	const held = items.map((i) => i.title);
+	const vague = sentences(text).find((s) => CLOSE_VAGUE.test(s));
+	if (vague) out.push({ rule: "close-calendar", excerpt: vague.trim() });
+	const untouched = titlesNamed(text, [...held, ...titles]).filter((t) => !held.includes(t));
+	if (untouched.length > 0) out.push({ rule: "close-untouched", excerpt: untouched.join(", ") });
+	for (const sentence of sentences(text)) {
+		const named = titlesNamed(sentence, held);
+		const dayless = items.filter((i) => named.includes(i.title) && !namesDay(sentence, i.day_words));
+		if (dayless.length > 0) {
+			out.push({ rule: "close-day", excerpt: dayless.map((i) => `${i.title}|${i.day_words}`).join(";") });
+			break;
+		}
+	}
+	const said = plain(text);
+	const joined = held.flatMap((a) => held.filter((b) => b !== a && said.includes(`${plain(a)} and ${plain(b)}`)).map((b) => `${a} and ${b}`))[0];
+	if (joined) out.push({ rule: "title-and", excerpt: joined });
+	return out;
+}
+
+/** The receipt's items no message of the close names by title. */
+export function closeMissing(texts: readonly string[], receipt: CloseReceipt): { title: string; day_words: string }[] {
+	const said = texts.join("\n");
+	return receiptItems(receipt).filter((i) => !titlesNamed(said, [i.title]).length);
 }

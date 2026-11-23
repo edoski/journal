@@ -172,7 +172,9 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	const systemPrompt = [composed, ...(opts.course ? [courseRecordPrompt(kind, { arcs: opts.course.arcs })] : []), foldersPrompt(opts.course, opts.setup)].join("\n\n---\n\n");
 	// Every message and question of the turn is read against the voice
 	// before he sees it, and one that breaks it is rewritten.
-	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind), opts.course?.review === true, opts.course !== undefined);
+	const courses = opts.course?.courses;
+	const titles = courses ? () => courses().then((maps) => maps.flatMap((map) => map.topics.map((topic) => topic.title))) : undefined;
+	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind), opts.course?.review === true, opts.course !== undefined, titles);
 	// The guard's budgets and refusals are a lesson's (a teaching turn, an
 	// answer, a hint): setting something up teaches nothing, so its messages
 	// keep to the voice its prompt carries, unchecked by them.

@@ -756,6 +756,15 @@ export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT | "s
 	};
 }
 
+/** His Done for today with the session's close receipt (close-receipt.ts),
+ *  read from the plan as he pressed it: the agent that answers it names
+ *  exactly the receipt's topics, each with its day, whatever kind of
+ *  session it closes (round 20, M3). Any other message is left as it is. */
+export function withCloseReceipt(message: LhMessage, receipt: unknown): LhMessage {
+	if (message.role !== "custom" || message.customType !== "done-tonight" || typeof message.content !== "string" || receipt === null || receipt === undefined) return message;
+	return { ...message, content: `${message.content}\nThe close receipt: ${JSON.stringify(receipt)}`, details: { ...(message.details as object), close: receipt } };
+}
+
 /** The task Continue picks up, as the engine's record names it: its title
  *  and the step he left it at, and the text of that part from his own
  *  material when a ref points to it (`passage`, round 18, M6). */

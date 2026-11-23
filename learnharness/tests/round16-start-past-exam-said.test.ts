@@ -8,12 +8,12 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { courseTools } from "../src/agent/tools/course.ts";
+import { receiptOfSaves } from "../src/core/close-receipt.ts";
 
 describe("a start a save moved past the exam is said in the close (round 16, M1)", () => {
-	it("the save's contract asks the close to say it now comes after the exam", () => {
-		const records = { run: async () => ({ ok: true, json: {} }), map: async () => ({ ok: false }), forgotten: () => false } as never;
-		const tools = courseTools({ course: { workspace: "/s/pr", title: "Probability" }, records, arcs: false });
-		assert.match(tools.course_save!.description, /with `past_exam`, that it now comes after the exam/);
+	it("the close receipt's sentence says it now comes after the exam (round 20, M3)", () => {
+		const moved = { expectation: { title: "Expectation and linearity", starts: "2026-11-20", moved: { from: "2026-11-18", by: "study", waits_on: ["Random variables and distributions"] }, past_exam: true } };
+		const receipt = receiptOfSaves([{ topics: [], receipt: { reviews: {}, starts_moved: moved } }], "2026-11-18");
+		assert.equal(receipt.says, "“Expectation and linearity” now starts on Friday 20 November, after the exam, since it waits on Random variables and distributions.");
 	});
 });

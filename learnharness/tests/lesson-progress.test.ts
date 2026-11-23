@@ -107,6 +107,7 @@ describe("closing for tonight", () => {
 describe("the close marks the lesson's new topics introduced", () => {
 	const TOPIC_TREE: PlanTree = { nodes: [{ id: "eigen", title: "Eigenvalues" }, { id: "warm-up", title: "Warm up" }], edges: [], version: 1 };
 	const mapTopic = (handle: string, introduced: string | null) => ({ handle, title: handle, level: introduced ? "attempted" : "new", introduced });
+	const mapOf = (topics: unknown[]) => ({ today: "2026-11-08", tasks: [], topics });
 
 	function closeWith(map: unknown) {
 		const runs: unknown[] = [];
@@ -123,7 +124,7 @@ describe("the close marks the lesson's new topics introduced", () => {
 	}
 
 	it("saves introduced on the session's topics the engine has never seen introduced, in code", async () => {
-		const { tool, runs } = closeWith({ topics: [mapTopic("eigen", null), mapTopic("rank", "2026-11-03"), mapTopic("span", null)] });
+		const { tool, runs } = closeWith(mapOf([mapTopic("eigen", null), mapTopic("rank", "2026-11-03"), mapTopic("span", null)]));
 		const res = await tool.execute("t1", { done: ["eigen"], close: true });
 		assert.deepEqual(runs, [{ verb: "save", changes: { topics: { eigen: { introduced: true } } } }]);
 		assert.match((res.content[0] as { text: string }).text, /Marked introduced: eigen/);
@@ -131,9 +132,10 @@ describe("the close marks the lesson's new topics introduced", () => {
 
 	it("gives each lesson topic's day as the plan holds it after the close's save, in words, for the close to copy", async () => {
 		const maps = [
-			{ today: "2026-11-08", topics: [mapTopic("eigen", null), mapTopic("rank", "2026-11-03")] },
+			mapOf([mapTopic("eigen", null), mapTopic("rank", "2026-11-03")]),
 			{
 				today: "2026-11-08",
+				tasks: [],
 				topics: [
 					{ ...mapTopic("eigen", "2026-11-08"), review: { kind: "scheduled", date: "2026-11-13", held: { reason: "full", due: "2026-11-09" } } },
 					{ ...mapTopic("rank", "2026-11-03"), review: { kind: "scheduled", date: "2026-11-09" } },
@@ -147,18 +149,18 @@ describe("the close marks the lesson's new topics introduced", () => {
 		const messages = [assistant([call("s1", "course_save", { changes: { observations: [{ topics: ["rank"], result: "correct" }] } })]), result("s1", "course_save", null)];
 		const tool = planTools({ chatId: "c1", chatStore: { getChat: () => ({ tree: TOPIC_TREE, messages, topics: ["eigen"] }) } as never, course: course as never })[LESSON_PROGRESS_TOOL]!;
 		const res = await tool.execute("t1", { done: ["eigen"], close: true });
-		const body = JSON.parse((res.content[0] as { text: string }).text) as { days: Record<string, { planned: string; planned_words: string }> };
-		assert.deepEqual(body.days, {
-			eigen: { planned: "2026-11-13", planned_words: "Friday 13 November" },
-			rank: { planned: "2026-11-09", planned_words: "tomorrow, Monday 9 November" },
-		});
+		const body = JSON.parse((res.content[0] as { text: string }).text) as { close: { topics: { handle: string; day: string; day_words: string }[] } };
+		assert.deepEqual(body.close.topics.map(({ handle, day, day_words }) => ({ handle, day, day_words })), [
+			{ handle: "eigen", day: "2026-11-13", day_words: "Friday 13 November" },
+			{ handle: "rank", day: "2026-11-09", day_words: "tomorrow, Monday 9 November" },
+		]);
 	});
 
 	it("saves nothing without a close, or when every topic is already introduced", async () => {
-		const open = closeWith({ topics: [mapTopic("eigen", null)] });
+		const open = closeWith(mapOf([mapTopic("eigen", null)]));
 		await open.tool.execute("t1", { done: ["eigen"] });
 		assert.deepEqual(open.runs, []);
-		const known = closeWith({ topics: [mapTopic("eigen", "2026-11-01")] });
+		const known = closeWith(mapOf([mapTopic("eigen", "2026-11-01")]));
 		await known.tool.execute("t2", { done: [], close: true });
 		assert.deepEqual(known.runs, []);
 	});

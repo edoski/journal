@@ -1,4 +1,4 @@
-import { courseReviewName, isReviewSession, lessonHereOf, taskTopics, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
+import { courseReviewName, isReviewSession, lessonHereOf, taskTopics, titleList, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
 import { continueMove, sessionState, type SessionState } from "@/components/nav/session-state";
 import { SOLID, taskSessions, topicSessions } from "@/components/unit-inbox/units";
@@ -9,10 +9,9 @@ import { lapsedNow, lessonBegun } from "@/components/study-words";
 /** "Span", "Span, Rank", "Span, Rank, Basis and dimension": every title,
  *  in order, joined by commas only, since a title may hold its own "and"
  *  ("Random variables and distributions") and "and more" hid which topics
- *  a review takes up (13 Nov 2026). Never a count. Pure. */
-export function titleList(titles: readonly string[]): string {
-	return titles.join(", ");
-}
+ *  a review takes up (13 Nov 2026). Never a count. The tutor's close joins
+ *  its titles by the same rule (close-receipt.ts). */
+export { titleList };
 
 function overdue(t: CourseMapTopic): number {
 	return t.review?.kind === "due" ? t.review.overdue : -1;

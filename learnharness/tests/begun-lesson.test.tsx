@@ -114,8 +114,8 @@ describe("what the tutor reads about a lesson he began", () => {
 		const tree = { nodes: [{ id: "slots", title: "Slicing the interval" }], edges: [], version: 1 };
 		const tool = planTools({ chatId: "c1", chatStore: { getChat: () => ({ tree, messages: [], topics: ["poisson"] }) } as never, course: course as never })[LESSON_PROGRESS_TOOL]!;
 		const res = await tool.execute("t1", { done: [], close: true });
-		const body = JSON.parse((res.content[0] as { text: string }).text) as { days: Record<string, unknown> };
-		assert.deepEqual(body.days.poisson, { continues: "2026-11-11", continues_words: "tomorrow, Wednesday 11 November" });
+		const body = JSON.parse((res.content[0] as { text: string }).text) as { close: { topics: { handle: string }[] } };
+		assert.deepEqual(body.close.topics.find((t) => t.handle === "poisson"), { handle: "poisson", title: "Poisson distribution", kind: "continues", day: "2026-11-11", day_words: "tomorrow, Wednesday 11 November" });
 	});
 
 	it("the close of a lesson he worked on today names the day it goes on after today (round 14, m2)", async () => {
@@ -128,8 +128,8 @@ describe("what the tutor reads about a lesson he began", () => {
 		const tree = { nodes: [{ id: "slots", title: "Slicing the interval" }], edges: [], version: 1 };
 		const tool = planTools({ chatId: "c1", chatStore: { getChat: () => ({ tree, messages: [], topics: ["poisson"] }) } as never, course: course as never })[LESSON_PROGRESS_TOOL]!;
 		const res = await tool.execute("t1", { done: [], close: true });
-		const body = JSON.parse((res.content[0] as { text: string }).text) as { days: Record<string, unknown> };
-		assert.deepEqual(body.days.poisson, { continues: "2026-11-11", continues_words: "tomorrow, Wednesday 11 November" });
+		const body = JSON.parse((res.content[0] as { text: string }).text) as { close: { topics: { handle: string }[] } };
+		assert.deepEqual(body.close.topics.find((t) => t.handle === "poisson"), { handle: "poisson", title: "Poisson distribution", kind: "continues", day: "2026-11-11", day_words: "tomorrow, Wednesday 11 November" });
 	});
 
 	it("the record doctrine has the tutor say the lesson continues, never that he starts it", () => {

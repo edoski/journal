@@ -5,11 +5,10 @@ import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, lessonProgressInput, PLAN_M
 import type { ChatStore } from "../../core/ports.ts";
 import { createTree, planDropsSteps, planMapTooBig, planStepIsTheTopic, planTitlesGiveAway, PlanTreeError } from "../../core/plan-tree.ts";
 import { parseMermaidPlan } from "./mermaid-plan.ts";
-import type { CourseToolContext } from "./course.ts";
+import { closeReceiptFor, type CourseToolContext } from "./course.ts";
 import { sessionTopicsOf } from "../../core/native-messages.ts";
 import { halfAnswerLeft, sinceLastClose } from "../../core/session-end.ts";
-import { topicsToIntroduce, type CourseMap } from "../../core/contracts/course-map.ts";
-import { plannedDayWords } from "../../core/day-words.ts";
+import { topicsToIntroduce } from "../../core/contracts/course-map.ts";
 import { planTakesUp, reviewRecord } from "../../core/session-opening.ts";
 
 /** The binding-id reminder riding plan_init's slim content (owner,
@@ -45,68 +44,6 @@ async function introduceLessonTopics(course: CourseToolContext, candidates: read
 		changes: { topics: Object.fromEntries(fresh.map((handle) => [handle, { introduced: true }])) },
 	});
 	return saved.ok ? `Marked introduced: ${fresh.join(", ")}.` : `The lesson's topics could not be marked introduced (${saved.message}).`;
-}
-
-type LessonDay = { planned: string; planned_words: string } | { starts: string; starts_words: string } | { continues: string; continues_words: string };
-
-/** Each of the lesson's topics on the plan as the engine holds it after the
- *  close's save: its next review, its start while untaught, or the day a
- *  lesson he began continues, in the words the close copies. Read after
- *  the save, so the close never names a day its own save has already
- *  moved. */
-async function lessonDays(course: CourseToolContext, candidates: readonly string[]): Promise<{ days: Record<string, LessonDay>; dayItems?: DayItems } | undefined> {
-	if (candidates.length === 0) return undefined;
-	const mapped = await course.records.map(course.course.workspace);
-	if (!mapped.ok) return undefined;
-	const wanted = new Set(candidates);
-	const days: Record<string, LessonDay> = {};
-	for (const topic of mapped.map.topics) {
-		if (!wanted.has(topic.handle)) continue;
-		if (topic.review) days[topic.handle] = { planned: topic.review.date, planned_words: plannedDayWords(topic.review.date, mapped.map.today) };
-		// A lesson he began continues that day, as the app says it; one he
-		// worked on today is today's until the close, which names the day
-		// it goes on after today (round 14, m2).
-		else if (topic.starts && topic.startsWhy?.kind === "begun") {
-			const day = topic.starts === mapped.map.today && topic.startsWhy.then ? topic.startsWhy.then : topic.starts;
-			days[topic.handle] = { continues: day, continues_words: plannedDayWords(day, mapped.map.today) };
-		}
-		else if (topic.starts) days[topic.handle] = { starts: topic.starts, starts_words: plannedDayWords(topic.starts, mapped.map.today) };
-	}
-	const others = ((await course.courses?.().catch(() => [])) ?? []).filter((map) => map.workspace !== mapped.map.workspace);
-	const dayItems = dayItemsOf(mapped.map, days, others);
-	return { days, ...(dayItems ? { dayItems } : {}) };
-}
-
-/** Everything the plan holds on each day from today to the last day the
- *  close gives a lesson topic (`days`), in this course and in `others`,
- *  his other courses: their reviews, starts and lessons that go on, by
- *  title, each day with the lesson's own topics, so a close that names
- *  what a day holds names all of it (round 14, m4: "On Wednesday 11
- *  November you have your Matrix multiplication review and you start
- *  Linear maps" left out the Determinants review; round 15, m3: the 10 Nov
- *  close named Linear Algebra's four reviews for 11 Nov and left out
- *  Probability's review and Geometric start). */
-export type DayItems = Record<string, { day_words: string; items: string[]; lesson: string[] }>;
-
-function dayItemsOf(map: CourseMap, days: Record<string, LessonDay>, others: readonly CourseMap[] = []): DayItems | undefined {
-	const last = Object.values(days)
-		.map((d) => ("planned" in d ? d.planned : "starts" in d ? d.starts : d.continues))
-		.sort()
-		.pop();
-	if (!last) return undefined;
-	const lesson = map.topics.filter((t) => t.handle in days).map((t) => t.title);
-	const items: DayItems = {};
-	const add = (date: string | undefined, item: string) => {
-		if (!date || date < map.today || date > last) return;
-		(items[date] ??= { day_words: plannedDayWords(date, map.today), items: [], lesson }).items.push(item);
-	};
-	for (const t of [map, ...others].flatMap((m) => m.topics)) {
-		if (t.excluded) continue;
-		if (t.review) add(t.review.date, `${t.title} review`);
-		else if (t.startsWhy?.kind === "begun" && t.starts) add(t.starts === map.today && t.startsWhy.then ? t.startsWhy.then : t.starts, `${t.title} lesson continues`);
-		else if (t.starts && t.level === "new") add(t.starts, `${t.title} starts`);
-	}
-	return Object.keys(items).length > 0 ? Object.fromEntries(Object.entries(items).sort(([a], [b]) => a.localeCompare(b))) : undefined;
 }
 
 /**
@@ -205,8 +142,8 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 			description:
 				"Mark plan steps done on his map, and say when you close the session for today. Call it in the turn that finishes a step, " +
 				"with that step's node id in `done`; in the turn that ends the session, add `close: true` before your closing words. " +
-				"The close's result gives each of the lesson's topics its day on the plan after the close: a day your closing words name is one of these, copied as written, and they name the day its topic's next review comes, when it has one. " +
-				"Its `day_items` lists everything the plan holds on each of those days, in every course: name a day by itself, or with all it holds, never with part of it.",
+				"The close's result carries the session's `close` receipt: the topics this session answered and the lesson's own, each with its day on the plan after the close, the task it holds when that goes on, and each start its saves moved. " +
+				"Your closing words name exactly those, each with its day, by copying `close.says`, and no other topic.",
 			parameters: lessonProgressInput,
 			execute: serverExecute(LESSON_PROGRESS_TOOL, lessonProgressInput, async ({ done, close }) => {
 				const record = ctx.chatStore.getChat(ctx.chatId);
@@ -228,9 +165,11 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 				// session's last close was named by that close (round 19, m15).
 				const topics = [...new Set([...(record.topics ?? []), ...sessionTopicsOf(sinceLastClose(record.messages))])];
 				const introduced = await introduceLessonTopics(ctx.course, topics);
-				const read = await lessonDays(ctx.course, topics);
+				// Read after the save that marks the topics introduced, so the close
+				// never names a day its own save has already moved.
+				const receipt = await closeReceiptFor(ctx.course.records, ctx.course.course.workspace, record, ctx.course);
 				const half = halfAnswerLeft(record.messages);
-				return { ok: true, ...(introduced ? { record: introduced } : {}), ...(read ? { days: read.days } : {}), ...(read?.dayItems ? { day_items: read.dayItems } : {}), ...(half ? { half_answer_on: half } : {}) };
+				return { ok: true, ...(introduced ? { record: introduced } : {}), ...(receipt ? { close: receipt } : {}), ...(half ? { half_answer_on: half } : {}) };
 			}),
 		},
 		plan_init: {

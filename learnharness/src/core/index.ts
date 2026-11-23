@@ -27,6 +27,7 @@ export * from "./lesson-place.ts";
 // task-session.ts: the task his Continue picked up, and where the session left it (pure).
 export * from "./task-session.ts";
 export * from "./session-opening.ts";
+export { titleList } from "./close-receipt.ts";
 export { courseReviewName, sessionTitleOf } from "./session-naming.ts";
 export * from "./phases.ts";
 export * from "./pending.ts";

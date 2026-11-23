@@ -115,7 +115,7 @@ describe("the tonight input", () => {
 	});
 
 	it("names only this session's open work, never another session's (round 12, 3 D7: Rank practice closed on \"Part (c) of Problem sheet 4 is still open\")", () => {
-		assert.match(DONE_TONIGHT_TEXT.practice, /only what his record keeps for next time from this session, an open task this session worked on at its place/);
+		assert.match(DONE_TONIGHT_TEXT.practice, /only what his record keeps from this session, an open task this session worked on at its place/);
 		assert.match(DONE_TONIGHT_TEXT.practice, /never another session's open work/);
 	});
 
