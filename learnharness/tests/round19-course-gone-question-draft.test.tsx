@@ -131,3 +131,41 @@ for (const [box, messages] of [
 		assert.equal(keptWords(NEW_LESSON_BOX)?.text, WORDS, "the New lesson box holds them as he typed them");
 	});
 }
+
+/**
+ * Round 20, m5 (round 19's m12, 4 recheck): after the delete the sidebar
+ * read the deleted course's review as history, but its transcript still
+ * labelled the question "Your turn" (68b). A deleted course's session is
+ * history in the transcript too: the question stays as the tutor asked it,
+ * the problem as posed, and nothing reads "Your turn", from the delete on
+ * and when the lesson is opened after it.
+ */
+for (const [what, messages, words] of [
+	["question", [question], "derivative of"],
+	["practice problem", [problem, posed], "Differentiate"],
+] as const) {
+	test(`a deleted course's open ${what} reads as history, with no "Your turn" (round 20, m5)`, async () => {
+		const { events, listed } = await mount([...messages]);
+		assert.ok(host!.querySelector('[data-slot="your-turn"]') !== null, "before the delete it waits on him");
+		await deleteCourse(events, listed);
+		assert.ok(host!.querySelector('[data-slot="your-turn"]') === null, "no Your turn once its course is deleted");
+		assert.ok(host!.querySelector('[data-slot="prose-question"]')?.textContent?.includes(words), `its words stay as the tutor wrote them: ${host!.querySelector('[data-slot="prose-question"]')?.textContent}`);
+		assert.ok(host!.querySelector('[data-slot="prose-question"][data-open]') === null, "nothing in it is open");
+	});
+}
+
+test(`a deleted course's lesson opened after the delete reads its open question as history (round 20, m5)`, async () => {
+	setKeptWindow("w-two", { live: ["w-two"] });
+	serve([question], { courses: [] });
+	host = document.createElement("div");
+	document.body.append(host);
+	root = createRoot(host);
+	await act(async () => root!.render(
+		<ServerEventsProvider connect={() => channel().source}>
+			<Chat chatId={CHAT} title="Calculus I review" initialMessages={[question]} course={{ workspace: WORKSPACE, title: "Calculus I" }} initiallyCourseDeleted />
+		</ServerEventsProvider>,
+	));
+	await settle();
+	assert.ok(host.querySelector('[data-slot="your-turn"]') === null, "no Your turn");
+	assert.ok(host.querySelector('[data-slot="prose-question"]')?.textContent?.includes("derivative of"), "the question as asked");
+});
