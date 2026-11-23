@@ -200,7 +200,7 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.deepEqual(presses, [EXAM_GAP_WORDS.which, "Review Binomial today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask], "a review of a taught topic is the pick, as the tutor orders it (round 10, 1 m6)");
 	});
 
-	it("picks today's plan first, as Home and the tutor do, and lists it before the gaps (round 11, 1 N10: Review Conditional probability while Home and the tutor began with Binomial)", () => {
+	it("picks the start the exam line names, then today's plan, as Home and the tutor do, and lists it before the gaps (round 11, 1 N10: Review Conditional probability while Home and the tutor began with Binomial; round 21, M1)", () => {
 		const c = gapped(["variance"], ["bayes"], { variance: "full", bayes: "full" });
 		const due = { kind: "due" as const, date: "2026-11-08", overdue: 2 };
 		const topics = [
@@ -212,11 +212,11 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		const map = { ...c.map, topics };
 		assert.deepEqual(
 			examGaps(map)!.ways.map((w) => `${w.starts ? "Start" : "Review"} ${w.topic.handle}`),
-			["Review binomial", "Start poisson", "Review bayes", "Start variance"],
-			"today's reviews, then today's starts, then the gaps",
+			["Start poisson", "Review binomial", "Review bayes", "Start variance"],
+			"the line's start (\"Start with Poisson.\"), then today's reviews, then the gaps",
 		);
 		const line = gapLine({ ...c, map })!;
-		assert.deepEqual([...line.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.which, "Review Binomial today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask]);
+		assert.deepEqual([...line.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.which, "Start Poisson today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask]);
 		const needsPoisson = [{ kind: "needs" as const, topic: h("variance"), prerequisite: h("poisson") }];
 		const alone = gapLine({ ...c, map: { ...map, topics: [topics[0]!, topics[1]!, topics[3]!], exam: { ...map.exam!, doesNotFit: [h("variance")], unreviewed: [] }, edges: needsPoisson } })!;
 		assert.deepEqual([...alone.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.which, "Review Binomial today", EXAM_GAP_WORDS.ask], "today's one item named, never \"Review it today\" for a topic the line does not name");

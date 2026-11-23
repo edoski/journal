@@ -507,11 +507,20 @@ function examDayWords(exam: Pick<CourseExam, "date" | "daysLeft">): string {
 /** The exam line, one sentence wherever the exam's plan cannot start
  *  every topic before it (Home, the course head, the calendar's exam
  *  panel), and what he can do: start the first topic the plan still
- *  starts before it (`first`). The names are one press away, in the
- *  head's Which topics (round 20, M2: an 11-name amber block on all three
- *  on the exam eve, saying nothing he could do). Pure. */
-export function examLineWords(exam: Pick<CourseExam, "date" | "daysLeft">, first: string | null): string {
-	return `Not every exam topic fits before ${examDayWords(exam)}.${first ? ` Start with ${first}.` : ""}`;
+ *  starts before it (`start`), "Start with Expectation and linearity."
+ *  when the plan starts it today, else on its day, "Start Stirling's
+ *  formula tomorrow." (round 21, M1: once Expectation was begun the line
+ *  said "Start with Joint distributions…", which the plan starts the next
+ *  day). The names are one press away, in the head's Which topics (round
+ *  20, M2: an 11-name amber block on all three on the exam eve, saying
+ *  nothing he could do). Pure. */
+export function examLineWords(exam: Pick<CourseExam, "date" | "daysLeft">, start: { title: string; day: string } | null, today: string): string {
+	const line = `Not every exam topic fits before ${examDayWords(exam)}.`;
+	if (!start) return line;
+	const days = Math.round((Date.parse(`${start.day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+	if (days <= 0) return `${line} Start with ${start.title}.`;
+	const when = days === 1 ? "tomorrow" : `on ${days < 7 ? EXAM_WEEKDAY.format(new Date(`${start.day}T00:00:00Z`)) : shortDay(start.day)}`;
+	return `${line} Start ${start.title} ${when}.`;
 }
 
 /** The exam line when every topic starts in time but the final review

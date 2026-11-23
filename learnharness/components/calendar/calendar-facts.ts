@@ -1,7 +1,7 @@
 import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween, leftWords } from "@/components/unit-inbox/units";
-import { dayAndNearWords, distanceWords, heldExamWords, longDayWords, nextSessionWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
+import { dayAndNearWords, distanceWords, examLineWords, heldExamWords, longDayWords, nextSessionWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { courseMove, nextStepOf, titleList, todaySteps, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 import { nowLine } from "@/components/study-home/needs-you";
@@ -37,8 +37,8 @@ export type CalendarEntry =
 			road: readonly RoadWeek[];
 			finalReview: string | null;
 			doesNotFit: readonly string[];
-			/** The first topic the plan still starts before the exam, while some do not fit (`firstExamStart`). */
-			firstStart: string | null;
+			/** The exam line's words (`examLine`), drawn while some topics do not fit. */
+			line: string | null;
 			unreviewed: readonly ExamGapTopic[];
 			allStarted: boolean;
 			next: NextMove | null;
@@ -378,14 +378,17 @@ export function calendarEntries({
 		if (map.exam) {
 			const road = roadOf(planned, map.exam.date, titleOf, finalReview);
 			const allStarted = map.topics.length > 0 && road.length === 0 && doesNotFit.length === 0;
-			const step = nextStepOf(studied);
-			const next = map.exam.date > today && step.kind !== "none" ? { ...nextParts(step), on: (step.kind === "review" || step.kind === "topic") && step.on ? step.on : null, move: courseMove(studied, chats) } : null;
+			// The start the exam line names is its next step, so the panel offers what its line says (round 21, M1:
+			// "Start with Expectation and linearity." above a Next step that reviewed five topics).
+			const line = examLine(map);
+			const step: NextStep = line?.start && doesNotFit.length > 0 ? { kind: "topic", title: line.start.title, topics: [line.start.handle], fresh: true, planned: true } : nextStepOf(studied);
+			const next = map.exam.date > today && step.kind !== "none" ? { ...nextParts(step), on: (step.kind === "review" || step.kind === "topic") && step.on ? step.on : null, move: courseMove(studied, chats, step) } : null;
 			const reasons = map.exam.reasons ?? {};
 			const unreviewed = (map.exam.unreviewed ?? []).map((h): ExamGapTopic => {
 				const reason = reasons[h];
 				return reason ? { title: titleOf(h), reason } : { title: titleOf(h) };
 			});
-			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, nextSession: nextSessionWords(map.exam), road, finalReview, doesNotFit: doesNotFit.map(titleOf), firstStart: firstExamStart(map)?.title ?? null, unreviewed, allStarted, next });
+			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, nextSession: nextSessionWords(map.exam), road, finalReview, doesNotFit: doesNotFit.map(titleOf), line: line?.words ?? null, unreviewed, allStarted, next });
 		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, chats) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) => {
@@ -543,17 +546,29 @@ function listWords(items: readonly string[]): string {
 	return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-/** The first topic the exam's plan still starts before the exam, the one
- *  the exam line says to start with (`examLineWords`): of the topics not
- *  started that the exam examines and that fit, the earliest the plan
- *  starts, in path order on one day, so on the exam eve it is the start
- *  Home's Today offers (round 20, M2). Null with none. Pure. */
-export function firstExamStart(map: Pick<CourseMap, "topics" | "exam">): CourseMapTopic | null {
+/** The exam line wherever it is drawn (Home, the course head, the
+ *  calendar's exam panel): its words (`examLineWords`) and its action,
+ *  `start`, the topic it says to start with when the plan starts it today,
+ *  which the head's popover and the panel's Next step offer first (round
+ *  21, M1: both offered only a review under "Start with Expectation and
+ *  linearity."). The topic it names is the first the plan still starts
+ *  before the exam: of the topics not started that the exam examines and
+ *  that fit, the earliest the plan starts, in path order on one day, so on
+ *  the exam eve it is the start Home's Today offers (round 20, M2); a later
+ *  one is named with its day. A lesson he began is no start. Null with no
+ *  exam ahead. Pure. */
+export interface ExamLine {
+	words: string;
+	start: CourseMapTopic | null;
+}
+
+export function examLine(map: Pick<CourseMap, "topics" | "exam" | "today">): ExamLine | null {
 	const { exam } = map;
-	if (!exam) return null;
+	if (!exam || exam.daysLeft < 0) return null;
 	const out = new Set<string>([...(exam.doesNotFit ?? []), ...(exam.leavesOut ?? [])]);
-	const fits = map.topics.filter((t) => t.level === "new" && t.starts !== undefined && t.starts < exam.date && !out.has(t.handle));
-	return fits.sort((a, b) => a.starts!.localeCompare(b.starts!))[0] ?? null;
+	const fits = map.topics.filter((t) => t.level === "new" && !lessonBegun(t) && t.starts !== undefined && t.starts >= map.today && t.starts < exam.date && !out.has(t.handle));
+	const first = fits.sort((a, b) => a.starts!.localeCompare(b.starts!))[0] ?? null;
+	return { words: examLineWords(exam, first && { title: first.title, day: first.starts! }, map.today), start: first?.starts === map.today ? first : null };
 }
 
 /** The topics the plan has no room to start before the exam, named: the

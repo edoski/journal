@@ -1,4 +1,5 @@
 import type { ChatListItem, CourseMap, CourseMapTopic, ExamGapReason, TopicHandle } from "@/src/core";
+import { examLine } from "@/components/calendar/calendar-facts";
 
 /**
  * The course page head's facts (spec: course-head.md), each a
@@ -16,8 +17,11 @@ export function namesWords(names: readonly string[]): string {
  *  topics it has no room to start before the exam (`doesNotFit`), the
  *  ones its final review has no room for (`unreviewed`: taught, or started
  *  too late for a review), and the engine's reasons for each list, each
- *  once, in topic order (`why`). `ways` is what he can take up today, in
- *  the order Home and the tutor take it: first today's plan for the course,
+ *  once, in topic order (`why`). `ways` is what he can take up today:
+ *  first the start the exam line names (`examLine`,
+ *  round 21, M1: the popover offered "Review Uniform distribution today"
+ *  under "Start with Expectation and linearity."), then the rest in the
+ *  order Home and the tutor take it: today's plan for the course,
  *  its reviews then its starts (`planned`; round 11, 1 N10: the head picked
  *  "Review Conditional probability today" while Home and the tutor began
  *  with Binomial), then the topics left out, never one the plan starts
@@ -48,9 +52,11 @@ export function examGaps(map: Pick<CourseMap, "exam" | "topics" | "edges" | "tod
 	const why = (topics: readonly CourseMapTopic[]) => [...new Set(topics.flatMap((t) => exam.reasons?.[t.handle] ?? []))];
 	const taught = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.introduced != null;
 	const startable = (topic: CourseMapTopic) => map.edges.every((edge) => edge.kind !== "needs" || edge.topic !== topic.handle || taught(edge.prerequisite));
+	const named = (exam.doesNotFit ?? []).length > 0 ? examLine(map)?.start : null;
 	const today = [
+		...(named ? [{ topic: named, starts: true, planned: true }] : []),
 		...map.topics.filter((t) => t.review?.kind === "due").map((topic) => ({ topic, starts: false, planned: true })),
-		...map.topics.filter((t) => t.starts === map.today).map((topic) => ({ topic, starts: true, planned: true })),
+		...map.topics.filter((t) => t.starts === map.today && t !== named).map((topic) => ({ topic, starts: true, planned: true })),
 	];
 	// A topic the plan starts before the exam is not left out before it (round 18, m6: Stirling's formula, planned
 	// for the day before the exam, under "Left out before the exam").

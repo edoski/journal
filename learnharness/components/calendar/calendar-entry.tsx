@@ -10,9 +10,8 @@ import { unitHref } from "@/components/unit-inbox/unit-href";
 import type { Fact } from "@/components/unit-inbox/fact-icon";
 import { FactIcon, StatusMark } from "@/components/unit-inbox/status-mark";
 import { dayAndNearWords, distanceWords, finalReviewWords, longDayWords, lookOf, lookWords, LOOKS, roadLines, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
-import { examLineWords, FINAL_REVIEW_GAP_WORDS, pressWord } from "@/components/study-words";
+import { FINAL_REVIEW_GAP_WORDS, pressWord } from "@/components/study-words";
 import { planDay } from "@/components/study-home/study-facts";
-import { daysBetween } from "@/components/unit-inbox/units";
 import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
 import { cn } from "@/lib/utils";
@@ -143,7 +142,7 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 	if (entry.kind === "exam") {
 		lines.push(dayAndNearWords(entry.day, longDayWords(entry.day), today));
 		if (entry.nextSession) lines.push(entry.nextSession);
-		if (entry.doesNotFit.length > 0) lines.push(examLineWords({ date: entry.day, daysLeft: daysBetween(today, entry.day) }, entry.firstStart));
+		if (entry.doesNotFit.length > 0 && entry.line) lines.push(entry.line);
 		if (entry.allStarted) lines.push("Every topic started");
 	} else if (entry.kind === "review") {
 		if (entry.overdue) lines.push(`Was due ${longDayWords(entry.dueOn ?? entry.day)}`);
