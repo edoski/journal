@@ -262,14 +262,15 @@ export function newAnswerResult(
 }
 
 /** What the answer's turn must fit, said with it (round 21, m17): its
- *  budget, the guard's own, and the messages since his last answer, which
- *  it never says again. Null for a shown answer or a question set aside,
+ *  budget, the guard's own, and for a hint the cues already given on the
+ *  question, which it never says again. Null for a shown answer or a question set aside,
  *  which set their own length. Pure. */
 function replyOwed(answer: unknown, told: readonly string[]): string | null {
 	const d = answer as { dismissed?: unknown; showMe?: unknown; hintRequested?: unknown } | null;
 	if (!d || typeof d !== "object" || d.dismissed === true || d.showMe === true) return null;
-	const said = told.length ? ` Already said since his last answer, so never again in any words: ${told.map((t) => `"${t.trim()}"`).join(" ")}` : "";
-	return `${replyBudgetText(d.hintRequested === true ? "hint" : "wrong")}${said}`;
+	if (d.hintRequested !== true) return replyBudgetText("wrong");
+	const said = told.length ? ` Already said on this question, so never again in any words: ${told.map((t) => `"${t.trim()}"`).join(" ")}` : "";
+	return `${replyBudgetText("hint")}${said}`;
 }
 
 /** What the tutor told him while the question `pending` was open and

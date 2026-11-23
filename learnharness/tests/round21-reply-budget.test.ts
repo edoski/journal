@@ -10,7 +10,8 @@ import { describe, it } from "node:test";
 import { fauxAssistantMessage, type ToolCall } from "@earendil-works/pi-ai";
 import { inputAppends } from "../src/core/input-events.ts";
 import { newUserMessage, SEND_TO_USER_TOOL, type LhMessage } from "../src/core/native-messages.ts";
-import { SENTENCE_BUDGETS, SENTENCE_WORDS } from "../src/core/voice-check.ts";
+import { readFileSync } from "node:fs";
+import { DRAFT_WORDS, draftSentences, SENTENCE_BUDGETS, SENTENCE_WORDS } from "../src/core/voice-check.ts";
 
 let n = 0;
 const call = (name: string, args: ToolCall["arguments"]): ToolCall => ({ type: "toolCall", id: `${name}-${++n}`, name, arguments: args });
@@ -49,31 +50,34 @@ const replyOf = (messages: LhMessage[], q: ToolCall, answer: Record<string, unkn
 };
 
 describe("the answer the tutor reads carries its reply's budget and what is already said (round 21, m17)", () => {
-	it("an answer: the guard's budget for his answer's words, then for a teaching step", () => {
+	it("an answer: a draft one sentence under the guard's budget, for his answer's words and a teaching step", () => {
 		const { messages, q } = lesson();
 		const reply = replyOf(messages, q, { text: "The two axes, each stretched by 2", confidence: "guessing" });
 		assert.ok(reply, "the answer says its reply's budget");
-		assert.ok(reply.includes(`at most ${SENTENCE_BUDGETS.wrong} sentences and 1 display`), reply);
-		assert.ok(reply.includes(`a teaching step after them, one message of at most ${SENTENCE_BUDGETS.teach} sentences and 1 display`), reply);
-		assert.ok(reply.includes(`a sentence over ${SENTENCE_WORDS} words counts as two`), reply);
+		assert.equal(draftSentences("wrong"), SENTENCE_BUDGETS.wrong - 1);
+		assert.ok(reply.includes(`at most ${draftSentences("wrong")} short sentences and 1 display, and a teaching step after them as at most ${draftSentences("teach")} short sentences and 1 display`), reply);
+		assert.ok(reply.includes(`each sentence under ${DRAFT_WORDS} words, since the voice refuses ${SENTENCE_BUDGETS.wrong + 1} sentences, counts a sentence over ${SENTENCE_WORDS} words as two`), reply);
+		assert.ok(!reply.includes(STEP), "an answer's reply carries no list of what was said");
 	});
 
-	it("names what he read since his last answer, never a refused draft or what came before", () => {
-		const { messages, q } = lesson();
-		const reply = replyOf(messages, q, { text: "The axes", confidence: "guessing" })!;
-		assert.ok(reply.includes(`never again in any words: "${STEP}"`), reply);
-		assert.ok(!reply.includes(REFUSED), "a refused draft never reached him");
-		assert.ok(!reply.includes(EARLIER), "what he read before his last answer is another question's");
+	it("the prober's first step aims under a teaching turn's budget", () => {
+		const doctrine = readFileSync(new URL("../src/agent/prompts/prober/10-probe-doctrine.md", import.meta.url), "utf8");
+		assert.equal(draftSentences("teach"), 3);
+		assert.equal(SENTENCE_BUDGETS.teach + 1, 5);
+		assert.ok(doctrine.includes(`one idea in at most three short sentences, each under ${DRAFT_WORDS} words`), "three: draftSentences(teach)");
+		assert.ok(doctrine.includes(`the voice refuses a fifth sentence and counts one over ${SENTENCE_WORDS} words as two`));
 	});
 
-	it("a hint: one sentence and no display, a statement, with the cues already given on the question", () => {
+	it("a hint: one sentence under the word aim and no display, a statement, with the cues already given on the question, never a refused draft or another question's", () => {
 		const { messages, q } = lesson();
 		const nudge = call(SEND_TO_USER_TOOL, { message: "Look at what $A$ does to $(1, 1)$." });
 		const again = { ...q, id: `${q.id}-again` };
 		const hinted = [...messages, result(q, { kind: "explain", questionText: QUESTION, answers: [], hintRequested: true, text: "maybe" }), assistant(nudge, again), result(nudge)];
 		const reply = replyOf(hinted, again, { hintRequested: true, text: "the diagonal?" })!;
-		assert.ok(reply.startsWith(`Your hint is one message of ${SENTENCE_BUDGETS.hint} sentence and no displays, a statement, never a question`), reply);
-		assert.ok(reply.includes(`"${STEP}" "Look at what $A$ does to $(1, 1)$."`), reply);
+		assert.ok(reply.startsWith(`Write your hint as 1 short sentence and no displays, a statement, never a question: each sentence under ${DRAFT_WORDS} words`), reply);
+		assert.ok(reply.includes(`never again in any words: "${STEP}" "Look at what $A$ does to $(1, 1)$."`), reply);
+		assert.ok(!reply.includes(REFUSED), "a refused draft never reached him");
+		assert.ok(!reply.includes(EARLIER), "what he read before his last answer is another question's");
 	});
 
 	it("a question set aside or shown sets its own length", () => {

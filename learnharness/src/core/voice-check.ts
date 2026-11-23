@@ -109,19 +109,6 @@ export const SENTENCE_BUDGETS: Readonly<Record<TurnKind, number>> = { teach: 4, 
 /** Displays each kind may carry. */
 const DISPLAYS: Readonly<Record<TurnKind, number>> = { teach: 1, right: 1, wrong: 1, hint: 0, direct: Infinity, close: 0 };
 
-/** The reply's budget, as the turn's own instructions say it before the
- *  first draft (round 21, m17: drafts the guard refused for length cost 6
- *  to 37 s each): the budget the guard reads the reply against, his
- *  answer's words or his hint, then any teaching step after them. */
-export function replyBudgetText(kind: "wrong" | "hint"): string {
-	const count = (n: number, one: string) => `${n === 0 ? "no" : n} ${one}${n === 1 ? "" : "s"}`;
-	const per = (k: TurnKind) => `${count(SENTENCE_BUDGETS[k], "sentence")} and ${count(DISPLAYS[k], "display")}`;
-	const words = `a sentence over ${SENTENCE_WORDS} words counts as two, and each clause after a colon or a semicolon as one more`;
-	return kind === "hint"
-		? `Your hint is one message of ${per("hint")}, a statement, never a question (${words}).`
-		: `Your words on it are one message of at most ${per("wrong")}; a teaching step after them, one message of at most ${per("teach")} (${words}).`;
-}
-
 /** Phrase rules: what the voice bans in any words he reads. */
 const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "praise", re: /(?:^|[.!?]\s+|\n)(?:that(?:'s| is) )?(?:exactly|great|nice|perfect|excellent|spot on|well done|good (?:question|instinct|timing|catch|thinking|work|job))\b/i },
@@ -352,6 +339,30 @@ function phraseBreaks(text: string, skip: ReadonlySet<VoiceRule> = new Set()): V
  *  plain-language ceiling GOV.UK's style guide sets; the voice states it,
  *  each formula counting as one word. */
 export const SENTENCE_WORDS = 25;
+
+/** The words a draft's sentence aims under: drafts written to the exact
+ *  limit missed it (round 21, m17: hints of one 28- and 30-word sentence,
+ *  first steps of 5 sentences against 4, each refused and rewritten). */
+export const DRAFT_WORDS = SENTENCE_WORDS - 5;
+
+/** The sentences a draft of this kind aims at: one under the guard's
+ *  budget, and never none. */
+export function draftSentences(kind: TurnKind): number {
+	return Math.max(1, SENTENCE_BUDGETS[kind] - 1);
+}
+
+/** The reply's budget, as the turn's own instructions say it before the
+ *  first draft (round 21, m17: drafts the guard refused for length cost 6
+ *  to 37 s each): what to aim at, under the budget the guard reads the
+ *  reply against, his answer's words or his hint, then any teaching step. */
+export function replyBudgetText(kind: "wrong" | "hint"): string {
+	const count = (n: number, one: string) => `${n === 0 ? "no" : n} ${one}${n === 1 ? "" : "s"}`;
+	const aim = (k: TurnKind) => `${count(draftSentences(k), "short sentence")} and ${count(DISPLAYS[k], "display")}`;
+	const limit = `each sentence under ${DRAFT_WORDS} words, since the voice refuses ${count(SENTENCE_BUDGETS[kind === "hint" ? "hint" : "wrong"] + 1, "sentence")}, counts a sentence over ${SENTENCE_WORDS} words as two and each clause after a colon or a semicolon as one more`;
+	return kind === "hint"
+		? `Write your hint as ${aim("hint")}, a statement, never a question: ${limit}.`
+		: `Write your words on it as at most ${aim("wrong")}, and a teaching step after them as at most ${aim("teach")}: ${limit}.`;
+}
 
 /** Words in his answer that say he is not sure of it or of its reason
  *  (round 18, m3: "Honestly not sure, gut feeling."). */
